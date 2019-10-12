@@ -1,0 +1,27 @@
+{
+  "name": "web-editor",
+  "version": "1.0.0",
+  "description": "a JS library for web editor to edit Electrious 3D contents.",
+  "main": "index.js",
+  "repository": "https://github.com/electrious/web-editor",
+  "author": "Eric Wong",
+  "license": "CopyrightsReserved",
+  "private": true,
+  "mode": "development",
+  "scripts": {
+    "build": "webpack"
+  },
+  "devDependencies": {
+    "@babel/cli": "^7.6.4",
+    "@babel/core": "^7.6.4",
+    "@babel/preset-env": "^7.6.3",
+    "@babel/register": "^7.6.2",
+    "babel-loader": "^8.0.6",
+    "webpack": "^4.41.1",
+    "webpack-cli": "^3.3.9",
+    "webpack-dev-server": "^3.8.2"
+  },
+  "dependencies": {
+    "three": "^0.109.0"
+  }
+}
