@@ -15,6 +15,9 @@
            loader: "ts-loader"
         }]
      },
+     resolve: {
+        extensions: ['.ts', '.js'],
+     },
      stats: {
          colors: true
      },

@@ -1,4 +1,5 @@
 import {Scene, PerspectiveCamera, WebGLRenderer, Vector3, AmbientLight} from "three";
+import { loadHouse } from "./house";
 
 /**
  * createEditor will create the Web Editor instance
@@ -56,9 +57,16 @@ export const createEditor = (width: number, height: number, dom: HTMLElement) =>
         scene.dispose();
     }
 
+    let loadHouseFunc = (obj: string, mtl: string) => {
+        loadHouse(obj, mtl, "").subscribe((ob) => {
+            scene.add(ob);
+        })
+    }
+
     let editor = {
         resize: resizeFunc,
-        dispose: disposeFunc
+        dispose: disposeFunc,
+        loadHouse: loadHouseFunc
     }
 
     return editor;
