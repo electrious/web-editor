@@ -5,7 +5,7 @@ const HtmlWebPackPlugin = require("html-webpack-plugin");
 module.exports = {
     entry: './src/editor.ts',
     output: {
-        path: path.resolve(__dirname, 'lib'),
+        path: path.resolve(__dirname, 'dist'),
         filename: 'editor.bundle.js'
     },
     module: {
