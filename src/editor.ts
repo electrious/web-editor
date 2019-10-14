@@ -1,4 +1,4 @@
-import {Scene, PerspectiveCamera, WebGLRenderer, Vector3, AmbientLight} from "three";
+import {Scene, PerspectiveCamera, WebGLRenderer, Vector3, AmbientLight, BoxGeometry, MeshBasicMaterial, Mesh} from "three";
 import { loadHouse } from "./house";
 
 /**
@@ -7,7 +7,7 @@ import { loadHouse } from "./house";
  * @param {Number} height height of the viewport
  * @param {HTMLElement} dom parent DOM element to attach the WebGL canvas to
  */
-export const createEditor = (width: number, height: number, dom: HTMLElement) => {
+export let createEditor = (width: number, height: number, dom: Element) => {
     let scene = new Scene();
     let camera = new PerspectiveCamera(75, width / height, 0.1, 1000);
     let renderer = new WebGLRenderer();
@@ -18,12 +18,17 @@ export const createEditor = (width: number, height: number, dom: HTMLElement) =>
     dom.appendChild(renderer.domElement);
 
     // set the camera position and orient it toward the center
-    camera.position = new Vector3(0, -1, 1);
+    camera.position.set(0, -5, 5);
     camera.lookAt(0, 0, 0);
 
     // add ambient light
     let light = new AmbientLight(0x404040);
     scene.add(light);
+
+    var geometry = new BoxGeometry(1, 1, 1);
+    var material = new MeshBasicMaterial({ color: 0x00ff00 });
+    var cube = new Mesh(geometry, material);
+    scene.add(cube);
 
     /**
      * function to update renderring of the WebGL scene
@@ -34,7 +39,8 @@ export const createEditor = (width: number, height: number, dom: HTMLElement) =>
 
     let animate = () => {
         requestAnimationFrame(animate);
-
+        cube.rotation.x += 0.01;
+        cube.rotation.y += 0.01;
         renderFunc();
     }
     // start the renderring

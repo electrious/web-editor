@@ -3,10 +3,10 @@ var webpack = require('webpack');
 const HtmlWebPackPlugin = require("html-webpack-plugin");
 
 module.exports = {
-    entry: './src/editor.ts',
+    entry: './example/index.ts',
     output: {
         path: path.resolve(__dirname, 'dist'),
-        filename: 'editor.bundle.js'
+        filename: 'demo.bundle.js'
     },
     module: {
         rules: [{
