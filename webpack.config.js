@@ -2,10 +2,9 @@
  var webpack = require('webpack');
 
  module.exports = {
-     mode: "development",
      entry: './src/editor.ts',
      output: {
-         path: path.resolve(__dirname, 'build'),
+         path: path.resolve(__dirname, 'lib'),
          filename: 'editor.bundle.js'
      },
      module: {
@@ -16,7 +15,7 @@
         }]
      },
      resolve: {
-        extensions: ['.ts', '.js'],
+         extensions: ['.ts', '.js']
      },
      stats: {
          colors: true
