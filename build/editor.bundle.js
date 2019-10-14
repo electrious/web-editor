@@ -81,7 +81,7 @@
 /******/
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = "./src/editor.js");
+/******/ 	return __webpack_require__(__webpack_require__.s = "./src/editor.ts");
 /******/ })
 /************************************************************************/
 /******/ ({
@@ -49708,56 +49708,70 @@ if ( typeof __THREE_DEVTOOLS__ !== 'undefined' ) {
 
 /***/ }),
 
-/***/ "./src/editor.js":
+/***/ "./src/editor.ts":
 /*!***********************!*\
-  !*** ./src/editor.js ***!
+  !*** ./src/editor.ts ***!
   \***********************/
-/*! exports provided: createEditor */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
-__webpack_require__.r(__webpack_exports__);
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "createEditor", function() { return createEditor; });
-/* harmony import */ var three__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! three */ "./node_modules/three/build/three.module.js");
 
+Object.defineProperty(exports, "__esModule", { value: true });
+var three_1 = __webpack_require__(/*! three */ "./node_modules/three/build/three.module.js");
 /**
  * createEditor will create the Web Editor instance
  * @param {Number} width width of the viewport
  * @param {Number} height height of the viewport
  * @param {HTMLElement} dom parent DOM element to attach the WebGL canvas to
  */
-
-var createEditor = function createEditor(width, height, dom) {
-  var scene = new three__WEBPACK_IMPORTED_MODULE_0__["Scene"]();
-  var camera = new three__WEBPACK_IMPORTED_MODULE_0__["PerspectiveCamera"](75, width / height, 0.1, 1000);
-  var renderer = new three__WEBPACK_IMPORTED_MODULE_0__["WebGLRenderer"]();
-  renderer.setSize(width, height); // attach the WebGL canvas to a parent DOM element
-
-  dom.appendChild(renderer.domElement);
-  /**
-   * function to update renderring of the WebGL scene
-   */
-
-  var renderFunc = function renderFunc() {
-    renderer.render(scene, camera);
-  };
-  /**
-   * resize the editor viewport
-   * @param {Number} width new width of the viewport
-   * @param {Number} height new height of the viewport
-   */
-
-
-  var resizeFunc = function resizeFunc(width, height) {
-    camera.aspect = width / height;
+exports.createEditor = function (width, height, dom) {
+    var scene = new three_1.Scene();
+    var camera = new three_1.PerspectiveCamera(75, width / height, 0.1, 1000);
+    var renderer = new three_1.WebGLRenderer();
     renderer.setSize(width, height);
-  };
-
-  return {
-    render: renderFunc,
-    resize: resizeFunc
-  };
+    // attach the WebGL canvas to a parent DOM element
+    dom.appendChild(renderer.domElement);
+    // set the camera position and orient it toward the center
+    camera.position = new three_1.Vector3(0, -1, 1);
+    camera.lookAt(0, 0, 0);
+    // add ambient light
+    var light = new three_1.AmbientLight(0x404040);
+    scene.add(light);
+    /**
+     * function to update renderring of the WebGL scene
+     */
+    var renderFunc = function () {
+        renderer.render(scene, camera);
+    };
+    var animate = function () {
+        requestAnimationFrame(animate);
+        renderFunc();
+    };
+    // start the renderring
+    animate();
+    /**
+     * resize the editor viewport
+     * @param {Number} width new width of the viewport
+     * @param {Number} height new height of the viewport
+     */
+    var resizeFunc = function (width, height) {
+        camera.aspect = width / height;
+        renderer.setSize(width, height);
+    };
+    /**
+     * dispose all resources used by the editor
+     */
+    var disposeFunc = function () {
+        scene.dispose();
+    };
+    var editor = {
+        resize: resizeFunc,
+        dispose: disposeFunc
+    };
+    return editor;
 };
+
 
 /***/ })
 

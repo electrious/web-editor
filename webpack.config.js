@@ -3,16 +3,16 @@
 
  module.exports = {
      mode: "development",
-     entry: './src/editor.js',
+     entry: './src/editor.ts',
      output: {
          path: path.resolve(__dirname, 'build'),
          filename: 'editor.bundle.js'
      },
      module: {
         rules: [{
-           test: /\.js$/,
+           test: /\.ts$/,
            exclude: /node_modules/,
-           loader: "babel-loader"
+           loader: "ts-loader"
         }]
      },
      stats: {
