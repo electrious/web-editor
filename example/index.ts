@@ -1,6 +1,8 @@
-import { createEditor } from "../src/editor";
+import { createEditor } from '../src/editor'
 
-let parent = document.querySelector("#editor");
+const parent = document.querySelector('#editor')
+
 if (parent != null) {
-    createEditor(800, 600, parent!);
+    const editor = createEditor(800, 600, parent)
+    editor.loadHouse(296285)
 }

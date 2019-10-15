@@ -1,35 +1,59 @@
 import { OBJLoader2 } from 'three/examples/jsm/loaders/OBJLoader2'
-import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader'
-import { Object3D } from 'three'
+import {
+    MTLLoader,
+    MaterialCreator
+} from 'three/examples/jsm/loaders/MTLLoader'
+import { Object3D, Mesh, Material } from 'three'
 import { Observable } from 'rxjs'
 
-/**
- *
- * @param {String} obj
- * @param {String} mtl
- * @param {String} jpg
- */
+function meshPath(leadId: number): string {
+    return 'http://data.electrious.com/leads/' + leadId + '/mesh/'
+}
 
-export function loadHouse(
-    obj: string,
-    mtl: string,
-    jpg: string
-): Observable<Object3D> {
+/**
+ * Apply the material creator's material to the Mesh, which is a child of
+ * the loaded Object3D.
+ * @param matCreator
+ * @param obj
+ */
+function applyMaterialCreator(matCreator: MaterialCreator, obj: Object3D) {
+    const mat = matCreator.materials.scene
+    mat.transparent = false
+
+    obj.children.forEach(child => {
+        if (child instanceof Mesh) {
+            child.name = '3dmap'
+
+            if (child.material instanceof Material) {
+                child.material.dispose()
+            }
+
+            child.material = mat
+        }
+    })
+}
+
+/**
+ * Load the house mesh of the specified lead.
+ * @param {number} leadId
+ */
+export function loadHouse(leadId: number): Observable<Object3D> {
     const objLoader = new OBJLoader2()
     const mtlLoader = new MTLLoader()
+    const path = meshPath(leadId)
 
     return new Observable<Object3D>(subscriber => {
-        mtlLoader.load(mtl, materials => {
+        mtlLoader.setPath(path)
+        mtlLoader.load('scene.mtl', materials => {
             materials.preload()
 
-            objLoader.addMaterials(materials)
-            objLoader.load(obj, object => {
+            objLoader.load(path + 'scene.obj', object => {
                 const childs = object.children
                 childs.forEach(c => {
                     c.castShadow = true
                     c.receiveShadow = true
                 })
-
+                applyMaterialCreator(materials, object)
                 subscriber.next(object)
                 subscriber.complete()
             })

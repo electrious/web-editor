@@ -3,16 +3,14 @@ import {
     PerspectiveCamera,
     WebGLRenderer,
     AmbientLight,
-    BoxGeometry,
-    MeshBasicMaterial,
-    Mesh
+    DirectionalLight
 } from 'three'
 import { loadHouse } from './house'
 
 export interface WebEditor {
     resize: (width: number, height: number) => void
     dispose: () => void
-    loadHouse: (obj: string, mtl: string) => void
+    loadHouse: (leadId: number) => void
 }
 
 /**
@@ -36,17 +34,17 @@ export function createEditor(
     dom.appendChild(renderer.domElement)
 
     // set the camera position and orient it toward the center
-    camera.position.set(0, -5, 5)
+    camera.position.set(0, 0, 80)
     camera.lookAt(0, 0, 0)
 
     // add ambient light
-    const light = new AmbientLight(0x404040)
-    scene.add(light)
+    const ambLight = new AmbientLight(0xffffff)
+    scene.add(ambLight)
 
-    const geometry = new BoxGeometry(1, 1, 1)
-    const material = new MeshBasicMaterial({ color: 0x00ff00 })
-    const cube = new Mesh(geometry, material)
-    scene.add(cube)
+    // add a directional light
+    const dirLight = new DirectionalLight(0xeeeeee, 0.5)
+    dirLight.position.set(100, 0, 100)
+    scene.add(dirLight)
 
     /**
      * function to update renderring of the WebGL scene
@@ -57,8 +55,7 @@ export function createEditor(
 
     const animate = () => {
         requestAnimationFrame(animate)
-        cube.rotation.x += 0.01
-        cube.rotation.y += 0.01
+
         renderFunc()
     }
     // start the renderring
@@ -82,8 +79,8 @@ export function createEditor(
         scene.dispose()
     }
 
-    const loadHouseFunc = (obj: string, mtl: string) => {
-        loadHouse(obj, mtl, '').subscribe(ob => {
+    const loadHouseFunc = (leadId: number) => {
+        loadHouse(leadId).subscribe(ob => {
             scene.add(ob)
         })
     }
