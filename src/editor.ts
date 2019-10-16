@@ -6,8 +6,12 @@ import {
     DirectionalLight
 } from 'three'
 import { loadHouse } from './house'
+import { mkSink } from './sink'
 import { newDefaultScheduler } from '@most/scheduler'
 
+/**
+ * Public Interface for the main WebEditor
+ */
 export interface WebEditor {
     resize: (width: number, height: number) => void
     dispose: () => void
@@ -15,16 +19,27 @@ export interface WebEditor {
 }
 
 /**
- * createEditor will create the Web Editor instance
- * @param {Number} width width of the viewport
- * @param {Number} height height of the viewport
- * @param {HTMLElement} dom parent DOM element to attach the WebGL canvas to
+ * Interface that defines components for Three.js related objects in the editor.
  */
-export function createEditor(
+interface EditorScene {
+    scene: Scene
+    camera: PerspectiveCamera
+    renderer: WebGLRenderer
+    render: () => void
+    resize: (width: number, height: number) => void
+}
+
+/**
+ * internal function to create the Threejs scene, camera, light and renderer.
+ * @param width
+ * @param height
+ * @param elem
+ */
+function createScene(
     width: number,
     height: number,
-    dom: Element
-): WebEditor {
+    elem: Element
+): EditorScene {
     const scene = new Scene()
     const camera = new PerspectiveCamera(75, width / height, 0.1, 1000)
     const renderer = new WebGLRenderer()
@@ -32,7 +47,7 @@ export function createEditor(
     renderer.setSize(width, height)
 
     // attach the WebGL canvas to a parent DOM element
-    dom.appendChild(renderer.domElement)
+    elem.appendChild(renderer.domElement)
 
     // set the camera position and orient it toward the center
     camera.position.set(0, 0, 80)
@@ -54,47 +69,66 @@ export function createEditor(
         renderer.render(scene, camera)
     }
 
-    const animate = () => {
-        requestAnimationFrame(animate)
-
-        renderFunc()
-    }
-    // start the renderring
-    animate()
-
     /**
      * resize the editor viewport
      * @param {Number} width new width of the viewport
      * @param {Number} height new height of the viewport
      */
-
     const resizeFunc = (width: number, height: number) => {
         camera.aspect = width / height
         renderer.setSize(width, height)
     }
 
+    return {
+        scene: scene,
+        camera: camera,
+        renderer: renderer,
+        render: renderFunc,
+        resize: resizeFunc
+    }
+}
+
+/**
+ * createEditor will create the Web Editor instance
+ * @param {Number} width width of the viewport
+ * @param {Number} height height of the viewport
+ * @param {HTMLElement} dom parent DOM element to attach the WebGL canvas to
+ */
+export function createEditor(
+    width: number,
+    height: number,
+    elem: Element
+): WebEditor {
+    const es = createScene(width, height, elem)
+
+    const scheduler = newDefaultScheduler()
+
+    const renderLoop = () => {
+        requestAnimationFrame(renderLoop)
+
+        es.render()
+    }
+    // start the renderring
+    renderLoop()
+
     /**
      * dispose all resources used by the editor
      */
     const disposeFunc = () => {
-        scene.dispose()
+        es.scene.dispose()
     }
 
     const loadHouseFunc = (leadId: number) => {
         loadHouse(leadId).run(
-            {
-                event: (t, obj) => {
-                    scene.add(obj)
-                },
-                error: (t, e) => {},
-                end: t => {}
-            },
-            newDefaultScheduler()
+            mkSink(obj => {
+                es.scene.add(obj)
+            }),
+            scheduler
         )
     }
 
     const editor = {
-        resize: resizeFunc,
+        resize: es.resize,
         dispose: disposeFunc,
         loadHouse: loadHouseFunc
     }

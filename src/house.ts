@@ -44,7 +44,7 @@ export function loadHouse(leadId: number): Stream<Object3D> {
     const path = meshPath(leadId)
 
     return fromPromise(
-        new Promise((resolve, reject) => {
+        new Promise(resolve => {
             mtlLoader.setPath(path)
             mtlLoader.load('scene.mtl', materials => {
                 materials.preload()
