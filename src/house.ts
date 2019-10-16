@@ -4,7 +4,8 @@ import {
     MaterialCreator
 } from 'three/examples/jsm/loaders/MTLLoader'
 import { Object3D, Mesh, Material } from 'three'
-import { Observable } from 'rxjs'
+import { Stream } from '@most/types'
+import { fromPromise } from '@most/core'
 
 function meshPath(leadId: number): string {
     return 'http://data.electrious.com/leads/' + leadId + '/mesh/'
@@ -37,26 +38,28 @@ function applyMaterialCreator(matCreator: MaterialCreator, obj: Object3D) {
  * Load the house mesh of the specified lead.
  * @param {number} leadId
  */
-export function loadHouse(leadId: number): Observable<Object3D> {
+export function loadHouse(leadId: number): Stream<Object3D> {
     const objLoader = new OBJLoader2()
     const mtlLoader = new MTLLoader()
     const path = meshPath(leadId)
 
-    return new Observable<Object3D>(subscriber => {
-        mtlLoader.setPath(path)
-        mtlLoader.load('scene.mtl', materials => {
-            materials.preload()
+    return fromPromise(
+        new Promise((resolve, reject) => {
+            mtlLoader.setPath(path)
+            mtlLoader.load('scene.mtl', materials => {
+                materials.preload()
 
-            objLoader.load(path + 'scene.obj', object => {
-                const childs = object.children
-                childs.forEach(c => {
-                    c.castShadow = true
-                    c.receiveShadow = true
+                objLoader.load(path + 'scene.obj', object => {
+                    const childs = object.children
+                    childs.forEach(c => {
+                        c.castShadow = true
+                        c.receiveShadow = true
+                    })
+                    applyMaterialCreator(materials, object)
+
+                    resolve(object)
                 })
-                applyMaterialCreator(materials, object)
-                subscriber.next(object)
-                subscriber.complete()
             })
         })
-    })
+    )
 }

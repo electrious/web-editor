@@ -6,6 +6,7 @@ import {
     DirectionalLight
 } from 'three'
 import { loadHouse } from './house'
+import { newDefaultScheduler } from '@most/scheduler'
 
 export interface WebEditor {
     resize: (width: number, height: number) => void
@@ -80,9 +81,16 @@ export function createEditor(
     }
 
     const loadHouseFunc = (leadId: number) => {
-        loadHouse(leadId).subscribe(ob => {
-            scene.add(ob)
-        })
+        loadHouse(leadId).run(
+            {
+                event: (t, obj) => {
+                    scene.add(obj)
+                },
+                error: (t, e) => {},
+                end: t => {}
+            },
+            newDefaultScheduler()
+        )
     }
 
     const editor = {

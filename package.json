@@ -30,9 +30,11 @@
     "webpack-dev-server": "^3.8.2"
   },
   "dependencies": {
+    "@most/core": "^1.5.0",
+    "@most/dom-event": "^2.2.0",
+    "@most/scheduler": "^1.2.3",
     "mtl-obj-loader": "^1.0.4",
     "ramda": "^0.26.1",
-    "rxjs": "^6.5.3",
     "three": "^0.109.0"
   }
 }
