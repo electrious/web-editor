@@ -8,7 +8,7 @@ import {
 import { loadHouse } from './house'
 import { mkSink } from './sink'
 import { newDefaultScheduler } from '@most/scheduler'
-
+import { disposeWith, disposeAll } from '@most/disposable'
 /**
  * Public Interface for the main WebEditor
  */
@@ -99,9 +99,18 @@ export function createEditor(
     height: number,
     elem: Element
 ): WebEditor {
-    const es = createScene(width, height, elem)
-
+    // default scheduler for all event streams
     const scheduler = newDefaultScheduler()
+
+    // create the editor scene
+    const es = createScene(width, height, elem)
+    // create a disposable for the scene
+    const sceneDisposable = disposeWith(s => {
+        s.dispose()
+    }, es.scene)
+
+    // an array of disposables to be disposed at the end of the editor
+    const disposables = [sceneDisposable]
 
     const renderLoop = () => {
         requestAnimationFrame(renderLoop)
@@ -115,16 +124,17 @@ export function createEditor(
      * dispose all resources used by the editor
      */
     const disposeFunc = () => {
-        es.scene.dispose()
+        disposeAll(disposables)
     }
 
     const loadHouseFunc = (leadId: number) => {
-        loadHouse(leadId).run(
+        const disp = loadHouse(leadId).run(
             mkSink(obj => {
                 es.scene.add(obj)
             }),
             scheduler
         )
+        disposables.push(disp)
     }
 
     const editor = {
