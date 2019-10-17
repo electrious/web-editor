@@ -7,8 +7,11 @@ import {
 } from 'three'
 import { loadHouse } from './house'
 import { mkSink } from './sink'
+import { setupInput } from './input'
 import { newDefaultScheduler } from '@most/scheduler'
 import { disposeWith, disposeAll } from '@most/disposable'
+import { Scheduler } from '@most/types'
+import { tap } from '@most/core'
 /**
  * Public Interface for the main WebEditor
  */
@@ -38,7 +41,8 @@ interface EditorScene {
 function createScene(
     width: number,
     height: number,
-    elem: Element
+    elem: Element,
+    scheduler: Scheduler
 ): EditorScene {
     const scene = new Scene()
     const camera = new PerspectiveCamera(75, width / height, 0.1, 1000)
@@ -79,6 +83,23 @@ function createScene(
         renderer.setSize(width, height)
     }
 
+    /**
+     * setup input events for the scene
+     */
+    const inputEvts = setupInput(elem)
+    inputEvts.zoomed.run(
+        mkSink(e => {
+            let newZ = camera.position.z + e.deltaY
+            if (newZ < 5) {
+                newZ = 5
+            } else if (newZ > 500) {
+                newZ = 500
+            }
+            camera.position.z = newZ
+        }),
+        scheduler
+    )
+
     return {
         scene: scene,
         camera: camera,
@@ -103,7 +124,7 @@ export function createEditor(
     const scheduler = newDefaultScheduler()
 
     // create the editor scene
-    const es = createScene(width, height, elem)
+    const es = createScene(width, height, elem, scheduler)
     // create a disposable for the scene
     const sceneDisposable = disposeWith(s => {
         s.dispose()

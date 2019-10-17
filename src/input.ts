@@ -1,19 +1,22 @@
 import { Stream } from '@most/types'
-import { empty } from '@most/core'
-import { click, touchstart, touchend } from '@most/dom-event'
+import { map, empty, fromPromise } from '@most/core'
+import { click, domEvent } from '@most/dom-event'
+
+export interface TapEvent {
+    tapX: number
+    tapY: number
+}
 
 export interface InputEvents {
-    clicked: Stream<Event>
-    tapped: Stream<Event>
+    clicked: Stream<MouseEvent>
+    tapped: Stream<TapEvent>
+    zoomed: Stream<WheelEvent>
 }
 
 export function setupInput(elem: Element): InputEvents {
-    const clicked = click(elem)
-    const touchS = touchstart(elem)
-    const touchE = touchend(elem)
-
     return {
-        clicked: clicked,
-        tapped: empty()
+        clicked: click(elem),
+        tapped: empty(),
+        zoomed: domEvent('wheel', elem)
     }
 }
