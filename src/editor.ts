@@ -11,7 +11,7 @@ import { setupInput } from './input'
 import { newDefaultScheduler } from '@most/scheduler'
 import { disposeWith, disposeAll } from '@most/disposable'
 import { Scheduler } from '@most/types'
-import { tap } from '@most/core'
+
 /**
  * Public Interface for the main WebEditor
  */
@@ -30,6 +30,16 @@ interface EditorScene {
     renderer: WebGLRenderer
     render: () => void
     resize: (width: number, height: number) => void
+}
+
+function updateCameraWithZoom(camera: PerspectiveCamera, zoom: number) {
+    let newZ = camera.position.z + zoom
+    if (newZ < 5) {
+        newZ = 5
+    } else if (newZ > 500) {
+        newZ = 500
+    }
+    camera.position.z = newZ
 }
 
 /**
@@ -88,15 +98,7 @@ function createScene(
      */
     const inputEvts = setupInput(elem)
     inputEvts.zoomed.run(
-        mkSink(e => {
-            let newZ = camera.position.z + e.deltaY
-            if (newZ < 5) {
-                newZ = 5
-            } else if (newZ > 500) {
-                newZ = 500
-            }
-            camera.position.z = newZ
-        }),
+        mkSink(e => updateCameraWithZoom(camera, e.deltaY)),
         scheduler
     )
 
