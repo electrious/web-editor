@@ -1,5 +1,5 @@
 import { Stream } from '@most/types'
-import { merge, map, delay, startWith, mergeArray } from '@most/core'
+import { merge, map, delay, startWith, mergeArray, snapshot } from '@most/core'
 import {
     click,
     domEvent,
@@ -44,6 +44,8 @@ export interface DragEvent {
     dragType: DragType
     dragX: number
     dragY: number
+    deltaX: number
+    deltaY: number
 }
 
 /**
@@ -69,7 +71,9 @@ function dragged(
             return {
                 dragType: t,
                 dragX: e.tapX,
-                dragY: e.tapY
+                dragY: e.tapY,
+                deltaX: 0,
+                deltaY: 0
             }
         }
     )
@@ -78,7 +82,18 @@ function dragged(
     const dend = map(mkDrag(DragType.DragEnd), end)
     const d = map(mkDrag(DragType.Drag), realMove)
 
-    return mergeArray([dstart, d, dend])
+    const evts = mergeArray([dstart, d, dend])
+
+    const calcDelta = (lastE: DragEvent, e: DragEvent) => {
+        if (e.dragType == DragType.DragStart) {
+            return e
+        } else {
+            e.deltaX = e.dragX - lastE.dragX
+            e.deltaY = e.dragY - lastE.dragY
+            return e
+        }
+    }
+    return snapshot(calcDelta, delay(3, evts), evts)
 }
 
 export interface InputEvents {

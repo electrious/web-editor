@@ -7,7 +7,7 @@ import {
 } from 'three'
 import { loadHouse } from './house'
 import { mkSink } from './sink'
-import { setupInput } from './input'
+import { setupInput, DragEvent } from './input'
 import { newDefaultScheduler } from '@most/scheduler'
 import { disposeWith, disposeAll } from '@most/disposable'
 import { Scheduler } from '@most/types'
@@ -40,6 +40,11 @@ function updateCameraWithZoom(camera: PerspectiveCamera, zoom: number) {
         newZ = 500
     }
     camera.position.z = newZ
+}
+
+function updateCameraWithDrag(camera: PerspectiveCamera, drag: DragEvent) {
+    camera.rotateX(drag.deltaY / 360)
+    camera.rotateY(drag.deltaX / 360)
 }
 
 /**
@@ -99,6 +104,10 @@ function createScene(
     const inputEvts = setupInput(elem)
     inputEvts.zoomed.run(
         mkSink(e => updateCameraWithZoom(camera, e.deltaY)),
+        scheduler
+    )
+    inputEvts.dragged.run(
+        mkSink(e => updateCameraWithDrag(camera, e)),
         scheduler
     )
 
