@@ -3,7 +3,9 @@ import {
     PerspectiveCamera,
     WebGLRenderer,
     AmbientLight,
-    DirectionalLight
+    DirectionalLight,
+    Object3D,
+    Vector3
 } from 'three'
 import { loadHouse } from './house'
 import { mkSink } from './sink'
@@ -30,21 +32,27 @@ interface EditorScene {
     renderer: WebGLRenderer
     render: () => void
     resize: (width: number, height: number) => void
+    addContent: (obj: Object3D) => void
 }
 
 function updateCameraWithZoom(camera: PerspectiveCamera, zoom: number) {
-    let newZ = camera.position.z + zoom
-    if (newZ < 5) {
-        newZ = 5
-    } else if (newZ > 500) {
-        newZ = 500
+    const pos = camera.position
+    const curDist = pos.length()
+    const norm = pos.normalize()
+
+    let newDist = curDist + zoom
+    if (newDist < 5) {
+        newDist = 5
+    } else if (newDist > 500) {
+        newDist = 500
     }
-    camera.position.z = newZ
+
+    camera.position = norm.multiplyScalar(newDist)
 }
 
-function updateCameraWithDrag(camera: PerspectiveCamera, drag: DragEvent) {
-    camera.rotateX(drag.deltaY / 360)
-    camera.rotateY(drag.deltaX / 360)
+function updateContentWithDrag(obj: Object3D, drag: DragEvent) {
+    obj.rotateZ(drag.deltaX / 360)
+    obj.rotateOnWorldAxis(new Vector3(1, 0, 0), drag.deltaY / 360)
 }
 
 /**
@@ -60,7 +68,7 @@ function createScene(
     scheduler: Scheduler
 ): EditorScene {
     const scene = new Scene()
-    const camera = new PerspectiveCamera(75, width / height, 0.1, 1000)
+    const camera = new PerspectiveCamera(45, width / height, 0.1, 1000)
     const renderer = new WebGLRenderer()
 
     renderer.setSize(width, height)
@@ -69,7 +77,7 @@ function createScene(
     elem.appendChild(renderer.domElement)
 
     // set the camera position and orient it toward the center
-    camera.position.set(0, 0, 80)
+    camera.position.set(0, -50, 50)
     camera.lookAt(0, 0, 0)
 
     // add ambient light
@@ -80,6 +88,10 @@ function createScene(
     const dirLight = new DirectionalLight(0xeeeeee, 0.5)
     dirLight.position.set(100, 0, 100)
     scene.add(dirLight)
+
+    // add a wrapper object to be parent all user contents
+    const content = new Object3D()
+    scene.add(content)
 
     /**
      * function to update renderring of the WebGL scene
@@ -98,6 +110,10 @@ function createScene(
         renderer.setSize(width, height)
     }
 
+    const addContentFunc = (obj: Object3D) => {
+        content.add(obj)
+    }
+
     /**
      * setup input events for the scene
      */
@@ -107,7 +123,7 @@ function createScene(
         scheduler
     )
     inputEvts.dragged.run(
-        mkSink(e => updateCameraWithDrag(camera, e)),
+        mkSink(e => updateContentWithDrag(content, e)),
         scheduler
     )
 
@@ -116,7 +132,8 @@ function createScene(
         camera: camera,
         renderer: renderer,
         render: renderFunc,
-        resize: resizeFunc
+        resize: resizeFunc,
+        addContent: addContentFunc
     }
 }
 
@@ -160,12 +177,7 @@ export function createEditor(
     }
 
     const loadHouseFunc = (leadId: number) => {
-        const disp = loadHouse(leadId).run(
-            mkSink(obj => {
-                es.scene.add(obj)
-            }),
-            scheduler
-        )
+        const disp = loadHouse(leadId).run(mkSink(es.addContent), scheduler)
         disposables.push(disp)
     }
 
