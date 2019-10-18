@@ -1,5 +1,14 @@
 import { Stream } from '@most/types'
-import { merge, map, delay, startWith, mergeArray, snapshot } from '@most/core'
+import {
+    merge,
+    map,
+    delay,
+    startWith,
+    mergeArray,
+    snapshot,
+    scan,
+    skip
+} from '@most/core'
 import {
     click,
     domEvent,
@@ -82,6 +91,14 @@ function dragged(
     const dend = map(mkDrag(DragType.DragEnd), end)
     const d = map(mkDrag(DragType.Drag), realMove)
 
+    const def = {
+        dragType: DragType.DragStart,
+        dragX: 0,
+        dragY: 0,
+        deltaX: 0,
+        deltaY: 0
+    }
+
     const evts = mergeArray([dstart, d, dend])
 
     const calcDelta = (lastE: DragEvent, e: DragEvent) => {
@@ -93,7 +110,8 @@ function dragged(
             return e
         }
     }
-    return snapshot(calcDelta, delay(3, evts), evts)
+
+    return skip(1, scan(calcDelta, def, evts))
 }
 
 export interface InputEvents {
