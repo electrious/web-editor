@@ -1,7 +1,7 @@
 {
   "name": "web-editor",
   "version": "1.0.0",
-  "description": "a JS library for web editor to edit Electrious 3D contents.",
+  "description": "a web editor library to edit Electrious 3D contents.",
   "main": "dist/editor.bundle.js",
   "types": "dist/editor.d.ts",
   "repository": "https://github.com/electrious/web-editor",
