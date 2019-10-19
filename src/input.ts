@@ -5,7 +5,6 @@ import {
     delay,
     startWith,
     mergeArray,
-    snapshot,
     scan,
     skip
 } from '@most/core'

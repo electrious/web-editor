@@ -1,6 +1,6 @@
-var path = require('path');
-var webpack = require('webpack');
-const HtmlWebPackPlugin = require("html-webpack-plugin");
+const path = require('path')
+const webpack = require('webpack')
+const HtmlWebPackPlugin = require('html-webpack-plugin')
 
 module.exports = {
     entry: './example/index.ts',
@@ -9,16 +9,18 @@ module.exports = {
         filename: 'demo.bundle.js'
     },
     module: {
-        rules: [{
-            test: /\.ts$/,
-            exclude: /node_modules/,
-            loader: "ts-loader"
-        },
-        {
-            test: /\.html$/,
-            exclude: /node_modules/,
-            loader: "html-loader"
-        }]
+        rules: [
+            {
+                test: /\.ts$/,
+                exclude: /node_modules/,
+                loader: 'ts-loader'
+            },
+            {
+                test: /\.html$/,
+                exclude: /node_modules/,
+                loader: 'html-loader'
+            }
+        ]
     },
     resolve: {
         extensions: ['.ts', '.js', '.html']
@@ -29,8 +31,8 @@ module.exports = {
     devtool: 'source-map',
     plugins: [
         new HtmlWebPackPlugin({
-            template: "./example/index.html",
-            filename: "./index.html"
+            template: './example/index.html',
+            filename: './index.html'
         })
     ]
-};
+}

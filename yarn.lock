@@ -3111,11 +3111,6 @@ ms@^2.1.1:
   resolved "https://registry.yarnpkg.com/ms/-/ms-2.1.2.tgz#d09d1f357b443f493382a8eb3ccd183872ae6009"
   integrity sha512-sGkPx+VjMtmA6MX27oA4FBFELFCZZ4S4XqeGOXCv68tT+jb3vk/RyaKWP0PTKyWtmLSM0b+adUTEvbs1PEaH2w==
 
-mtl-obj-loader@^1.0.4:
-  version "1.0.4"
-  resolved "https://registry.yarnpkg.com/mtl-obj-loader/-/mtl-obj-loader-1.0.4.tgz#218cb965b381e05ed9ed29990dc2d1400b8e22cd"
-  integrity sha512-shJc91hc/Z4IHpdtn6N7S+hVLmUaIq7DwQlk0EnaJdocSGoMcCZCHHPycefK/bmxTb6fEiWpRnM7KkAr9vJtCA==
-
 multicast-dns-service-types@^1.1.0:
   version "1.1.0"
   resolved "https://registry.yarnpkg.com/multicast-dns-service-types/-/multicast-dns-service-types-1.1.0.tgz#899f11d9686e5e05cb91b35d5f0e63b773cfc901"
@@ -4537,10 +4532,9 @@ text-table@^0.2.0:
   resolved "https://registry.yarnpkg.com/text-table/-/text-table-0.2.0.tgz#7f5ee823ae805207c00af2df4a84ec3fcfa570b4"
   integrity sha1-f17oI66AUgfACvLfSoTsP8+lcLQ=
 
-three@^0.109.0:
+"three@https://github.com/manyoo/three.js.git":
   version "0.109.0"
-  resolved "https://registry.yarnpkg.com/three/-/three-0.109.0.tgz#611c9ef860d10bd107695cead6c6abcd2422e5fd"
-  integrity sha512-XT99T3Hvgh2CEvwPdHYEunNE+clLK6KiT1U8En7YOgIqTUw4MrLeIc8zxQAJ6wbP8hhJaY5+Cff3jwBPpBa0gA==
+  resolved "https://github.com/manyoo/three.js.git#2e62906d9b69164f8572e7bcf1b86e5f18e6c4d2"
 
 through2@^2.0.0:
   version "2.0.5"
