@@ -13,6 +13,8 @@ import { setupInput, DragEvent } from './input'
 import { newDefaultScheduler } from '@most/scheduler'
 import { disposeWith, disposeAll } from '@most/disposable'
 import { Scheduler } from '@most/types'
+import { RoofPlate } from './models/roofplate'
+import { createRoofNode } from './roofnode'
 
 /**
  * Public Interface for the main WebEditor
@@ -20,7 +22,7 @@ import { Scheduler } from '@most/types'
 export interface WebEditor {
     resize: (width: number, height: number) => void
     dispose: () => void
-    loadHouse: (leadId: number) => void
+    loadHouse: (leadId: number, roofs: RoofPlate[]) => void
 }
 
 /**
@@ -176,8 +178,16 @@ export function createEditor(
         disposeAll(disposables)
     }
 
-    const loadHouseFunc = (leadId: number) => {
-        const disp = loadHouse(leadId).run(mkSink(es.addContent), scheduler)
+    const loadHouseFunc = (leadId: number, roofs: RoofPlate[]) => {
+        const f = (h: Object3D) => {
+            es.addContent(h)
+
+            roofs.map(createRoofNode).forEach(n => {
+                es.addContent(n.roofObject)
+            })
+        }
+
+        const disp = loadHouse(leadId).run(mkSink(f), scheduler)
         disposables.push(disp)
     }
 
