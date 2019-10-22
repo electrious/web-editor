@@ -12,7 +12,8 @@ import { mkSink } from './sink'
 import { setupInput, DragEvent } from './input'
 import { newDefaultScheduler } from '@most/scheduler'
 import { disposeWith, disposeAll } from '@most/disposable'
-import { Scheduler, Disposable } from '@most/types'
+import { Stream, Scheduler, Disposable } from '@most/types'
+import { createAdapter } from '@most/adapter'
 import { RoofPlate } from './models/roofplate'
 import { createRoofNode } from './roofnode'
 import { setupRaycasting } from './sceneevent'
@@ -33,6 +34,7 @@ interface EditorScene {
     scene: Scene
     camera: PerspectiveCamera
     renderer: WebGLRenderer
+    size: Stream<[number, number]>
     disposable: Disposable
     render: () => void
     resize: (width: number, height: number) => void
@@ -80,7 +82,7 @@ function createScene(
     const camera = new PerspectiveCamera(45, width / height, 0.1, 1000)
     const renderer = new WebGLRenderer()
 
-    renderer.setSize(width, height)
+    const [updateSize, sizeStream] = createAdapter()
 
     // attach the WebGL canvas to a parent DOM element
     elem.appendChild(renderer.domElement)
@@ -117,6 +119,8 @@ function createScene(
     const resizeFunc = (width: number, height: number) => {
         camera.aspect = width / height
         renderer.setSize(width, height)
+
+        updateSize([width, height])
     }
 
     const addContentFunc = (obj: Object3D) => {
@@ -135,12 +139,21 @@ function createScene(
         mkSink(e => updateContentWithDrag(content, e)),
         scheduler
     )
-    const disposable3 = setupRaycasting(camera, scene, inputEvts, scheduler)
+    const disposable3 = setupRaycasting(
+        camera,
+        scene,
+        inputEvts,
+        sizeStream,
+        scheduler
+    )
+
+    resizeFunc(width, height)
 
     return {
         scene: scene,
         camera: camera,
         renderer: renderer,
+        size: sizeStream,
         disposable: disposeAll([
             sceneDisposable,
             disposable1,

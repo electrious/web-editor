@@ -1,8 +1,8 @@
 import { InputEvents, TapEvent, DragEvent } from './input'
-import { Camera, Object3D, Vector3, Raycaster, Vector2 } from 'three'
-import { Disposable, Scheduler } from '@most/types'
+import { Camera, Object3D, Vector3, Raycaster, Vector2, Vec2 } from 'three'
+import { Stream, Disposable, Scheduler } from '@most/types'
 import { mkSink } from './sink'
-import { disposeAll } from '@most/disposable'
+import { snapshot, merge, tap } from '@most/core'
 
 /**
  * SceneEvent is the event data sent to objects in the scene graph that's
@@ -30,19 +30,48 @@ function toRaycastTarget(obj: any): RaycastTarget | null {
     return 'processEvent' in obj ? obj : null
 }
 
+interface EventWithSize {
+    size: [number, number]
+    event: TapEvent | DragEvent
+}
+
+function mkEventWithSize(
+    size: [number, number],
+    event: TapEvent | DragEvent
+): EventWithSize {
+    return {
+        size: size,
+        event: event
+    }
+}
+
+function calcPosition(pos: Vector2, size: [number, number]): Vector2 {
+    const w = size[0]
+    const h = size[1]
+    return new Vector2((pos.x / w) * 2 - 1, -(pos.y / h) * 2 + 1)
+}
+
+function getMousePosition(es: EventWithSize): Vector2 {
+    const e = es.event
+    return calcPosition(
+        isTapEvent(e)
+            ? new Vector2(e.tapX, e.tapY)
+            : new Vector2(e.dragX, e.dragY),
+        es.size
+    )
+}
+
 export function setupRaycasting(
     camera: Camera,
     scene: Object3D,
     input: InputEvents,
+    size: Stream<[number, number]>,
     scheduler: Scheduler
 ): Disposable {
     const raycaster = new Raycaster()
 
-    const f = (e: TapEvent | DragEvent) => {
-        const tp = isTapEvent(e)
-            ? new Vector2(e.tapX, e.tapY)
-            : new Vector2(e.dragX, e.dragY)
-
+    const f = (es: EventWithSize) => {
+        const tp = getMousePosition(es)
         raycaster.setFromCamera(tp, camera)
         const results = raycaster.intersectObject(scene, true)
         for (const k in results) {
@@ -54,7 +83,7 @@ export function setupRaycasting(
                     const canTestNext = rt.processEvent({
                         distance: res.distance,
                         point: res.point,
-                        event: e
+                        event: es.event
                     })
 
                     if (!canTestNext) {
@@ -66,8 +95,6 @@ export function setupRaycasting(
     }
 
     const sink = mkSink(f)
-    const dispose1 = input.tapped.run(sink, scheduler)
-    const dispose2 = input.dragged.run(sink, scheduler)
-
-    return disposeAll([dispose1, dispose2])
+    const evts = merge(input.tapped, input.dragged)
+    return snapshot(mkEventWithSize, size, evts).run(sink, scheduler)
 }
