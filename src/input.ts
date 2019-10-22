@@ -114,7 +114,6 @@ function dragged(
 }
 
 export interface InputEvents {
-    clicked: Stream<MouseEvent>
     tapped: Stream<TapEvent>
     zoomed: Stream<WheelEvent>
     dragged: Stream<DragEvent>
@@ -147,7 +146,6 @@ export function setupInput(elem: Element): InputEvents {
     const end = merge(mouseEnd, touchEnd)
 
     return {
-        clicked: click(elem),
         tapped: tapped(start, end),
         zoomed: domEvent('wheel', elem),
         dragged: dragged(start, move, end)

@@ -12,9 +12,10 @@ import { mkSink } from './sink'
 import { setupInput, DragEvent } from './input'
 import { newDefaultScheduler } from '@most/scheduler'
 import { disposeWith, disposeAll } from '@most/disposable'
-import { Scheduler } from '@most/types'
+import { Scheduler, Disposable } from '@most/types'
 import { RoofPlate } from './models/roofplate'
 import { createRoofNode } from './roofnode'
+import { setupRaycasting } from './sceneevent'
 
 /**
  * Public Interface for the main WebEditor
@@ -32,6 +33,7 @@ interface EditorScene {
     scene: Scene
     camera: PerspectiveCamera
     renderer: WebGLRenderer
+    disposable: Disposable
     render: () => void
     resize: (width: number, height: number) => void
     addContent: (obj: Object3D) => void
@@ -70,6 +72,11 @@ function createScene(
     scheduler: Scheduler
 ): EditorScene {
     const scene = new Scene()
+    // create a disposable for the scene
+    const sceneDisposable = disposeWith(s => {
+        s.dispose()
+    }, scene)
+
     const camera = new PerspectiveCamera(45, width / height, 0.1, 1000)
     const renderer = new WebGLRenderer()
 
@@ -120,19 +127,26 @@ function createScene(
      * setup input events for the scene
      */
     const inputEvts = setupInput(elem)
-    inputEvts.zoomed.run(
+    const disposable1 = inputEvts.zoomed.run(
         mkSink(e => updateCameraWithZoom(camera, e.deltaY)),
         scheduler
     )
-    inputEvts.dragged.run(
+    const disposable2 = inputEvts.dragged.run(
         mkSink(e => updateContentWithDrag(content, e)),
         scheduler
     )
+    const disposable3 = setupRaycasting(camera, scene, inputEvts, scheduler)
 
     return {
         scene: scene,
         camera: camera,
         renderer: renderer,
+        disposable: disposeAll([
+            sceneDisposable,
+            disposable1,
+            disposable2,
+            disposable3
+        ]),
         render: renderFunc,
         resize: resizeFunc,
         addContent: addContentFunc
@@ -155,13 +169,9 @@ export function createEditor(
 
     // create the editor scene
     const es = createScene(width, height, elem, scheduler)
-    // create a disposable for the scene
-    const sceneDisposable = disposeWith(s => {
-        s.dispose()
-    }, es.scene)
 
     // an array of disposables to be disposed at the end of the editor
-    const disposables = [sceneDisposable]
+    const disposables = [es.disposable]
 
     const renderLoop = () => {
         requestAnimationFrame(renderLoop)
