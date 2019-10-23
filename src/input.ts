@@ -10,7 +10,6 @@ import {
     snapshot
 } from '@most/core'
 import {
-    click,
     domEvent,
     mousedown,
     mousemove,
@@ -20,7 +19,7 @@ import {
     touchmove
 } from '@most/dom-event'
 import { always, curry, not } from 'ramda'
-import { gate, unwrap, tag } from './helper'
+import { gate, unwrap, tag, debug } from './helper'
 
 export interface TapEvent {
     tapX: number
@@ -37,10 +36,10 @@ function tapped(
 ): Stream<TapEvent> {
     const canBeTap = startWith(
         false,
-        merge(map(always(true), start), map(always(false), end))
+        merge(map(always(false), start), map(always(true), end))
     )
-    // the touch should end in less than 0.5 seconds to be considered a tap.
-    const tapCheckEvt = delay(500, start)
+    // the touch should end in less than 0.32 seconds to be considered a tap.
+    const tapCheckEvt = delay(320, start)
     return gate(canBeTap, tapCheckEvt)
 }
 
@@ -136,7 +135,7 @@ function dragged(
     const lastDrag = unwrap(tag(lastPos, gate(dragging, end)))
     const dragEnd = map(updateDragType(DragType.DragEnd), lastDrag)
 
-    const def = {
+    const def: DragEvent = {
         dragType: DragType.DragStart,
         dragX: 0,
         dragY: 0,
@@ -147,7 +146,7 @@ function dragged(
     // merge all drag related events and do delta calculation
     const evts = mergeArray([dragStart, dragMove, dragEnd])
 
-    const calcDelta = (lastE: DragEvent, e: DragEvent) => {
+    const calcDelta = (lastE: DragEvent, e: DragEvent): DragEvent => {
         if (e.dragType == DragType.DragStart) {
             return e
         } else {
@@ -192,11 +191,8 @@ export function setupInput(elem: Element): InputEvents {
     const move = merge(mouseMove, touchMove)
     const end = merge(mouseEnd, touchEnd)
 
-    const touchTapped = tapped(touchStart, touchEnd)
-    const mouseTapped = map(mouseTap, click(elem))
-
     return {
-        tapped: merge(touchTapped, mouseTapped),
+        tapped: debug(tapped(start, end)),
         zoomed: domEvent('wheel', elem),
         dragged: dragged(start, move, end)
     }
