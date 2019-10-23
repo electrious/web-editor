@@ -8,7 +8,11 @@ import { Stream } from '@most/types'
 import { fromPromise } from '@most/core'
 
 function meshPath(leadId: number): string {
-    return 'http://data.electrious.com/leads/' + leadId + '/mesh/'
+    return (
+        'https://s3.eu-west-1.amazonaws.com/data.electrious.com/leads/' +
+        leadId +
+        '/mesh/'
+    )
 }
 
 /**
