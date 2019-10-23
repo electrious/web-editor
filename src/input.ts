@@ -6,7 +6,8 @@ import {
     startWith,
     mergeArray,
     scan,
-    skip
+    skip,
+    snapshot
 } from '@most/core'
 import {
     click,
@@ -18,8 +19,8 @@ import {
     touchend,
     touchmove
 } from '@most/dom-event'
-import { always, curry } from 'ramda'
-import { gate } from './helper'
+import { always, curry, not } from 'ramda'
+import { gate, unwrap, tag } from './helper'
 
 export interface TapEvent {
     tapX: number
@@ -56,6 +57,26 @@ export interface DragEvent {
     deltaY: number
 }
 
+const updateDragType = curry(
+    (t: DragType, d: DragEvent): DragEvent => {
+        return {
+            dragType: t,
+            dragX: d.dragX,
+            dragY: d.dragY,
+            deltaX: d.deltaX,
+            deltaY: d.deltaY
+        }
+    }
+)
+
+function distance(d1: DragEvent | null, d2: DragEvent): number {
+    if (d1 == null) return 0
+
+    const dx = d1.dragX - d2.dragX
+    const dy = d1.dragY - d2.dragY
+    return Math.sqrt(dx * dx + dy * dy)
+}
+
 /**
  * Drag gesture recognizer for both mouse and touch events.
  * @param start
@@ -71,8 +92,7 @@ function dragged(
     const endDrag = map(always(false), end)
 
     // we're only interested in move events between start and end
-    const dragging = startWith(false, merge(startDrag, endDrag))
-    const realMove = gate(dragging, move)
+    const touching = startWith(false, merge(startDrag, endDrag))
 
     const mkDrag = curry(
         (t: DragType, e: TapEvent): DragEvent => {
@@ -86,9 +106,35 @@ function dragged(
         }
     )
 
+    // only move events that are in between 'touching' is real move
+    const realMove = map(mkDrag(DragType.Drag), gate(touching, move))
+
+    // make sure user did move the mouse/touch
+    const checkDist = (s: DragEvent | null, p: DragEvent) => {
+        return distance(s, p) >= 1 ? p : null
+    }
+
     const dstart = map(mkDrag(DragType.DragStart), start)
-    const dend = map(mkDrag(DragType.DragEnd), end)
-    const d = map(mkDrag(DragType.Drag), realMove)
+    const startPos = startWith(null, dstart)
+    const dragMove = unwrap(snapshot(checkDist, startPos, realMove))
+
+    // when user is actually dragging
+    const dragging = startWith(
+        false,
+        mergeArray([
+            map(always(false), start),
+            map(always(true), dragMove),
+            map(always(false), end)
+        ])
+    )
+    const notDragging = map(not, dragging)
+    // the drag start should be the first drag event attached with start position
+    const dragStart = unwrap(tag(startPos, gate(notDragging, dragMove)))
+
+    // calculate the new drag end event
+    const lastPos = startWith(null, dragMove)
+    const lastDrag = unwrap(tag(lastPos, gate(dragging, end)))
+    const dragEnd = map(updateDragType(DragType.DragEnd), lastDrag)
 
     const def = {
         dragType: DragType.DragStart,
@@ -98,7 +144,8 @@ function dragged(
         deltaY: 0
     }
 
-    const evts = mergeArray([dstart, d, dend])
+    // merge all drag related events and do delta calculation
+    const evts = mergeArray([dragStart, dragMove, dragEnd])
 
     const calcDelta = (lastE: DragEvent, e: DragEvent) => {
         if (e.dragType == DragType.DragStart) {
