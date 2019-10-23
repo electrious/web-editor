@@ -1,100 +1,141 @@
-import { InputEvents, TapEvent, DragEvent } from './input'
-import { Camera, Object3D, Vector3, Raycaster, Vector2, Vec2 } from 'three'
+import { InputEvents, TapEvent, DragEvent, DragType } from './input'
+import {
+    Camera,
+    Object3D,
+    Vector3,
+    Raycaster,
+    Vector2,
+    Intersection
+} from 'three'
 import { Stream, Disposable, Scheduler } from '@most/types'
 import { mkSink } from './sink'
-import { snapshot, merge, tap } from '@most/core'
+import { snapshot } from '@most/core'
+import { Size } from './editor'
+import { disposeBoth } from '@most/disposable'
 
 /**
- * SceneEvent is the event data sent to objects in the scene graph that's
- * been raycasted as the target
+ * tap events sent to 3D objects
  */
-export interface SceneEvent {
+export interface SceneTapEvent {
     distance: number
     point: Vector3
-    event: TapEvent | DragEvent
-}
-
-function isTapEvent(event: TapEvent | DragEvent): event is TapEvent {
-    return 'tapX' in event
 }
 
 /**
- * Any object that want to accept SceneEvent as target should implement this
- * interface
+ * drag events sent to 3D objects
  */
-export interface RaycastTarget {
-    processEvent: (event: SceneEvent) => boolean
+export interface SceneDragEvent {
+    type: DragType
+    distance: number
+    point: Vector3
 }
 
-function toRaycastTarget(obj: any): RaycastTarget | null {
-    return 'processEvent' in obj ? obj : null
+/**
+ * objects that can process tap event
+ */
+export interface Tappable {
+    tapped: (event: SceneTapEvent) => boolean
 }
 
-interface EventWithSize {
-    size: [number, number]
-    event: TapEvent | DragEvent
+function toTappable(obj: any): Tappable | null {
+    return 'tapped' in obj ? obj : null
+}
+/**
+ * objects that can process drag event
+ */
+export interface Draggable {
+    dragged: (event: SceneDragEvent) => boolean
 }
 
-function mkEventWithSize(
-    size: [number, number],
-    event: TapEvent | DragEvent
-): EventWithSize {
-    return {
-        size: size,
-        event: event
-    }
+function toDraggable(obj: any): Draggable | null {
+    return 'dragged' in obj ? obj : null
 }
 
-function calcPosition(pos: Vector2, size: [number, number]): Vector2 {
+function calcPosition(pos: Vector2, size: Size): Vector2 {
     const w = size[0]
     const h = size[1]
     return new Vector2((pos.x / w) * 2 - 1, -(pos.y / h) * 2 + 1)
 }
 
-function getMousePosition(es: EventWithSize): Vector2 {
-    const e = es.event
-    return calcPosition(
-        isTapEvent(e)
-            ? new Vector2(e.tapX, e.tapY)
-            : new Vector2(e.dragX, e.dragY),
-        es.size
-    )
+function tapPosition(size: Size, e: TapEvent): Vector2 {
+    return calcPosition(new Vector2(e.tapX, e.tapY), size)
+}
+
+function dragPosition(size: Size, e: DragEvent): Vector2 {
+    return calcPosition(new Vector2(e.dragX, e.dragY), size)
+}
+
+function processTapObjects(objs: Intersection[]) {
+    for (const key in objs) {
+        if (objs.hasOwnProperty(key)) {
+            const res = objs[key]
+
+            const t = toTappable(res.object)
+            if (t != null) {
+                const canTestNext = t.tapped({
+                    distance: res.distance,
+                    point: res.point
+                })
+
+                if (!canTestNext) break
+            }
+        }
+    }
+}
+
+function processDragObjects(objs: Intersection[], e: DragEvent) {
+    for (const key in objs) {
+        if (objs.hasOwnProperty(key)) {
+            const res = objs[key]
+            const t = toDraggable(res.object)
+
+            if (t != null) {
+                const canTestNext = t.dragged({
+                    type: e.dragType,
+                    distance: res.distance,
+                    point: res.point
+                })
+
+                if (!canTestNext) break
+            }
+        }
+    }
 }
 
 export function setupRaycasting(
     camera: Camera,
     scene: Object3D,
     input: InputEvents,
-    size: Stream<[number, number]>,
+    size: Stream<Size>,
     scheduler: Scheduler
 ): Disposable {
     const raycaster = new Raycaster()
 
-    const f = (es: EventWithSize) => {
-        const tp = getMousePosition(es)
+    const raycastTap = (tp: Vector2) => {
         raycaster.setFromCamera(tp, camera)
         const results = raycaster.intersectObject(scene, true)
-        for (const k in results) {
-            if (results.hasOwnProperty(k)) {
-                const res = results[k]
-
-                const rt = toRaycastTarget(res.object)
-                if (rt != null) {
-                    const canTestNext = rt.processEvent({
-                        distance: res.distance,
-                        point: res.point,
-                        event: es.event
-                    })
-
-                    if (!canTestNext) {
-                        break
-                    }
-                }
-            }
-        }
+        processTapObjects(results)
     }
 
-    const sink = mkSink(f)
-    const evts = merge(input.tapped, input.dragged)
-    return snapshot(mkEventWithSize, size, evts).run(sink, scheduler)
+    const raycastDrag = (arg: [Vector2, DragEvent]) => {
+        raycaster.setFromCamera(arg[0], camera)
+        const results = raycaster.intersectObject(scene, true)
+        processDragObjects(results, arg[1])
+    }
+
+    const disposeTap = snapshot(tapPosition, size, input.tapped).run(
+        mkSink(raycastTap),
+        scheduler
+    )
+
+    const f = (s: Size, e: DragEvent): [Vector2, DragEvent] => {
+        return [dragPosition(s, e), e]
+    }
+
+    const disposeDrag = snapshot(f, size, input.dragged).run(
+        mkSink(raycastDrag),
+        scheduler
+    )
+
+    return disposeBoth(disposeTap, disposeDrag)
 }

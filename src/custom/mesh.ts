@@ -1,12 +1,29 @@
 import { Mesh, Geometry, Material } from 'three'
-import { RaycastTarget, SceneEvent } from '../sceneevent'
+import {
+    Tappable,
+    SceneTapEvent,
+    Draggable,
+    SceneDragEvent
+} from '../sceneevent'
 
-export class SceneEventMesh extends Mesh implements RaycastTarget {
+export class TappableMesh extends Mesh implements Tappable {
     constructor(geo: Geometry, mat: Material) {
         super(geo, mat)
     }
 
-    processEvent(event: SceneEvent): boolean {
+    tapped(event: SceneTapEvent): boolean {
+        console.log(event)
+
+        return false
+    }
+}
+
+export class DraggableMesh extends Mesh implements Draggable {
+    constructor(geo: Geometry, mat: Material) {
+        super(geo, mat)
+    }
+
+    dragged(event: SceneDragEvent): boolean {
         console.log(event)
 
         return false
