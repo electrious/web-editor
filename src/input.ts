@@ -120,7 +120,7 @@ export interface InputEvents {
 }
 
 export function setupInput(elem: Element): InputEvents {
-    const mouseTap = (e: MouseEvent) => {
+    const mouseTap = (e: MouseEvent): TapEvent => {
         return {
             tapX: e.clientX,
             tapY: e.clientY
@@ -145,8 +145,11 @@ export function setupInput(elem: Element): InputEvents {
     const move = merge(mouseMove, touchMove)
     const end = merge(mouseEnd, touchEnd)
 
+    const touchTapped = tapped(touchStart, touchEnd)
+    const mouseTapped = map(mouseTap, click(elem))
+
     return {
-        tapped: tapped(start, end),
+        tapped: merge(touchTapped, mouseTapped),
         zoomed: domEvent('wheel', elem),
         dragged: dragged(start, move, end)
     }
