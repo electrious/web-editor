@@ -18,11 +18,13 @@ import { RoofPlate } from './models/roofplate'
 import { createRoofNode } from './roofnode'
 import { setupRaycasting } from './sceneevent'
 
+export type Size = [number, number]
+
 /**
  * Public Interface for the main WebEditor
  */
 export interface WebEditor {
-    resize: (width: number, height: number) => void
+    resize: (size: Size) => void
     dispose: () => void
     loadHouse: (leadId: number, roofs: RoofPlate[]) => void
 }
@@ -37,7 +39,7 @@ interface EditorScene {
     size: Stream<[number, number]>
     disposable: Disposable
     render: () => void
-    resize: (width: number, height: number) => void
+    resize: (size: Size) => void
     addContent: (obj: Object3D) => void
 }
 
@@ -84,6 +86,15 @@ function createScene(
 
     const [updateSize, sizeStream] = createAdapter()
 
+    // function to update camera and renderer when size changed.
+    const resized = (s: Size) => {
+        const width = s[0]
+        const height = s[1]
+        camera.aspect = width / height
+        renderer.setSize(width, height)
+    }
+    const disposable0 = sizeStream.run(mkSink(resized), scheduler)
+
     // attach the WebGL canvas to a parent DOM element
     elem.appendChild(renderer.domElement)
 
@@ -111,18 +122,6 @@ function createScene(
         renderer.render(scene, camera)
     }
 
-    /**
-     * resize the editor viewport
-     * @param {Number} width new width of the viewport
-     * @param {Number} height new height of the viewport
-     */
-    const resizeFunc = (width: number, height: number) => {
-        camera.aspect = width / height
-        renderer.setSize(width, height)
-
-        updateSize([width, height])
-    }
-
     const addContentFunc = (obj: Object3D) => {
         content.add(obj)
     }
@@ -147,7 +146,8 @@ function createScene(
         scheduler
     )
 
-    resizeFunc(width, height)
+    // update with the default size
+    updateSize([width, height])
 
     return {
         scene: scene,
@@ -156,12 +156,13 @@ function createScene(
         size: sizeStream,
         disposable: disposeAll([
             sceneDisposable,
+            disposable0,
             disposable1,
             disposable2,
             disposable3
         ]),
         render: renderFunc,
-        resize: resizeFunc,
+        resize: updateSize,
         addContent: addContentFunc
     }
 }
