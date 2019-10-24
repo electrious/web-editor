@@ -10,13 +10,13 @@ import {
 import { loadHouse } from './house'
 import { mkSink } from './sink'
 import { setupInput, DragEvent } from './input'
-import { newDefaultScheduler } from '@most/scheduler'
 import { disposeWith, disposeAll } from '@most/disposable'
-import { Stream, Scheduler, Disposable } from '@most/types'
+import { Stream, Disposable } from '@most/types'
 import { createAdapter } from '@most/adapter'
 import { RoofPlate } from './models/roofplate'
-import { createRoofNode } from './roofnode'
 import { setupRaycasting } from './sceneevent'
+import { defScheduler } from './helper'
+import { createRoofManager } from './roofmanager'
 
 export type Size = [number, number]
 
@@ -72,8 +72,7 @@ function updateContentWithDrag(obj: Object3D, drag: DragEvent) {
 function createScene(
     width: number,
     height: number,
-    elem: Element,
-    scheduler: Scheduler
+    elem: Element
 ): EditorScene {
     const scene = new Scene()
     // create a disposable for the scene
@@ -85,6 +84,8 @@ function createScene(
     const renderer = new WebGLRenderer()
 
     const [updateSize, sizeStream] = createAdapter()
+
+    const scheduler = defScheduler()
 
     // function to update camera and renderer when size changed.
     const resized = (s: Size) => {
@@ -138,13 +139,7 @@ function createScene(
         mkSink(e => updateContentWithDrag(content, e)),
         scheduler
     )
-    const disposable3 = setupRaycasting(
-        camera,
-        scene,
-        inputEvts,
-        sizeStream,
-        scheduler
-    )
+    const disposable3 = setupRaycasting(camera, scene, inputEvts, sizeStream)
 
     // update with the default size
     updateSize([width, height])
@@ -178,11 +173,8 @@ export function createEditor(
     height: number,
     elem: Element
 ): WebEditor {
-    // default scheduler for all event streams
-    const scheduler = newDefaultScheduler()
-
     // create the editor scene
-    const es = createScene(width, height, elem, scheduler)
+    const es = createScene(width, height, elem)
 
     // an array of disposables to be disposed at the end of the editor
     const disposables = [es.disposable]
@@ -206,12 +198,12 @@ export function createEditor(
         const f = (h: Object3D) => {
             es.addContent(h)
 
-            roofs.map(createRoofNode).forEach(n => {
-                es.addContent(n.roofObject)
-            })
+            // add all roofs to a new roof manager
+            const mgr = createRoofManager(roofs)
+            es.addContent(mgr.roofWrapper)
         }
 
-        const disp = loadHouse(leadId).run(mkSink(f), scheduler)
+        const disp = loadHouse(leadId).run(mkSink(f), defScheduler())
         disposables.push(disp)
     }
 

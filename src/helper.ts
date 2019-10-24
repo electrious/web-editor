@@ -1,5 +1,16 @@
 import { Stream } from '@most/types'
 import { filter, tap, snapshot } from '@most/core'
+import memoizeWith from 'ramda/es/memoizeWith'
+import always from 'ramda/es/always'
+import { newDefaultScheduler } from '@most/scheduler'
+
+/**
+ * get the default scheduler used in stream processing. This function is
+ * memoized so the scheduler is created once and shared.
+ */
+export const defScheduler = memoizeWith(always('def_scheduler'), () => {
+    return newDefaultScheduler()
+})
 
 /**
  * unwrap values that can be null in a stream to non-null stream

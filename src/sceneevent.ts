@@ -7,12 +7,13 @@ import {
     Vector2,
     Intersection
 } from 'three'
-import { Stream, Disposable, Scheduler } from '@most/types'
+import { Stream, Disposable } from '@most/types'
 import { mkSink } from './sink'
 import { snapshot } from '@most/core'
 import { Size } from './editor'
 import { disposeBoth } from '@most/disposable'
 import compose from 'ramda/es/compose'
+import { defScheduler } from './helper'
 
 /**
  * tap events sent to 3D objects
@@ -142,8 +143,7 @@ export function setupRaycasting(
     camera: Camera,
     scene: Object3D,
     input: InputEvents,
-    size: Stream<Size>,
-    scheduler: Scheduler
+    size: Stream<Size>
 ): Disposable {
     const raycaster = new Raycaster()
 
@@ -166,6 +166,7 @@ export function setupRaycasting(
         processDragObjects(results, arg[1])
     }
 
+    const scheduler = defScheduler()
     const disposeTap = snapshot(tapPosition, size, input.tapped).run(
         mkSink(raycastTap),
         scheduler

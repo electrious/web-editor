@@ -1,6 +1,5 @@
 import { RoofPlate } from './models/roofplate'
 import {
-    Mesh,
     Object3D,
     Vector2,
     Shape,
@@ -8,14 +7,45 @@ import {
     MeshBasicMaterial
 } from 'three'
 import { TappableMesh } from './custom/mesh'
+import memoizeWith from 'ramda/es/memoizeWith'
+import always from 'ramda/es/always'
+import { Stream } from '@most/types'
+import { SceneTapEvent } from './sceneevent'
+import { mkSink } from './sink'
+import { defScheduler } from './helper'
 
 export interface RoofNode {
     roof: RoofPlate
+    tapped: Stream<SceneTapEvent>
     roofObject: Object3D
 }
 
+/**
+ * Get the default material for roofplate. This function is memoized so the
+ * actual material is created only once and shared.
+ */
+const getDefMaterial = memoizeWith(always('def_material'), () => {
+    const mat = new MeshBasicMaterial({ color: 0xffffbb })
+    mat.transparent = true
+    mat.opacity = 0.7
+
+    return mat
+})
+
+/**
+ * Get the material for an active roofpalte. This function is memoized so the
+ * actual material is created only once and shared.
+ */
+const getActiveMaterial = memoizeWith(always('active_material'), () => {
+    const mat = new MeshBasicMaterial({ color: 0xffff88 })
+    mat.transparent = true
+    mat.opacity = 0.9
+
+    return mat
+})
+
 // create roof mesh
-function createRoofMesh(roof: RoofPlate, obj: Object3D): Mesh {
+function createRoofMesh(roof: RoofPlate, obj: Object3D): TappableMesh {
     // convert all roof border points to local coordinate
     // and get only the x,y coordinates
     const ps = roof.borderPoints.map(p => {
@@ -25,21 +55,18 @@ function createRoofMesh(roof: RoofPlate, obj: Object3D): Mesh {
 
     // create a ShapeGeometry with the Shape from border points
     const shp = new Shape(ps)
-    const shpGeo = new ShapeGeometry(shp)
 
-    // setup the material
-    const mat = new MeshBasicMaterial({ color: 0xffffbb })
-    mat.transparent = true
-    mat.opacity = 0.7
-
-    return new TappableMesh(shpGeo, mat)
+    return new TappableMesh(new ShapeGeometry(shp), getDefMaterial())
 }
 
 /**
  * create RoofNode for a RoofPlate
  * @param roof
  */
-export function createRoofNode(roof: RoofPlate): RoofNode {
+export function createRoofNode(
+    roof: RoofPlate,
+    isActive: Stream<boolean>
+): RoofNode {
     const obj = new Object3D()
     obj.name = 'roofplate'
 
@@ -60,8 +87,15 @@ export function createRoofNode(roof: RoofPlate): RoofNode {
     const mesh = createRoofMesh(roof, obj)
     obj.add(mesh)
 
+    const activate = (active: boolean) => {
+        mesh.material = active ? getActiveMaterial() : getDefMaterial()
+    }
+
+    isActive.run(mkSink(activate), defScheduler())
+
     return {
         roof: roof,
+        tapped: mesh.tapEvents,
         roofObject: obj
     }
 }
