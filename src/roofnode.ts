@@ -7,7 +7,7 @@ import {
     ShapeGeometry,
     MeshBasicMaterial
 } from 'three'
-import { TappableMesh, DraggableMesh } from './custom/mesh'
+import { TappableMesh } from './custom/mesh'
 
 export interface RoofNode {
     roof: RoofPlate
@@ -32,7 +32,7 @@ function createRoofMesh(roof: RoofPlate, obj: Object3D): Mesh {
     mat.transparent = true
     mat.opacity = 0.7
 
-    return new DraggableMesh(shpGeo, mat)
+    return new TappableMesh(shpGeo, mat)
 }
 
 /**

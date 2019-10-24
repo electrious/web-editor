@@ -19,7 +19,7 @@ import {
     touchmove
 } from '@most/dom-event'
 import { always, curry, not } from 'ramda'
-import { gate, unwrap, tag, debug } from './helper'
+import { gate, unwrap, tag } from './helper'
 
 export interface TapEvent {
     tapX: number
@@ -192,7 +192,7 @@ export function setupInput(elem: Element): InputEvents {
     const end = merge(mouseEnd, touchEnd)
 
     return {
-        tapped: debug(tapped(start, end)),
+        tapped: tapped(start, end),
         zoomed: domEvent('wheel', elem),
         dragged: dragged(start, move, end)
     }
