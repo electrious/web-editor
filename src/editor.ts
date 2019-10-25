@@ -200,6 +200,8 @@ export function createEditor(
 
             // add all roofs to a new roof manager
             const mgr = createRoofManager(roofs)
+            disposables.push(mgr.disposable)
+
             es.addContent(mgr.roofWrapper)
         }
 

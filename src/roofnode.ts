@@ -9,15 +9,20 @@ import {
 import { TappableMesh } from './custom/mesh'
 import memoizeWith from 'ramda/es/memoizeWith'
 import always from 'ramda/es/always'
-import { Stream } from '@most/types'
+import { Stream, Disposable } from '@most/types'
 import { SceneTapEvent } from './sceneevent'
 import { mkSink } from './sink'
 import { defScheduler } from './helper'
+import { createDraggableMarker } from './ui/draggablemarker'
+import map from 'ramda/es/map'
+import pluck from 'ramda/es/pluck'
+import { disposeAll, disposeBoth } from '@most/disposable'
 
 export interface RoofNode {
     roof: RoofPlate
     tapped: Stream<SceneTapEvent>
     roofObject: Object3D
+    disposable: Disposable
 }
 
 /**
@@ -45,18 +50,26 @@ const getActiveMaterial = memoizeWith(always('active_material'), () => {
 })
 
 // create roof mesh
-function createRoofMesh(roof: RoofPlate, obj: Object3D): TappableMesh {
-    // convert all roof border points to local coordinate
-    // and get only the x,y coordinates
-    const ps = roof.borderPoints.map(p => {
-        const np = obj.worldToLocal(p)
-        return new Vector2(np.x, np.y)
-    })
-
+function createRoofMesh(ps: Vector2[]): TappableMesh {
     // create a ShapeGeometry with the Shape from border points
     const shp = new Shape(ps)
 
     return new TappableMesh(new ShapeGeometry(shp), getDefMaterial())
+}
+
+// create roof corner markers
+const createVertexMarkers = (
+    obj: Object3D,
+    active: Stream<boolean>,
+    ps: Vector2[]
+): Disposable => {
+    const markers = map(createDraggableMarker(active), ps)
+
+    markers.forEach(m => {
+        obj.add(m.marker)
+    })
+
+    return disposeAll(pluck('disposable', markers))
 }
 
 /**
@@ -79,23 +92,33 @@ export function createRoofNode(
     obj.rotateX(-roof.slope.rad)
 
     // make sure the matrix and matrixWorld are updated immediately after
-    // position and rotation changed, so that createRoofMesh can use them
+    // position and rotation changed, so that worldToLocal can use them
     // to convert coordinates correctly
     obj.updateMatrix()
     obj.updateMatrixWorld()
 
-    const mesh = createRoofMesh(roof, obj)
+    // convert all roof border points to local coordinate
+    // and get only the x,y coordinates
+    const ps = roof.borderPoints.map(p => {
+        const np = obj.worldToLocal(p)
+        return new Vector2(np.x, np.y)
+    })
+
+    const disposable = createVertexMarkers(obj, isActive, ps)
+
+    const mesh = createRoofMesh(ps)
     obj.add(mesh)
 
     const activate = (active: boolean) => {
         mesh.material = active ? getActiveMaterial() : getDefMaterial()
     }
 
-    isActive.run(mkSink(activate), defScheduler())
+    const disposable1 = isActive.run(mkSink(activate), defScheduler())
 
     return {
         roof: roof,
         tapped: mesh.tapEvents,
-        roofObject: obj
+        roofObject: obj,
+        disposable: disposeBoth(disposable, disposable1)
     }
 }
