@@ -9,13 +9,15 @@ import { Sink } from '@most/types'
  * @returns Sink<T>
  */
 export function mkSink<T>(
-    event: (val: T) => void,
+    event?: ((val: T) => void) | undefined,
     error?: ((err: Error) => void) | undefined,
     end?: (() => void) | undefined
 ): Sink<T> {
     return {
         event: (_t, v) => {
-            event(v)
+            if (event != undefined) {
+                event(v)
+            }
         },
         error: (_t, e) => {
             if (error != undefined) {

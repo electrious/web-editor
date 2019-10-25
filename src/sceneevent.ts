@@ -13,7 +13,7 @@ import { snapshot } from '@most/core'
 import { Size } from './editor'
 import { disposeBoth } from '@most/disposable'
 import compose from 'ramda/es/compose'
-import { defScheduler } from './helper'
+import { defScheduler, unwrap } from './helper'
 
 /**
  * tap events sent to 3D objects
@@ -106,12 +106,23 @@ function processTapObjects(objs: Intersection[]) {
 }
 
 /**
+ * interface for the raycasting process setup result.
+ */
+export interface RaycastSetup {
+    dragEvent: Stream<DragEvent>
+    disposable: Disposable
+}
+
+/**
  * Find first object in the intersections array that is Draggable and send the
  * drag event to it
  * @param objs
  * @param e
  */
-function processDragObjects(objs: Intersection[], e: DragEvent) {
+function processDragObjects(
+    objs: Intersection[],
+    e: DragEvent
+): DragEvent | null {
     for (const key in objs) {
         if (objs.hasOwnProperty(key)) {
             const res = objs[key]
@@ -124,10 +135,12 @@ function processDragObjects(objs: Intersection[], e: DragEvent) {
                     point: res.point
                 })
 
-                break
+                return null
             }
         }
     }
+
+    return e
 }
 
 /**
@@ -144,7 +157,7 @@ export function setupRaycasting(
     scene: Object3D,
     input: InputEvents,
     size: Stream<Size>
-): Disposable {
+): RaycastSetup {
     const raycaster = new Raycaster()
 
     // function to do real raycasting
@@ -154,16 +167,14 @@ export function setupRaycasting(
     }
 
     // raycast tap events
-    const raycastTap = compose(
-        processTapObjects,
-        doRaycast
-    )
+    // eslint-disable-next-line prettier/prettier
+    const raycastTap = compose(processTapObjects, doRaycast)
 
     // raycast drag events
-    const raycastDrag = (arg: [Vector2, DragEvent]) => {
+    const raycastDrag = (arg: [Vector2, DragEvent]): DragEvent | null => {
         raycaster.setFromCamera(arg[0], camera)
         const results = raycaster.intersectObject(scene, true)
-        processDragObjects(results, arg[1])
+        return processDragObjects(results, arg[1])
     }
 
     const scheduler = defScheduler()
@@ -176,10 +187,14 @@ export function setupRaycasting(
         return [dragPosition(s, e), e]
     }
 
-    const disposeDrag = snapshot(f, size, input.dragged).run(
-        mkSink(raycastDrag),
-        scheduler
-    )
+    // eslint-disable-next-line prettier/prettier
+    const g = compose(raycastDrag, f)
 
-    return disposeBoth(disposeTap, disposeDrag)
+    const unraycastedDrag = snapshot(g, size, input.dragged)
+    const disposeDrag = unraycastedDrag.run(mkSink(), scheduler)
+
+    return {
+        dragEvent: unwrap(unraycastedDrag),
+        disposable: disposeBoth(disposeTap, disposeDrag)
+    }
 }

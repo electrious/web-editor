@@ -135,12 +135,14 @@ function createScene(
         mkSink(e => updateCameraWithZoom(camera, e.deltaY)),
         scheduler
     )
-    const disposable2 = inputEvts.dragged.run(
+
+    const rcs = setupRaycasting(camera, scene, inputEvts, sizeStream)
+
+    // use drag events filtered by raycasting already
+    const disposable2 = rcs.dragEvent.run(
         mkSink(e => updateContentWithDrag(content, e)),
         scheduler
     )
-    const disposable3 = setupRaycasting(camera, scene, inputEvts, sizeStream)
-
     // update with the default size
     updateSize([width, height])
 
@@ -154,7 +156,7 @@ function createScene(
             disposable0,
             disposable1,
             disposable2,
-            disposable3
+            rcs.disposable
         ]),
         render: renderFunc,
         resize: updateSize,

@@ -1,10 +1,4 @@
-import {
-    Mesh,
-    Vector3,
-    Vector2,
-    CircleGeometry,
-    MeshBasicMaterial
-} from 'three'
+import { Vector3, Vector2, CircleGeometry, MeshBasicMaterial } from 'three'
 import { Stream, Disposable } from '@most/types'
 import { empty } from '@most/core'
 import memoizeWith from 'ramda/es/memoizeWith'
