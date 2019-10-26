@@ -1,12 +1,13 @@
 import { Vector3, Vector2, CircleGeometry, MeshBasicMaterial } from 'three'
 import { Stream, Disposable } from '@most/types'
-import { empty } from '@most/core'
+import { scan } from '@most/core'
 import memoizeWith from 'ramda/es/memoizeWith'
 import always from 'ramda/es/always'
 import { DraggableMesh } from '../custom/mesh'
 import { mkSink } from '../sink'
 import { defScheduler } from '../helper'
 import curry from 'ramda/es/curry'
+import clone from 'ramda/es/clone'
 
 export interface DraggableMarker {
     marker: DraggableMesh
@@ -24,7 +25,8 @@ export const createDraggableMarker = curry(
         const mat = getMarkerMaterial()
 
         const mesh = new DraggableMesh(geo, mat)
-        mesh.position.set(position.x, position.y, 0.1)
+        const defPosition = new Vector3(position.x, position.y, 0.1)
+        mesh.position.copy(defPosition)
         mesh.visible = false
 
         const disposable = active.run(
@@ -34,9 +36,21 @@ export const createDraggableMarker = curry(
             defScheduler()
         )
 
+        const updatePos = (lastPos: Vector3, delta: Vector3): Vector3 => {
+            const np = clone(lastPos)
+            np.add(delta)
+            mesh.position.copy(np)
+
+            return np
+        }
+
+        const newPos = scan(updatePos, defPosition, mesh.dragDelta)
+
+        newPos.run(mkSink(), defScheduler())
+
         return {
             marker: mesh,
-            position: empty(),
+            position: newPos,
             disposable: disposable
         }
     }
