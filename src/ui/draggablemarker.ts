@@ -9,19 +9,30 @@ import { defScheduler } from '../helper'
 import curry from 'ramda/es/curry'
 import clone from 'ramda/es/clone'
 
+/**
+ * defines all data for a Draggable Marker
+ */
 export interface DraggableMarker {
     marker: DraggableMesh
     position: Stream<Vector3>
     disposable: Disposable
 }
 
+// get the marker material. This function is memoized so the material is
+// only created once and shared.
 const getMarkerMaterial = memoizeWith(always('marker_material'), () => {
     return new MeshBasicMaterial({ color: 0xff2222 })
 })
 
+/**
+ * create a draggable marker.
+ * @param active a stream signalling if the current roof is active or not
+ * @param position 2D start position of the marker
+ * @returns DraggableMarker
+ */
 export const createDraggableMarker = curry(
     (active: Stream<boolean>, position: Vector2): DraggableMarker => {
-        const geo = new CircleGeometry(0.3, 32)
+        const geo = new CircleGeometry(1, 32)
         const mat = getMarkerMaterial()
 
         const mesh = new DraggableMesh(geo, mat)
@@ -36,6 +47,7 @@ export const createDraggableMarker = curry(
             defScheduler()
         )
 
+        // function to update the mesh position based on dragDelta
         const updatePos = (lastPos: Vector3, delta: Vector3): Vector3 => {
             const np = clone(lastPos)
             np.add(delta)

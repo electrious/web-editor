@@ -4,7 +4,8 @@ import {
     Vector2,
     Shape,
     ShapeGeometry,
-    MeshBasicMaterial
+    MeshBasicMaterial,
+    Vector3
 } from 'three'
 import { TappableMesh } from './custom/mesh'
 import memoizeWith from 'ramda/es/memoizeWith'
@@ -14,9 +15,10 @@ import { SceneTapEvent } from './sceneevent'
 import { mkSink } from './sink'
 import { defScheduler } from './helper'
 import { createDraggableMarker } from './ui/draggablemarker'
-import map from 'ramda/es/map'
 import pluck from 'ramda/es/pluck'
 import { disposeAll, disposeBoth } from '@most/disposable'
+import { combineArray } from '@most/core'
+import { createAdapter } from '@most/adapter'
 
 export interface RoofNode {
     roof: RoofPlate
@@ -62,14 +64,24 @@ const createVertexMarkers = (
     obj: Object3D,
     active: Stream<boolean>,
     ps: Vector2[]
-): Disposable => {
-    const markers = map(createDraggableMarker(active), ps)
+): [Stream<Vector2[]>, Disposable] => {
+    const markers = ps.map(createDraggableMarker(active))
 
     markers.forEach(m => {
         obj.add(m.marker)
     })
 
-    return disposeAll(pluck('disposable', markers))
+    const toVec2 = (v: Vector3): Vector2 => {
+        return new Vector2(v.x, v.y)
+    }
+    const mkArray = (...args: Vector3[]) => {
+        return args.map(toVec2)
+    }
+
+    return [
+        combineArray(mkArray, pluck('position', markers)),
+        disposeAll(pluck('disposable', markers))
+    ]
 }
 
 /**
@@ -104,9 +116,7 @@ export function createRoofNode(
         return new Vector2(np.x, np.y)
     })
 
-    const disposable = createVertexMarkers(obj, isActive, ps)
-
-    const mesh = createRoofMesh(ps)
+    let mesh = createRoofMesh(ps)
     obj.add(mesh)
 
     const activate = (active: boolean) => {
@@ -115,9 +125,24 @@ export function createRoofNode(
 
     const disposable1 = isActive.run(mkSink(activate), defScheduler())
 
+    const [newPosArr, disposable] = createVertexMarkers(obj, isActive, ps)
+
+    const [updateTap, tapped] = createAdapter()
+
+    const updatePos = (arr: Vector2[]) => {
+        obj.remove(mesh)
+
+        mesh = createRoofMesh(arr)
+        obj.add(mesh)
+
+        mesh.tapEvents.run(mkSink(updateTap), defScheduler())
+    }
+
+    newPosArr.run(mkSink(updatePos), defScheduler())
+
     return {
         roof: roof,
-        tapped: mesh.tapEvents,
+        tapped: tapped,
         roofObject: obj,
         disposable: disposeBoth(disposable, disposable1)
     }
