@@ -8,7 +8,7 @@ import {
 import { Stream } from '@most/types'
 import { createAdapter } from '@most/adapter'
 import clone from 'ramda/es/clone'
-import { map, loop } from '@most/core'
+import { map, loop, multicast } from '@most/core'
 import { unwrap } from '../helper'
 import { DragType } from '../input'
 
@@ -102,10 +102,12 @@ export class DraggableMesh extends Mesh implements Draggable {
         this.dragEvents = s
         this.insertDrag = f
 
-        this.dragDelta = calcDragDelta(s, v => {
-            const obj = this.parent
-            return obj == null ? null : obj.worldToLocal(v)
-        })
+        this.dragDelta = multicast(
+            calcDragDelta(s, v => {
+                const obj = this.parent
+                return obj == null ? null : obj.worldToLocal(v)
+            })
+        )
     }
 
     dragged(event: SceneDragEvent) {

@@ -1,6 +1,6 @@
 import { Vector3, Vector2, CircleGeometry, MeshBasicMaterial } from 'three'
 import { Stream, Disposable } from '@most/types'
-import { scan } from '@most/core'
+import { scan, multicast } from '@most/core'
 import memoizeWith from 'ramda/es/memoizeWith'
 import always from 'ramda/es/always'
 import { DraggableMesh } from '../custom/mesh'
@@ -50,7 +50,8 @@ export const createDraggableMarker = curry(
         // function to update the mesh position based on dragDelta
         const updatePos = (lastPos: Vector3, delta: Vector3): Vector3 => {
             const np = clone(lastPos)
-            np.add(delta)
+            const nDelta = new Vector3(delta.x, delta.y, 0)
+            np.add(nDelta)
             mesh.position.copy(np)
 
             return np
@@ -62,7 +63,7 @@ export const createDraggableMarker = curry(
 
         return {
             marker: mesh,
-            position: newPos,
+            position: multicast(newPos),
             disposable: disposable
         }
     }

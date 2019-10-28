@@ -9,7 +9,7 @@ import {
 } from 'three'
 import { Stream, Disposable } from '@most/types'
 import { mkSink } from './sink'
-import { snapshot } from '@most/core'
+import { snapshot, multicast } from '@most/core'
 import { Size } from './editor'
 import { disposeBoth } from '@most/disposable'
 import compose from 'ramda/es/compose'
@@ -194,7 +194,7 @@ export function setupRaycasting(
     const disposeDrag = unraycastedDrag.run(mkSink(), scheduler)
 
     return {
-        dragEvent: unwrap(unraycastedDrag),
+        dragEvent: multicast(unwrap(unraycastedDrag)),
         disposable: disposeBoth(disposeTap, disposeDrag)
     }
 }
