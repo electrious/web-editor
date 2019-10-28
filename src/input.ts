@@ -7,7 +7,8 @@ import {
     mergeArray,
     scan,
     skip,
-    snapshot
+    snapshot,
+    constant
 } from '@most/core'
 import {
     domEvent,
@@ -18,7 +19,7 @@ import {
     touchend,
     touchmove
 } from '@most/dom-event'
-import { always, curry, not } from 'ramda'
+import { curry, not } from 'ramda'
 import { gate, unwrap, tag } from './helper'
 
 export interface TapEvent {
@@ -36,7 +37,7 @@ function tapped(
 ): Stream<TapEvent> {
     const canBeTap = startWith(
         false,
-        merge(map(always(false), start), map(always(true), end))
+        merge(constant(false, start), constant(true, end))
     )
     // the touch should end in less than 0.32 seconds to be considered a tap.
     const tapCheckEvt = delay(320, start)
@@ -87,8 +88,8 @@ function dragged(
     move: Stream<TapEvent>,
     end: Stream<TapEvent>
 ): Stream<DragEvent> {
-    const startDrag = map(always(true), start)
-    const endDrag = map(always(false), end)
+    const startDrag = constant(true, start)
+    const endDrag = constant(false, end)
 
     // we're only interested in move events between start and end
     const touching = startWith(false, merge(startDrag, endDrag))
@@ -121,9 +122,9 @@ function dragged(
     const dragging = startWith(
         false,
         mergeArray([
-            map(always(false), start),
-            map(always(true), dragMove),
-            map(always(false), end)
+            constant(false, start),
+            constant(true, dragMove),
+            constant(false, end)
         ])
     )
     const notDragging = map(not, dragging)
