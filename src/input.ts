@@ -23,8 +23,7 @@ import {
     touchmove
 } from '@most/dom-event'
 import { curry } from 'ramda'
-import { gate, unwrap, tag, debug } from './helper'
-import { Vector2 } from 'three'
+import { gate, unwrap, tag } from './helper'
 import not from 'ramda/es/not'
 
 export interface TapEvent {

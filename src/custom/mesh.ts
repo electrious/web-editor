@@ -8,7 +8,7 @@ import {
 import { Stream } from '@most/types'
 import { createAdapter } from '@most/adapter'
 import clone from 'ramda/es/clone'
-import { map, loop, multicast, debounce, merge } from '@most/core'
+import { map, loop, multicast } from '@most/core'
 import { unwrap } from '../helper'
 import { DragType } from '../input'
 
