@@ -6,9 +6,11 @@ import {
     startWith,
     mergeArray,
     constant,
-    loop,
     multicast,
-    debounce
+    debounce,
+    skip,
+    scan,
+    snapshot
 } from '@most/core'
 import {
     domEvent,
@@ -20,8 +22,9 @@ import {
     touchmove
 } from '@most/dom-event'
 import { curry } from 'ramda'
-import { gate, unwrap } from './helper'
+import { gate, unwrap, tag } from './helper'
 import { Vector2 } from 'three'
+import not from 'ramda/es/not'
 
 export interface TapEvent {
     tapX: number
@@ -59,90 +62,24 @@ export interface DragEvent {
     deltaY: number
 }
 
-// internal enum for managing drag state
-enum DragState {
-    Waiting,
-    MayStart,
-    Dragging,
-    End
-}
-
-// internal drag state
-interface DragInfo {
-    state: DragState
-    lastPos: Vector2
-}
-
-// internal function to process drag events with DragInfo as a state between
-// events
-const processDrag = (
-    di: DragInfo,
-    de: DragEvent
-): { seed: DragInfo; value: DragEvent | null } => {
-    const pos = new Vector2(de.dragX, de.dragY)
-    if (
-        de.dragType == DragType.DragStart &&
-        (di.state == DragState.Waiting || di.state == DragState.End)
-    ) {
-        // drag start
-        const info: DragInfo = {
-            state: DragState.MayStart,
-            lastPos: pos
+const updateDragType = curry(
+    (t: DragType, d: DragEvent): DragEvent => {
+        return {
+            dragType: t,
+            dragX: d.dragX,
+            dragY: d.dragY,
+            deltaX: d.deltaX,
+            deltaY: d.deltaY
         }
-
-        return { seed: info, value: null }
-    } else if (de.dragType == DragType.Drag) {
-        if (di.state == DragState.MayStart && di.lastPos.distanceTo(pos) > 0) {
-            // now we received real drag events and we can send out real drag events
-            const info: DragInfo = {
-                state: DragState.Dragging,
-                lastPos: pos
-            }
-
-            const evt: DragEvent = {
-                dragType: DragType.DragStart,
-                dragX: pos.x,
-                dragY: pos.y,
-                deltaX: pos.x - di.lastPos.x,
-                deltaY: pos.y - di.lastPos.y
-            }
-
-            return { seed: info, value: evt }
-        } else if (di.state == DragState.Dragging) {
-            const info: DragInfo = {
-                state: di.state,
-                lastPos: pos
-            }
-            const evt: DragEvent = {
-                dragType: DragType.Drag,
-                dragX: pos.x,
-                dragY: pos.y,
-                deltaX: pos.x - di.lastPos.x,
-                deltaY: pos.y - di.lastPos.y
-            }
-
-            return { seed: info, value: evt }
-        }
-    } else if (
-        de.dragType == DragType.DragEnd &&
-        di.state == DragState.Dragging
-    ) {
-        const info: DragInfo = {
-            state: DragState.End,
-            lastPos: pos
-        }
-        const evt: DragEvent = {
-            dragType: DragType.DragEnd,
-            dragX: pos.x,
-            dragY: pos.y,
-            deltaX: pos.x - di.lastPos.x,
-            deltaY: pos.y - di.lastPos.y
-        }
-
-        return { seed: info, value: evt }
     }
+)
 
-    return { seed: di, value: null }
+function distance(d1: DragEvent | null, d2: DragEvent): number {
+    if (d1 == null) return 0
+
+    const dx = d1.dragX - d2.dragX
+    const dy = d1.dragY - d2.dragY
+    return Math.sqrt(dx * dx + dy * dy)
 }
 
 function mkDragEndable(evt: Stream<DragEvent>): Stream<DragEvent> {
@@ -178,6 +115,12 @@ function dragged(
     move: Stream<TapEvent>,
     end: Stream<TapEvent>
 ): Stream<DragEvent> {
+    const startDrag = constant(true, start)
+    const endDrag = constant(false, end)
+
+    // we're only interested in move events between start and end
+    const touching = startWith(false, merge(startDrag, endDrag))
+
     const mkDrag = curry(
         (t: DragType, e: TapEvent): DragEvent => {
             return {
@@ -189,19 +132,59 @@ function dragged(
             }
         }
     )
-    const e = mergeArray([
-        map(mkDrag(DragType.DragStart), start),
-        map(mkDrag(DragType.Drag), move),
-        map(mkDrag(DragType.DragEnd), end)
-    ])
 
-    const defPos = new Vector2(0, 0)
-    const def: DragInfo = {
-        state: DragState.Waiting,
-        lastPos: defPos
+    // only move events that are in between 'touching' is real move
+    const realMove = map(mkDrag(DragType.Drag), gate(touching, move))
+
+    // make sure user did move the mouse/touch
+    const checkDist = (s: DragEvent | null, p: DragEvent) => {
+        return distance(s, p) >= 1 ? p : null
     }
 
-    return mkDragEndable(unwrap(loop(processDrag, def, e)))
+    const dstart = map(mkDrag(DragType.DragStart), start)
+    const startPos = startWith(null, dstart)
+    const dragMove = unwrap(snapshot(checkDist, startPos, realMove))
+
+    // when user is actually dragging
+    const dragging = startWith(
+        false,
+        mergeArray([
+            constant(false, start),
+            constant(true, dragMove),
+            constant(false, end)
+        ])
+    )
+    const notDragging = map(not, dragging)
+    // the drag start should be the first drag event attached with start position
+    const dragStart = unwrap(tag(startPos, gate(notDragging, dragMove)))
+
+    // calculate the new drag end event
+    const lastPos = startWith(null, dragMove)
+    const lastDrag = unwrap(tag(lastPos, gate(dragging, end)))
+    const dragEnd = map(updateDragType(DragType.DragEnd), lastDrag)
+
+    const def: DragEvent = {
+        dragType: DragType.DragStart,
+        dragX: 0,
+        dragY: 0,
+        deltaX: 0,
+        deltaY: 0
+    }
+
+    // merge all drag related events and do delta calculation
+    const evts = mergeArray([dragStart, dragMove, dragEnd])
+
+    const calcDelta = (lastE: DragEvent, e: DragEvent): DragEvent => {
+        if (e.dragType == DragType.DragStart) {
+            return e
+        } else {
+            e.deltaX = e.dragX - lastE.dragX
+            e.deltaY = e.dragY - lastE.dragY
+            return e
+        }
+    }
+
+    return mkDragEndable(skip(1, scan(calcDelta, def, evts)))
 }
 
 export interface InputEvents {
