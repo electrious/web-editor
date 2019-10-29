@@ -10,7 +10,8 @@ import {
     debounce,
     skip,
     scan,
-    snapshot
+    snapshot,
+    skipRepeats
 } from '@most/core'
 import {
     domEvent,
@@ -22,7 +23,7 @@ import {
     touchmove
 } from '@most/dom-event'
 import { curry } from 'ramda'
-import { gate, unwrap, tag } from './helper'
+import { gate, unwrap, tag, debug } from './helper'
 import { Vector2 } from 'three'
 import not from 'ramda/es/not'
 
@@ -146,13 +147,15 @@ function dragged(
     const dragMove = unwrap(snapshot(checkDist, startPos, realMove))
 
     // when user is actually dragging
-    const dragging = startWith(
-        false,
-        mergeArray([
-            constant(false, start),
-            constant(true, dragMove),
-            constant(false, end)
-        ])
+    const dragging = skipRepeats(
+        startWith(
+            false,
+            mergeArray([
+                constant(false, start),
+                constant(true, dragMove),
+                constant(false, end)
+            ])
+        )
     )
     const notDragging = map(not, dragging)
     // the drag start should be the first drag event attached with start position
