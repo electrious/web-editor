@@ -7,7 +7,8 @@ import {
     mergeArray,
     constant,
     loop,
-    multicast
+    multicast,
+    debounce
 } from '@most/core'
 import {
     domEvent,
@@ -19,7 +20,7 @@ import {
     touchmove
 } from '@most/dom-event'
 import { curry } from 'ramda'
-import { gate, unwrap, debug } from './helper'
+import { gate, unwrap } from './helper'
 import { Vector2 } from 'three'
 
 export interface TapEvent {
@@ -144,6 +145,28 @@ const processDrag = (
     return { seed: di, value: null }
 }
 
+function mkDragEndable(evt: Stream<DragEvent>): Stream<DragEvent> {
+    // wait for 2 seconds and see if there're new events
+    // if not, make sure the last one is DragEnd
+    const e = debounce(2000, evt)
+
+    const f = (e: DragEvent): DragEvent | null => {
+        if (e.dragType != DragType.DragEnd) {
+            return {
+                dragType: DragType.DragEnd,
+                dragX: e.dragX,
+                dragY: e.dragY,
+                deltaX: 0,
+                deltaY: 0
+            }
+        }
+
+        return null
+    }
+
+    return merge(evt, unwrap(map(f, e)))
+}
+
 /**
  * Drag gesture recognizer for both mouse and touch events.
  * @param start
@@ -178,7 +201,7 @@ function dragged(
         lastPos: defPos
     }
 
-    return unwrap(loop(processDrag, def, e))
+    return mkDragEndable(unwrap(loop(processDrag, def, e)))
 }
 
 export interface InputEvents {

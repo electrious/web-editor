@@ -8,7 +8,7 @@ import {
 import { Stream } from '@most/types'
 import { createAdapter } from '@most/adapter'
 import clone from 'ramda/es/clone'
-import { map, loop, multicast } from '@most/core'
+import { map, loop, multicast, debounce, merge } from '@most/core'
 import { unwrap } from '../helper'
 import { DragType } from '../input'
 
@@ -40,7 +40,7 @@ export class TappableMesh extends Mesh implements Tappable {
  * @param evt
  * @param toLocal
  */
-function calcDragDelta(
+export function calcDragDelta(
     evt: Stream<SceneDragEvent>,
     toLocal: (v: Vector3) => Vector3 | null
 ): Stream<Vector3> {
@@ -99,11 +99,11 @@ export class DraggableMesh extends Mesh implements Draggable {
         super(geo, mat)
 
         const [f, s] = createAdapter()
-        this.dragEvents = s
+        this.dragEvents = multicast(s)
         this.insertDrag = f
 
         this.dragDelta = multicast(
-            calcDragDelta(s, v => {
+            calcDragDelta(this.dragEvents, v => {
                 const obj = this.parent
                 return obj == null ? null : obj.worldToLocal(v)
             })
