@@ -1,7 +1,7 @@
 import { RoofPlate } from './models/roofplate'
 import { Object3D } from 'three'
 import { createAdapter } from '@most/adapter'
-import { map, constant } from '@most/core'
+import { map, constant, multicast } from '@most/core'
 import equals from 'ramda/es/equals'
 import { createRoofNode } from './roofnode'
 import { mkSink } from './sink'
@@ -28,7 +28,7 @@ export function createRoofManager(roofs: RoofPlate[]): RoofManager {
     // create roof node for each roof
     const disposables = roofs.map(r => {
         // create a stream for this roof noting if it's active
-        const isActive = map(equals(r.id), activeRoof)
+        const isActive = multicast(map(equals(r.id), activeRoof))
         const n = createRoofNode(r, isActive)
 
         // convert the tap event on this roof to the roof id

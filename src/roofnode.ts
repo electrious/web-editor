@@ -16,8 +16,8 @@ import { mkSink } from './sink'
 import { defScheduler } from './helper'
 import { createDraggableMarker } from './ui/draggablemarker'
 import pluck from 'ramda/es/pluck'
-import { disposeAll, disposeBoth } from '@most/disposable'
-import { combineArray } from '@most/core'
+import { disposeAll, dispose } from '@most/disposable'
+import { combineArray, skip } from '@most/core'
 import { createAdapter } from '@most/adapter'
 
 export interface RoofNode {
@@ -52,11 +52,15 @@ const getActiveMaterial = memoizeWith(always('active_material'), () => {
 })
 
 // create roof mesh
-function createRoofMesh(ps: Vector2[]): TappableMesh {
+function createRoofMesh(
+    ps: Vector2[],
+    active?: boolean | undefined
+): TappableMesh {
     // create a ShapeGeometry with the Shape from border points
     const shp = new Shape(ps)
 
-    return new TappableMesh(new ShapeGeometry(shp), getDefMaterial())
+    const mat = active ? getActiveMaterial() : getDefMaterial()
+    return new TappableMesh(new ShapeGeometry(shp), mat)
 }
 
 // create roof corner markers
@@ -79,7 +83,8 @@ const createVertexMarkers = (
     }
 
     return [
-        combineArray(mkArray, pluck('position', markers)),
+        // skip the first occurrence as it's the same values as provided
+        skip(1, combineArray(mkArray, pluck('position', markers))),
         disposeAll(pluck('disposable', markers))
     ]
 }
@@ -116,34 +121,50 @@ export function createRoofNode(
         return new Vector2(np.x, np.y)
     })
 
+    const scheduler = defScheduler()
+
+    // add the roof mesh
     let mesh = createRoofMesh(ps)
     obj.add(mesh)
 
-    const activate = (active: boolean) => {
-        mesh.material = active ? getActiveMaterial() : getDefMaterial()
-    }
+    // update mesh material when the roof is activated/deactivated
+    const disposable1 = isActive.run(
+        mkSink((active: boolean) => {
+            mesh.material = active ? getActiveMaterial() : getDefMaterial()
+        }),
+        scheduler
+    )
 
-    const disposable1 = isActive.run(mkSink(activate), defScheduler())
-
+    // create the vertex markers
     const [newPosArr, disposable] = createVertexMarkers(obj, isActive, ps)
 
+    // create a stream for tap event of the mesh
     const [updateTap, tapped] = createAdapter()
+    // pipe mesh tap events into the new tapped stream
+    let updateTapDispose = mesh.tapEvents.run(mkSink(updateTap), scheduler)
 
+    // update roof corner positions and the mesh
     const updatePos = (arr: Vector2[]) => {
+        // remove old mesh and dispose old tap event pipe
         obj.remove(mesh)
+        dispose(updateTapDispose)
 
-        mesh = createRoofMesh(arr)
+        // create new mesh and setup the tap event pipe
+        mesh = createRoofMesh(arr, true)
         obj.add(mesh)
-
-        mesh.tapEvents.run(mkSink(updateTap), defScheduler())
+        updateTapDispose = mesh.tapEvents.run(mkSink(updateTap), scheduler)
     }
-
-    newPosArr.run(mkSink(updatePos), defScheduler())
+    const disposable2 = newPosArr.run(mkSink(updatePos), scheduler)
 
     return {
         roof: roof,
         tapped: tapped,
         roofObject: obj,
-        disposable: disposeBoth(disposable, disposable1)
+        disposable: disposeAll([
+            disposable,
+            disposable1,
+            disposable2,
+            updateTapDispose
+        ])
     }
 }

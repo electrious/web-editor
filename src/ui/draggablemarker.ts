@@ -33,7 +33,7 @@ const getMarkerMaterial = memoizeWith(always('marker_material'), () => {
 })
 
 function createVisibleMarker(): DraggableMesh {
-    const geo = new CircleGeometry(0.3, 32)
+    const geo = new CircleGeometry(0.5, 32)
     const mat = getMarkerMaterial()
 
     return new DraggableMesh(geo, mat)
