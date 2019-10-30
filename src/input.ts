@@ -198,15 +198,17 @@ export interface InputEvents {
 export function setupInput(elem: Element): InputEvents {
     const mouseTap = (e: MouseEvent): TapEvent => {
         return {
-            tapX: e.clientX,
-            tapY: e.clientY
+            tapX: e.offsetX,
+            tapY: e.offsetY
         }
     }
+
     const touchTap = (e: TouchEvent) => {
         const t = e.touches[0]
+        const rect = elem.getBoundingClientRect()
         return {
-            tapX: t.clientX,
-            tapY: t.clientY
+            tapX: t.pageX - rect.left,
+            tapY: t.clientY - rect.top
         }
     }
 
