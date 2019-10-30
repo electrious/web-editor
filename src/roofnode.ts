@@ -13,15 +13,18 @@ import always from 'ramda/es/always'
 import { Stream, Disposable } from '@most/types'
 import { SceneTapEvent } from './sceneevent'
 import { mkSink } from './sink'
-import { defScheduler } from './helper'
+import { defScheduler, debug } from './helper'
 import { createDraggableMarker } from './ui/draggablemarker'
 import pluck from 'ramda/es/pluck'
 import { disposeAll, dispose } from '@most/disposable'
-import { combineArray, skip } from '@most/core'
+import { combineArray, skip, map, multicast, debounce } from '@most/core'
 import { createAdapter } from '@most/adapter'
+import curry from 'ramda/es/curry'
+import compose from 'ramda/es/compose'
+import fmap from 'ramda/es/map'
 
 export interface RoofNode {
-    roof: RoofPlate
+    roof: Stream<RoofPlate>
     tapped: Stream<SceneTapEvent>
     roofObject: Object3D
     disposable: Disposable
@@ -88,6 +91,11 @@ const createVertexMarkers = (
         disposeAll(pluck('disposable', markers))
     ]
 }
+
+const updateRoofPlate = curry((roof: RoofPlate, ps: Vector3[]) => {
+    roof.borderPoints = ps
+    return roof
+})
 
 /**
  * create RoofNode for a RoofPlate
@@ -156,8 +164,19 @@ export function createRoofNode(
     }
     const disposable2 = newPosArr.run(mkSink(updatePos), scheduler)
 
+    const toWorld = (v: Vector2): Vector3 => {
+        return obj.localToWorld(new Vector3(v.x, v.y, 0))
+    }
+    const newRoofs = map(
+        compose(
+            updateRoofPlate(roof),
+            fmap(toWorld)
+        ),
+        newPosArr
+    )
+
     return {
-        roof: roof,
+        roof: multicast(debounce(1000, newRoofs)),
         tapped: tapped,
         roofObject: obj,
         disposable: disposeAll([

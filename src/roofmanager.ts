@@ -1,16 +1,18 @@
 import { RoofPlate } from './models/roofplate'
 import { Object3D } from 'three'
 import { createAdapter } from '@most/adapter'
-import { map, constant, multicast } from '@most/core'
+import { map, constant, multicast, mergeArray } from '@most/core'
 import equals from 'ramda/es/equals'
 import { createRoofNode } from './roofnode'
 import { mkSink } from './sink'
 import { defScheduler } from './helper'
-import { Disposable } from '@most/types'
+import { Disposable, Stream } from '@most/types'
 import { disposeBoth, disposeAll } from '@most/disposable'
+import pluck from 'ramda/es/pluck'
 
 export interface RoofManager {
     roofWrapper: Object3D
+    newRoof: Stream<RoofPlate>
     disposable: Disposable
 }
 
@@ -26,7 +28,7 @@ export function createRoofManager(roofs: RoofPlate[]): RoofManager {
     const [updateActive, activeRoof] = createAdapter<string>()
 
     // create roof node for each roof
-    const disposables = roofs.map(r => {
+    const nodes = roofs.map(r => {
         // create a stream for this roof noting if it's active
         const isActive = multicast(map(equals(r.id), activeRoof))
         const n = createRoofNode(r, isActive)
@@ -40,11 +42,14 @@ export function createRoofManager(roofs: RoofPlate[]): RoofManager {
 
         wrapper.add(n.roofObject)
 
-        return disposeBoth(n.disposable, d)
+        n.disposable = disposeBoth(n.disposable, d)
+
+        return n
     })
 
     return {
         roofWrapper: wrapper,
-        disposable: disposeAll(disposables)
+        newRoof: mergeArray(pluck('roof', nodes)),
+        disposable: disposeAll(pluck('disposable', nodes))
     }
 }

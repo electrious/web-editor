@@ -3,6 +3,8 @@ import { testRoofs } from './testroofplates'
 import { Vector3 } from 'three'
 import { RoofPlate } from '../src/models/roofplate'
 import { Angle } from '../src/math/angle'
+import { mkSink } from '../src/sink'
+import { defScheduler, debug } from '../src/helper'
 
 const parent = document.querySelector('#editor')
 
@@ -37,5 +39,6 @@ if (parent != null) {
     )
 
     // load the house and roofs
-    editor.loadHouse(296285, roofs)
+    const newRoofs = debug(editor.loadHouse(296285, roofs))
+    newRoofs.run(mkSink(), defScheduler())
 }
