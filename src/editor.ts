@@ -205,9 +205,7 @@ export function createEditor(
         roofs: RoofPlate[],
         roofUpdated: (r: RoofPlate) => void
     ) => {
-        const f = (h: Object3D) => {
-            es.addContent(h)
-
+        const loadRoofs = () => {
             // add all roofs to a new roof manager
             const mgr = createRoofManager(roofs)
             disposables.push(mgr.disposable)
@@ -216,6 +214,11 @@ export function createEditor(
             )
 
             es.addContent(mgr.roofWrapper)
+        }
+
+        const f = (h: Object3D) => {
+            es.addContent(h)
+            loadRoofs()
         }
 
         const disp = loadHouse(leadId).run(mkSink(f), defScheduler())
