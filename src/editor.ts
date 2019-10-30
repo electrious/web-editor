@@ -16,8 +16,7 @@ import { createAdapter } from '@most/adapter'
 import { RoofPlate } from './models/roofplate'
 import { setupRaycasting } from './sceneevent'
 import { defScheduler } from './helper'
-import { createRoofManager, RoofManager } from './roofmanager'
-import { empty } from '@most/core'
+import { createRoofManager } from './roofmanager'
 
 export type Size = [number, number]
 
@@ -27,7 +26,11 @@ export type Size = [number, number]
 export interface WebEditor {
     resize: (size: Size) => void
     dispose: () => void
-    loadHouse: (leadId: number, roofs: RoofPlate[]) => Stream<RoofPlate>
+    loadHouse: (
+        leadId: number,
+        roofs: RoofPlate[],
+        roofUpdated: (r: RoofPlate) => void
+    ) => void
 }
 
 /**
@@ -199,9 +202,9 @@ export function createEditor(
 
     const loadHouseFunc = (
         leadId: number,
-        roofs: RoofPlate[]
-    ): Stream<RoofPlate> => {
-        const [injectRoofs, newRoofs] = createAdapter<RoofPlate>()
+        roofs: RoofPlate[],
+        roofUpdated: (r: RoofPlate) => void
+    ) => {
         const f = (h: Object3D) => {
             es.addContent(h)
 
@@ -209,7 +212,7 @@ export function createEditor(
             const mgr = createRoofManager(roofs)
             disposables.push(mgr.disposable)
             disposables.push(
-                mgr.newRoof.run(mkSink(injectRoofs), defScheduler())
+                mgr.newRoof.run(mkSink(roofUpdated), defScheduler())
             )
 
             es.addContent(mgr.roofWrapper)
@@ -217,8 +220,6 @@ export function createEditor(
 
         const disp = loadHouse(leadId).run(mkSink(f), defScheduler())
         disposables.push(disp)
-
-        return newRoofs
     }
 
     const editor = {
