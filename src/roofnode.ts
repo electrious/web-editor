@@ -16,8 +16,15 @@ import { mkSink } from './sink'
 import { defScheduler, debug } from './helper'
 import { createDraggableMarker } from './ui/draggablemarker'
 import pluck from 'ramda/es/pluck'
-import { disposeAll, dispose } from '@most/disposable'
-import { combineArray, skip, map, multicast, debounce } from '@most/core'
+import { disposeAll, dispose, disposeBoth } from '@most/disposable'
+import {
+    combineArray,
+    skip,
+    map,
+    multicast,
+    debounce,
+    combine
+} from '@most/core'
 import { createAdapter } from '@most/adapter'
 import curry from 'ramda/es/curry'
 import compose from 'ramda/es/compose'
@@ -72,7 +79,35 @@ const createVertexMarkers = (
     active: Stream<boolean>,
     ps: Vector2[]
 ): [Stream<Vector2[]>, Disposable] => {
-    const markers = ps.map(createDraggableMarker(active))
+    // internal stream for currently active marker
+    const [setActive, activeMarker] = createAdapter<number | null>()
+
+    const markers = ps.map((pos: Vector2, idx: number) => {
+        // determine whether the current marker should be active or not
+        const f = (roofActive: boolean, activeIdx: number | null): boolean => {
+            return roofActive && (activeIdx == null || activeIdx == idx)
+        }
+        const isActive = multicast(combine(f, active, activeMarker))
+
+        // create the marker
+        const marker = createDraggableMarker(isActive, pos)
+
+        // if the current marker is being dragged, then it's active
+        const g = (dragging: boolean): number | null => {
+            return dragging ? idx : null
+        }
+        const d = map(g, marker.isDragging).run(
+            mkSink(setActive),
+            defScheduler()
+        )
+
+        marker.disposable = disposeBoth(marker.disposable, d)
+
+        return marker
+    })
+
+    // by default, all markers should be active for an active roof
+    setActive(null)
 
     markers.forEach(m => {
         obj.add(m.marker)

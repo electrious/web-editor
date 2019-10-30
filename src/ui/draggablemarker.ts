@@ -23,6 +23,7 @@ import { DragType } from '../input'
 export interface DraggableMarker {
     marker: Object3D
     position: Stream<Vector3>
+    isDragging: Stream<boolean>
     disposable: Disposable
 }
 
@@ -123,6 +124,7 @@ export const createDraggableMarker = curry(
         return {
             marker: markerObj,
             position: multicast(newPos),
+            isDragging: multicast(dragging),
             disposable: disposable
         }
     }
