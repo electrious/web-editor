@@ -13,8 +13,8 @@ import always from 'ramda/es/always'
 import { Stream, Disposable } from '@most/types'
 import { SceneTapEvent } from './sceneevent'
 import { mkSink } from './sink'
-import { defScheduler, debug } from './helper'
-import { createDraggableMarker } from './ui/draggablemarker'
+import { defScheduler } from './helper'
+import { createDraggableObject } from './ui/draggableobject'
 import pluck from 'ramda/es/pluck'
 import { disposeAll, dispose, disposeBoth } from '@most/disposable'
 import {
@@ -90,7 +90,7 @@ const createVertexMarkers = (
         const isActive = multicast(combine(f, active, activeMarker))
 
         // create the marker
-        const marker = createDraggableMarker(isActive, pos)
+        const marker = createDraggableObject(isActive, pos)
 
         // if the current marker is being dragged, then it's active
         const g = (dragging: boolean): number | null => {
@@ -110,7 +110,7 @@ const createVertexMarkers = (
     setActive(null)
 
     markers.forEach(m => {
-        obj.add(m.marker)
+        obj.add(m.object)
     })
 
     const toVec2 = (v: Vector3): Vector2 => {
