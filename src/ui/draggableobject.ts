@@ -11,10 +11,9 @@ import { Stream, Disposable } from '@most/types'
 import { scan, multicast, merge, skipRepeats, map } from '@most/core'
 import memoizeWith from 'ramda/es/memoizeWith'
 import always from 'ramda/es/always'
-import { DraggableMesh, calcDragDelta } from '../custom/mesh'
+import { DraggableMesh, calcDragDelta, TapDragMesh } from '../custom/mesh'
 import { mkSink } from '../sink'
 import { defScheduler } from '../helper'
-import curry from 'ramda/es/curry'
 import clone from 'ramda/es/clone'
 import { SceneDragEvent } from '../sceneevent'
 import { DragType } from '../input'
@@ -40,11 +39,11 @@ const getMaterial = memoizeWith(always('marker_material'), () => {
 function createVisibleObject(
     customGeo?: Geometry | undefined,
     customMat?: Material | undefined
-): DraggableMesh {
+): TapDragMesh {
     const geo = customGeo == undefined ? new CircleGeometry(0.5, 32) : customGeo
     const mat = customMat == undefined ? getMaterial() : customMat
 
-    return new DraggableMesh(geo, mat)
+    return new TapDragMesh(geo, mat)
 }
 
 // get invisible material for the big circle under marker to ease dragging.

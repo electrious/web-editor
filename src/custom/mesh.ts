@@ -114,3 +114,50 @@ export class DraggableMesh extends Mesh implements Draggable {
         this.insertDrag(event)
     }
 }
+
+/**
+ * Extend Mesh with both Tappable and Draggable and provide the event streams
+ */
+export class TapDragMesh extends Mesh implements Tappable, Draggable {
+    // tap event streams
+    tapEvents: Stream<SceneTapEvent>
+
+    // private function to insert new tap events to the stream
+    private insertTap: (event: SceneTapEvent) => void
+
+    // drag event streams
+    dragEvents: Stream<SceneDragEvent>
+
+    // drag delta in parent's coordinate system
+    dragDelta: Stream<Vector3>
+
+    // private function to insert drag events into the stream
+    private insertDrag: (event: SceneDragEvent) => void
+
+    constructor(geo: Geometry, mat: Material) {
+        super(geo, mat)
+
+        const [tf, ts] = createAdapter()
+        this.tapEvents = ts
+        this.insertTap = tf
+
+        const [f, s] = createAdapter()
+        this.dragEvents = multicast(s)
+        this.insertDrag = f
+
+        this.dragDelta = multicast(
+            calcDragDelta(this.dragEvents, v => {
+                const obj = this.parent
+                return obj == null ? null : obj.worldToLocal(v)
+            })
+        )
+    }
+
+    tapped(event: SceneTapEvent) {
+        this.insertTap(event)
+    }
+
+    dragged(event: SceneDragEvent) {
+        this.insertDrag(event)
+    }
+}
