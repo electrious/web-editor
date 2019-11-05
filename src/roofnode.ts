@@ -14,17 +14,9 @@ import { Stream, Disposable } from '@most/types'
 import { SceneTapEvent } from './sceneevent'
 import { mkSink } from './sink'
 import { defScheduler } from './helper'
-import { createDraggableObject } from './ui/draggableobject'
-import pluck from 'ramda/es/pluck'
-import { disposeAll, dispose, disposeBoth } from '@most/disposable'
-import {
-    combineArray,
-    skip,
-    map,
-    multicast,
-    debounce,
-    combine
-} from '@most/core'
+import { createRoofEditor } from './editor/roofeditor'
+import { disposeAll, dispose } from '@most/disposable'
+import { map, multicast, debounce } from '@most/core'
 import { createAdapter } from '@most/adapter'
 import curry from 'ramda/es/curry'
 import compose from 'ramda/es/compose'
@@ -71,60 +63,6 @@ function createRoofMesh(
 
     const mat = active ? getActiveMaterial() : getDefMaterial()
     return new TappableMesh(new ShapeGeometry(shp), mat)
-}
-
-// create roof corner markers
-const createVertexMarkers = (
-    obj: Object3D,
-    active: Stream<boolean>,
-    ps: Vector2[]
-): [Stream<Vector2[]>, Disposable] => {
-    // internal stream for currently active marker
-    const [setActive, activeMarker] = createAdapter<number | null>()
-
-    const markers = ps.map((pos: Vector2, idx: number) => {
-        // determine whether the current marker should be active or not
-        const f = (roofActive: boolean, activeIdx: number | null): boolean => {
-            return roofActive && (activeIdx == null || activeIdx == idx)
-        }
-        const isActive = multicast(combine(f, active, activeMarker))
-
-        // create the marker
-        const marker = createDraggableObject(isActive, pos)
-
-        // if the current marker is being dragged, then it's active
-        const g = (dragging: boolean): number | null => {
-            return dragging ? idx : null
-        }
-        const d = map(g, marker.isDragging).run(
-            mkSink(setActive),
-            defScheduler()
-        )
-
-        marker.disposable = disposeBoth(marker.disposable, d)
-
-        return marker
-    })
-
-    // by default, all markers should be active for an active roof
-    setActive(null)
-
-    markers.forEach(m => {
-        obj.add(m.object)
-    })
-
-    const toVec2 = (v: Vector3): Vector2 => {
-        return new Vector2(v.x, v.y)
-    }
-    const mkArray = (...args: Vector3[]) => {
-        return args.map(toVec2)
-    }
-
-    return [
-        // skip the first occurrence as it's the same values as provided
-        skip(1, combineArray(mkArray, pluck('position', markers))),
-        disposeAll(pluck('disposable', markers))
-    ]
 }
 
 const updateRoofPlate = curry((roof: RoofPlate, ps: Vector3[]) => {
@@ -179,7 +117,7 @@ export function createRoofNode(
     )
 
     // create the vertex markers
-    const [newPosArr, disposable] = createVertexMarkers(obj, isActive, ps)
+    const editor = createRoofEditor(obj, isActive, ps)
 
     // create a stream for tap event of the mesh
     const [updateTap, tapped] = createAdapter()
@@ -197,7 +135,7 @@ export function createRoofNode(
         obj.add(mesh)
         updateTapDispose = mesh.tapEvents.run(mkSink(updateTap), scheduler)
     }
-    const disposable2 = newPosArr.run(mkSink(updatePos), scheduler)
+    const disposable2 = editor.roofVertices.run(mkSink(updatePos), scheduler)
 
     const toWorld = (v: Vector2): Vector3 => {
         return obj.localToWorld(new Vector3(v.x, v.y, 0))
@@ -207,7 +145,7 @@ export function createRoofNode(
             updateRoofPlate(roof),
             fmap(toWorld)
         ),
-        newPosArr
+        editor.roofVertices
     )
 
     return {
@@ -215,7 +153,7 @@ export function createRoofNode(
         tapped: tapped,
         roofObject: obj,
         disposable: disposeAll([
-            disposable,
+            editor.disposable,
             disposable1,
             disposable2,
             updateTapDispose
