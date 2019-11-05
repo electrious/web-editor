@@ -176,28 +176,21 @@ export function setupRaycasting(
         processTapObjects(domPos, raycastRes)
     }
 
-    // raycast drag events
-    const raycastDrag = (arg: [Vector2, DragEvent]): DragEvent | null => {
-        raycaster.setFromCamera(arg[0], camera)
-        const results = raycaster.intersectObject(scene, true)
-        return processDragObjects(results, arg[1])
-    }
-
     const scheduler = defScheduler()
+    const sink = mkSink()
     const disposeTap = snapshot(raycastTap, size, input.tapped).run(
-        mkSink(),
+        sink,
         scheduler
     )
 
-    const f = (s: Size, e: DragEvent): [Vector2, DragEvent] => {
-        return [dragPosition(s, e), e]
+    // raycast drag events
+    const raycastDrag = (s: Size, e: DragEvent): DragEvent | null => {
+        const results = doRaycast(dragPosition(s, e))
+        return processDragObjects(results, e)
     }
 
-    // eslint-disable-next-line prettier/prettier
-    const g = compose(raycastDrag, f)
-
-    const unraycastedDrag = snapshot(g, size, input.dragged)
-    const disposeDrag = unraycastedDrag.run(mkSink(), scheduler)
+    const unraycastedDrag = snapshot(raycastDrag, size, input.dragged)
+    const disposeDrag = unraycastedDrag.run(sink, scheduler)
 
     return {
         dragEvent: multicast(unwrap(unraycastedDrag)),
