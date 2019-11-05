@@ -21,6 +21,7 @@ import { defScheduler, unwrap } from './helper'
 export interface SceneTapEvent {
     distance: number
     point: Vector3
+    domPosition: Vector2 // original mouse/touch event position
 }
 
 /**
@@ -87,7 +88,7 @@ function dragPosition(size: Size, e: DragEvent): Vector2 {
  * event to it.
  * @param objs
  */
-function processTapObjects(objs: Intersection[]) {
+function processTapObjects(domPos: Vector2, objs: Intersection[]) {
     for (const key in objs) {
         if (objs.hasOwnProperty(key)) {
             const res = objs[key]
@@ -96,7 +97,8 @@ function processTapObjects(objs: Intersection[]) {
             if (t != null) {
                 t.tapped({
                     distance: res.distance,
-                    point: res.point
+                    point: res.point,
+                    domPosition: domPos
                 })
 
                 break
@@ -167,8 +169,12 @@ export function setupRaycasting(
     }
 
     // raycast tap events
-    // eslint-disable-next-line prettier/prettier
-    const raycastTap = compose(processTapObjects, doRaycast)
+    const raycastTap = (s: Size, e: TapEvent) => {
+        const domPos = new Vector2(e.tapX, e.tapY)
+        const raycastRes = doRaycast(tapPosition(s, e))
+
+        processTapObjects(domPos, raycastRes)
+    }
 
     // raycast drag events
     const raycastDrag = (arg: [Vector2, DragEvent]): DragEvent | null => {
@@ -178,8 +184,8 @@ export function setupRaycasting(
     }
 
     const scheduler = defScheduler()
-    const disposeTap = snapshot(tapPosition, size, input.tapped).run(
-        mkSink(raycastTap),
+    const disposeTap = snapshot(raycastTap, size, input.tapped).run(
+        mkSink(),
         scheduler
     )
 
