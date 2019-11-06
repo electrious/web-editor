@@ -8,7 +8,7 @@ import {
     Material
 } from 'three'
 import { Stream, Disposable } from '@most/types'
-import { scan, multicast, merge, skipRepeats, map } from '@most/core'
+import { scan, multicast, merge, skipRepeats, map, constant } from '@most/core'
 import memoizeWith from 'ramda/es/memoizeWith'
 import always from 'ramda/es/always'
 import { DraggableMesh, calcDragDelta, TapDragMesh } from '../custom/mesh'
@@ -23,6 +23,7 @@ import { DragType } from '../input'
  */
 export interface DraggableObject {
     object: Object3D
+    tapped: Stream<number>
     position: Stream<Vector3>
     isDragging: Stream<boolean>
     disposable: Disposable
@@ -73,6 +74,7 @@ function createInvisibleCircle(): DraggableMesh {
  */
 export const createDraggableObject = (
     active: Stream<boolean>,
+    index: number,
     position: Vector2,
     customGeo?: Geometry | undefined,
     customMat?: Material | undefined
@@ -135,6 +137,7 @@ export const createDraggableObject = (
 
     return {
         object: dragObj,
+        tapped: constant(index, mesh.tapEvents),
         position: multicast(newPos),
         isDragging: multicast(dragging),
         disposable: disposable
