@@ -36,6 +36,6 @@
     "@most/scheduler": "^1.2.3",
     "@types/ramda": "^0.26.33",
     "ramda": "^0.26.1",
-    "three": "https://github.com/manyoo/three.js.git"
+    "three": "^0.110.0"
   }
 }
