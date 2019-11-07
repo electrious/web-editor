@@ -18,12 +18,11 @@ import {
     mergeArray,
     snapshot,
     merge,
-    constant,
-    scan
+    constant
 } from '@most/core'
 import { createDraggableObject, DraggableObject } from '../ui/draggableobject'
 import { mkSink } from '../sink'
-import { defScheduler, debug } from '../helper'
+import { defScheduler } from '../helper'
 import { dispose, disposeAll } from '@most/disposable'
 import pluck from 'ramda/es/pluck'
 import remove from 'ramda/es/remove'
@@ -39,6 +38,8 @@ import takeLast from 'ramda/es/takeLast'
 import concat from 'ramda/es/concat'
 import filter from 'ramda/es/filter'
 import insert from 'ramda/es/insert'
+import append from 'ramda/es/append'
+import head from 'ramda/es/head'
 
 const toVec2 = (v: Vector3): Vector2 => {
     return new Vector2(v.x, v.y)
@@ -165,10 +166,12 @@ const greenMarkerPositions = (vertices: Vector2[]): GreenMarkerPoint[] => {
         return { dist: v1.distanceTo(v2), point: markerPoint }
     }
 
-    // take the n-1 vertices and their index
-    const v1List = init(vertices).map((v, i): [Vector2, number] => [v, i])
+    // take all vertices and their index
+    const v1List = vertices.map((v, i): [Vector2, number] => [v, i])
+    // make a new list with the head of origin list put to end
+    const v2List = append(head(vertices), tail(vertices))
     // calculate the distance and points between vertex pairs
-    const d = zipWith(f, v1List, tail(vertices))
+    const d = zipWith(f, v1List, v2List)
 
     // filter function
     const g = (d: { dist: number }) => {
@@ -232,7 +235,7 @@ const mkGreenMarkers = (
         return { seed: res, value: res }
     }
 
-    const markers = multicast(debug(loop(f, [], mPosLst)))
+    const markers = multicast(loop(f, [], mPosLst))
 
     // set active status for all markers
     const setActive = (ms: GreenMarker[], active: boolean) => {
