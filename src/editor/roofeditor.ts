@@ -1,4 +1,10 @@
-import { Object3D, Vector2, Vector3 } from 'three'
+import {
+    Object3D,
+    Vector2,
+    Vector3,
+    MeshBasicMaterial,
+    CircleGeometry
+} from 'three'
 import { Stream, Disposable } from '@most/types'
 import { createAdapter } from '@most/adapter'
 import {
@@ -12,15 +18,27 @@ import {
     mergeArray,
     snapshot,
     merge,
-    constant
+    constant,
+    scan
 } from '@most/core'
 import { createDraggableObject, DraggableObject } from '../ui/draggableobject'
 import { mkSink } from '../sink'
-import { defScheduler } from '../helper'
+import { defScheduler, debug } from '../helper'
 import { dispose, disposeAll } from '@most/disposable'
 import pluck from 'ramda/es/pluck'
 import remove from 'ramda/es/remove'
 import curry from 'ramda/es/curry'
+import memoizeWith from 'ramda/es/memoizeWith'
+import always from 'ramda/es/always'
+import { TappableMesh } from '../custom/mesh'
+import zipWith from 'ramda/es/zipWith'
+import init from 'ramda/es/init'
+import tail from 'ramda/es/tail'
+import take from 'ramda/es/take'
+import takeLast from 'ramda/es/takeLast'
+import concat from 'ramda/es/concat'
+import filter from 'ramda/es/filter'
+import insert from 'ramda/es/insert'
 
 const toVec2 = (v: Vector3): Vector2 => {
     return new Vector2(v.x, v.y)
@@ -94,6 +112,150 @@ const attachObjs = (parent: Object3D) => {
     }
 }
 
+/**
+ * create material for the green marker. this function is memoized so the material
+ * is created once and shared.
+ */
+const greenMaterial = memoizeWith(always('green_material'), () => {
+    return new MeshBasicMaterial({ color: 0x22ff22 })
+})
+
+/**
+ * create a green marker object
+ */
+const mkGreenMarker = (p: Vector2): TappableMesh => {
+    const geo = new CircleGeometry(0.3, 32)
+    const mat = greenMaterial()
+    const m = new TappableMesh(geo, mat)
+    m.position.set(p.x, p.y, 0.01)
+
+    return m
+}
+
+/**
+ * internal object for green marker point data
+ */
+interface GreenMarkerPoint {
+    position: Vector2
+    vertIndex: number // the index to be used to insert new vertex
+}
+
+interface GreenMarker {
+    mesh: TappableMesh
+    point: GreenMarkerPoint
+}
+
+/**
+ * given a list of vertices position, calculate all middle points
+ * @param vertices
+ */
+const greenMarkerPositions = (vertices: Vector2[]): GreenMarkerPoint[] => {
+    if (vertices.length <= 1) {
+        return []
+    }
+
+    // calculate the distance and marker point for two point
+    const f = (v: [Vector2, number], v2: Vector2) => {
+        const v1 = v[0]
+        const idx = v[1]
+        const markerPoint: GreenMarkerPoint = {
+            position: new Vector2((v1.x + v2.x) / 2, (v1.y + v2.y) / 2),
+            vertIndex: idx + 1
+        }
+        return { dist: v1.distanceTo(v2), point: markerPoint }
+    }
+
+    // take the n-1 vertices and their index
+    const v1List = init(vertices).map((v, i): [Vector2, number] => [v, i])
+    // calculate the distance and points between vertex pairs
+    const d = zipWith(f, v1List, tail(vertices))
+
+    // filter function
+    const g = (d: { dist: number }) => {
+        return d.dist > 1
+    }
+
+    // extract the marker point
+    const h = (d: { point: GreenMarkerPoint }) => {
+        return d.point
+    }
+
+    return filter(g, d).map(h)
+}
+
+const mkGreenMarkers = (
+    parent: Object3D,
+    active: Stream<boolean>,
+    vertices: Stream<Vector2[]>
+): [Stream<GreenMarkerPoint>, Disposable] => {
+    const mPosLst = map(greenMarkerPositions, vertices)
+
+    const updatePos = (o: GreenMarker, p: GreenMarkerPoint) => {
+        o.mesh.position.set(p.position.x, p.position.y, 0.01)
+        o.point = p
+        return o
+    }
+    // function to create/delete/update green marker objects based on new list
+    // of GreenMarkerPoint
+    const f = (
+        oldObjs: GreenMarker[],
+        ps: GreenMarkerPoint[]
+    ): GreenMarker[] => {
+        if (oldObjs.length == ps.length) {
+            return zipWith(updatePos, oldObjs, ps)
+        } else if (oldObjs.length < ps.length) {
+            const updObjs = zipWith(
+                updatePos,
+                oldObjs,
+                take(oldObjs.length, ps)
+            )
+            const newObjs = takeLast(ps.length - oldObjs.length, ps).map(p => {
+                const m = mkGreenMarker(p.position)
+                return { mesh: m, point: p }
+            })
+            newObjs.forEach(o => {
+                parent.add(o.mesh)
+            })
+
+            return concat(updObjs, newObjs)
+        } else if (oldObjs.length > ps.length) {
+            const updObjs = zipWith(updatePos, take(ps.length, oldObjs), ps)
+            const delObjs = takeLast(oldObjs.length - ps.length, oldObjs)
+            delObjs.forEach(o => {
+                parent.remove(o.mesh)
+            })
+
+            return updObjs
+        } else {
+            return []
+        }
+    }
+
+    const markers = multicast(scan(f, [], mPosLst))
+
+    // set active status for all markers
+    const setActive = (ms: GreenMarker[], active: boolean) => {
+        ms.forEach(m => {
+            m.mesh.visible = active
+        })
+    }
+
+    const d = combine(setActive, markers, active).run(mkSink(), defScheduler())
+
+    // transform tap event to add vertex event
+    const getTap = (m: GreenMarker) => {
+        return constant(m.point, m.mesh.tapEvents)
+    }
+
+    const getTapForAll = (ms: GreenMarker[]) => {
+        return mergeArray(ms.map(getTap))
+    }
+
+    const tapEvts = switchLatest(map(getTapForAll, markers))
+
+    return [tapEvts, d]
+}
+
 export interface RoofEditor {
     roofVertices: Stream<Vector2[]>
     disposable: Disposable
@@ -133,8 +295,28 @@ export const createRoofEditor = (
     }
     const vertsAfterDrag = switchLatest(map(getPosition, markers))
 
-    // merge new vertices after dragging and vertices after deleting
+    // merge new vertices after dragging and vertices after adding/deleting
     const newVertices = multicast(merge(vertices, vertsAfterDrag))
+
+    const greenActive = multicast(
+        combine(
+            (ra: boolean, am: number | null) => {
+                return ra && am == null
+            },
+            roofActive,
+            activeMarker
+        )
+    )
+    // create green markers for adding new vertices
+    const [toAddVert, disposable4] = mkGreenMarkers(
+        parent,
+        greenActive,
+        newVertices
+    )
+    const addVert = (ps: Vector2[], p: GreenMarkerPoint) => {
+        return insert(p.vertIndex, p.position, ps)
+    }
+    const vertsAfterAdd = snapshot(addVert, newVertices, toAddVert)
 
     // get delete event of tapping on a marker
     const getDelEvt = (o: DraggableObject[]) => {
@@ -148,8 +330,8 @@ export const createRoofEditor = (
     }
     const vertsAfterDel = snapshot(delMarker, newVertices, delEvts)
 
-    // update the real vertex list after deleting
-    const disposable2 = vertsAfterDel.run(
+    // update the real vertex list after adding/deleting
+    const disposable2 = merge(vertsAfterAdd, vertsAfterDel).run(
         mkSink(vs => {
             updateVertList(vs)
 
@@ -167,6 +349,11 @@ export const createRoofEditor = (
     return {
         // skip the first occurrence as it's the same values as provided
         roofVertices: newVertices,
-        disposable: disposeAll([disposable1, disposable2, disposable3])
+        disposable: disposeAll([
+            disposable1,
+            disposable2,
+            disposable3,
+            disposable4
+        ])
     }
 }
