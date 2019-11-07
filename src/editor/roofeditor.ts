@@ -200,9 +200,10 @@ const mkGreenMarkers = (
     const f = (
         oldObjs: GreenMarker[],
         ps: GreenMarkerPoint[]
-    ): GreenMarker[] => {
+    ): { seed: GreenMarker[]; value: GreenMarker[] } => {
+        let res: GreenMarker[] = []
         if (oldObjs.length == ps.length) {
-            return zipWith(updatePos, oldObjs, ps)
+            res = zipWith(updatePos, oldObjs, ps)
         } else if (oldObjs.length < ps.length) {
             const updObjs = zipWith(
                 updatePos,
@@ -217,7 +218,7 @@ const mkGreenMarkers = (
                 parent.add(o.mesh)
             })
 
-            return concat(updObjs, newObjs)
+            res = concat(updObjs, newObjs)
         } else if (oldObjs.length > ps.length) {
             const updObjs = zipWith(updatePos, take(ps.length, oldObjs), ps)
             const delObjs = takeLast(oldObjs.length - ps.length, oldObjs)
@@ -225,13 +226,13 @@ const mkGreenMarkers = (
                 parent.remove(o.mesh)
             })
 
-            return updObjs
-        } else {
-            return []
+            res = updObjs
         }
+
+        return { seed: res, value: res }
     }
 
-    const markers = multicast(scan(f, [], mPosLst))
+    const markers = multicast(debug(loop(f, [], mPosLst)))
 
     // set active status for all markers
     const setActive = (ms: GreenMarker[], active: boolean) => {
@@ -345,6 +346,9 @@ export const createRoofEditor = (
 
     // set the default vertices
     updateVertList(ps)
+
+    // set roof to be inactive by default
+    setRoofActive(false)
 
     return {
         // skip the first occurrence as it's the same values as provided
