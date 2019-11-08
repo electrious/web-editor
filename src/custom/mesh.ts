@@ -73,7 +73,7 @@ export function validateDrag(
         }
     }
 
-    return unwrap(loop(f, false, evt))
+    return unwrap(loop(f, false, mkDragEndable(evt)))
 }
 
 /**

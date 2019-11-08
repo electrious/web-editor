@@ -9,11 +9,10 @@ import {
 } from 'three'
 import { Stream, Disposable } from '@most/types'
 import { mkSink } from './sink'
-import { snapshot, multicast, debounce, map } from '@most/core'
+import { snapshot, multicast, debounce, map, merge } from '@most/core'
 import { Size } from './editor'
 import { disposeBoth } from '@most/disposable'
 import { defScheduler, unwrap } from './helper'
-import merge from 'ramda/es/merge'
 
 /**
  * tap events sent to 3D objects
