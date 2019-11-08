@@ -34,19 +34,5 @@ export function debug<T>(src: Stream<T>): Stream<T> {
  * @param stream
  */
 export function gate<T>(pred: Stream<boolean>, stream: Stream<T>): Stream<T> {
-    const doGate = (pred: boolean, v: T) => {
-        return pred ? v : null
-    }
-    return unwrap(snapshot(doGate, pred, stream))
-}
-
-/**
- * propagate value in 'stream' when events in 'sampler' occurs.
- * @param stream
- * @param sampler
- */
-export function tag<T, S>(stream: Stream<T>, sampler: Stream<S>): Stream<T> {
-    const f = (v1: T, _v2: S) => v1
-
-    return snapshot(f, stream, sampler)
+    return unwrap(snapshot((pred, v) => (pred ? v : null), pred, stream))
 }

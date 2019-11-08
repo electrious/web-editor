@@ -12,7 +12,8 @@ import {
     scan,
     snapshot,
     skipRepeats,
-    filter
+    filter,
+    sample
 } from '@most/core'
 import {
     domEvent,
@@ -24,7 +25,7 @@ import {
     touchmove
 } from '@most/dom-event'
 import { curry } from 'ramda'
-import { gate, unwrap, tag, defScheduler } from './helper'
+import { gate, unwrap, defScheduler } from './helper'
 import not from 'ramda/es/not'
 import { createAdapter } from '@most/adapter'
 import { mkSink } from './sink'
@@ -169,11 +170,11 @@ function dragged(
     )
     const notDragging = map(not, dragging)
     // the drag start should be the first drag event attached with start position
-    const dragStart = unwrap(tag(startPos, gate(notDragging, dragMove)))
+    const dragStart = unwrap(sample(startPos, gate(notDragging, dragMove)))
 
     // calculate the new drag end event
     const lastPos = startWith(null, dragMove)
-    const lastDrag = unwrap(tag(lastPos, gate(dragging, end)))
+    const lastDrag = unwrap(sample(lastPos, gate(dragging, end)))
     const dragEnd = map(updateDragType(DragType.DragEnd), lastDrag)
 
     const def: DragEvent = {

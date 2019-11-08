@@ -9,11 +9,11 @@ import {
 } from 'three'
 import { Stream, Disposable } from '@most/types'
 import { mkSink } from './sink'
-import { snapshot, multicast } from '@most/core'
+import { snapshot, multicast, debounce, map } from '@most/core'
 import { Size } from './editor'
 import { disposeBoth } from '@most/disposable'
-import compose from 'ramda/es/compose'
 import { defScheduler, unwrap } from './helper'
+import merge from 'ramda/es/merge'
 
 /**
  * tap events sent to 3D objects
@@ -31,6 +31,45 @@ export interface SceneDragEvent {
     type: DragType
     distance: number
     point: Vector3
+}
+
+export function isDragStart(e: SceneDragEvent): boolean {
+    return e.type == DragType.DragStart
+}
+
+export function isDrag(e: SceneDragEvent): boolean {
+    return e.type == DragType.Drag
+}
+
+export function isDragEnd(e: SceneDragEvent): boolean {
+    return e.type == DragType.DragEnd
+}
+
+/**
+ * add end event to SceneDragEvent stream if there's no input for a while and
+ * no end event.
+ * @param evt input event stream
+ */
+export function mkDragEndable(
+    evt: Stream<SceneDragEvent>
+): Stream<SceneDragEvent> {
+    // wait for 2 seconds and see if there're new events
+    // if not, make sure the last one is DragEnd
+    const e = debounce(2000, evt)
+
+    const f = (e: SceneDragEvent): SceneDragEvent | null => {
+        if (e.type != DragType.DragEnd) {
+            return {
+                type: DragType.DragEnd,
+                distance: e.distance,
+                point: e.point
+            }
+        }
+
+        return null
+    }
+
+    return merge(evt, unwrap(map(f, e)))
 }
 
 /**

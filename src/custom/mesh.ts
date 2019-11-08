@@ -3,7 +3,11 @@ import {
     Tappable,
     SceneTapEvent,
     Draggable,
-    SceneDragEvent
+    SceneDragEvent,
+    isDragStart,
+    isDrag,
+    isDragEnd,
+    mkDragEndable
 } from '../sceneevent'
 import { Stream } from '@most/types'
 import { createAdapter } from '@most/adapter'
@@ -33,6 +37,43 @@ export class TappableMesh extends Mesh implements Tappable {
     tapped(event: SceneTapEvent) {
         this.insertTap(event)
     }
+}
+
+/**
+ * process the drag events in the stream to make sure all drag start with
+ * dragStart and end with dragEnd.
+ * @param evt
+ */
+export function validateDrag(
+    evt: Stream<SceneDragEvent>
+): Stream<SceneDragEvent> {
+    const f = (
+        canDrag: boolean,
+        e: SceneDragEvent
+    ): { seed: boolean; value: SceneDragEvent | null } => {
+        if (isDragStart(e)) {
+            if (canDrag) {
+                // if there's a repeated dragStart, omit it.
+                return { seed: true, value: null }
+            }
+            return { seed: true, value: e }
+        } else if (canDrag && isDrag(e)) {
+            // only send drag event downstream if there was a drag start event
+            return { seed: true, value: e }
+        } else if (isDragEnd(e)) {
+            // if the drag already ended, then omit the new End event.
+            if (!canDrag) {
+                return { seed: false, value: null }
+            }
+            // otherwise, stop the dragging, and send the end event
+            return { seed: false, value: e }
+        } else {
+            // unknown state, omit the event
+            return { seed: false, value: null }
+        }
+    }
+
+    return unwrap(loop(f, false, evt))
 }
 
 /**
@@ -118,21 +159,12 @@ export class DraggableMesh extends Mesh implements Draggable {
 /**
  * Extend Mesh with both Tappable and Draggable and provide the event streams
  */
-export class TapDragMesh extends Mesh implements Tappable, Draggable {
+export class TapDragMesh extends DraggableMesh implements Tappable {
     // tap event streams
     tapEvents: Stream<SceneTapEvent>
 
     // private function to insert new tap events to the stream
     private insertTap: (event: SceneTapEvent) => void
-
-    // drag event streams
-    dragEvents: Stream<SceneDragEvent>
-
-    // drag delta in parent's coordinate system
-    dragDelta: Stream<Vector3>
-
-    // private function to insert drag events into the stream
-    private insertDrag: (event: SceneDragEvent) => void
 
     constructor(geo: Geometry, mat: Material) {
         super(geo, mat)
@@ -140,24 +172,9 @@ export class TapDragMesh extends Mesh implements Tappable, Draggable {
         const [tf, ts] = createAdapter()
         this.tapEvents = ts
         this.insertTap = tf
-
-        const [f, s] = createAdapter()
-        this.dragEvents = multicast(s)
-        this.insertDrag = f
-
-        this.dragDelta = multicast(
-            calcDragDelta(this.dragEvents, v => {
-                const obj = this.parent
-                return obj == null ? null : obj.worldToLocal(v)
-            })
-        )
     }
 
     tapped(event: SceneTapEvent) {
         this.insertTap(event)
-    }
-
-    dragged(event: SceneDragEvent) {
-        this.insertDrag(event)
     }
 }

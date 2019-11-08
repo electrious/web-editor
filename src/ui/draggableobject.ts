@@ -8,15 +8,26 @@ import {
     Material
 } from 'three'
 import { Stream, Disposable } from '@most/types'
-import { scan, multicast, merge, skipRepeats, map, constant } from '@most/core'
+import {
+    scan,
+    multicast,
+    merge,
+    skipRepeats,
+    filter,
+    constant
+} from '@most/core'
 import memoizeWith from 'ramda/es/memoizeWith'
 import always from 'ramda/es/always'
-import { DraggableMesh, calcDragDelta, TapDragMesh } from '../custom/mesh'
+import {
+    DraggableMesh,
+    calcDragDelta,
+    TapDragMesh,
+    validateDrag
+} from '../custom/mesh'
 import { mkSink } from '../sink'
 import { defScheduler } from '../helper'
 import clone from 'ramda/es/clone'
-import { SceneDragEvent } from '../sceneevent'
-import { DragType } from '../input'
+import { isDragStart, isDragEnd } from '../sceneevent'
 
 /**
  * defines all data for a Draggable Object
@@ -97,25 +108,19 @@ export const createDraggableObject = (
     invCircle.renderOrder = 10
     dragObj.add(invCircle)
 
-    const disposable = active.run(
-        mkSink(a => {
-            mesh.visible = a
-        }),
-        defScheduler()
+    const sched = defScheduler()
+    const disposable = active.run(mkSink(a => (mesh.visible = a)), sched)
+
+    const dragEvts = multicast(merge(mesh.dragEvents, invCircle.dragEvents))
+    const evts = multicast(validateDrag(dragEvts))
+    const startEvt = filter(isDragStart, evts)
+    const endEvt = filter(isDragEnd, evts)
+
+    const dragging = skipRepeats(
+        merge(constant(true, startEvt), constant(false, endEvt))
     )
 
-    const evts = multicast(merge(mesh.dragEvents, invCircle.dragEvents))
-    const isDragging = (e: SceneDragEvent): boolean => {
-        return e.type == DragType.DragStart || e.type == DragType.Drag
-    }
-    const dragging = skipRepeats(map(isDragging, evts))
-
-    dragging.run(
-        mkSink(d => {
-            invCircle.visible = d
-        }),
-        defScheduler()
-    )
+    dragging.run(mkSink(d => (invCircle.visible = d)), sched)
 
     const delta = calcDragDelta(evts, v => {
         const obj = dragObj.parent
