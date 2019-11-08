@@ -160,7 +160,8 @@ function createScene(
             disposable0,
             disposable1,
             disposable2,
-            rcs.disposable
+            rcs.disposable,
+            inputEvts.disposable
         ]),
         render: renderFunc,
         resize: updateSize,

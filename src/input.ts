@@ -1,4 +1,4 @@
-import { Stream } from '@most/types'
+import { Stream, Disposable } from '@most/types'
 import {
     merge,
     map,
@@ -11,7 +11,8 @@ import {
     skip,
     scan,
     snapshot,
-    skipRepeats
+    skipRepeats,
+    filter
 } from '@most/core'
 import {
     domEvent,
@@ -23,8 +24,10 @@ import {
     touchmove
 } from '@most/dom-event'
 import { curry } from 'ramda'
-import { gate, unwrap, tag } from './helper'
+import { gate, unwrap, tag, defScheduler } from './helper'
 import not from 'ramda/es/not'
+import { createAdapter } from '@most/adapter'
+import { mkSink } from './sink'
 
 export interface TapEvent {
     tapX: number
@@ -62,6 +65,10 @@ export interface DragEvent {
     deltaY: number
 }
 
+const isEnd = (e: DragEvent) => {
+    return e.dragType == DragType.DragEnd
+}
+
 const updateDragType = curry(
     (t: DragType, d: DragEvent): DragEvent => {
         return {
@@ -85,7 +92,7 @@ function distance(d1: DragEvent | null, d2: DragEvent): number {
 function mkDragEndable(evt: Stream<DragEvent>): Stream<DragEvent> {
     // wait for 2 seconds and see if there're new events
     // if not, make sure the last one is DragEnd
-    const e = debounce(2000, evt)
+    const e = debounce(1500, evt)
 
     const f = (e: DragEvent): DragEvent | null => {
         if (e.dragType != DragType.DragEnd) {
@@ -114,12 +121,16 @@ function dragged(
     start: Stream<TapEvent>,
     move: Stream<TapEvent>,
     end: Stream<TapEvent>
-): Stream<DragEvent> {
+): [Stream<DragEvent>, Disposable] {
     const startDrag = constant(true, start)
     const endDrag = constant(false, end)
 
+    // create an adapter stream for auto end event
+    const [updateEnd, possibleEnd] = createAdapter()
+    const posEnd = constant(false, possibleEnd)
+
     // we're only interested in move events between start and end
-    const touching = startWith(false, merge(startDrag, endDrag))
+    const touching = startWith(false, mergeArray([startDrag, endDrag, posEnd]))
 
     const mkDrag = curry(
         (t: DragType, e: TapEvent): DragEvent => {
@@ -186,13 +197,19 @@ function dragged(
         }
     }
 
-    return mkDragEndable(skip(1, scan(calcDelta, def, evts)))
+    const resEvt = mkDragEndable(skip(1, scan(calcDelta, def, evts)))
+
+    // filter End event and pipe it back to the internal possibleEnd stream
+    const d = filter(isEnd, resEvt).run(mkSink(updateEnd), defScheduler())
+
+    return [resEvt, d]
 }
 
 export interface InputEvents {
     tapped: Stream<TapEvent>
     zoomed: Stream<WheelEvent>
     dragged: Stream<DragEvent>
+    disposable: Disposable
 }
 
 export function setupInput(elem: Element): InputEvents {
@@ -219,13 +236,16 @@ export function setupInput(elem: Element): InputEvents {
     const touchMove = map(touchTap, touchmove(elem))
     const touchEnd = map(touchTap, touchend(elem))
 
-    const start = merge(mouseStart, touchStart)
-    const move = merge(mouseMove, touchMove)
-    const end = merge(mouseEnd, touchEnd)
+    const start = multicast(merge(mouseStart, touchStart))
+    const move = multicast(merge(mouseMove, touchMove))
+    const end = multicast(merge(mouseEnd, touchEnd))
+
+    const [drag, disp] = dragged(start, move, end)
 
     return {
         tapped: multicast(tapped(start, end)),
         zoomed: multicast(domEvent('wheel', elem)),
-        dragged: multicast(dragged(start, move, end))
+        dragged: multicast(drag),
+        disposable: disp
     }
 }
