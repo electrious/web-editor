@@ -5,6 +5,10 @@ export class Angle {
         this.deg = deg
     }
 
+    static fromRad(rad: number): Angle {
+        return new Angle((rad * 180) / Math.PI)
+    }
+
     get rad(): number {
         return (this.deg * Math.PI) / 180
     }
