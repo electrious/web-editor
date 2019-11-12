@@ -4,8 +4,7 @@ import {
     Mesh,
     Vector2,
     BufferGeometry,
-    InterleavedBufferAttribute,
-    Vector
+    BufferAttribute
 } from 'three'
 import { RoofPlate } from '../models/roofplate'
 import RBush, { BBox } from 'rbush'
@@ -194,15 +193,16 @@ function applyFlattendVertex(
     const newGeo = geo.clone()
     const attr = newGeo.getAttribute('position')
 
-    if (attr instanceof InterleavedBufferAttribute) return geo
+    if (attr instanceof BufferAttribute) {
+        for (const fv of fvs) {
+            const p = fv.newPos
+            attr.setXYZ(fv.index, p.x, p.y, p.z)
+        }
+        attr.needsUpdate = true
 
-    for (const fv of fvs) {
-        const p = fv.newPos
-        attr.setXYZ(fv.index, p.x, p.y, p.z)
+        return newGeo
     }
-    attr.needsUpdate = true
-
-    return newGeo
+    return geo
 }
 
 /**
