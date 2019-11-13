@@ -98,7 +98,7 @@ function getHouseMesh(obj: Object3D): Mesh | undefined {
  * @param mesh
  */
 function getGeometryInfo(mesh: Mesh) {
-    const geo = mesh.geometry.clone()
+    const geo = mesh.geometry
 
     if (geo instanceof BufferGeometry) {
         const posAttr = geo.getAttribute('position')
@@ -121,12 +121,10 @@ function getGeometryInfo(mesh: Mesh) {
             const y = normAttr.getY(i)
             const z = normAttr.getZ(i)
 
-            const n = new Vector3(x, y, z)
-            n.normalize()
-            normVecs.push(n)
+            normVecs.push(new Vector3(x, y, z))
         }
 
-        return { geometry: geo, vertices: posVecs, normals: posVecs }
+        return { geometry: geo, vertices: posVecs, normals: normVecs }
     }
 
     return null

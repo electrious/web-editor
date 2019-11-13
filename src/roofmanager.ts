@@ -119,6 +119,6 @@ export function createRoofManager(
     return {
         roofWrapper: wrapper,
         newRoof: newRoof,
-        disposable: disposeAll(pluck('disposable', nodes))
+        disposable: disposeBoth(disposeAll(pluck('disposable', nodes)), d)
     }
 }
