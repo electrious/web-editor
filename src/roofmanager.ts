@@ -1,14 +1,18 @@
 import { RoofPlate } from './models/roofplate'
-import { Object3D } from 'three'
+import { Object3D, Mesh } from 'three'
 import { createAdapter } from '@most/adapter'
-import { map, constant, multicast, mergeArray } from '@most/core'
+import { constant, multicast, mergeArray, map, scan } from '@most/core'
 import equals from 'ramda/es/equals'
-import { createRoofNode } from './roofnode'
+import { createRoofNode, RoofNode } from './roofnode'
 import { mkSink } from './sink'
 import { defScheduler } from './helper'
 import { Disposable, Stream } from '@most/types'
 import { disposeBoth, disposeAll } from '@most/disposable'
 import pluck from 'ramda/es/pluck'
+import { HouseMeshData } from './house'
+import { flattenRoofPlates } from './algorithm/meshflatten'
+import values from 'ramda/es/values'
+import curry from 'ramda/es/curry'
 
 export interface RoofManager {
     roofWrapper: Object3D
@@ -16,11 +20,57 @@ export interface RoofManager {
     disposable: Disposable
 }
 
+type RoofDict = { [key: string]: RoofPlate }
+
+function roofDict(roofs: RoofPlate[]) {
+    const dict: RoofDict = {}
+    for (const r of roofs) {
+        dict[r.id] = r
+    }
+
+    return dict
+}
+
+type RoofObjectDict = { [key: string]: Object3D }
+
+function roofObjDict(nodes: RoofNode[]) {
+    const dict: RoofObjectDict = {}
+    for (const n of nodes) {
+        dict[n.roofId] = n.roofObject
+    }
+    return dict
+}
+
+function roofParams(
+    roofD: RoofDict,
+    nodeD: RoofObjectDict
+): [RoofPlate, Object3D][] {
+    const roofs = values(roofD)
+    const f = (r: RoofPlate): [RoofPlate, Object3D] => {
+        const n = nodeD[r.id]
+        return [r, n]
+    }
+    return roofs.map(f)
+}
+
+const doFlatten = curry(
+    (meshData: HouseMeshData, objDict: RoofObjectDict, rd: RoofDict) => {
+        flattenRoofPlates(
+            meshData.geometry,
+            meshData.verticeTree,
+            meshData.mesh,
+            roofParams(rd, objDict)
+        )
+    }
+)
 /**
  * create RoofManager for an array of roofs
  * @param roofs
  */
-export function createRoofManager(roofs: RoofPlate[]): RoofManager {
+export function createRoofManager(
+    meshData: HouseMeshData,
+    roofs: RoofPlate[]
+): RoofManager {
     const wrapper = new Object3D()
     wrapper.name = 'roof wrapper'
 
@@ -46,10 +96,29 @@ export function createRoofManager(roofs: RoofPlate[]): RoofManager {
 
         return n
     })
+    const objDict = roofObjDict(nodes)
+
+    const newRoof = multicast(mergeArray(pluck('roof', nodes)))
+
+    const f = (dict: RoofDict, roof: RoofPlate) => {
+        dict[roof.id] = roof
+
+        return dict
+    }
+
+    const defRoofDict = roofDict(roofs)
+    doFlatten(meshData, objDict, defRoofDict)
+
+    const roofDicts = scan(f, defRoofDict, newRoof)
+
+    const d = roofDicts.run(
+        mkSink(doFlatten(meshData, objDict)),
+        defScheduler()
+    )
 
     return {
         roofWrapper: wrapper,
-        newRoof: mergeArray(pluck('roof', nodes)),
+        newRoof: newRoof,
         disposable: disposeAll(pluck('disposable', nodes))
     }
 }

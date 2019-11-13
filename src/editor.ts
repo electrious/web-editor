@@ -7,7 +7,7 @@ import {
     Object3D,
     Vector3
 } from 'three'
-import { loadHouse } from './house'
+import { loadHouse, HouseMeshData, getHouseMeshData } from './house'
 import { mkSink } from './sink'
 import { setupInput, DragEvent } from './input'
 import { disposeWith, disposeAll } from '@most/disposable'
@@ -109,15 +109,18 @@ function createScene(
 
     // add ambient light
     const ambLight = new AmbientLight(0xffffff)
+    ambLight.name = 'ambient-light'
     scene.add(ambLight)
 
     // add a directional light
     const dirLight = new DirectionalLight(0xeeeeee, 0.5)
+    dirLight.name = 'directional-light'
     dirLight.position.set(100, 0, 100)
     scene.add(dirLight)
 
     // add a wrapper object to be parent all user contents
     const content = new Object3D()
+    content.name = 'scene-content'
     scene.add(content)
 
     /**
@@ -206,9 +209,9 @@ export function createEditor(
         roofs: RoofPlate[],
         roofUpdated: (r: RoofPlate) => void
     ) => {
-        const loadRoofs = () => {
+        const loadRoofs = (md: HouseMeshData) => {
             // add all roofs to a new roof manager
-            const mgr = createRoofManager(roofs)
+            const mgr = createRoofManager(md, roofs)
             disposables.push(mgr.disposable)
             disposables.push(
                 mgr.newRoof.run(mkSink(roofUpdated), defScheduler())
@@ -219,7 +222,8 @@ export function createEditor(
 
         const f = (h: Object3D) => {
             es.addContent(h)
-            loadRoofs()
+            const md = getHouseMeshData(h)
+            if (md != null) loadRoofs(md)
         }
 
         const disp = loadHouse(leadId).run(mkSink(f), defScheduler())

@@ -23,6 +23,7 @@ import compose from 'ramda/es/compose'
 import fmap from 'ramda/es/map'
 
 export interface RoofNode {
+    roofId: string
     roof: Stream<RoofPlate>
     tapped: Stream<SceneTapEvent>
     roofObject: Object3D
@@ -149,6 +150,7 @@ export function createRoofNode(
     )
 
     return {
+        roofId: roof.id,
         roof: multicast(debounce(1000, newRoofs)),
         tapped: tapped,
         roofObject: obj,

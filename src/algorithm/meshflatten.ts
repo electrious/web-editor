@@ -17,7 +17,7 @@ type Polygon = Vector2[]
 /**
  * Vertex data that will be inserted into RTree
  */
-interface VertexItem {
+export interface VertexItem {
     minX: number
     minY: number
     maxX: number
@@ -268,7 +268,7 @@ export function flattenRoofPlates(
     geo: BufferGeometry,
     tree: RBush<VertexItem>,
     house: Mesh,
-    roofs: [[RoofPlate, Object3D]]
+    roofs: [RoofPlate, Object3D][]
 ) {
     const fvs = flatten(
         roofs.map(arg => {
