@@ -3,14 +3,7 @@ import {
     MTLLoader,
     MaterialCreator
 } from 'three/examples/jsm/loaders/MTLLoader'
-import {
-    Object3D,
-    Mesh,
-    Material,
-    Vector3,
-    BufferGeometry,
-    Vector
-} from 'three'
+import { Object3D, Mesh, Material, Vector3, BufferGeometry } from 'three'
 import { Stream } from '@most/types'
 import { fromPromise } from '@most/core'
 import find from 'ramda/es/find'
@@ -128,7 +121,9 @@ function getGeometryInfo(mesh: Mesh) {
             const y = normAttr.getY(i)
             const z = normAttr.getZ(i)
 
-            normVecs.push(new Vector3(x, y, z))
+            const n = new Vector3(x, y, z)
+            n.normalize()
+            normVecs.push(n)
         }
 
         return { geometry: geo, vertices: posVecs, normals: posVecs }

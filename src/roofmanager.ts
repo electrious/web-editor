@@ -1,5 +1,5 @@
 import { RoofPlate } from './models/roofplate'
-import { Object3D, Mesh } from 'three'
+import { Object3D } from 'three'
 import { createAdapter } from '@most/adapter'
 import { constant, multicast, mergeArray, map, scan } from '@most/core'
 import equals from 'ramda/es/equals'
