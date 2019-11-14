@@ -22,6 +22,9 @@ import curry from 'ramda/es/curry'
 import compose from 'ramda/es/compose'
 import fmap from 'ramda/es/map'
 import clone from 'ramda/es/clone'
+import init from 'ramda/es/init'
+import append from 'ramda/es/append'
+import head from 'ramda/es/head'
 
 export interface RoofNode {
     roofId: string
@@ -69,7 +72,8 @@ function createRoofMesh(
 
 const updateRoofPlate = curry((roof: RoofPlate, ps: Vector3[]) => {
     const newRoof = clone(roof)
-    newRoof.borderPoints = ps
+    // make sure the first and last point are the same
+    newRoof.borderPoints = append(head(ps), ps)
     return newRoof
 })
 
@@ -100,11 +104,15 @@ export function createRoofNode(
 
     // convert all roof border points to local coordinate
     // and get only the x,y coordinates
-    const ps = fmap(p => {
-        const np = clone(p)
-        obj.worldToLocal(np)
-        return new Vector2(np.x, np.y)
-    }, roof.borderPoints)
+    // NOTE: the last point will be dropped here because it's the same with the
+    // first one.
+    const ps = init(
+        fmap(p => {
+            const np = clone(p)
+            obj.worldToLocal(np)
+            return new Vector2(np.x, np.y)
+        }, roof.borderPoints)
+    )
 
     const scheduler = defScheduler()
 
