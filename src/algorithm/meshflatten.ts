@@ -1,11 +1,4 @@
-import {
-    Vector3,
-    Object3D,
-    Mesh,
-    Vector2,
-    BufferGeometry,
-    BufferAttribute
-} from 'three'
+import { Vector3, Mesh, Vector2, BufferGeometry, BufferAttribute } from 'three'
 import { RoofPlate } from '../models/roofplate'
 import RBush, { BBox } from 'rbush'
 import { pointInPolygon } from './pointinpolygon'
@@ -137,40 +130,13 @@ class RoofFlattener {
 }
 
 /**
- * convert a Vector3 from the 'from' object3D coordinate system to the 'to' object
- * coordinate system.
- * @param v
- * @param from
- * @param to
- */
-function convertVector3(v: Vector3, from: Object3D, to: Object3D): Vector3 {
-    return to.worldToLocal(from.localToWorld(v))
-}
-
-/**
  * get the RoofFlattener for a roof
- * @param house
- * @param roofNode
  * @param roof
  */
-function roofFlattener(
-    house: Mesh,
-    roofNode: Object3D,
-    roof: RoofPlate
-): RoofFlattener | null {
-    const parent = roofNode.parent
-    if (parent == null) return null
+function roofFlattener(roof: RoofPlate): RoofFlattener {
+    const poly = roof.borderPoints.map(v => new Vector2(v.x, v.y))
 
-    const roofCenter = convertVector3(roof.center, parent, house)
-    const roofNormal = convertVector3(roof.normal, parent, house)
-    roofNormal.normalize()
-
-    const poly = roof.borderPoints.map(v => {
-        const nv = convertVector3(v, parent, house)
-        return new Vector2(nv.x, nv.y)
-    })
-
-    return new RoofFlattener(roofNormal, roofCenter, poly)
+    return new RoofFlattener(roof.normal, roof.center, poly)
 }
 
 /**
@@ -208,53 +174,44 @@ function applyFlattendVertex(
 /**
  * Flatten a single roof plate
  * @param tree
- * @param house
- * @param roofNode
  * @param roof
  */
 function flattenRoofplate(
     tree: RBush<VertexItem>,
-    house: Mesh,
-    roofNode: Object3D,
     roof: RoofPlate
 ): FlattenedVertex[] {
-    const flattener = roofFlattener(house, roofNode, roof)
+    const flattener = roofFlattener(roof)
+    const poly = flattener.roofPolygon
+    // search for all vertices under the roof polygon bounding box
+    const candidates = tree.search(polygonBoundingBox(poly))
 
-    if (flattener != null) {
-        const poly = flattener.roofPolygon
-        // search for all vertices under the roof polygon bounding box
-        const candidates = tree.search(polygonBoundingBox(poly))
+    // for all candidates, check if it's inside the polygon.
+    // if it is, then flatten that vertex
+    const result: FlattenedVertex[] = []
+    for (const cand of candidates) {
+        const vec2 = new Vector2(cand.vertex.x, cand.vertex.y)
+        if (pointInPolygon(poly, vec2)) {
+            // now, the point is inside the roof polygon. check its distance
+            // to the roof and the angle between its normal vector with the
+            // roof normal vector.
+            const angle = Angle.fromRad(
+                Math.acos(flattener.roofNormal.dot(cand.normal))
+            )
+            const dist = flattener.distToRoof(cand.vertex)
 
-        // for all candidates, check if it's inside the polygon.
-        // if it is, then flatten that vertex
-        const result: FlattenedVertex[] = []
-        for (const cand of candidates) {
-            const vec2 = new Vector2(cand.vertex.x, cand.vertex.y)
-            if (pointInPolygon(poly, vec2)) {
-                // now, the point is inside the roof polygon. check its distance
-                // to the roof and the angle between its normal vector with the
-                // roof normal vector.
-                const angle = Angle.fromRad(
-                    Math.acos(flattener.roofNormal.dot(cand.normal))
-                )
-                const dist = flattener.distToRoof(cand.vertex)
-
-                // only add points that're close to the roofplate and within
-                // an angle limit to flattening result.
-                if (
-                    (dist < 0.5 && dist >= 0) ||
-                    (dist < 0 && dist > -1 && angle.deg < 20)
-                ) {
-                    const newPos = flattener.flatten(cand.vertex)
-                    result.push({ index: cand.index, newPos: newPos })
-                }
+            // only add points that're close to the roofplate and within
+            // an angle limit to flattening result.
+            if (
+                (dist < 0.5 && dist >= 0) ||
+                (dist < 0 && dist > -1 && angle.deg < 20)
+            ) {
+                const newPos = flattener.flatten(cand.vertex)
+                result.push({ index: cand.index, newPos: newPos })
             }
         }
-
-        return result
     }
 
-    return []
+    return result
 }
 
 /**
@@ -268,13 +225,9 @@ export function flattenRoofPlates(
     geo: BufferGeometry,
     tree: RBush<VertexItem>,
     house: Mesh,
-    roofs: [RoofPlate, Object3D][]
+    roofs: RoofPlate[]
 ) {
-    const fvs = flatten(
-        roofs.map(arg => {
-            return flattenRoofplate(tree, house, arg[1], arg[0])
-        })
-    )
+    const fvs = flatten(roofs.map(r => flattenRoofplate(tree, r)))
 
     const newGeo = applyFlattendVertex(geo, fvs)
 

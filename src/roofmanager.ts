@@ -3,7 +3,7 @@ import { Object3D } from 'three'
 import { createAdapter } from '@most/adapter'
 import { constant, multicast, mergeArray, map, scan } from '@most/core'
 import equals from 'ramda/es/equals'
-import { createRoofNode, RoofNode } from './roofnode'
+import { createRoofNode } from './roofnode'
 import { mkSink } from './sink'
 import { defScheduler } from './helper'
 import { Disposable, Stream } from '@most/types'
@@ -31,38 +31,15 @@ function roofDict(roofs: RoofPlate[]) {
     return dict
 }
 
-type RoofObjectDict = { [key: string]: Object3D }
+const doFlatten = curry((meshData: HouseMeshData, rd: RoofDict) => {
+    flattenRoofPlates(
+        meshData.geometry,
+        meshData.verticeTree,
+        meshData.mesh,
+        values(rd)
+    )
+})
 
-function roofObjDict(nodes: RoofNode[]) {
-    const dict: RoofObjectDict = {}
-    for (const n of nodes) {
-        dict[n.roofId] = n.roofObject
-    }
-    return dict
-}
-
-function roofParams(
-    roofD: RoofDict,
-    nodeD: RoofObjectDict
-): [RoofPlate, Object3D][] {
-    const roofs = values(roofD)
-    const f = (r: RoofPlate): [RoofPlate, Object3D] => {
-        const n = nodeD[r.id]
-        return [r, n]
-    }
-    return roofs.map(f)
-}
-
-const doFlatten = curry(
-    (meshData: HouseMeshData, objDict: RoofObjectDict, rd: RoofDict) => {
-        flattenRoofPlates(
-            meshData.geometry,
-            meshData.verticeTree,
-            meshData.mesh,
-            roofParams(rd, objDict)
-        )
-    }
-)
 /**
  * create RoofManager for an array of roofs
  * @param roofs
@@ -96,7 +73,6 @@ export function createRoofManager(
 
         return n
     })
-    const objDict = roofObjDict(nodes)
 
     const newRoof = multicast(mergeArray(pluck('roof', nodes)))
 
@@ -107,14 +83,11 @@ export function createRoofManager(
     }
 
     const defRoofDict = roofDict(roofs)
-    doFlatten(meshData, objDict, defRoofDict)
+    doFlatten(meshData, defRoofDict)
 
     const roofDicts = scan(f, defRoofDict, newRoof)
 
-    const d = roofDicts.run(
-        mkSink(doFlatten(meshData, objDict)),
-        defScheduler()
-    )
+    const d = roofDicts.run(mkSink(doFlatten(meshData)), defScheduler())
 
     return {
         roofWrapper: wrapper,
