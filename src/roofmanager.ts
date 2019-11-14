@@ -82,10 +82,7 @@ export function createRoofManager(
         return dict
     }
 
-    const defRoofDict = roofDict(roofs)
-    doFlatten(meshData, defRoofDict)
-
-    const roofDicts = scan(f, defRoofDict, newRoof)
+    const roofDicts = scan(f, roofDict(roofs), newRoof)
 
     const d = roofDicts.run(mkSink(doFlatten(meshData)), defScheduler())
 

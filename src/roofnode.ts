@@ -149,15 +149,14 @@ export function createRoofNode(
     }
     const disposable2 = editor.roofVertices.run(mkSink(updatePos), scheduler)
 
-    const toWorld = (v: Vector2): Vector3 => {
-        const p = obj.parent
-        if (p == null) return obj.localToWorld(new Vector3(v.x, v.y, 0))
-        return p.worldToLocal(obj.localToWorld(new Vector3(v.x, v.y, 0)))
+    const toParent = (v: Vector2): Vector3 => {
+        // convert the local position to parent's coordinate
+        return new Vector3(v.x, v.y, 0).applyMatrix4(obj.matrix)
     }
     const newRoofs = map(
         compose(
             updateRoofPlate(roof),
-            fmap(toWorld)
+            fmap(toParent)
         ),
         editor.roofVertices
     )
