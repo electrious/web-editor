@@ -28,6 +28,7 @@ import head from 'ramda/es/head'
 export interface RoofNode {
     roofId: string
     roof: Stream<RoofPlate>
+    roofForFlatten: Stream<RoofPlate>
     tapped: Stream<SceneTapEvent>
     roofObject: Object3D
     disposable: Disposable
@@ -163,6 +164,7 @@ export function createRoofNode(
     return {
         roofId: roof.id,
         roof: multicast(debounce(1000, newRoofs)),
+        roofForFlatten: newRoofs,
         tapped: tapped,
         roofObject: obj,
         disposable: disposeAll([

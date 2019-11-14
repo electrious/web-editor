@@ -81,8 +81,8 @@ export function createRoofManager(
 
         return dict
     }
-
-    const roofDicts = scan(f, roofDict(roofs), newRoof)
+    const newRoofFlatten = mergeArray(pluck('roofForFlatten', nodes))
+    const roofDicts = scan(f, roofDict(roofs), newRoofFlatten)
 
     const d = roofDicts.run(mkSink(doFlatten(meshData)), defScheduler())
 
