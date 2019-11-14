@@ -1,4 +1,4 @@
-import { RoofPlate } from './models/roofplate'
+import { RoofPlate, cloneRoof } from './models/roofplate'
 import {
     Object3D,
     Vector2,
@@ -21,7 +21,6 @@ import { createAdapter } from '@most/adapter'
 import curry from 'ramda/es/curry'
 import compose from 'ramda/es/compose'
 import fmap from 'ramda/es/map'
-import clone from 'ramda/es/clone'
 import init from 'ramda/es/init'
 import append from 'ramda/es/append'
 import head from 'ramda/es/head'
@@ -71,7 +70,7 @@ function createRoofMesh(
 }
 
 const updateRoofPlate = curry((roof: RoofPlate, ps: Vector3[]) => {
-    const newRoof = clone(roof)
+    const newRoof = cloneRoof(roof)
     // make sure the first and last point are the same
     newRoof.borderPoints = append(head(ps), ps)
     return newRoof
@@ -108,7 +107,7 @@ export function createRoofNode(
     // first one.
     const ps = init(
         fmap(p => {
-            const np = clone(p)
+            const np = p.clone()
             obj.worldToLocal(np)
             return new Vector2(np.x, np.y)
         }, roof.borderPoints)
