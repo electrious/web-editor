@@ -1,4 +1,4 @@
-import { Vector3, Vector2 } from 'three'
+import { Vector3 } from 'three'
 import { Angle } from '../math/angle'
 
 export enum Orientation {

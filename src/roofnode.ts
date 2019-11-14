@@ -21,6 +21,7 @@ import { createAdapter } from '@most/adapter'
 import curry from 'ramda/es/curry'
 import compose from 'ramda/es/compose'
 import fmap from 'ramda/es/map'
+import clone from 'ramda/es/clone'
 
 export interface RoofNode {
     roofId: string
@@ -67,8 +68,9 @@ function createRoofMesh(
 }
 
 const updateRoofPlate = curry((roof: RoofPlate, ps: Vector3[]) => {
-    roof.borderPoints = ps
-    return roof
+    const newRoof = clone(roof)
+    newRoof.borderPoints = ps
+    return newRoof
 })
 
 /**
@@ -98,10 +100,11 @@ export function createRoofNode(
 
     // convert all roof border points to local coordinate
     // and get only the x,y coordinates
-    const ps = roof.borderPoints.map(p => {
-        const np = obj.worldToLocal(p)
+    const ps = fmap(p => {
+        const np = clone(p)
+        obj.worldToLocal(np)
         return new Vector2(np.x, np.y)
-    })
+    }, roof.borderPoints)
 
     const scheduler = defScheduler()
 
@@ -139,7 +142,9 @@ export function createRoofNode(
     const disposable2 = editor.roofVertices.run(mkSink(updatePos), scheduler)
 
     const toWorld = (v: Vector2): Vector3 => {
-        return obj.localToWorld(new Vector3(v.x, v.y, 0))
+        const p = obj.parent
+        if (p == null) return obj.localToWorld(new Vector3(v.x, v.y, 0))
+        return p.worldToLocal(obj.localToWorld(new Vector3(v.x, v.y, 0)))
     }
     const newRoofs = map(
         compose(
