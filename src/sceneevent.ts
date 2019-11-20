@@ -3,7 +3,7 @@ import {
     TapEvent,
     DragEvent,
     DragType,
-    MouseOverEvent
+    MouseMoveEvent
 } from './input'
 import {
     Camera,
@@ -30,9 +30,9 @@ export interface SceneTapEvent {
 }
 
 /**
- * mouseover events sent to 3D objects
+ * mousemove events sent to 3D objects
  */
-export interface SceneMouseOverEvent {
+export interface SceneMouseMoveEvent {
     distance: number
     point: Vector3
     domPosition: Vector2 // original mouse event position
@@ -100,11 +100,11 @@ function toTappable(obj: any): Tappable | null {
 /**
  * objects that can process mouseover event
  */
-export interface MouseOver {
-    mouseOver: (event: SceneMouseOverEvent) => void
+export interface MouseMovable {
+    mouseMove: (event: SceneMouseMoveEvent) => void
 }
 
-function toMouseOver(obj: any): MouseOver | null {
+function toMouseOver(obj: any): MouseMovable | null {
     return 'mouseOver' in obj ? obj : null
 }
 
@@ -139,7 +139,7 @@ function tapPosition(size: Size, e: TapEvent): Vector2 {
     return calcPosition(new Vector2(e.tapX, e.tapY), size)
 }
 
-function mousePosition(size: Size, e: MouseOverEvent): Vector2 {
+function mousePosition(size: Size, e: MouseMoveEvent): Vector2 {
     return calcPosition(new Vector2(e.mouseX, e.mouseY), size)
 }
 
@@ -177,7 +177,7 @@ function processMouseOverObjects(domPos: Vector2, objs: Intersection[]) {
         const t = toMouseOver(obj)
 
         if (t != null) {
-            t.mouseOver({
+            t.mouseMove({
                 distance: obj.distance,
                 point: obj.point,
                 domPosition: domPos
@@ -255,7 +255,7 @@ export function setupRaycasting(
     }
 
     // raycast mouseover events
-    const raycastMouseOver = (s: Size, e: MouseOverEvent) => {
+    const raycastMouseOver = (s: Size, e: MouseMoveEvent) => {
         const domPos = new Vector2(e.mouseX, e.mouseY)
         const res = doRaycast(mousePosition(s, e))
 
@@ -269,7 +269,7 @@ export function setupRaycasting(
         scheduler
     )
 
-    const disposeMO = snapshot(raycastMouseOver, size, input.mouseOver).run(
+    const disposeMO = snapshot(raycastMouseOver, size, input.mouseMove).run(
         sink,
         scheduler
     )

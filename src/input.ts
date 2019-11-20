@@ -22,11 +22,10 @@ import {
     mouseup,
     touchstart,
     touchend,
-    touchmove,
-    mouseover
+    touchmove
 } from '@most/dom-event'
 import { curry } from 'ramda'
-import { gate, unwrap, defScheduler } from './helper'
+import { gate, unwrap, defScheduler, debug } from './helper'
 import not from 'ramda/es/not'
 import { createAdapter } from '@most/adapter'
 import { mkSink } from './sink'
@@ -54,14 +53,14 @@ function tapped(
 }
 
 /**
- * MouseOverEvent encode the mouse position for MouseOver event.
+ * MouseMoveEvent encode the mouse position for MouseMove event.
  */
-export interface MouseOverEvent {
+export interface MouseMoveEvent {
     mouseX: number
     mouseY: number
 }
 
-function mouseOverEvent(e: MouseEvent): MouseOverEvent {
+function mouseMoveEvent(e: MouseEvent): MouseMoveEvent {
     return {
         mouseX: e.offsetX,
         mouseY: e.offsetY
@@ -226,7 +225,7 @@ export interface InputEvents {
     tapped: Stream<TapEvent>
     zoomed: Stream<WheelEvent>
     dragged: Stream<DragEvent>
-    mouseOver: Stream<MouseOverEvent>
+    mouseMove: Stream<MouseMoveEvent>
     disposable: Disposable
 }
 
@@ -269,7 +268,7 @@ export function setupInput(elem: Element): InputEvents {
         tapped: multicast(tapped(start, end)),
         zoomed: multicast(domEvent('wheel', elem)),
         dragged: multicast(drag),
-        mouseOver: multicast(map(mouseOverEvent, mouseover(elem))),
+        mouseMove: multicast(map(mouseMoveEvent, mousemove(elem))),
         disposable: disp
     }
 }
