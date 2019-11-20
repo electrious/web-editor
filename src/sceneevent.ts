@@ -1,4 +1,10 @@
-import { InputEvents, TapEvent, DragEvent, DragType } from './input'
+import {
+    InputEvents,
+    TapEvent,
+    DragEvent,
+    DragType,
+    MouseOverEvent
+} from './input'
 import {
     Camera,
     Object3D,
@@ -11,7 +17,7 @@ import { Stream, Disposable } from '@most/types'
 import { mkSink } from './sink'
 import { snapshot, multicast, debounce, map, merge } from '@most/core'
 import { Size } from './editor'
-import { disposeBoth } from '@most/disposable'
+import { disposeAll } from '@most/disposable'
 import { defScheduler, unwrap } from './helper'
 
 /**
@@ -21,6 +27,15 @@ export interface SceneTapEvent {
     distance: number
     point: Vector3
     domPosition: Vector2 // original mouse/touch event position
+}
+
+/**
+ * mouseover events sent to 3D objects
+ */
+export interface SceneMouseOverEvent {
+    distance: number
+    point: Vector3
+    domPosition: Vector2 // original mouse event position
 }
 
 /**
@@ -81,6 +96,18 @@ export interface Tappable {
 function toTappable(obj: any): Tappable | null {
     return 'tapped' in obj ? obj : null
 }
+
+/**
+ * objects that can process mouseover event
+ */
+export interface MouseOver {
+    mouseOver: (event: SceneMouseOverEvent) => void
+}
+
+function toMouseOver(obj: any): MouseOver | null {
+    return 'mouseOver' in obj ? obj : null
+}
+
 /**
  * objects that can process drag event
  */
@@ -112,6 +139,10 @@ function tapPosition(size: Size, e: TapEvent): Vector2 {
     return calcPosition(new Vector2(e.tapX, e.tapY), size)
 }
 
+function mousePosition(size: Size, e: MouseOverEvent): Vector2 {
+    return calcPosition(new Vector2(e.mouseX, e.mouseY), size)
+}
+
 /**
  * convert a DragEvent to position used for raycasting
  * @param size
@@ -127,20 +158,32 @@ function dragPosition(size: Size, e: DragEvent): Vector2 {
  * @param objs
  */
 function processTapObjects(domPos: Vector2, objs: Intersection[]) {
-    for (const key in objs) {
-        if (objs.hasOwnProperty(key)) {
-            const res = objs[key]
+    for (const res of objs) {
+        const t = toTappable(res.object)
+        if (t != null) {
+            t.tapped({
+                distance: res.distance,
+                point: res.point,
+                domPosition: domPos
+            })
 
-            const t = toTappable(res.object)
-            if (t != null) {
-                t.tapped({
-                    distance: res.distance,
-                    point: res.point,
-                    domPosition: domPos
-                })
+            break
+        }
+    }
+}
 
-                break
-            }
+function processMouseOverObjects(domPos: Vector2, objs: Intersection[]) {
+    for (const obj of objs) {
+        const t = toMouseOver(obj)
+
+        if (t != null) {
+            t.mouseOver({
+                distance: obj.distance,
+                point: obj.point,
+                domPosition: domPos
+            })
+
+            break
         }
     }
 }
@@ -163,20 +206,17 @@ function processDragObjects(
     objs: Intersection[],
     e: DragEvent
 ): DragEvent | null {
-    for (const key in objs) {
-        if (objs.hasOwnProperty(key)) {
-            const res = objs[key]
-            const t = toDraggable(res.object)
+    for (const res of objs) {
+        const t = toDraggable(res.object)
 
-            if (t != null) {
-                t.dragged({
-                    type: e.dragType,
-                    distance: res.distance,
-                    point: res.point
-                })
+        if (t != null) {
+            t.dragged({
+                type: e.dragType,
+                distance: res.distance,
+                point: res.point
+            })
 
-                return null
-            }
+            return null
         }
     }
 
@@ -214,6 +254,14 @@ export function setupRaycasting(
         processTapObjects(domPos, raycastRes)
     }
 
+    // raycast mouseover events
+    const raycastMouseOver = (s: Size, e: MouseOverEvent) => {
+        const domPos = new Vector2(e.mouseX, e.mouseY)
+        const res = doRaycast(mousePosition(s, e))
+
+        processMouseOverObjects(domPos, res)
+    }
+
     const scheduler = defScheduler()
     const sink = mkSink()
     const disposeTap = snapshot(raycastTap, size, input.tapped).run(
@@ -221,6 +269,10 @@ export function setupRaycasting(
         scheduler
     )
 
+    const disposeMO = snapshot(raycastMouseOver, size, input.mouseOver).run(
+        sink,
+        scheduler
+    )
     // raycast drag events
     const raycastDrag = (s: Size, e: DragEvent): DragEvent | null => {
         const results = doRaycast(dragPosition(s, e))
@@ -232,6 +284,6 @@ export function setupRaycasting(
 
     return {
         dragEvent: multicast(unwrap(unraycastedDrag)),
-        disposable: disposeBoth(disposeTap, disposeDrag)
+        disposable: disposeAll([disposeTap, disposeMO, disposeDrag])
     }
 }

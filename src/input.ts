@@ -22,7 +22,8 @@ import {
     mouseup,
     touchstart,
     touchend,
-    touchmove
+    touchmove,
+    mouseover
 } from '@most/dom-event'
 import { curry } from 'ramda'
 import { gate, unwrap, defScheduler } from './helper'
@@ -50,6 +51,21 @@ function tapped(
     // the touch should end in less than 0.32 seconds to be considered a tap.
     const tapCheckEvt = delay(320, start)
     return gate(canBeTap, tapCheckEvt)
+}
+
+/**
+ * MouseOverEvent encode the mouse position for MouseOver event.
+ */
+export interface MouseOverEvent {
+    mouseX: number
+    mouseY: number
+}
+
+function mouseOverEvent(e: MouseEvent): MouseOverEvent {
+    return {
+        mouseX: e.offsetX,
+        mouseY: e.offsetY
+    }
 }
 
 export enum DragType {
@@ -210,9 +226,15 @@ export interface InputEvents {
     tapped: Stream<TapEvent>
     zoomed: Stream<WheelEvent>
     dragged: Stream<DragEvent>
+    mouseOver: Stream<MouseOverEvent>
     disposable: Disposable
 }
 
+/**
+ * Setup the input system for an element. It will return the InputEvents object
+ * with all supported event streams.
+ * @param elem
+ */
 export function setupInput(elem: Element): InputEvents {
     const mouseTap = (e: MouseEvent): TapEvent => {
         return {
@@ -247,6 +269,7 @@ export function setupInput(elem: Element): InputEvents {
         tapped: multicast(tapped(start, end)),
         zoomed: multicast(domEvent('wheel', elem)),
         dragged: multicast(drag),
+        mouseOver: multicast(map(mouseOverEvent, mouseover(elem))),
         disposable: disp
     }
 }
