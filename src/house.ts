@@ -3,12 +3,21 @@ import {
     MTLLoader,
     MaterialCreator
 } from 'three/examples/jsm/loaders/MTLLoader'
-import { Object3D, Mesh, Material, Vector3, BufferGeometry } from 'three'
+import {
+    Object3D,
+    Mesh,
+    Material,
+    Vector3,
+    BufferGeometry,
+    Geometry
+} from 'three'
 import { Stream } from '@most/types'
 import { fromPromise } from '@most/core'
 import find from 'ramda/es/find'
 import RBush from 'rbush'
 import { VertexItem, buildRTree } from './algorithm/meshflatten'
+import { MouseMovable, SceneMouseMoveEvent } from './sceneevent'
+import { createAdapter } from '@most/adapter'
 
 function meshPath(leadId: number): string {
     return (
@@ -16,6 +25,35 @@ function meshPath(leadId: number): string {
         leadId +
         '/mesh/'
     )
+}
+
+/**
+ * HouseMesh is a Mesh subclass with support for mouse move event and allow user
+ * to add new roofs by moving mouse over the mesh.
+ */
+class HouseMesh extends Mesh implements MouseMovable {
+    canAcceptMouseMove = false
+
+    mouseMoveEvent: Stream<SceneMouseMoveEvent>
+    mouseMoved: (e: SceneMouseMoveEvent) => void
+
+    constructor(geo: Geometry | BufferGeometry, mat: Material) {
+        super(geo, mat)
+
+        this.name = 'house-mesh'
+
+        // create event stream for the mouse events
+        const [upd, s] = createAdapter()
+        this.mouseMoveEvent = s
+        this.mouseMoved = upd
+    }
+
+    // method to receive mouse move event from the raycaster.
+    mouseMove(event: SceneMouseMoveEvent) {
+        if (this.canAcceptMouseMove) {
+            this.mouseMoved(event)
+        }
+    }
 }
 
 /**
@@ -28,17 +66,15 @@ function applyMaterialCreator(matCreator: MaterialCreator, obj: Object3D) {
     const mat = matCreator.materials.scene
     mat.transparent = false
 
-    obj.children.forEach(child => {
-        if (child instanceof Mesh) {
-            child.name = '3dmap'
+    const oldMesh = find(child => child instanceof Mesh, obj.children)
+    if (oldMesh != undefined) {
+        obj.remove(oldMesh)
 
-            if (child.material instanceof Material) {
-                child.material.dispose()
-            }
+        const m = oldMesh as Mesh
+        const newMesh = new HouseMesh(m.geometry, mat)
 
-            child.material = mat
-        }
-    })
+        obj.add(newMesh)
+    }
 }
 
 /**
@@ -57,7 +93,7 @@ export function loadHouse(leadId: number): Stream<Object3D> {
                 materials.preload()
 
                 objLoader.load(path + 'scene.obj', object => {
-                    object.name = 'house-mesh'
+                    object.name = 'house-mesh-wrapper'
                     const childs = object.children
                     childs.forEach(c => {
                         c.castShadow = true
@@ -87,7 +123,7 @@ export interface HouseMeshData {
  * @param obj
  */
 function getHouseMesh(obj: Object3D): Mesh | undefined {
-    const m = find(m => m.name == '3dmap', obj.children)
+    const m = find(m => m.name == 'house-mesh', obj.children)
     if (m == undefined) return undefined
 
     return m as Mesh
