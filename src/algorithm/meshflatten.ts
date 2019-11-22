@@ -1,11 +1,9 @@
 import { Vector3, Mesh, Vector2, BufferGeometry, BufferAttribute } from 'three'
-import { RoofPlate } from '../models/roofplate'
+import { RoofPlate, Polygon, getRoofPolygon } from '../models/roofplate'
 import RBush, { BBox } from 'rbush'
 import { pointInPolygon } from './pointinpolygon'
 import flatten from 'ramda/es/flatten'
 import { Angle } from '../math/angle'
-
-type Polygon = Vector2[]
 
 /**
  * Vertex data that will be inserted into RTree
@@ -134,7 +132,7 @@ class RoofFlattener {
  * @param roof
  */
 function roofFlattener(roof: RoofPlate): RoofFlattener {
-    const poly = roof.borderPoints.map(v => new Vector2(v.x, v.y))
+    const poly = getRoofPolygon(roof)
 
     return new RoofFlattener(roof.normal, roof.center, poly)
 }

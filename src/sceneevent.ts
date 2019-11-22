@@ -11,7 +11,8 @@ import {
     Vector3,
     Raycaster,
     Vector2,
-    Intersection
+    Intersection,
+    Face3
 } from 'three'
 import { Stream, Disposable } from '@most/types'
 import { mkSink } from './sink'
@@ -35,6 +36,7 @@ export interface SceneTapEvent {
 export interface SceneMouseMoveEvent {
     distance: number
     point: Vector3
+    face: Face3
     domPosition: Vector2 // original mouse event position
 }
 
@@ -175,11 +177,13 @@ function processTapObjects(domPos: Vector2, objs: Intersection[]) {
 function processMouseOverObjects(domPos: Vector2, objs: Intersection[]) {
     for (const obj of objs) {
         const t = toMouseOver(obj)
+        const f = obj.face
 
-        if (t != null) {
+        if (t != null && f != null && f != undefined) {
             t.mouseMove({
                 distance: obj.distance,
                 point: obj.point,
+                face: f,
                 domPosition: domPos
             })
 

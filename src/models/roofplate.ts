@@ -1,4 +1,4 @@
-import { Vector3 } from 'three'
+import { Vector3, Vector2 } from 'three'
 import { Angle } from '../math/angle'
 import map from 'ramda/es/map'
 
@@ -43,4 +43,17 @@ export function cloneRoof(roof: RoofPlate): RoofPlate {
         azimuth: roof.azimuth,
         rotation: roof.rotation
     }
+}
+
+/**
+ * 2D Polygon for roof plate projection on ground
+ */
+export type Polygon = Vector2[]
+
+/**
+ * get the 2D polygon for a roof plate
+ * @param roof
+ */
+export function getRoofPolygon(roof: RoofPlate): Polygon {
+    return roof.borderPoints.map(v => new Vector2(v.x, v.y))
 }

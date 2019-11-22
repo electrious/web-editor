@@ -39,6 +39,7 @@ import filter from 'ramda/es/filter'
 import insert from 'ramda/es/insert'
 import append from 'ramda/es/append'
 import head from 'ramda/es/head'
+import { SceneTapEvent } from '../sceneevent'
 
 const toVec2 = (v: Vector3): Vector2 => {
     return new Vector2(v.x, v.y)
@@ -113,6 +114,28 @@ const attachObjs = (parent: Object3D) => {
 }
 
 /**
+ * create the geometry and material for roof delete marker button. These are all
+ * memoized functions to be shared.
+ */
+const roofDeleteMaterial = memoizeWith(always('roof_del_material'), () => {
+    return new MeshBasicMaterial({ color: 0xff2222 })
+})
+
+const roofDeleteGeometry = memoizeWith(always('roof_del_geometry'), () => {
+    return new CircleGeometry(0.5, 32)
+})
+
+/**
+ * create the roof delete marker button
+ */
+const createRoofDeleteMarker = (): TappableMesh => {
+    const geo = roofDeleteGeometry()
+    const mat = roofDeleteMaterial()
+
+    return new TappableMesh(geo, mat)
+}
+
+/**
  * create material for the green marker. this function is memoized so the material
  * is created once and shared.
  */
@@ -120,11 +143,15 @@ const greenMaterial = memoizeWith(always('green_material'), () => {
     return new MeshBasicMaterial({ color: 0x22ff22 })
 })
 
+const greenGeometry = memoizeWith(always('green_geometry'), () => {
+    return new CircleGeometry(0.3, 32)
+})
+
 /**
  * create a green marker object
  */
 const mkGreenMarker = (p: Vector2): TappableMesh => {
-    const geo = new CircleGeometry(0.3, 32)
+    const geo = greenGeometry()
     const mat = greenMaterial()
     const m = new TappableMesh(geo, mat)
     m.position.set(p.x, p.y, 0.01)
@@ -261,6 +288,7 @@ const mkGreenMarkers = (
 
 export interface RoofEditor {
     roofVertices: Stream<Vector2[]>
+    deleteRoof: Stream<SceneTapEvent>
     disposable: Disposable
 }
 
@@ -346,6 +374,18 @@ export const createRoofEditor = (
         scheduler
     )
 
+    // create the roof delete button
+    const roofDel = createRoofDeleteMarker()
+    roofDel.position.set(0, 0, 0.01)
+    parent.add(roofDel)
+
+    const disposable5 = roofActive.run(
+        mkSink(a => {
+            roofDel.visible = a
+        }),
+        scheduler
+    )
+
     // set the default vertices
     updateVertList(ps)
 
@@ -355,11 +395,13 @@ export const createRoofEditor = (
     return {
         // skip the first occurrence as it's the same values as provided
         roofVertices: newVertices,
+        deleteRoof: roofDel.tapEvents,
         disposable: disposeAll([
             disposable1,
             disposable2,
             disposable3,
-            disposable4
+            disposable4,
+            disposable5
         ])
     }
 }
