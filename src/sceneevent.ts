@@ -106,8 +106,8 @@ export interface MouseMovable {
     mouseMove: (event: SceneMouseMoveEvent) => void
 }
 
-function toMouseOver(obj: any): MouseMovable | null {
-    return 'mouseOver' in obj ? obj : null
+function toMouseMovable(obj: any): MouseMovable | null {
+    return 'mouseMove' in obj ? obj : null
 }
 
 /**
@@ -176,7 +176,7 @@ function processTapObjects(domPos: Vector2, objs: Intersection[]) {
 
 function processMouseOverObjects(domPos: Vector2, objs: Intersection[]) {
     for (const obj of objs) {
-        const t = toMouseOver(obj)
+        const t = toMouseMovable(obj.object)
         const f = obj.face
 
         if (t != null && f != null && f != undefined) {

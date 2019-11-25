@@ -32,7 +32,7 @@ function meshPath(leadId: number): string {
  * to add new roofs by moving mouse over the mesh.
  */
 class HouseMesh extends Mesh implements MouseMovable {
-    canAcceptMouseMove = false
+    canAcceptMouseMove = true
 
     mouseMoveEvent: Stream<SceneMouseMoveEvent>
     mouseMoved: (e: SceneMouseMoveEvent) => void
@@ -113,7 +113,8 @@ export function loadHouse(leadId: number): Stream<Object3D> {
  * rtree built from all vertices
  */
 export interface HouseMeshData {
-    mesh: Mesh
+    wrapper: Object3D
+    mesh: HouseMesh
     geometry: BufferGeometry
     verticeTree: RBush<VertexItem>
 }
@@ -122,11 +123,11 @@ export interface HouseMeshData {
  * get the house mesh from the loaded Object3D
  * @param obj
  */
-function getHouseMesh(obj: Object3D): Mesh | undefined {
+function getHouseMesh(obj: Object3D): HouseMesh | undefined {
     const m = find(m => m.name == 'house-mesh', obj.children)
     if (m == undefined) return undefined
 
-    return m as Mesh
+    return m as HouseMesh
 }
 
 /**
@@ -179,5 +180,5 @@ export function getHouseMeshData(obj: Object3D): HouseMeshData | null {
 
     const tree = buildRTree(d.vertices, d.normals)
 
-    return { mesh: mesh, geometry: d.geometry, verticeTree: tree }
+    return { wrapper: obj, mesh: mesh, geometry: d.geometry, verticeTree: tree }
 }

@@ -13,6 +13,7 @@ import { HouseMeshData } from './house'
 import { flattenRoofPlates } from './algorithm/meshflatten'
 import values from 'ramda/es/values'
 import curry from 'ramda/es/curry'
+import { createRoofRecognizer } from './editor/roofrecognizer'
 
 export interface RoofManager {
     roofWrapper: Object3D
@@ -85,6 +86,17 @@ export function createRoofManager(
     const roofDicts = scan(f, roofDict(roofs), newRoofFlatten)
 
     const d = roofDicts.run(mkSink(doFlatten(meshData)), defScheduler())
+
+    const newRoofList = map((d: RoofDict) => values(d), roofDicts)
+
+    // create the roof recognizer and add it to the roof wrapper object.
+    const recognizer = createRoofRecognizer(
+        meshData.wrapper,
+        newRoofList,
+        meshData.mesh.mouseMoveEvent
+    )
+
+    wrapper.add(recognizer.marker)
 
     return {
         roofWrapper: wrapper,
