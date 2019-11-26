@@ -1,13 +1,7 @@
 import { Stream, Disposable } from '@most/types'
 import { empty, snapshot } from '@most/core'
 import { RoofPlate } from '../models/roofplate'
-import {
-    Object3D,
-    Vector3,
-    Face3,
-    MeshBasicMaterial,
-    CircleGeometry
-} from 'three'
+import { Object3D, Vector3, MeshBasicMaterial, CircleGeometry } from 'three'
 import { SceneMouseMoveEvent } from '../sceneevent'
 import { couldBeRoof } from '../algorithm/roofcheck'
 import memoizeWith from 'ramda/es/memoizeWith'
@@ -40,7 +34,7 @@ const adderMarkerMaterial = memoizeWith(always('adder-marker-mat'), () => {
 })
 
 const adderMarkerGeometry = memoizeWith(always('adder-marker-geo'), () => {
-    return new CircleGeometry(0.6, 32)
+    return new CircleGeometry(1, 32)
 })
 
 const createAdderMarker = () => {
@@ -90,8 +84,14 @@ export function createRoofRecognizer(
             marker.visible = false
         } else {
             marker.visible = true
-            marker.position.copy(p.position)
-            marker.up.copy(p.faceNormal)
+
+            const rp = p.position.clone()
+            rp.addScaledVector(p.faceNormal, 0.03)
+            marker.position.copy(rp)
+
+            const target = p.position.clone()
+            target.add(p.faceNormal)
+            marker.lookAt(target)
         }
     }
 
