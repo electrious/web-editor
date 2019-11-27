@@ -35,8 +35,8 @@ export interface SceneTapEvent {
  */
 export interface SceneMouseMoveEvent {
     distance: number
-    point: Vector3
-    face: Face3
+    point: Vector3 // position in local coord of the target object
+    face: Face3 // face with local normal of the target object
     domPosition: Vector2 // original mouse event position
 }
 
@@ -182,7 +182,8 @@ function processMouseOverObjects(domPos: Vector2, objs: Intersection[]) {
         if (t != null && f != null && f != undefined) {
             t.mouseMove({
                 distance: obj.distance,
-                point: obj.point,
+                point: obj.point, // NOTE: thought documented to be in world coord,
+                // it's actually in local coord here.
                 face: f,
                 domPosition: domPos
             })

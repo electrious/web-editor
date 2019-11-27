@@ -80,17 +80,23 @@ export function createRoofRecognizer(
     const point = snapshot(f, roofs, mouseMove)
 
     const showMarker = (p: CandidatePoint | null) => {
-        if (p == null) {
+        const parent = marker.parent
+        if (p == null || parent == null) {
             marker.visible = false
         } else {
             marker.visible = true
 
+            // get the local position of the candidate point and move it
+            // along the normal vector a bit. Then used as the new position
+            // of the marker
             const rp = p.position.clone()
             rp.addScaledVector(p.faceNormal, 0.03)
             marker.position.copy(rp)
 
+            // set the right direction of the marker
             const target = p.position.clone()
             target.add(p.faceNormal)
+            parent.localToWorld(target)
             marker.lookAt(target)
         }
     }
