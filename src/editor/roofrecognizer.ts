@@ -1,6 +1,6 @@
 import { Stream, Disposable } from '@most/types'
-import { empty, snapshot } from '@most/core'
-import { RoofPlate } from '../models/roofplate'
+import { empty, snapshot, map } from '@most/core'
+import { RoofPlate, newRoofPlate } from '../models/roofplate'
 import { Object3D, Vector3, MeshBasicMaterial, CircleGeometry } from 'three'
 import { SceneMouseMoveEvent } from '../sceneevent'
 import { couldBeRoof } from '../algorithm/roofcheck'
@@ -8,7 +8,7 @@ import memoizeWith from 'ramda/es/memoizeWith'
 import always from 'ramda/es/always'
 import { TappableMesh } from '../custom/mesh'
 import { mkSink } from '../sink'
-import { defScheduler } from '../helper'
+import { defScheduler, debug } from '../helper'
 
 /**
  * RoofRecognizer wlll be able to let user add new roof
@@ -37,10 +37,24 @@ const adderMarkerGeometry = memoizeWith(always('adder-marker-geo'), () => {
     return new CircleGeometry(1, 32)
 })
 
-const createAdderMarker = () => {
+interface RoofAdder {
+    marker: TappableMesh
+    position: Vector3
+    normal: Vector3
+}
+
+const createAdderMarker = (): RoofAdder => {
     const geo = adderMarkerGeometry()
     const mat = adderMarkerMaterial()
-    return new TappableMesh(geo, mat)
+
+    const marker = new TappableMesh(geo, mat)
+    marker.name = 'add-roof-marker'
+
+    return {
+        marker: marker,
+        position: new Vector3(0, 0, 0),
+        normal: new Vector3(0, 1, 0)
+    }
 }
 
 /**
@@ -56,8 +70,8 @@ export function createRoofRecognizer(
     mouseMove: Stream<SceneMouseMoveEvent>
 ): RoofRecognizer {
     // create the adder marker and add it to parent
-    const marker = createAdderMarker()
-    marker.name = 'add-roof-marker'
+    const adder = createAdderMarker()
+    const marker = adder.marker
 
     // hide the marker by default
     marker.visible = false
@@ -92,20 +106,26 @@ export function createRoofRecognizer(
             const rp = p.position.clone()
             rp.addScaledVector(p.faceNormal, 0.03)
             marker.position.copy(rp)
+            adder.position.copy(rp)
 
             // set the right direction of the marker
             const target = p.position.clone()
             target.add(p.faceNormal)
             parent.localToWorld(target)
             marker.lookAt(target)
+            adder.normal.copy(p.faceNormal)
         }
     }
 
     const disposable = point.run(mkSink(showMarker), defScheduler())
 
+    const mkRoof = () => {
+        return newRoofPlate(adder.position, adder.normal)
+    }
+
     return {
         marker: marker,
-        addedNewRoof: empty(),
+        addedNewRoof: debug(map(mkRoof, marker.tapEvents)),
         disposable: disposable
     }
 }
