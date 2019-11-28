@@ -16,7 +16,12 @@ import { fromPromise } from '@most/core'
 import find from 'ramda/es/find'
 import RBush from 'rbush'
 import { VertexItem, buildRTree } from './algorithm/meshflatten'
-import { MouseMovable, SceneMouseMoveEvent } from './sceneevent'
+import {
+    MouseMovable,
+    SceneMouseMoveEvent,
+    Tappable,
+    SceneTapEvent
+} from './sceneevent'
 import { createAdapter } from '@most/adapter'
 
 function meshPath(leadId: number): string {
@@ -31,21 +36,39 @@ function meshPath(leadId: number): string {
  * HouseMesh is a Mesh subclass with support for mouse move event and allow user
  * to add new roofs by moving mouse over the mesh.
  */
-class HouseMesh extends Mesh implements MouseMovable {
-    canAcceptMouseMove = true
+class HouseMesh extends Mesh implements MouseMovable, Tappable {
+    private canAcceptMouseMove: boolean
+
+    tappedEvent: Stream<SceneTapEvent>
+    private tapFunc: (e: SceneTapEvent) => void
 
     mouseMoveEvent: Stream<SceneMouseMoveEvent>
-    mouseMoved: (e: SceneMouseMoveEvent) => void
+    private mouseMoved: (e: SceneMouseMoveEvent) => void
 
     constructor(geo: Geometry | BufferGeometry, mat: Material) {
         super(geo, mat)
 
         this.name = 'house-mesh'
 
+        this.canAcceptMouseMove = true
+
+        // create event stream for the tap event
+        const [updTap, ts] = createAdapter()
+        this.tappedEvent = ts
+        this.tapFunc = updTap
+
         // create event stream for the mouse events
         const [upd, s] = createAdapter()
         this.mouseMoveEvent = s
         this.mouseMoved = upd
+    }
+
+    enableAddingRoof(enabled: boolean) {
+        this.canAcceptMouseMove = enabled
+    }
+
+    tapped(event: SceneTapEvent) {
+        this.tapFunc(event)
     }
 
     // method to receive mouse move event from the raycaster.

@@ -142,7 +142,19 @@ export function createRoofManager(
 
     const scheduler = defScheduler()
     // create a stream for the current active roof id
-    const [updateActive, activeRoof] = createAdapter<string>()
+    const [updateActive, activeRoof] = createAdapter<string | null>()
+
+    // if house mesh is tapped, to deactivate all roofs
+    const d4 = constant(null, meshData.mesh.tappedEvent).run(
+        mkSink(updateActive),
+        scheduler
+    )
+
+    // only enable house to add new roof if no roof is currently active.
+    const enableAddingRoof = (r: string | null) => {
+        meshData.mesh.enableAddingRoof(r == null)
+    }
+    const d5 = activeRoof.run(mkSink(enableAddingRoof), scheduler)
 
     const mkNode = (r: RoofPlate): RoofNode => {
         // create a stream for this roof noting if it's active
@@ -214,11 +226,13 @@ export function createRoofManager(
         scheduler
     )
 
+    updateActive(null)
+
     return {
         roofWrapper: wrapper,
         roofOps: multicast(
             mergeArray([addRoofOp, deleteRoofOp, updatedRoofOp])
         ),
-        disposable: disposeAll([d, d1, d2, d3])
+        disposable: disposeAll([d, d1, d2, d3, d4, d5])
     }
 }
