@@ -132,6 +132,20 @@ function defBorderPoints(
 }
 
 /**
+ * calculate the azimuth angle based on roof normal
+ * @param normal
+ */
+function getAzimuth(normal: Vector3): Angle {
+    const a = Angle.fromRad(Math.atan2(normal.x, normal.y))
+
+    if (a.deg > 360) {
+        return new Angle(a.deg - 360)
+    } else if (a.deg < 0) {
+        return new Angle(a.deg + 360)
+    } else return a
+}
+
+/**
  * create a new RoofPlate based on the start position and normal vector.
  * @param center
  * @param normal
@@ -143,7 +157,7 @@ export function newRoofPlate(center: Vector3, normal: Vector3): RoofPlate {
 
     const slope = new Angle(90 - angle.deg)
 
-    const azimuth = new Angle(Math.atan(normal.y / normal.x))
+    const azimuth = getAzimuth(normal)
 
     // calculate the gutter and rafter vectors and add default border points
     const gutter = gutterVector(normal)
