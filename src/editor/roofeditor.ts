@@ -118,11 +118,11 @@ const attachObjs = (parent: Object3D) => {
  * memoized functions to be shared.
  */
 const roofDeleteMaterial = memoizeWith(always('roof_del_material'), () => {
-    return new MeshBasicMaterial({ color: 0xff2222 })
+    return new MeshBasicMaterial({ color: 0xffaa22 })
 })
 
 const roofDeleteGeometry = memoizeWith(always('roof_del_geometry'), () => {
-    return new CircleGeometry(0.5, 32)
+    return new CircleGeometry(0.6, 32)
 })
 
 /**
