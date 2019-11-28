@@ -47,10 +47,11 @@ function roofDict(roofs: RoofPlate[]) {
 
 // internal data structure used to manage roofs
 interface RoofDictData {
-    roofs: RoofDict
-    roofsToRender: RoofDict | null
+    roofs: RoofDict // all roofs managed. will be updated on any changes.
+    roofsToRender: RoofDict | null // roofs to be used to rerender
 }
 
+// helper functions to extract fields from RoofDictData
 function roofsForFlatten(rd: RoofDictData): RoofDict {
     return rd.roofs
 }
@@ -59,7 +60,12 @@ function roofsToRender(rd: RoofDictData): RoofDict | null {
     return rd.roofsToRender
 }
 
-const updateRoofDict = (rd: RoofDictData, op: RoofOperation): RoofDictData => {
+/**
+ * Update the managed roof dict with new operation
+ * @param rd
+ * @param op
+ */
+function updateRoofDict(rd: RoofDictData, op: RoofOperation): RoofDictData {
     if (op.type == RoofOperationType.Create) {
         const r = op.roof as RoofPlate
         rd.roofs[r.id] = r
@@ -87,24 +93,40 @@ const doFlatten = curry((meshData: HouseMeshData, rd: RoofDict) => {
     )
 })
 
+/**
+ * get roofUpdate event stream from an array of roof nodes
+ * @param ns
+ */
 function getRoofUpdate(ns: RoofNode[]): Stream<RoofOperation> {
     return mergeArray(pluck('roofUpdate', ns))
 }
 
+/**
+ * get roofDelete event stream from an array of roof nodes
+ * @param ns
+ */
 function getRoofDelete(ns: RoofNode[]): Stream<RoofOperation> {
     return mergeArray(pluck('roofDelete', ns))
 }
 
+/**
+ * get roofForFlatten event stream from an array of roof nodes
+ * @param ns
+ */
 function getRoofChange(ns: RoofNode[]): Stream<RoofOperation> {
     return mergeArray(pluck('roofForFlatten', ns))
 }
 
-function roofActivated(n: RoofNode): Stream<string> {
-    return constant(n.roofId, n.tapped)
-}
-
+/**
+ * get the activated roof id stream from an array of roof nodes
+ * @param ns
+ */
 function getActivated(ns: RoofNode[]): Stream<string> {
-    return mergeArray(ns.map(roofActivated))
+    return mergeArray(
+        ns.map(n => {
+            return constant(n.roofId, n.tapped)
+        })
+    )
 }
 
 /**
@@ -142,6 +164,7 @@ export function createRoofManager(
         scheduler
     )
 
+    // helper function to delete and re-add roof nodes
     const renderNodes = (
         rendered: RoofNode[],
         newNodes: RoofNode[]
