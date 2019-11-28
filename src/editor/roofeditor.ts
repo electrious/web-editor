@@ -286,6 +286,26 @@ const mkGreenMarkers = (
     return [tapEvts, d]
 }
 
+/**
+ * calculate the center based on roof vertices
+ * @param vs
+ */
+function verticesCenter(vs: Vector2[]): Vector3 {
+    if (vs.length == 0) return new Vector3(0, 0, 0.01)
+
+    let x = 0,
+        y = 0
+    vs.forEach(v => {
+        x += v.x
+        y += v.y
+    })
+
+    x /= vs.length
+    y /= vs.length
+
+    return new Vector3(x, y, 0.01)
+}
+
 export interface RoofEditor {
     roofVertices: Stream<Vector2[]>
     deleteRoof: Stream<SceneTapEvent>
@@ -304,7 +324,7 @@ export const createRoofEditor = (
     const [setRoofActive, roofActive] = createAdapter<boolean>()
 
     // pipe the 'active' param event into internal roofActive stream
-    const disposable1 = active.run(mkSink(setRoofActive), scheduler)
+    const d1 = active.run(mkSink(setRoofActive), scheduler)
 
     // stream for new list of vertices
     const [updateVertList, vertices] = createAdapter<Vector2[]>()
@@ -318,7 +338,7 @@ export const createRoofEditor = (
 
     // stream for active red marker
     const actMarker = getRedMarkerActiveStatus(markers)
-    const disposable3 = actMarker.run(mkSink(setActive), scheduler)
+    const d2 = actMarker.run(mkSink(setActive), scheduler)
 
     // get new positions after dragging
     const getPosition = (o: DraggableObject[]) => {
@@ -339,11 +359,7 @@ export const createRoofEditor = (
         )
     )
     // create green markers for adding new vertices
-    const [toAddVert, disposable4] = mkGreenMarkers(
-        parent,
-        greenActive,
-        newVertices
-    )
+    const [toAddVert, d3] = mkGreenMarkers(parent, greenActive, newVertices)
     const addVert = (ps: Vector2[], p: GreenMarkerPoint) => {
         return insert(p.vertIndex, p.position, ps)
     }
@@ -362,7 +378,7 @@ export const createRoofEditor = (
     const vertsAfterDel = snapshot(delMarker, newVertices, delEvts)
 
     // update the real vertex list after adding/deleting
-    const disposable2 = merge(vertsAfterAdd, vertsAfterDel).run(
+    const d4 = merge(vertsAfterAdd, vertsAfterDel).run(
         mkSink(vs => {
             updateVertList(vs)
 
@@ -376,10 +392,14 @@ export const createRoofEditor = (
 
     // create the roof delete button
     const roofDel = createRoofDeleteMarker()
-    roofDel.position.set(0, 0, 0.01)
     parent.add(roofDel)
 
-    const disposable5 = roofActive.run(
+    const d5 = map(verticesCenter, newVertices).run(
+        mkSink(p => roofDel.position.copy(p)),
+        scheduler
+    )
+
+    const d6 = roofActive.run(
         mkSink(a => {
             roofDel.visible = a
         }),
@@ -396,12 +416,6 @@ export const createRoofEditor = (
         // skip the first occurrence as it's the same values as provided
         roofVertices: newVertices,
         deleteRoof: roofDel.tapEvents,
-        disposable: disposeAll([
-            disposable1,
-            disposable2,
-            disposable3,
-            disposable4,
-            disposable5
-        ])
+        disposable: disposeAll([d1, d2, d3, d4, d5, d6])
     }
 }
