@@ -165,3 +165,41 @@ export function newRoofPlate(center: Vector3, normal: Vector3): RoofPlate {
         rotation: new Angle(0)
     }
 }
+
+/**
+ * enum that defines the types of operation applied to roofs
+ */
+export enum RoofOperationType {
+    Create,
+    Delete,
+    Update
+}
+
+/**
+ * interface for objects that encode the operations on a roof.
+ */
+export interface RoofOperation {
+    type: RoofOperationType
+    roof: RoofPlate | string
+}
+
+export function mkCreateRoofOp(roof: RoofPlate): RoofOperation {
+    return {
+        type: RoofOperationType.Create,
+        roof: roof
+    }
+}
+
+export function mkDeleteRoofOp(roof: RoofPlate): RoofOperation {
+    return {
+        type: RoofOperationType.Delete,
+        roof: roof.id
+    }
+}
+
+export function mkUpdateRoofOp(roof: RoofPlate): RoofOperation {
+    return {
+        type: RoofOperationType.Update,
+        roof: roof
+    }
+}

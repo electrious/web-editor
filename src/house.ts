@@ -32,7 +32,7 @@ function meshPath(leadId: number): string {
  * to add new roofs by moving mouse over the mesh.
  */
 class HouseMesh extends Mesh implements MouseMovable {
-    canAcceptMouseMove = true
+    canAcceptMouseMove = false
 
     mouseMoveEvent: Stream<SceneMouseMoveEvent>
     mouseMoved: (e: SceneMouseMoveEvent) => void

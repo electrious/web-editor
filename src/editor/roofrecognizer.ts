@@ -1,5 +1,5 @@
 import { Stream, Disposable } from '@most/types'
-import { empty, snapshot, map } from '@most/core'
+import { snapshot, map } from '@most/core'
 import { RoofPlate, newRoofPlate } from '../models/roofplate'
 import { Object3D, Vector3, MeshBasicMaterial, CircleGeometry } from 'three'
 import { SceneMouseMoveEvent } from '../sceneevent'
@@ -8,7 +8,7 @@ import memoizeWith from 'ramda/es/memoizeWith'
 import always from 'ramda/es/always'
 import { TappableMesh } from '../custom/mesh'
 import { mkSink } from '../sink'
-import { defScheduler, debug } from '../helper'
+import { defScheduler } from '../helper'
 
 /**
  * RoofRecognizer wlll be able to let user add new roof
@@ -125,7 +125,7 @@ export function createRoofRecognizer(
 
     return {
         marker: marker,
-        addedNewRoof: debug(map(mkRoof, marker.tapEvents)),
+        addedNewRoof: map(mkRoof, marker.tapEvents),
         disposable: disposable
     }
 }

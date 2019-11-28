@@ -1,4 +1,10 @@
-import { RoofPlate, cloneRoof } from './models/roofplate'
+import {
+    RoofPlate,
+    cloneRoof,
+    RoofOperation,
+    mkUpdateRoofOp,
+    mkDeleteRoofOp
+} from './models/roofplate'
 import {
     Object3D,
     Vector2,
@@ -16,7 +22,7 @@ import { mkSink } from './sink'
 import { defScheduler } from './helper'
 import { createRoofEditor } from './editor/roofeditor'
 import { disposeAll, dispose } from '@most/disposable'
-import { map, multicast, debounce } from '@most/core'
+import { map, multicast, debounce, constant } from '@most/core'
 import { createAdapter } from '@most/adapter'
 import curry from 'ramda/es/curry'
 import compose from 'ramda/es/compose'
@@ -27,8 +33,9 @@ import head from 'ramda/es/head'
 
 export interface RoofNode {
     roofId: string
-    roof: Stream<RoofPlate>
-    roofForFlatten: Stream<RoofPlate>
+    roofUpdate: Stream<RoofOperation>
+    roofDelete: Stream<RoofOperation>
+    roofForFlatten: Stream<RoofOperation>
     tapped: Stream<SceneTapEvent>
     roofObject: Object3D
     disposable: Disposable
@@ -155,6 +162,7 @@ export function createRoofNode(
     }
     const newRoofs = map(
         compose(
+            mkUpdateRoofOp,
             updateRoofPlate(roof),
             fmap(toParent)
         ),
@@ -163,7 +171,8 @@ export function createRoofNode(
 
     return {
         roofId: roof.id,
-        roof: multicast(debounce(1000, newRoofs)),
+        roofUpdate: multicast(debounce(1000, newRoofs)),
+        roofDelete: constant(mkDeleteRoofOp(roof), editor.deleteRoof),
         roofForFlatten: newRoofs,
         tapped: tapped,
         roofObject: obj,

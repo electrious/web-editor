@@ -13,7 +13,7 @@ import { setupInput, DragEvent } from './input'
 import { disposeWith, disposeAll } from '@most/disposable'
 import { Stream, Disposable } from '@most/types'
 import { createAdapter } from '@most/adapter'
-import { RoofPlate } from './models/roofplate'
+import { RoofPlate, RoofOperation } from './models/roofplate'
 import { setupRaycasting } from './sceneevent'
 import { defScheduler } from './helper'
 import { createRoofManager } from './roofmanager'
@@ -29,7 +29,7 @@ export interface WebEditor {
     loadHouse: (
         leadId: number,
         roofs: RoofPlate[],
-        roofUpdated: (r: RoofPlate) => void
+        roofUpdated: (r: RoofOperation) => void
     ) => void
 }
 
@@ -207,14 +207,14 @@ export function createEditor(
     const loadHouseFunc = (
         leadId: number,
         roofs: RoofPlate[],
-        roofUpdated: (r: RoofPlate) => void
+        roofUpdated: (r: RoofOperation) => void
     ) => {
         const loadRoofs = (md: HouseMeshData) => {
             // add all roofs to a new roof manager
             const mgr = createRoofManager(md, roofs)
             disposables.push(mgr.disposable)
             disposables.push(
-                mgr.newRoof.run(mkSink(roofUpdated), defScheduler())
+                mgr.roofOps.run(mkSink(roofUpdated), defScheduler())
             )
 
             es.addContent(mgr.roofWrapper)
