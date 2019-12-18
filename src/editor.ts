@@ -71,8 +71,16 @@ function updateContentWithDrag(obj: Object3D, drag: DragEvent) {
 }
 
 function moveWithShiftDrag(obj: Object3D, drag: DragEvent, scale: number) {
-    obj.translateX((drag.deltaX * scale) / 10)
-    obj.translateY((-drag.deltaY * scale) / 10)
+    const p = obj.parent
+    if (p == null) {
+        return
+    }
+
+    const vec = new Vector3(drag.deltaX, -drag.deltaY, 0)
+    p.worldToLocal(vec)
+
+    obj.translateX((vec.x * scale) / 10)
+    obj.translateY((vec.y * scale) / 10)
 }
 
 /**
@@ -128,15 +136,15 @@ function createScene(
     dirLight.position.set(100, 0, 100)
     scene.add(dirLight)
 
-    // add a wrapper object that's used only to move the scene around
-    const transWrapper = new Object3D()
-    transWrapper.name = 'translate-wrapper'
-    scene.add(transWrapper)
+    // add a wrapper object that's used only to rotate the scene around
+    const rotWrapper = new Object3D()
+    rotWrapper.name = 'rotate-wrapper'
+    scene.add(rotWrapper)
 
     // add a wrapper object to be parent all user contents
     const content = new Object3D()
     content.name = 'scene-content'
-    transWrapper.add(content)
+    rotWrapper.add(content)
 
     /**
      * function to update renderring of the WebGL scene
@@ -166,13 +174,13 @@ function createScene(
 
     // use drag events filtered by raycasting already
     const disposable2 = rcs.dragEvent.run(
-        mkSink(e => updateContentWithDrag(content, e)),
+        mkSink(e => updateContentWithDrag(rotWrapper, e)),
         scheduler
     )
 
     // use shift drag events to translate the whole scene
     const disposable3 = inputEvts.shiftDragged.run(
-        mkSink(e => moveWithShiftDrag(transWrapper, e, scale)),
+        mkSink(e => moveWithShiftDrag(content, e, scale)),
         scheduler
     )
 
