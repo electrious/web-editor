@@ -47,10 +47,9 @@ interface EditorScene {
     addContent: (obj: Object3D) => void
 }
 
-function updateCameraWithZoom(camera: PerspectiveCamera, zoom: number) {
+function updateCameraWithZoom(camera: PerspectiveCamera, zoom: number): number {
     const pos = camera.position
     const curDist = pos.length()
-    const norm = pos.normalize()
 
     let newDist = curDist + zoom
     if (newDist < 5) {
@@ -59,12 +58,21 @@ function updateCameraWithZoom(camera: PerspectiveCamera, zoom: number) {
         newDist = 500
     }
 
-    camera.position = norm.multiplyScalar(newDist)
+    // normalize the position and multiply the new distance
+    pos.normalize()
+    pos.multiplyScalar(newDist)
+
+    return newDist
 }
 
 function updateContentWithDrag(obj: Object3D, drag: DragEvent) {
     obj.rotateZ(drag.deltaX / 360)
     obj.rotateOnWorldAxis(new Vector3(1, 0, 0), drag.deltaY / 360)
+}
+
+function moveWithShiftDrag(obj: Object3D, drag: DragEvent, scale: number) {
+    obj.translateX((drag.deltaX * scale) / 10)
+    obj.translateY((-drag.deltaY * scale) / 10)
 }
 
 /**
@@ -107,6 +115,8 @@ function createScene(
     camera.position.set(0, -50, 50)
     camera.lookAt(0, 0, 0)
 
+    const cameraDefDist = camera.position.length()
+
     // add ambient light
     const ambLight = new AmbientLight(0xffffff)
     ambLight.name = 'ambient-light'
@@ -118,10 +128,15 @@ function createScene(
     dirLight.position.set(100, 0, 100)
     scene.add(dirLight)
 
+    // add a wrapper object that's used only to move the scene around
+    const transWrapper = new Object3D()
+    transWrapper.name = 'translate-wrapper'
+    scene.add(transWrapper)
+
     // add a wrapper object to be parent all user contents
     const content = new Object3D()
     content.name = 'scene-content'
-    scene.add(content)
+    transWrapper.add(content)
 
     /**
      * function to update renderring of the WebGL scene
@@ -137,9 +152,13 @@ function createScene(
     /**
      * setup input events for the scene
      */
+    let scale = 1
     const inputEvts = setupInput(elem)
     const disposable1 = inputEvts.zoomed.run(
-        mkSink(e => updateCameraWithZoom(camera, e.deltaY)),
+        mkSink(e => {
+            const newDist = updateCameraWithZoom(camera, e.deltaY)
+            scale = newDist / cameraDefDist
+        }),
         scheduler
     )
 
@@ -150,6 +169,13 @@ function createScene(
         mkSink(e => updateContentWithDrag(content, e)),
         scheduler
     )
+
+    // use shift drag events to translate the whole scene
+    const disposable3 = inputEvts.shiftDragged.run(
+        mkSink(e => moveWithShiftDrag(transWrapper, e, scale)),
+        scheduler
+    )
+
     // update with the default size
     updateSize([width, height])
 
@@ -163,6 +189,7 @@ function createScene(
             disposable0,
             disposable1,
             disposable2,
+            disposable3,
             rcs.disposable,
             inputEvts.disposable
         ]),

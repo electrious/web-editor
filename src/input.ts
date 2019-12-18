@@ -29,6 +29,7 @@ import { gate, unwrap, defScheduler, debug } from './helper'
 import not from 'ramda/es/not'
 import { createAdapter } from '@most/adapter'
 import { mkSink } from './sink'
+import { disposeBoth } from '@most/disposable'
 
 export interface TapEvent {
     tapX: number
@@ -225,6 +226,7 @@ export interface InputEvents {
     tapped: Stream<TapEvent>
     zoomed: Stream<WheelEvent>
     dragged: Stream<DragEvent>
+    shiftDragged: Stream<DragEvent>
     mouseMove: Stream<MouseMoveEvent>
     disposable: Disposable
 }
@@ -242,6 +244,14 @@ export function setupInput(elem: Element): InputEvents {
         }
     }
 
+    const shifted = (e: MouseEvent): boolean => {
+        return e.getModifierState('Shift')
+    }
+
+    const notShifted = (e: MouseEvent): boolean => {
+        return !e.getModifierState('Shift')
+    }
+
     const touchTap = (e: TouchEvent) => {
         const t = e.touches[0]
         const rect = elem.getBoundingClientRect()
@@ -251,24 +261,33 @@ export function setupInput(elem: Element): InputEvents {
         }
     }
 
-    const mouseStart = map(mouseTap, mousedown(elem))
-    const mouseMove = map(mouseTap, mousemove(elem))
-    const mouseEnd = map(mouseTap, mouseup(elem))
+    const md = multicast(mousedown(elem))
+    const mm = multicast(mousemove(elem))
+    const mu = multicast(mouseup(elem))
+
+    const mouseStart = map(mouseTap, filter(notShifted, md))
+    const mouseMove = map(mouseTap, filter(notShifted, mm))
+    const mouseEnd = map(mouseTap, mu)
     const touchStart = map(touchTap, touchstart(elem))
     const touchMove = map(touchTap, touchmove(elem))
     const touchEnd = map(touchTap, touchend(elem))
+
+    const shiftStart = map(mouseTap, filter(shifted, md))
+    const shiftMove = map(mouseTap, filter(shifted, mm))
 
     const start = multicast(merge(mouseStart, touchStart))
     const move = multicast(merge(mouseMove, touchMove))
     const end = multicast(merge(mouseEnd, touchEnd))
 
     const [drag, disp] = dragged(start, move, end)
+    const [shiftDrag, shiftDisp] = dragged(shiftStart, shiftMove, mouseEnd)
 
     return {
         tapped: multicast(tapped(start, end)),
         zoomed: multicast(domEvent('wheel', elem)),
         dragged: multicast(drag),
+        shiftDragged: multicast(shiftDrag),
         mouseMove: multicast(map(mouseMoveEvent, mousemove(elem))),
-        disposable: disp
+        disposable: disposeBoth(disp, shiftDisp)
     }
 }
