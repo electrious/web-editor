@@ -47,7 +47,7 @@ interface EditorScene {
     addContent: (obj: Object3D) => void
 }
 
-function updateCameraWithZoom(camera: PerspectiveCamera, zoom: number): number {
+function zoomCamera(camera: PerspectiveCamera, zoom: number): number {
     const pos = camera.position
     const curDist = pos.length()
 
@@ -65,7 +65,7 @@ function updateCameraWithZoom(camera: PerspectiveCamera, zoom: number): number {
     return newDist
 }
 
-function updateContentWithDrag(obj: Object3D, drag: DragEvent) {
+function rotateContentWithDrag(obj: Object3D, drag: DragEvent) {
     obj.rotateZ(drag.deltaX / 360)
     obj.rotateOnWorldAxis(new Vector3(1, 0, 0), drag.deltaY / 360)
 }
@@ -164,7 +164,7 @@ function createScene(
     const inputEvts = setupInput(elem)
     const disposable1 = inputEvts.zoomed.run(
         mkSink(e => {
-            const newDist = updateCameraWithZoom(camera, e.deltaY)
+            const newDist = zoomCamera(camera, e.deltaY)
             scale = newDist / cameraDefDist
         }),
         scheduler
@@ -174,7 +174,7 @@ function createScene(
 
     // use drag events filtered by raycasting already
     const disposable2 = rcs.dragEvent.run(
-        mkSink(e => updateContentWithDrag(rotWrapper, e)),
+        mkSink(e => rotateContentWithDrag(rotWrapper, e)),
         scheduler
     )
 
