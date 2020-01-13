@@ -80,7 +80,10 @@ function createRoofMesh(
 const updateRoofPlate = curry((roof: RoofPlate, ps: Vector3[]) => {
     const newRoof = cloneRoof(roof)
     // make sure the first and last point are the same
-    newRoof.borderPoints = append(head(ps), ps)
+    const headEl = head(ps)
+    if (headEl == undefined) return newRoof
+
+    newRoof.borderPoints = append(headEl, ps)
     return newRoof
 })
 

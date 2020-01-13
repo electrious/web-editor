@@ -195,7 +195,10 @@ const greenMarkerPositions = (vertices: Vector2[]): GreenMarkerPoint[] => {
     // take all vertices and their index
     const v1List = vertices.map((v, i): [Vector2, number] => [v, i])
     // make a new list with the head of origin list put to end
-    const v2List = append(head(vertices), tail(vertices))
+    const headEl = head(vertices)
+    if (headEl == undefined) return []
+
+    const v2List = append(headEl, tail(vertices))
     // calculate the distance and points between vertex pairs
     const d = zipWith(f, v1List, v2List)
 
