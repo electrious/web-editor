@@ -213,11 +213,7 @@ function createScene(
  * @param {Number} height height of the viewport
  * @param {HTMLElement} dom parent DOM element to attach the WebGL canvas to
  */
-export function createEditor(
-    width: number,
-    height: number,
-    elem: Element
-): WebEditor {
+function createEditor(width: number, height: number, elem: Element): WebEditor {
     // create the editor scene
     const es = createScene(width, height, elem)
 
@@ -272,4 +268,8 @@ export function createEditor(
     }
 
     return editor
+}
+
+export default {
+    createEditor: createEditor
 }

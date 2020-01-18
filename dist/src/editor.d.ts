@@ -14,4 +14,8 @@ export interface WebEditor {
  * @param {Number} height height of the viewport
  * @param {HTMLElement} dom parent DOM element to attach the WebGL canvas to
  */
-export declare function createEditor(width: number, height: number, elem: Element): WebEditor;
+declare function createEditor(width: number, height: number, elem: Element): WebEditor;
+declare const _default: {
+    createEditor: typeof createEditor;
+};
+export default _default;
