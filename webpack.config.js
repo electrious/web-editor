@@ -1,13 +1,12 @@
 const path = require('path')
 
 module.exports = {
-    entry: './src/index.ts',
+    entry: './index.ts',
     output: {
         path: path.resolve(__dirname, 'dist'),
         filename: 'web-editor.js',
         library: 'webEditor',
-        libraryTarget: 'umd',
-        umdNamedDefine: true
+        libraryTarget: 'umd'
     },
     module: {
         rules: [
