@@ -1,4 +1,4 @@
-import Editor from '../src/editor'
+import { createEditor } from '../src/editor'
 import { testRoofs } from './testroofplates'
 import { Vector3 } from 'three'
 import { RoofPlate } from '../src/models/roofplate'
@@ -8,7 +8,7 @@ const parent = document.querySelector('#editor')
 
 if (parent != null) {
     // create editor instance
-    const editor = Editor.createEditor(800, 600, parent)
+    const editor = createEditor(800, 600, parent)
 
     const mkVec = (ns: number[]) => {
         return new Vector3(ns[0], ns[1], ns[2])
