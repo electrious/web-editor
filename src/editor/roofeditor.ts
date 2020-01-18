@@ -203,7 +203,7 @@ const greenMarkerPositions = (vertices: Vector2[]): GreenMarkerPoint[] => {
     const d = zipWith(f, v1List, v2List)
 
     // filter function
-    const g = (d: { dist: number }) => {
+    const g = (d: { dist: number; point: GreenMarkerPoint }) => {
         return d.dist > 1
     }
 

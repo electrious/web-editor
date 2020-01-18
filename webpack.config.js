@@ -1,7 +1,7 @@
 const path = require('path')
 
 module.exports = {
-    entry: './index.ts',
+    entry: './src/editor.ts',
     output: {
         path: path.resolve(__dirname, 'dist'),
         filename: 'web-editor.js',
@@ -22,18 +22,6 @@ module.exports = {
         extensions: ['.ts', '.js']
     },
 
-    externals: ['three',
-                'ramda',
-                'rbush',
-                'uuid',
-                '@most/adaptor',
-                '@most/core',
-                '@most/dom-event',
-                '@most/scheduler',
-                '@types/ramda',
-                '@types/rbush',
-                '@types/uuid'
-            ],
     stats: {
         colors: true
     },

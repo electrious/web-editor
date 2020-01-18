@@ -2,8 +2,8 @@
   "name": "web-editor",
   "version": "1.0.0",
   "description": "a web editor library to edit Electrious 3D contents.",
-  "main": "dist/editor.bundle.js",
-  "types": "dist/editor.d.ts",
+  "main": "lib/src/editor.js",
+  "types": "lib/src/editor.d.ts",
   "repository": "https://github.com/electrious/web-editor",
   "author": "Eric Wong",
   "license": "CopyrightsReserved",
@@ -11,8 +11,8 @@
   "mode": "development",
   "scripts": {
     "demo": "webpack-dev-server --mode development --host 0.0.0.0 --config example.webpack.config.js",
-    "dev": "webpack --mode development",
-    "build": "webpack --mode production"
+    "build-lib": "rm -rf lib && tsc",
+    "build": "rm -rf dist && webpack --mode production"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^2.4.0",

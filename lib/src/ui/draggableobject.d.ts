@@ -18,4 +18,4 @@ export interface DraggableObject {
  * @param customMat optional custom material for the object
  * @returns DraggableObject
  */
-export declare const createDraggableObject: (active: Stream<boolean>, index: number, position: Vector2, customGeo?: Geometry | undefined, customMat?: Material | undefined) => DraggableObject;
+export declare const createDraggableObject: (active: Stream<boolean>, index: number, position: Vector2, customGeo?: Geometry, customMat?: Material) => DraggableObject;
