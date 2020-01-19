@@ -4,7 +4,7 @@ export declare type Size = [number, number];
  * Public Interface for the main WebEditor
  */
 export interface WebEditor {
-    resize: (size: Size) => void;
+    resize: (width: number, height: number) => void;
     dispose: () => void;
     loadHouse: (leadId: number, roofs: RoofPlate[], roofUpdated: (r: RoofOperation) => void) => void;
 }

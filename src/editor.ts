@@ -24,7 +24,7 @@ export type Size = [number, number]
  * Public Interface for the main WebEditor
  */
 export interface WebEditor {
-    resize: (size: Size) => void
+    resize: (width: number, height: number) => void
     dispose: () => void
     loadHouse: (
         leadId: number,
@@ -43,7 +43,7 @@ interface EditorScene {
     size: Stream<[number, number]>
     disposable: Disposable
     render: () => void
-    resize: (size: Size) => void
+    resize: (width: number, height: number) => void
     addContent: (obj: Object3D) => void
 }
 
@@ -202,7 +202,9 @@ function createScene(
             inputEvts.disposable
         ]),
         render: renderFunc,
-        resize: updateSize,
+        resize: (width: number, height: number) => {
+            updateSize([width, height])
+        },
         addContent: addContentFunc
     }
 }
