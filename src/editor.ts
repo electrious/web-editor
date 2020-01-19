@@ -112,6 +112,7 @@ function createScene(
         const width = s[0]
         const height = s[1]
         camera.aspect = width / height
+        camera.updateProjectionMatrix()
         renderer.setSize(width, height)
     }
     const disposable0 = sizeStream.run(mkSink(resized), scheduler)
