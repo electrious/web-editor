@@ -46,6 +46,80 @@ export function cloneRoof(roof: RoofPlate): RoofPlate {
     }
 }
 
+// RoofPlate model used in JS code. The data received from user and updates
+// sent back to user should be in this format.
+export interface JSRoofPlate {
+    uuid: string
+    id: number
+    lead_id: number
+    border_points: { x: number; y: number; z: number }[]
+    coefs: number[]
+    center: number[]
+    normal: number[]
+    orientation: number
+    alignment: number
+    slope: number
+    azimuth: number
+    rotation_override: number
+}
+
+const mkVec = (ns: number[]) => {
+    return new Vector3(ns[0], ns[1], ns[2])
+}
+
+const fromVec = (v: Vector3) => {
+    return [v.x, v.y, v.z]
+}
+
+/**
+ * convert an external JSRoofPlate object to internal RoofPlate model
+ * @param r
+ */
+export function fromJSRoofPlate(r: JSRoofPlate): RoofPlate {
+    return {
+        id: r.uuid,
+        intId: r.id,
+        leadId: r.lead_id,
+        borderPoints: r.border_points.map(v => {
+            return new Vector3(v.x, v.y, v.z)
+        }),
+        coefs: r.coefs,
+        center: mkVec(r.center),
+        normal: mkVec(r.normal),
+        orientation: r.orientation,
+        alignment: r.alignment,
+        slope: new Angle(r.slope),
+        azimuth: new Angle(r.azimuth),
+        rotation: new Angle(r.rotation_override)
+    }
+}
+
+/**
+ * convert an internal RoofPlate object to an external JSRoofPlate object
+ * @param r
+ */
+export function toJSRoofPlate(r: RoofPlate): JSRoofPlate {
+    return {
+        uuid: r.id,
+        id: r.intId,
+        // eslint-disable-next-line @typescript-eslint/camelcase
+        lead_id: r.leadId,
+        // eslint-disable-next-line @typescript-eslint/camelcase
+        border_points: r.borderPoints.map(v => {
+            return { x: v.x, y: v.y, z: v.z }
+        }),
+        coefs: r.coefs,
+        center: fromVec(r.center),
+        normal: fromVec(r.normal),
+        orientation: r.orientation,
+        alignment: r.alignment,
+        slope: r.slope.deg,
+        azimuth: r.azimuth.deg,
+        // eslint-disable-next-line @typescript-eslint/camelcase
+        rotation_override: r.rotation.deg
+    }
+}
+
 /**
  * 2D Polygon for roof plate projection on ground
  */
@@ -197,6 +271,19 @@ export interface RoofOperation {
     roof: RoofPlate | string
 }
 
+function isRoofPlate(r: RoofPlate | string): r is RoofPlate {
+    return (r as RoofPlate).normal !== undefined
+}
+
+/**
+ * interface for objects that encode the operations on a roof with
+ * an external JSRoofPlate object
+ */
+export interface JSRoofOperation {
+    type: RoofOperationType
+    roof: JSRoofPlate | string
+}
+
 export function mkCreateRoofOp(roof: RoofPlate): RoofOperation {
     return {
         type: RoofOperationType.Create,
@@ -215,5 +302,14 @@ export function mkUpdateRoofOp(roof: RoofPlate): RoofOperation {
     return {
         type: RoofOperationType.Update,
         roof: roof
+    }
+}
+
+export function toJSRoofOperation(o: RoofOperation): JSRoofOperation {
+    const r = o.roof
+    if (isRoofPlate(r)) {
+        return { type: o.type, roof: toJSRoofPlate(r) }
+    } else {
+        return { type: o.type, roof: r }
     }
 }

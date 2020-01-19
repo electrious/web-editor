@@ -1,4 +1,4 @@
-import { RoofPlate, RoofOperation } from './models/roofplate';
+import { JSRoofPlate, JSRoofOperation } from './models/roofplate';
 export declare type Size = [number, number];
 /**
  * Public Interface for the main WebEditor
@@ -6,7 +6,7 @@ export declare type Size = [number, number];
 export interface WebEditor {
     resize: (width: number, height: number) => void;
     dispose: () => void;
-    loadHouse: (leadId: number, roofs: RoofPlate[], roofUpdated: (r: RoofOperation) => void) => void;
+    loadHouse: (leadId: number, roofs: JSRoofPlate[], roofUpdated: (r: JSRoofOperation) => void) => void;
 }
 /**
  * createEditor will create the Web Editor instance

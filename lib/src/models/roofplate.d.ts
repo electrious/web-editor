@@ -23,6 +23,34 @@ export interface RoofPlate {
     rotation: Angle;
 }
 export declare function cloneRoof(roof: RoofPlate): RoofPlate;
+export interface JSRoofPlate {
+    uuid: string;
+    id: number;
+    lead_id: number;
+    border_points: {
+        x: number;
+        y: number;
+        z: number;
+    }[];
+    coefs: number[];
+    center: number[];
+    normal: number[];
+    orientation: number;
+    alignment: number;
+    slope: number;
+    azimuth: number;
+    rotation_override: number;
+}
+/**
+ * convert an external JSRoofPlate object to internal RoofPlate model
+ * @param r
+ */
+export declare function fromJSRoofPlate(r: JSRoofPlate): RoofPlate;
+/**
+ * convert an internal RoofPlate object to an external JSRoofPlate object
+ * @param r
+ */
+export declare function toJSRoofPlate(r: RoofPlate): JSRoofPlate;
 /**
  * 2D Polygon for roof plate projection on ground
  */
@@ -53,6 +81,15 @@ export interface RoofOperation {
     type: RoofOperationType;
     roof: RoofPlate | string;
 }
+/**
+ * interface for objects that encode the operations on a roof with
+ * an external JSRoofPlate object
+ */
+export interface JSRoofOperation {
+    type: RoofOperationType;
+    roof: JSRoofPlate | string;
+}
 export declare function mkCreateRoofOp(roof: RoofPlate): RoofOperation;
 export declare function mkDeleteRoofOp(roof: RoofPlate): RoofOperation;
 export declare function mkUpdateRoofOp(roof: RoofPlate): RoofOperation;
+export declare function toJSRoofOperation(o: RoofOperation): JSRoofOperation;

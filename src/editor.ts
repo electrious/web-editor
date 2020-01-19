@@ -13,10 +13,17 @@ import { setupInput, DragEvent } from './input'
 import { disposeWith, disposeAll } from '@most/disposable'
 import { Stream, Disposable } from '@most/types'
 import { createAdapter } from '@most/adapter'
-import { RoofPlate, RoofOperation } from './models/roofplate'
+import {
+    RoofOperation,
+    JSRoofPlate,
+    fromJSRoofPlate,
+    JSRoofOperation,
+    toJSRoofOperation
+} from './models/roofplate'
 import { setupRaycasting } from './sceneevent'
 import { defScheduler } from './helper'
 import { createRoofManager } from './roofmanager'
+import { map } from '@most/core'
 
 export type Size = [number, number]
 
@@ -28,8 +35,8 @@ export interface WebEditor {
     dispose: () => void
     loadHouse: (
         leadId: number,
-        roofs: RoofPlate[],
-        roofUpdated: (r: RoofOperation) => void
+        roofs: JSRoofPlate[],
+        roofUpdated: (r: JSRoofOperation) => void
     ) => void
 }
 
@@ -244,15 +251,18 @@ export function createEditor(
 
     const loadHouseFunc = (
         leadId: number,
-        roofs: RoofPlate[],
-        roofUpdated: (r: RoofOperation) => void
+        roofs: JSRoofPlate[],
+        roofUpdated: (r: JSRoofOperation) => void
     ) => {
         const loadRoofs = (md: HouseMeshData) => {
             // add all roofs to a new roof manager
-            const mgr = createRoofManager(md, roofs)
+            const mgr = createRoofManager(md, roofs.map(fromJSRoofPlate))
             disposables.push(mgr.disposable)
             disposables.push(
-                mgr.roofOps.run(mkSink(roofUpdated), defScheduler())
+                map(toJSRoofOperation, mgr.roofOps).run(
+                    mkSink(roofUpdated),
+                    defScheduler()
+                )
             )
 
             es.addContent(mgr.roofWrapper)
