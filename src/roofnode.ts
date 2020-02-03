@@ -22,7 +22,7 @@ import { mkSink } from './sink'
 import { defScheduler } from './helper'
 import { createRoofEditor } from './editor/roofeditor'
 import { disposeAll, dispose } from '@most/disposable'
-import { map, multicast, debounce, constant } from '@most/core'
+import { map, multicast, constant } from '@most/core'
 import { createAdapter } from '@most/adapter'
 import curry from 'ramda/es/curry'
 import compose from 'ramda/es/compose'
@@ -35,7 +35,6 @@ export interface RoofNode {
     roofId: string
     roofUpdate: Stream<RoofOperation>
     roofDelete: Stream<RoofOperation>
-    roofForFlatten: Stream<RoofOperation>
     tapped: Stream<SceneTapEvent>
     roofObject: Object3D
     disposable: Disposable
@@ -164,19 +163,14 @@ export function createRoofNode(
         return new Vector3(v.x, v.y, 0).applyMatrix4(obj.matrix)
     }
     const newRoofs = map(
-        compose(
-            mkUpdateRoofOp,
-            updateRoofPlate(roof),
-            fmap(toParent)
-        ),
+        compose(mkUpdateRoofOp, updateRoofPlate(roof), fmap(toParent)),
         editor.roofVertices
     )
 
     return {
         roofId: roof.id,
-        roofUpdate: multicast(debounce(1000, newRoofs)),
         roofDelete: constant(mkDeleteRoofOp(roof), editor.deleteRoof),
-        roofForFlatten: newRoofs,
+        roofUpdate: multicast(newRoofs),
         tapped: tapped,
         roofObject: obj,
         disposable: disposeAll([

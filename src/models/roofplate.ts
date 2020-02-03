@@ -2,6 +2,7 @@ import { Vector3, Vector2 } from 'three'
 import { Angle } from '../math/angle'
 import map from 'ramda/es/map'
 import uuidv4 from 'uuid/v4'
+import { range } from 'ramda'
 
 export enum Orientation {
     Landscape,
@@ -67,10 +68,6 @@ const mkVec = (ns: number[]) => {
     return new Vector3(ns[0], ns[1], ns[2])
 }
 
-const fromVec = (v: Vector3) => {
-    return [v.x, v.y, v.z]
-}
-
 /**
  * convert an external JSRoofPlate object to internal RoofPlate model
  * @param r
@@ -91,32 +88,6 @@ export function fromJSRoofPlate(r: JSRoofPlate): RoofPlate {
         slope: new Angle(r.slope),
         azimuth: new Angle(r.azimuth),
         rotation: new Angle(r.rotation_override)
-    }
-}
-
-/**
- * convert an internal RoofPlate object to an external JSRoofPlate object
- * @param r
- */
-export function toJSRoofPlate(r: RoofPlate): JSRoofPlate {
-    return {
-        uuid: r.id,
-        id: r.intId,
-        // eslint-disable-next-line @typescript-eslint/camelcase
-        lead_id: r.leadId,
-        // eslint-disable-next-line @typescript-eslint/camelcase
-        border_points: r.borderPoints.map(v => {
-            return { x: v.x, y: v.y, z: v.z }
-        }),
-        coefs: r.coefs,
-        center: fromVec(r.center),
-        normal: fromVec(r.normal),
-        orientation: r.orientation,
-        alignment: r.alignment,
-        slope: r.slope.deg,
-        azimuth: r.azimuth.deg,
-        // eslint-disable-next-line @typescript-eslint/camelcase
-        rotation_override: r.rotation.deg
     }
 }
 
@@ -271,19 +242,6 @@ export interface RoofOperation {
     roof: RoofPlate | string
 }
 
-function isRoofPlate(r: RoofPlate | string): r is RoofPlate {
-    return (r as RoofPlate).normal !== undefined
-}
-
-/**
- * interface for objects that encode the operations on a roof with
- * an external JSRoofPlate object
- */
-export interface JSRoofOperation {
-    type: RoofOperationType
-    roof: JSRoofPlate | string
-}
-
 export function mkCreateRoofOp(roof: RoofPlate): RoofOperation {
     return {
         type: RoofOperationType.Create,
@@ -305,11 +263,40 @@ export function mkUpdateRoofOp(roof: RoofPlate): RoofOperation {
     }
 }
 
-export function toJSRoofOperation(o: RoofOperation): JSRoofOperation {
-    const r = o.roof
-    if (isRoofPlate(r)) {
-        return { type: o.type, roof: toJSRoofPlate(r) }
-    } else {
-        return { type: o.type, roof: r }
+// Point defines a 3D point used in the exported RoofDetected object.
+export interface Point {
+    x: number
+    y: number
+    z: number
+}
+
+function pointFromVector(v: Vector3): Point {
+    return { x: v.x, y: v.y, z: v.z }
+}
+
+// RoofEdited defines data required by the final API to actually update
+// the roofplates on server.
+export interface RoofEdited {
+    ground: Point
+    inclined: Point
+    contours: Point[]
+    indices: number[]
+}
+
+function toRoofEdited(roof: RoofPlate): RoofEdited {
+    const normal = roof.normal
+    const gutter = gutterVector(normal)
+    const rafter = rafterVector(normal, gutter)
+
+    return {
+        ground: pointFromVector(gutter),
+        inclined: pointFromVector(rafter),
+        contours: roof.borderPoints.map(pointFromVector),
+        indices: range(1, roof.borderPoints.length + 1)
     }
+}
+
+// exported funtion to convert a Roofplate to the RoofEdited object
+export function toRoofsEdited(roofs: RoofPlate[]): RoofEdited[] {
+    return roofs.map(toRoofEdited)
 }

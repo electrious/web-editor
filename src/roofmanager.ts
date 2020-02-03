@@ -2,7 +2,9 @@ import {
     RoofPlate,
     RoofOperation,
     RoofOperationType,
-    mkCreateRoofOp
+    mkCreateRoofOp,
+    RoofEdited,
+    toRoofsEdited
 } from './models/roofplate'
 import { Object3D } from 'three'
 import { createAdapter } from '@most/adapter'
@@ -12,12 +14,13 @@ import {
     mergeArray,
     map,
     scan,
-    switchLatest
+    switchLatest,
+    debounce
 } from '@most/core'
 import equals from 'ramda/es/equals'
 import { createRoofNode, RoofNode } from './roofnode'
 import { mkSink } from './sink'
-import { defScheduler, unwrap, debug } from './helper'
+import { defScheduler, unwrap } from './helper'
 import { Disposable, Stream } from '@most/types'
 import { disposeAll } from '@most/disposable'
 import pluck from 'ramda/es/pluck'
@@ -27,10 +30,11 @@ import values from 'ramda/es/values'
 import curry from 'ramda/es/curry'
 import fmap from 'ramda/es/map'
 import { createRoofRecognizer } from './editor/roofrecognizer'
+import { compose } from 'ramda'
 
 export interface RoofManager {
     roofWrapper: Object3D
-    roofOps: Stream<RoofOperation>
+    editedRoofs: Stream<RoofEdited[]>
     disposable: Disposable
 }
 
@@ -52,7 +56,7 @@ interface RoofDictData {
 }
 
 // helper functions to extract fields from RoofDictData
-function roofsForFlatten(rd: RoofDictData): RoofDict {
+function roofs(rd: RoofDictData): RoofDict {
     return rd.roofs
 }
 
@@ -110,14 +114,6 @@ function getRoofDelete(ns: RoofNode[]): Stream<RoofOperation> {
 }
 
 /**
- * get roofForFlatten event stream from an array of roof nodes
- * @param ns
- */
-function getRoofChange(ns: RoofNode[]): Stream<RoofOperation> {
-    return mergeArray(pluck('roofForFlatten', ns))
-}
-
-/**
  * get the activated roof id stream from an array of roof nodes
  * @param ns
  */
@@ -166,10 +162,10 @@ export function createRoofManager(
     const defRoofDict = roofDict(defRoofs)
 
     // get the roofs to be rerendered
-    const roofs = unwrap(map(roofsToRender, roofsData))
-    const roofsLst = map(values, roofs)
+    const rsToRender = unwrap(map(roofsToRender, roofsData))
+    const rsToRenderLst = map(values, rsToRender)
     // create roof node for each roof
-    const nodes = multicast(map(fmap(mkNode), roofsLst))
+    const nodes = multicast(map(fmap(mkNode), rsToRenderLst))
 
     const d = switchLatest(map(getActivated, nodes)).run(
         mkSink(updateActive),
@@ -189,18 +185,14 @@ export function createRoofManager(
     // do the renderring
     const d1 = scan(renderNodes, [], nodes).run(mkSink(), scheduler)
 
-    // stream of operation that roof updated. It only fires after user stop
-    // making any new changes.
-    const updatedRoofOp = multicast(switchLatest(map(getRoofUpdate, nodes)))
-
     // stream of delete roof operations
     const deleteRoofOp = multicast(switchLatest(map(getRoofDelete, nodes)))
 
-    const roofChangeOp = switchLatest(map(getRoofChange, nodes))
+    const roofChangeOp = switchLatest(map(getRoofUpdate, nodes))
 
     // stream of new roofs that will be updated on any change
     // and run the roof flatten algorithm whenever there's new roof change.
-    const newRoofs = multicast(map(roofsForFlatten, roofsData))
+    const newRoofs = multicast(map(roofs, roofsData))
     const d2 = newRoofs.run(mkSink(doFlatten(meshData)), scheduler)
 
     // create the roof recognizer and add it to the roof wrapper object.
@@ -228,11 +220,11 @@ export function createRoofManager(
 
     updateActive(null)
 
+    const getRoofEdited = compose(toRoofsEdited, values)
+
     return {
         roofWrapper: wrapper,
-        roofOps: multicast(
-            mergeArray([addRoofOp, deleteRoofOp, updatedRoofOp])
-        ),
+        editedRoofs: multicast(debounce(1000, map(getRoofEdited, newRoofs))),
         disposable: disposeAll([d, d1, d2, d3, d4, d5])
     }
 }
