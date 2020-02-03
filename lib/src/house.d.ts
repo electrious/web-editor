@@ -22,7 +22,7 @@ declare class HouseMesh extends Mesh implements MouseMovable, Tappable {
  * Load the house mesh of the specified lead.
  * @param {number} leadId
  */
-export declare function loadHouse(leadId: number): Stream<Object3D>;
+export declare function loadHouse(dataServerUrl: string, leadId: number): Stream<Object3D>;
 /**
  * House mesh data, including the mesh, the original geometry, and the vertices
  * rtree built from all vertices
