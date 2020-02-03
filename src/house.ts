@@ -24,12 +24,8 @@ import {
 } from './sceneevent'
 import { createAdapter } from '@most/adapter'
 
-function meshPath(leadId: number): string {
-    return (
-        'https://s3.eu-west-1.amazonaws.com/data.electrious.com/leads/' +
-        leadId +
-        '/mesh/'
-    )
+function meshPath(dataServerUrl: string, leadId: number): string {
+    return dataServerUrl + '/leads/' + leadId + '/mesh/'
 }
 
 /**
@@ -104,10 +100,13 @@ function applyMaterialCreator(matCreator: MaterialCreator, obj: Object3D) {
  * Load the house mesh of the specified lead.
  * @param {number} leadId
  */
-export function loadHouse(leadId: number): Stream<Object3D> {
+export function loadHouse(
+    dataServerUrl: string,
+    leadId: number
+): Stream<Object3D> {
     const objLoader = new OBJLoader2Parallel()
     const mtlLoader = new MTLLoader()
-    const path = meshPath(leadId)
+    const path = meshPath(dataServerUrl, leadId)
 
     return fromPromise(
         new Promise(resolve => {

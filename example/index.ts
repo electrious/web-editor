@@ -9,8 +9,13 @@ if (parent != null) {
     // convert test data to RoofPlate objects
     const roofs = testRoofs.roofplates
     // load the house and roofs
-    editor.loadHouse(296285, roofs, r => {
-        // updated roof
-        console.log(r)
-    })
+    editor.loadHouse(
+        'https://s3.eu-west-1.amazonaws.com/data.electrious.com',
+        296285,
+        roofs,
+        r => {
+            // updated roof
+            console.log(r)
+        }
+    )
 }

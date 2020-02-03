@@ -27,6 +27,7 @@ export interface WebEditor {
     resize: (width: number, height: number) => void
     dispose: () => void
     loadHouse: (
+        dataServerUrl: string,
         leadId: number,
         roofs: JSRoofPlate[],
         roofEdited: (r: RoofEdited[]) => void
@@ -243,6 +244,7 @@ export function createEditor(
     }
 
     const loadHouseFunc = (
+        dataServerUrl: string,
         leadId: number,
         roofs: JSRoofPlate[],
         roofEdited: (r: RoofEdited[]) => void
@@ -264,7 +266,10 @@ export function createEditor(
             if (md != null) loadRoofs(md)
         }
 
-        const disp = loadHouse(leadId).run(mkSink(f), defScheduler())
+        const disp = loadHouse(dataServerUrl, leadId).run(
+            mkSink(f),
+            defScheduler()
+        )
         disposables.push(disp)
     }
 
