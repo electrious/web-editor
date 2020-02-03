@@ -15,7 +15,8 @@ import {
     map,
     scan,
     switchLatest,
-    debounce
+    debounce,
+    skip
 } from '@most/core'
 import equals from 'ramda/es/equals'
 import { createRoofNode, RoofNode } from './roofnode'
@@ -224,7 +225,10 @@ export function createRoofManager(
 
     return {
         roofWrapper: wrapper,
-        editedRoofs: multicast(debounce(1000, map(getRoofEdited, newRoofs))),
+        editedRoofs: multicast(
+            // skip the first elem, which is the default data.
+            debounce(1000, map(getRoofEdited, skip(1, newRoofs)))
+        ),
         disposable: disposeAll([d, d1, d2, d3, d4, d5])
     }
 }
