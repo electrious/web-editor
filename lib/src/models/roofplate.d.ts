@@ -47,11 +47,6 @@ export interface JSRoofPlate {
  */
 export declare function fromJSRoofPlate(r: JSRoofPlate): RoofPlate;
 /**
- * convert an internal RoofPlate object to an external JSRoofPlate object
- * @param r
- */
-export declare function toJSRoofPlate(r: RoofPlate): JSRoofPlate;
-/**
  * 2D Polygon for roof plate projection on ground
  */
 export declare type Polygon = Vector2[];
@@ -81,15 +76,18 @@ export interface RoofOperation {
     type: RoofOperationType;
     roof: RoofPlate | string;
 }
-/**
- * interface for objects that encode the operations on a roof with
- * an external JSRoofPlate object
- */
-export interface JSRoofOperation {
-    type: RoofOperationType;
-    roof: JSRoofPlate | string;
-}
 export declare function mkCreateRoofOp(roof: RoofPlate): RoofOperation;
 export declare function mkDeleteRoofOp(roof: RoofPlate): RoofOperation;
 export declare function mkUpdateRoofOp(roof: RoofPlate): RoofOperation;
-export declare function toJSRoofOperation(o: RoofOperation): JSRoofOperation;
+export interface Point {
+    x: number;
+    y: number;
+    z: number;
+}
+export interface RoofEdited {
+    ground: Point;
+    inclined: Point;
+    contours: Point[];
+    indices: number[];
+}
+export declare function toRoofsEdited(roofs: RoofPlate[]): RoofEdited[];

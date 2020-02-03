@@ -6,7 +6,6 @@ export interface RoofNode {
     roofId: string;
     roofUpdate: Stream<RoofOperation>;
     roofDelete: Stream<RoofOperation>;
-    roofForFlatten: Stream<RoofOperation>;
     tapped: Stream<SceneTapEvent>;
     roofObject: Object3D;
     disposable: Disposable;

@@ -1,10 +1,10 @@
-import { RoofPlate, RoofOperation } from './models/roofplate';
+import { RoofPlate, RoofEdited } from './models/roofplate';
 import { Object3D } from 'three';
 import { Disposable, Stream } from '@most/types';
 import { HouseMeshData } from './house';
 export interface RoofManager {
     roofWrapper: Object3D;
-    roofOps: Stream<RoofOperation>;
+    editedRoofs: Stream<RoofEdited[]>;
     disposable: Disposable;
 }
 /**
