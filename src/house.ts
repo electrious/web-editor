@@ -1,4 +1,4 @@
-import { OBJLoader2Parallel } from 'three/examples/jsm/loaders/OBJLoader2Parallel'
+import { OBJLoader2 } from 'three/examples/jsm/loaders/OBJLoader2'
 import {
     MTLLoader,
     MaterialCreator
@@ -104,7 +104,7 @@ export function loadHouse(
     dataServerUrl: string,
     leadId: number
 ): Stream<Object3D> {
-    const objLoader = new OBJLoader2Parallel()
+    const objLoader = new OBJLoader2()
     const mtlLoader = new MTLLoader()
     const path = meshPath(dataServerUrl, leadId)
 
