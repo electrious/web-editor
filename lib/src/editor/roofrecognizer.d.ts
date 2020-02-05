@@ -17,4 +17,4 @@ export interface RoofRecognizer {
  * @param mouseMove a stream of mouse move events in the scene
  * @returns RoofRecognizer
  */
-export declare function createRoofRecognizer(houseWrapper: Object3D, roofs: Stream<RoofPlate[]>, mouseMove: Stream<SceneMouseMoveEvent>): RoofRecognizer;
+export declare function createRoofRecognizer(houseWrapper: Object3D, roofs: Stream<RoofPlate[]>, mouseMove: Stream<SceneMouseMoveEvent>, canShow: Stream<boolean>): RoofRecognizer;
