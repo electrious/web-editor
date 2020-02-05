@@ -1,5 +1,5 @@
 import { Stream, Disposable } from '@most/types'
-import { snapshot, map } from '@most/core'
+import { snapshot, map, combine } from '@most/core'
 import { RoofPlate, newRoofPlate } from '../models/roofplate'
 import { Object3D, Vector3, MeshBasicMaterial, CircleGeometry } from 'three'
 import { SceneMouseMoveEvent } from '../sceneevent'
@@ -67,7 +67,8 @@ const createAdderMarker = (): RoofAdder => {
 export function createRoofRecognizer(
     houseWrapper: Object3D,
     roofs: Stream<RoofPlate[]>,
-    mouseMove: Stream<SceneMouseMoveEvent>
+    mouseMove: Stream<SceneMouseMoveEvent>,
+    canShow: Stream<boolean>
 ): RoofRecognizer {
     // create the adder marker and add it to parent
     const adder = createAdderMarker()
@@ -117,7 +118,17 @@ export function createRoofRecognizer(
         }
     }
 
-    const disposable = point.run(mkSink(showMarker), defScheduler())
+    const g = (
+        p: CandidatePoint | null,
+        canShow: boolean
+    ): CandidatePoint | null => {
+        return canShow ? p : null
+    }
+
+    const disposable = combine(g, point, canShow).run(
+        mkSink(showMarker),
+        defScheduler()
+    )
 
     const mkRoof = () => {
         return newRoofPlate(adder.position, adder.normal)
