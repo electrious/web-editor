@@ -21,7 +21,7 @@ import {
 import equals from 'ramda/es/equals'
 import { createRoofNode, RoofNode } from './roofnode'
 import { mkSink } from './sink'
-import { defScheduler, unwrap, debug } from './helper'
+import { defScheduler, unwrap } from './helper'
 import { Disposable, Stream } from '@most/types'
 import { disposeAll } from '@most/disposable'
 import pluck from 'ramda/es/pluck'
@@ -197,7 +197,7 @@ export function createRoofManager(
     const d2 = newRoofs.run(mkSink(doFlatten(meshData)), scheduler)
 
     // create the roof recognizer and add it to the roof wrapper object.
-    const canShowRecognizer = debug(map(a => a === null, activeRoof))
+    const canShowRecognizer = map(a => a === null, activeRoof)
     const recognizer = createRoofRecognizer(
         meshData.wrapper,
         map(values, newRoofs),
