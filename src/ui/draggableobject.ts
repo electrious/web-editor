@@ -109,7 +109,10 @@ export const createDraggableObject = (
     dragObj.add(invCircle)
 
     const sched = defScheduler()
-    const disposable = active.run(mkSink(a => (mesh.visible = a)), sched)
+    const disposable = active.run(
+        mkSink(a => (mesh.visible = a)),
+        sched
+    )
 
     const dragEvts = multicast(merge(mesh.dragEvents, invCircle.dragEvents))
     const evts = multicast(validateDrag(dragEvts))
@@ -120,7 +123,10 @@ export const createDraggableObject = (
         merge(constant(true, startEvt), constant(false, endEvt))
     )
 
-    dragging.run(mkSink(d => (invCircle.visible = d)), sched)
+    dragging.run(
+        mkSink(d => (invCircle.visible = d)),
+        sched
+    )
 
     const delta = calcDragDelta(evts, v => {
         const obj = dragObj.parent
