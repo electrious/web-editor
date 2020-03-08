@@ -14,12 +14,22 @@ module.exports = {
                 test: /\.ts$/,
                 exclude: /node_modules/,
                 loader: 'ts-loader'
+            },
+            {
+                test: /\.purs$/,
+                exclude: /node_modules/,
+                loader: 'purs-loader',
+                query: {
+                    psc: 'psa',
+                    spago: true,
+                    src: ['src/**/*.purs']
+                }
             }
         ]
     },
 
     resolve: {
-        extensions: ['.ts', '.js']
+        extensions: ['.ts', '.js', '.purs']
     },
 
     stats: {

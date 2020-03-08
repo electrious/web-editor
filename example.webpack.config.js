@@ -18,11 +18,21 @@ module.exports = {
                 test: /\.html$/,
                 exclude: /node_modules/,
                 loader: 'html-loader'
+            },
+            {
+                test: /\.purs$/,
+                exclude: /node_modules/,
+                loader: 'purs-loader',
+                query: {
+                    psc: 'psa',
+                    spago: true,
+                    src: ['src/**/*.purs']
+                }
             }
         ]
     },
     resolve: {
-        extensions: ['.ts', '.js', '.html']
+        extensions: ['.ts', '.js', '.html', '.purs']
     },
     stats: {
         colors: true
