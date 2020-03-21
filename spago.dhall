@@ -13,6 +13,7 @@ You can edit this file as you like.
   , "math"
   , "psci-support"
   , "uuid"
+  , "web-touchevents"
   ]
 , packages = ./packages.dhall
 , sources = [ "src/**/*.purs", "test/**/*.purs" ]
