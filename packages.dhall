@@ -123,6 +123,12 @@ let upstream =
 
 let overrides = {=}
 
-let additions = {=}
+let additions = {
+    easy-ffi = {
+        dependencies = ["prelude"],
+        repo = "https://github.com/pelotom/purescript-easy-ffi.git",
+        version = "master"
+    }
+}
 
 in  upstream // overrides // additions

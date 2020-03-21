@@ -1,0 +1,92 @@
+module Three.Math.Vector (
+  Vector2, Vector3, mkVec2, mkVec3, class HasX, vecX,
+  class HasY, vecY, class HasZ, vecZ,
+  class Vector, dot, (<.>), length, cross, addScaled
+  ) where
+
+import Prelude
+
+import Util (ffi)
+
+foreign import data Vector2 :: Type
+foreign import data Vector3 :: Type
+
+foreign import mkVec2 :: Number -> Number -> Vector2
+foreign import mkVec3 :: Number -> Number -> Number -> Vector3
+
+foreign import vEq :: forall a. a -> a -> Boolean
+
+instance eqVec2 :: Eq Vector2 where
+  eq = vEq
+
+instance eqVec3 :: Eq Vector3 where
+  eq = vEq
+
+getX :: forall a.a -> Number
+getX = ffi ["vec"] "vec.x"
+
+getY :: forall a.a -> Number
+getY = ffi ["vec"] "vec.y"
+
+getZ :: forall a.a -> Number
+getZ = ffi ["vec"] "vec.z"
+
+class HasX a where
+  vecX :: a -> Number
+
+class HasY a where
+  vecY :: a -> Number
+
+class HasZ a where
+  vecZ :: a -> Number
+
+instance hasXVec2 :: HasX Vector2 where
+  vecX = getX
+
+instance hasYVec2 :: HasY Vector2 where
+  vecY = getY
+
+instance hasXVec3 :: HasX Vector3 where
+  vecX = getX
+
+instance hasYVec3 :: HasY Vector3 where
+  vecY = getY
+
+instance hasZVec3 :: HasZ Vector3 where
+  vecZ = getZ
+
+instance showVec2 :: Show Vector2 where
+  show = ffi ["vec"] "'(' + vec.x + ', ' + vec.y + ')'"
+
+instance showVec3 :: Show Vector3 where
+  show = ffi ["vec"] "'(' + vec.x + ', ' + vec.y + ', ' + vec.z + ')'"
+
+
+vDot :: forall a. a -> a -> Number
+vDot = ffi ["v1", "v2"] "v1.dot(v2)"
+
+vLength :: forall a. a -> Number
+vLength = ffi ["v"] "v.length()"
+
+foreign import vCross :: forall a. a -> a -> a
+foreign import vAddScaled :: forall a. a -> a -> Number -> a
+
+class Vector a where
+  dot :: a -> a -> Number
+  length :: a -> Number
+  cross :: a -> a -> a
+  addScaled :: a -> a -> Number -> a
+
+infixr 5 dot as <.>
+
+instance vecVec2 :: Vector Vector2 where
+  dot = vDot
+  length = vLength
+  cross = vCross
+  addScaled = vAddScaled
+
+instance vecVec3 :: Vector Vector3 where
+  dot = vDot
+  length = vLength
+  cross = vCross
+  addScaled = vAddScaled
