@@ -187,11 +187,8 @@ offsetY :: MouseEvent -> Number
 offsetY = ffi ["mouseEvt"] "mouseEvt.offsetY"
 
 touchTap :: Element -> TouchEvent -> Maybe TapEvent
-touchTap elem e = case tch of
-                  Just t -> Just { tapX: getX t, tapY: getY t }
-                  Nothing -> Nothing
-    where ts = touches e
-          tch = item 0 ts
+touchTap elem e = tapT <$> item 0 (touches e)
+    where tapT t = { tapX: getX t, tapY: getY t }
           rect = getBoundingClientRect elem
           getX t = toNumber (pageX t) - rect.left
           getY t = toNumber (clientY t) - rect.top
