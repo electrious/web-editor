@@ -6,10 +6,11 @@ import Prelude
 import Data.DateTime.Instant (Instant)
 import Data.Filterable (filter)
 import Data.Maybe (Maybe(..), fromJust, isJust)
+import Effect (Effect)
 import Effect.Now (now)
 import Effect.Timer (clearTimeout, setTimeout)
 import FRP.Behavior (gate, step)
-import FRP.Event (Event, count, makeEvent, subscribe, withLast)
+import FRP.Event (Event, count, create, makeEvent, subscribe, withLast)
 import Partial.Unsafe (unsafePartial)
 
 ffi :: forall a. Array String -> String -> a
@@ -46,3 +47,10 @@ distinct :: forall a. Eq a => Event a -> Event a
 distinct evt = getNow <$> filter isDiff (withLast evt)
     where isDiff { last, now } = last == Just now
           getNow { now } = now
+
+-- | Perform events with actions inside.
+performEvent :: forall a. Event (Effect a) -> Effect { event:: Event a, disposable:: Effect Unit }
+performEvent evt = do
+    { event, push } <- create
+    canceller <- subscribe evt \act -> act >>= push
+    pure { event: event, disposable: canceller }
