@@ -35,6 +35,9 @@ worldToLocal = ffi ["v", "o", ""] "o.worldToLocal(v)"
 lookAt :: forall a. Vector3 -> Object3D a -> Effect Unit
 lookAt = fpi ["v", "o", ""] "o.lookAt(v)"
 
+clone :: forall a. Object3D a -> Effect (Object3D a)
+clone = ffi ["o", ""] "o.clone()"
+
 -- | get user data. Make it a String here
 userData :: forall a. Object3D a -> String
 userData = ffi ["o"] "o.userData"

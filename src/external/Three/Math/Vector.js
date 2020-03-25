@@ -36,3 +36,11 @@ exports.vAddScaled = v1 => {
         }
     }
 }
+
+exports.vSub = v1 => {
+    return v2 => {
+        const r = v1.clone()
+        r.sub(v2)
+        return r
+    }
+}
