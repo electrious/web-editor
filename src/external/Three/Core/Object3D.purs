@@ -17,6 +17,21 @@ castShadow = ffi ["o"] "o.castShadow"
 setCastShadow :: forall a. Boolean -> Object3D a -> Effect Unit
 setCastShadow = fpi ["s", "o", ""] "o.castShadow = s"
 
+setReceiveShadow :: forall a. Boolean -> Object3D a -> Effect Unit
+setReceiveShadow = fpi ["s", "o", ""] "o.receiveShadow = s"
+
+children :: forall a b. Object3D a -> Array (Object3D b)
+children = ffi ["o"] "o.children"
+
+add :: forall a b. Object3D a -> Object3D b -> Effect Unit
+add = fpi ["child", "parent", ""] "parent.add(child)"
+
+remove :: forall a b. Object3D a -> Object3D b -> Effect Unit
+remove = fpi ["child", "parent", ""] "parent.remove(child)"
+
+setName :: forall a. String -> Object3D a -> Effect Unit
+setName = fpi ["name", "obj", ""] "obj.name = name"
+
 position :: forall a. Object3D a -> Vector3
 position = ffi ["o"] "o.position"
 
