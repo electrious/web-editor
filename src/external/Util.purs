@@ -49,8 +49,7 @@ distinct evt = getNow <$> filter isDiff (withLast evt)
           getNow { now } = now
 
 -- | Perform events with actions inside.
-performEvent :: forall a. Event (Effect a) -> Effect { event:: Event a, disposable:: Effect Unit }
-performEvent evt = do
-    { event, push } <- create
-    canceller <- subscribe evt \act -> act >>= push
-    pure { event: event, disposable: canceller }
+performEvent :: forall a. Event (Effect a) -> Event a
+performEvent evt = makeEvent \k -> do
+    canceller <- subscribe evt \act -> act >>= k
+    pure canceller

@@ -6,7 +6,7 @@ import Algorithm.MeshFlatten (VertexItem, buildRTree)
 import Data.Array (range)
 import Data.Foldable (find, traverse_)
 import Data.Traversable (traverse)
-import Editor.SceneEvent (SceneMouseMoveEvent, SceneTapEvent, makeMouseMove, makeTappable)
+import Editor.SceneEvent (SceneMouseMoveEvent, SceneTapEvent, makeMouseMove, makeTappable, stopMouseMove, stopTappable)
 import Effect (Effect)
 import FRP.Event (Event, makeEvent)
 import RBush.RBush (RBush)
@@ -37,10 +37,10 @@ mkHouseMesh geo mat = do
 
     let tapEvt = makeEvent \k -> do
             makeTappable mesh k
-            pure (pure unit)
+            pure (stopTappable mesh)
         mouseEvt = makeEvent \k -> do
             makeMouseMove mesh k
-            pure (pure unit)
+            pure (stopMouseMove mesh)
     
     pure {
         mesh      : mesh,

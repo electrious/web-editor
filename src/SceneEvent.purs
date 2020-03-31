@@ -6,7 +6,7 @@ import Control.Alt ((<|>))
 import Data.Array (filter, head)
 import Data.Maybe (Maybe(..))
 import Data.Time.Duration (Milliseconds(..))
-import Data.Traversable (sequence, traverse)
+import Data.Traversable (traverse)
 import Editor.Input (DragEvent, DragType(..), MouseMoveEvent, TapEvent, InputEvents)
 import Effect (Effect)
 import FRP.Behavior (Behavior, sampleBy)
@@ -60,11 +60,14 @@ mkDragEndable evt = evt <|> unwrap (f <$> e)
 makeTappable :: forall a. Object3D a -> (SceneTapEvent -> Effect Unit) -> Effect Unit
 makeTappable = fpi ["obj", "cb", ""] "obj.tapped = cb"
 
+stopTappable :: forall a. Object3D a -> Effect Unit
+stopTappable = fpi ["obj", ""] "obj.tapped = undefined"
+
 isTappable :: forall a. Object3D a -> Boolean
 isTappable = ffi ["obj"] "obj.tapped !== undefined"
 
 sendTapEvent :: forall a. Object3D a -> SceneTapEvent -> Effect Unit
-sendTapEvent = fpi ["obj", "evt", ""] "obj.tapped(evt)"
+sendTapEvent = fpi ["obj", "evt", ""] "obj.tapped(evt)()"
 
 
 -- | Convert an Object3D to be MouseMovable by attaching a callback
@@ -72,22 +75,28 @@ sendTapEvent = fpi ["obj", "evt", ""] "obj.tapped(evt)"
 makeMouseMove :: forall a. Object3D a -> (SceneMouseMoveEvent -> Effect Unit) -> Effect Unit
 makeMouseMove = fpi ["obj", "cb", ""] "obj.mouseMove = cb"
 
+stopMouseMove :: forall a. Object3D a -> Effect Unit
+stopMouseMove = fpi ["obj", ""] "obj.mouseMove = undefined"
+
 isMouseMove :: forall a. Object3D a -> Boolean
 isMouseMove = ffi ["obj"] "obj.mouseMove !== undefined"
 
 sendMouseMoveEvent :: forall a. Object3D a -> SceneMouseMoveEvent -> Effect Unit
-sendMouseMoveEvent = fpi ["obj", "evt", ""] "obj.mouseMove(evt)"
+sendMouseMoveEvent = fpi ["obj", "evt", ""] "obj.mouseMove(evt)()"
 
 -- | Convert an Object3D to be Draggable by attaching a callback
 -- function for drag events.
 makeDraggable :: forall a. Object3D a -> (SceneDragEvent -> Effect Unit) -> Effect Unit
 makeDraggable = fpi ["obj", "cb", ""] "obj.dragged = cb"
 
+stopDraggable :: forall a. Object3D a -> Effect Unit
+stopDraggable = fpi ["obj", ""] "obj.dragged = undefined"
+
 isDraggable :: forall a. Object3D a -> Boolean
 isDraggable = ffi ["obj"] "obj.dragged !== undefined"
 
 sendDragEvent :: forall a. Object3D a -> SceneDragEvent -> Effect Unit
-sendDragEvent = fpi ["obj", "evt", ""] "obj.dragged(evt)"
+sendDragEvent = fpi ["obj", "evt", ""] "obj.dragged(evt)()"
 
 -- | convert mouse/touch position to values between -1 and 1
 calcPosition :: Size -> Vector2 -> Vector2
@@ -138,15 +147,9 @@ processDragObjects e objs = traverse doDrag target *> pure e
             }
 
 
--- | Result for the raycasting setup process
-type RaycastSetup = {
-    dragEvent  :: Event DragEvent,
-    disposable :: Effect Unit
-}
-
 -- | setup all raycasting needed to process user inputs and send
 -- them to the corresponding 3D object in the scene
-setupRaycasting :: forall a b. Camera a -> Object3D b -> InputEvents -> Behavior Size -> Effect RaycastSetup
+setupRaycasting :: forall a b. Camera a -> Object3D b -> InputEvents -> Behavior Size -> Effect (Event DragEvent)
 setupRaycasting camera scene input size = do
     raycaster <- mkRaycaster
     
@@ -168,11 +171,8 @@ setupRaycasting camera scene input size = do
             res <- doRaycast (dragPosition sz e)
             processDragObjects e res
     
-    { disposable: disp1 } <- performEvent $ sampleBy raycastTap size input.tapped
-    { disposable: disp2 } <- performEvent $ sampleBy raycastMouse size input.mouseMove
-    { event: unraycastedDrag, disposable: disp3 } <- performEvent $ sampleBy raycastDrag size input.dragged
+    let e1 = performEvent $ sampleBy raycastTap size input.tapped
+        e2 = performEvent $ sampleBy raycastMouse size input.mouseMove
+        unraycastedDrag = performEvent $ sampleBy raycastDrag size input.dragged
 
-    pure {
-        dragEvent: unraycastedDrag,
-        disposable: void (sequence [disp1, disp2, disp3])
-    }
+    pure unraycastedDrag

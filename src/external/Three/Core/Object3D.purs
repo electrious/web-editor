@@ -23,6 +23,12 @@ setReceiveShadow = fpi ["s", "o", ""] "o.receiveShadow = s"
 children :: forall a b. Object3D a -> Array (Object3D b)
 children = ffi ["o"] "o.children"
 
+hasParent :: forall a. Object3D a -> Boolean
+hasParent = ffi ["o"] "o.parent !== null && o.parent !== undefined"
+
+parent :: forall a b. Object3D a -> Object3D b
+parent = ffi ["o"] "o.parent"
+
 add :: forall a b. Object3D a -> Object3D b -> Effect Unit
 add = fpi ["child", "parent", ""] "parent.add(child)"
 
