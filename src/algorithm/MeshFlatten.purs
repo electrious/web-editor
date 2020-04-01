@@ -12,7 +12,7 @@ import Effect (Effect)
 import Math.Angle (acos, degreeVal)
 import Models.RoofPlate (Polygon, RoofPlate, getRoofPolygon)
 import RBush.RBush (BBox, RBush, load, mkRBush, search)
-import Three.Core.BufferGeometry (BufferGeometry, clone, getAttribute, isBufferAttribute, setNeedsUpdate, setXYZ)
+import Three.Core.Geometry (BufferGeometry, clone, getAttribute, isBufferAttribute, setNeedsUpdate, setXYZ)
 import Three.Core.Mesh (Mesh, setBufferGeometry)
 import Three.Math.Vector (Vector3, addScaled, mkVec2, vecX, vecY, vecZ, (<->), (<.>))
 

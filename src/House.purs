@@ -1,10 +1,11 @@
 module Editor.House where
 
-import Prelude
+import Prelude hiding (add)
 
 import Algorithm.MeshFlatten (VertexItem, buildRTree)
 import Data.Array (range)
 import Data.Foldable (find, traverse_)
+import Data.Maybe (Maybe)
 import Data.Traversable (traverse)
 import Editor.SceneEvent (SceneMouseMoveEvent, SceneTapEvent, makeMouseMove, makeTappable, stopMouseMove, stopTappable)
 import Effect (Effect)
