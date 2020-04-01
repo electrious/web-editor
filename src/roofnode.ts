@@ -22,7 +22,7 @@ import { mkSink } from './sink'
 import { defScheduler } from './helper'
 import { createRoofEditor } from './editor/roofeditor'
 import { disposeAll, dispose } from '@most/disposable'
-import { map, multicast, constant } from '@most/core'
+import { map, multicast, constant, merge } from '@most/core'
 import { createAdapter } from '@most/adapter'
 import curry from 'ramda/es/curry'
 import compose from 'ramda/es/compose'
@@ -30,6 +30,7 @@ import fmap from 'ramda/es/map'
 import init from 'ramda/es/init'
 import append from 'ramda/es/append'
 import head from 'ramda/es/head'
+import isSimple from 'shamos-hoey'
 
 export interface RoofNode {
     roofId: string
@@ -85,6 +86,15 @@ const updateRoofPlate = curry((roof: RoofPlate, ps: Vector3[]) => {
     newRoof.borderPoints = append(headEl, ps)
     return newRoof
 })
+
+// test if a polygon is simple or with self-intersections
+function testSimplePolygon(ps: Vector2[]): boolean {
+    const psArr = ps.map(p => {
+        return [p.x, p.y]
+    })
+
+    return isSimple({ type: 'Polygon', coordinates: [psArr] })
+}
 
 /**
  * create RoofNode for a RoofPlate
@@ -167,9 +177,19 @@ export function createRoofNode(
         editor.roofVertices
     )
 
+    // create a stream for delete event if the current roof is not simple.
+    const [toDel, delEvt] = createAdapter<void>()
+    if (!testSimplePolygon(ps)) {
+        setTimeout(() => {
+            toDel()
+        }, 1000)
+    }
+
+    const delRoofEvt = merge(delEvt, editor.deleteRoof)
+
     return {
         roofId: roof.id,
-        roofDelete: constant(mkDeleteRoofOp(roof), editor.deleteRoof),
+        roofDelete: constant(mkDeleteRoofOp(roof), delRoofEvt),
         roofUpdate: multicast(newRoofs),
         tapped: tapped,
         roofObject: obj,
