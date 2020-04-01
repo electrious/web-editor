@@ -5,26 +5,26 @@ import Prelude
 import Effect (Effect)
 import Util (ffi, fpi)
 
-foreign import data Geometry :: Type
-foreign import data BufferGeometry :: Type
+foreign import data JSGeometry :: Type -> Type
+foreign import data JSBufferGeometry :: Type -> Type
 foreign import data BufferAttribute :: Type
 
-class IsGeometry a where
-    clone :: a -> Effect a
+type Geometry a = JSGeometry a
+type BufferGeometry a = Geometry (JSBufferGeometry a)
 
-instance isGeo :: IsGeometry Geometry where
-    clone = jsClone
+clone :: forall a. Geometry a -> Effect (Geometry a)
+clone = ffi ["geo", ""] "geo.clone()"
 
-instance isBuffGeo :: IsGeometry BufferGeometry where
-    clone = jsClone
+foreign import data JSCircleGeometry :: Type -> Type
+type CircleGeometry a = Geometry (JSCircleGeometry a)
 
-jsClone :: forall a. a -> Effect a
-jsClone = ffi ["geo", ""] "geo.clone()"
+mkCircleGeometry :: forall a. Number -> Int -> Effect (CircleGeometry a)
+mkCircleGeometry = ffi ["radius", "segs", ""] "new THREE.CircleGeometry(radius, segs)"
 
-isBufferGeometry :: forall a. IsGeometry a => a -> Boolean
+isBufferGeometry :: forall a. Geometry a -> Boolean
 isBufferGeometry = ffi ["geo"] "geo instanceof THREE.BufferGeometry"
 
-getAttribute :: String -> BufferGeometry -> BufferAttribute
+getAttribute :: forall a. String -> BufferGeometry a -> BufferAttribute
 getAttribute = ffi ["name", "geo"] "geo.getAttribute(name)"
 
 

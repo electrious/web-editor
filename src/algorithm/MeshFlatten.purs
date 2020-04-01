@@ -87,7 +87,7 @@ type FlattenedVertex = {
 }
 
 -- | apply the flattened vertices to the BufferGeometry and return a new one
-applyFlattenedVertex :: BufferGeometry -> Array FlattenedVertex -> Effect BufferGeometry
+applyFlattenedVertex :: forall geo. BufferGeometry geo -> Array FlattenedVertex -> Effect (BufferGeometry geo)
 applyFlattenedVertex geo fvs = do
     newGeo <- clone geo
     let attr = getAttribute "position" newGeo
@@ -128,7 +128,7 @@ flattenRoofplate tree roof = do
 
 
 -- | flatten all roofplates
-flattenRoofPlates :: forall a. BufferGeometry -> RBush VertexItem -> Mesh a -> Array RoofPlate -> Effect Unit
+flattenRoofPlates :: forall a geo. BufferGeometry geo -> RBush VertexItem -> Mesh a -> Array RoofPlate -> Effect Unit
 flattenRoofPlates geo tree house roofs = do
     fvs <- concat <$> traverse (flattenRoofplate tree) roofs
     newGeo <- applyFlattenedVertex geo fvs

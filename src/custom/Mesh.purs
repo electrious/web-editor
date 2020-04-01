@@ -8,7 +8,7 @@ import Editor.Input (DragType(..))
 import Editor.SceneEvent (SceneDragEvent, SceneTapEvent, makeDraggable, makeTappable, stopDraggable, stopTappable)
 import Effect (Effect)
 import FRP.Event (Event, makeEvent, mapAccum)
-import Three.Core.Geometry (class IsGeometry)
+import Three.Core.Geometry (Geometry)
 import Three.Core.Material (Material)
 import Three.Core.Mesh (Mesh, mkMesh)
 import Three.Core.Object3D (hasParent, parent, worldToLocal)
@@ -20,7 +20,7 @@ type TappableMesh a = {
     tapped :: Event SceneTapEvent
 }
 
-mkTappableMesh :: forall a geo mat. IsGeometry geo => geo -> Material mat -> Effect (TappableMesh a)
+mkTappableMesh :: forall a geo mat. Geometry geo -> Material mat -> Effect (TappableMesh a)
 mkTappableMesh geo mat = do
     mesh <- mkMesh geo mat
     let tapEvt = makeEvent \k -> do
@@ -65,7 +65,7 @@ type DraggableMesh a = {
     dragDelta :: Event Vector3
 }
 
-mkDraggableMesh :: forall a geo mat. IsGeometry geo => geo -> Material mat -> Effect (DraggableMesh a)
+mkDraggableMesh :: forall a geo mat. Geometry geo -> Material mat -> Effect (DraggableMesh a)
 mkDraggableMesh geo mat = do
     mesh <- mkMesh geo mat
 
@@ -90,7 +90,7 @@ type TapDragMesh a = {
     dragDelta :: Event Vector3
 }
 
-mkTapDragMesh :: forall a geo mat. IsGeometry geo => geo -> Material mat -> Effect (TapDragMesh a)
+mkTapDragMesh :: forall a geo mat. Geometry geo -> Material mat -> Effect (TapDragMesh a)
 mkTapDragMesh geo mat = do
     mesh <- mkMesh geo mat
 

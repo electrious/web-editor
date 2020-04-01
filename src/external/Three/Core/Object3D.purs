@@ -9,6 +9,8 @@ import Util (ffi, fpi)
 foreign import data JSObject3D :: Type -> Type
 type Object3D = JSObject3D
 
+mkObject3D :: forall a. Effect (Object3D a)
+mkObject3D = ffi [""] "new THREE.Object3D()"
 
 -- | Whether the object gets rendered into shadow map, default False
 castShadow :: forall a. Object3D a -> Boolean
@@ -46,6 +48,9 @@ setPosition = fpi ["v", "o", ""] "o.position.copy(v)"
 
 setRenderOrder :: forall a. Int -> Object3D a -> Effect Unit
 setRenderOrder = fpi ["r", "o", ""] "o.renderOrder = r"
+
+setVisible :: forall a. Boolean -> Object3D a -> Effect Unit
+setVisible = fpi ["v", "o", ""] "o.visible = v"
 
 localToWorld :: forall a. Vector3 -> Object3D a -> Effect Vector3
 localToWorld = ffi ["v", "o", ""] "o.localToWorld(v)"

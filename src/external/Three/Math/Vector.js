@@ -27,6 +27,14 @@ exports.vCross = v1 => {
     }
 }
 
+exports.vAdd = v1 => {
+    return v2 => {
+        const r = v1.clone()
+        r.add(v2)
+        return r
+    }
+}
+
 exports.vAddScaled = v1 => {
     return v2 => {
         return s => {

@@ -7,7 +7,7 @@ import Data.Array (filter, head)
 import Data.Maybe (Maybe(..))
 import Data.Time.Duration (Milliseconds(..))
 import Data.Traversable (traverse)
-import Editor.Input (DragEvent, DragType(..), MouseMoveEvent, TapEvent, InputEvents)
+import Editor.Input (DragEvent, DragType(..), InputEvents, MouseMoveEvent, TapEvent)
 import Effect (Effect)
 import FRP.Behavior (Behavior, sampleBy)
 import FRP.Event (Event)
@@ -45,6 +45,15 @@ type SceneDragEvent = {
     distance :: Number,
     point    :: Vector3
 }
+
+isDragStart :: SceneDragEvent -> Boolean
+isDragStart e = e.type == DragStart
+
+isDrag :: SceneDragEvent -> Boolean
+isDrag e = e.type == Drag
+
+isDragEnd :: SceneDragEvent -> Boolean
+isDragEnd e = e.type == DragEnd
 
 -- | add end event to SceneDragEvent stream if there's no input for a while
 -- and no end event.
