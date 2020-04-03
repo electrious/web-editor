@@ -53,10 +53,10 @@ setVisible :: forall a. Boolean -> Object3D a -> Effect Unit
 setVisible = fpi ["v", "o", ""] "o.visible = v"
 
 localToWorld :: forall a. Vector3 -> Object3D a -> Effect Vector3
-localToWorld = ffi ["v", "o", ""] "o.localToWorld(v)"
+localToWorld = ffi ["v", "o", ""] "o.localToWorld(v.clone())"
 
 worldToLocal :: forall a. Vector3 -> Object3D a -> Effect Vector3
-worldToLocal = ffi ["v", "o", ""] "o.worldToLocal(v)"
+worldToLocal = ffi ["v", "o", ""] "o.worldToLocal(v.clone())"
 
 lookAt :: forall a. Vector3 -> Object3D a -> Effect Unit
 lookAt = fpi ["v", "o", ""] "o.lookAt(v)"

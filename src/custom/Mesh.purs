@@ -11,7 +11,7 @@ import FRP.Event (Event, makeEvent, mapAccum)
 import Three.Core.Geometry (Geometry)
 import Three.Core.Material (Material)
 import Three.Core.Mesh (Mesh, mkMesh)
-import Three.Core.Object3D (hasParent, parent, worldToLocal)
+import Three.Core.Object3D (Object3D, hasParent, parent, worldToLocal)
 import Three.Math.Vector (Vector3, mkVec3, (<->))
 import Util (performEvent, unwrap)
 
@@ -20,15 +20,17 @@ type TappableMesh a = {
     tapped :: Event SceneTapEvent
 }
 
+tapEvtOn :: forall a. Mesh a -> Event SceneTapEvent
+tapEvtOn m = makeEvent \k -> do
+                makeTappable m k
+                pure (stopTappable m)
+
 mkTappableMesh :: forall a geo mat. Geometry geo -> Material mat -> Effect (TappableMesh a)
 mkTappableMesh geo mat = do
     mesh <- mkMesh geo mat
-    let tapEvt = makeEvent \k -> do
-                    makeTappable mesh k
-                    pure (stopTappable mesh)
     pure {
         mesh   : mesh,
-        tapped : tapEvt
+        tapped : tapEvtOn mesh
     }
 
 
@@ -47,16 +49,16 @@ validateDrag evt = unwrap (mapAccum f evt false)
 
 -- | calculate local delta distances for all drag events
 calcDragDelta :: (Vector3 -> Effect (Maybe Vector3)) -> Event SceneDragEvent -> Event Vector3
-calcDragDelta toLocal evt = mapAccum calcDelta evt def
-    where f d = map (mkNewDrag d) <$> toLocal d.point
+calcDragDelta toLocalF evt = mapAccum calcDelta e def
+    where f d = map (mkNewDrag d) <$> toLocalF d.point
           mkNewDrag d p = { distance: d.distance, type: d.type, point: p }
           -- convert drag event to use local coordinate system
           e = unwrap (performEvent $ f <$> evt)
           zero = mkVec3 0.0 0.0 0.0
           def = { type: DragStart, distance: 0.0, point: zero }
 
-          calcDelta e oldE | e.type == DragStart = Tuple e zero
-                           | otherwise           = Tuple e (e.point <-> oldE.point)
+          calcDelta ne oldE | ne.type == DragStart = Tuple ne zero
+                            | otherwise            = Tuple ne (ne.point <-> oldE.point)
 
 
 type DraggableMesh a = {
@@ -65,17 +67,23 @@ type DraggableMesh a = {
     dragDelta :: Event Vector3
 }
 
+dragEvtOn :: forall a. Mesh a -> Event SceneDragEvent
+dragEvtOn m = makeEvent \k -> do
+                  makeDraggable m k
+                  pure (stopDraggable m)
+
+-- helper function to convert a world Vector3 to the mesh's local coord
+toLocal :: forall a. Object3D a -> Vector3 -> Effect (Maybe Vector3)
+toLocal mesh v = if hasParent mesh
+                 then Just <$> worldToLocal v (parent mesh)
+                 else pure Nothing
+
 mkDraggableMesh :: forall a geo mat. Geometry geo -> Material mat -> Effect (DraggableMesh a)
 mkDraggableMesh geo mat = do
     mesh <- mkMesh geo mat
 
-    let dragged = makeEvent \k -> do
-                      makeDraggable mesh k
-                      pure (stopDraggable mesh)
-        toLocal v = if hasParent mesh
-                    then Just <$> worldToLocal v (parent mesh)
-                    else pure Nothing
-        dragDelta = calcDragDelta toLocal dragged
+    let dragged = dragEvtOn mesh
+        dragDelta = calcDragDelta (toLocal mesh) dragged
     
     pure {
         mesh      : mesh,
@@ -92,22 +100,10 @@ type TapDragMesh a = {
 
 mkTapDragMesh :: forall a geo mat. Geometry geo -> Material mat -> Effect (TapDragMesh a)
 mkTapDragMesh geo mat = do
-    mesh <- mkMesh geo mat
-
-    let tapEvt = makeEvent \k -> do
-                    makeTappable mesh k
-                    pure (stopTappable mesh)
-        dragged = makeEvent \k -> do
-                      makeDraggable mesh k
-                      pure (stopDraggable mesh)
-        toLocal v = if hasParent mesh
-                    then Just <$> worldToLocal v (parent mesh)
-                    else pure Nothing
-        dragDelta = calcDragDelta toLocal dragged
-    
+    m <- mkDraggableMesh geo mat
     pure {
-        mesh      : mesh,
-        tapped    : tapEvt,
-        dragged   : dragged,
-        dragDelta : dragDelta
+        mesh      : m.mesh,
+        tapped    : tapEvtOn m.mesh,
+        dragged   : m.dragged,
+        dragDelta : m.dragDelta
     }
