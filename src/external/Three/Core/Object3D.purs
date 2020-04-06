@@ -3,6 +3,7 @@ module Three.Core.Object3D where
 import Prelude
 
 import Effect (Effect)
+import Three.Math.Matrix (Matrix4)
 import Three.Math.Vector (Vector3)
 import Util (ffi, fpi)
 
@@ -46,11 +47,29 @@ position = ffi ["o"] "o.position"
 setPosition :: forall a. Vector3 -> Object3D a -> Effect Unit
 setPosition = fpi ["v", "o", ""] "o.position.copy(v)"
 
+rotateX :: forall a. Number -> Object3D a -> Effect Unit
+rotateX = fpi ["r", "o", ""] "o.rotateX(r)"
+
+rotateY :: forall a. Number -> Object3D a -> Effect Unit
+rotateY = fpi ["r", "o", ""] "o.rotateY(r)"
+
+rotateZ :: forall a. Number -> Object3D a -> Effect Unit
+rotateZ = fpi ["r", "o", ""] "o.rotateZ(r)"
+
 setRenderOrder :: forall a. Int -> Object3D a -> Effect Unit
 setRenderOrder = fpi ["r", "o", ""] "o.renderOrder = r"
 
 setVisible :: forall a. Boolean -> Object3D a -> Effect Unit
 setVisible = fpi ["v", "o", ""] "o.visible = v"
+
+matrix :: forall a. Object3D a -> Matrix4
+matrix = ffi ["o"] "o.matrix"
+
+updateMatrix :: forall a. Object3D a -> Effect Unit
+updateMatrix = fpi ["o", ""] "o.updateMatrix()"
+
+updateMatrixWorld :: forall a. Object3D a -> Effect Unit
+updateMatrixWorld = fpi ["o", ""] "o.updateMatrixWorld()"
 
 localToWorld :: forall a. Vector3 -> Object3D a -> Effect Vector3
 localToWorld = ffi ["v", "o", ""] "o.localToWorld(v.clone())"

@@ -52,3 +52,10 @@ exports.vSub = v1 => {
         return r
     }
 }
+
+exports.applyMatrix = m => {
+    return v => {
+        const nv = v.clone()
+        return nv.applyMatrix4(m)
+    }
+}

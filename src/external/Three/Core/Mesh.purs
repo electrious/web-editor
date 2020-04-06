@@ -26,3 +26,6 @@ bufferGeometry = ffi ["mesh"] "mesh.geometry"
 
 setBufferGeometry :: forall a geo. BufferGeometry geo -> Mesh a -> Effect Unit
 setBufferGeometry = fpi ["geo", "mesh", ""] "mesh.geometry = geo"
+
+setMaterial :: forall a mat. Material mat -> Mesh a -> Effect Unit
+setMaterial = fpi ["mat", "mesh", ""] "mesh.material = mat"

@@ -10,6 +10,7 @@ You can edit this file as you like.
   , "effect"
   , "event"
   , "generics-rep"
+  , "js-timers"
   , "math"
   , "psci-support"
   , "uuid"

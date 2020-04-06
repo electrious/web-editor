@@ -1,11 +1,13 @@
 module Three.Math.Vector (
   Vector2, Vector3, mkVec2, mkVec3, class HasX, vecX,
   class HasY, vecY, class HasZ, vecZ,
-  class Vector, dot, (<.>), (<+>), (<->), length, dist, cross, add, addScaled, sub
+  class Vector, dot, (<.>), (<+>), (<->), length, dist, cross, add, addScaled, sub,
+  applyMatrix
   ) where
 
 import Prelude
 
+import Three.Math.Matrix (Matrix4)
 import Util (ffi)
 
 foreign import data Vector2 :: Type
@@ -107,3 +109,5 @@ instance vecVec3 :: Vector Vector3 where
   add = vAdd
   addScaled = vAddScaled
   sub = vSub
+
+foreign import applyMatrix :: Matrix4 -> Vector3 -> Vector3

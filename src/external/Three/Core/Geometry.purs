@@ -3,6 +3,7 @@ module Three.Core.Geometry where
 import Prelude
 
 import Effect (Effect)
+import Three.Math.Vector (Vector2)
 import Util (ffi, fpi)
 
 foreign import data JSGeometry :: Type -> Type
@@ -20,6 +21,18 @@ type CircleGeometry a = Geometry (JSCircleGeometry a)
 
 mkCircleGeometry :: forall a. Number -> Int -> Effect (CircleGeometry a)
 mkCircleGeometry = ffi ["radius", "segs", ""] "new THREE.CircleGeometry(radius, segs)"
+
+
+foreign import data JSShapeGeometry :: Type -> Type
+type ShapeGeometry a = Geometry (JSShapeGeometry a)
+
+foreign import data Shape :: Type
+
+mkShape :: Array Vector2 -> Effect Shape
+mkShape = ffi ["ps", ""] "new THREE.Shape(ps)"
+
+mkShapeGeometry :: forall a. Shape -> Effect (ShapeGeometry a)
+mkShapeGeometry = ffi ["shp", ""] "new THREE.ShapeGeometry(shp)"
 
 isBufferGeometry :: forall a. Geometry a -> Boolean
 isBufferGeometry = ffi ["geo"] "geo instanceof THREE.BufferGeometry"
