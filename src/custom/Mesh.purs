@@ -2,6 +2,7 @@ module Custom.Mesh where
 
 import Prelude
 
+import Data.Compactable (compact)
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
 import Editor.Input (DragType(..))
@@ -13,7 +14,7 @@ import Three.Core.Material (Material)
 import Three.Core.Mesh (Mesh, mkMesh)
 import Three.Core.Object3D (Object3D, hasParent, parent, worldToLocal)
 import Three.Math.Vector (Vector3, mkVec3, (<->))
-import Util (performEvent, unwrap)
+import Util (performEvent)
 
 type TappableMesh a = {
     mesh   :: Mesh a,
@@ -37,7 +38,7 @@ mkTappableMesh geo mat = do
 -- | process the drag events in the event stream to make sure all drag start
 -- with dragStart and end with dragEnd
 validateDrag :: Event SceneDragEvent -> Event SceneDragEvent
-validateDrag evt = unwrap (mapAccum f evt false)
+validateDrag evt = compact (mapAccum f evt false)
     where f e canDrag | e.type == DragStart = if canDrag
                                               then Tuple true Nothing  -- if there's a repeated drag start, omit it
                                               else Tuple true (Just e)
@@ -53,7 +54,7 @@ calcDragDelta toLocalF evt = mapAccum calcDelta e def
     where f d = map (mkNewDrag d) <$> toLocalF d.point
           mkNewDrag d p = { distance: d.distance, type: d.type, point: p }
           -- convert drag event to use local coordinate system
-          e = unwrap (performEvent $ f <$> evt)
+          e = compact (performEvent $ f <$> evt)
           zero = mkVec3 0.0 0.0 0.0
           def = { type: DragStart, distance: 0.0, point: zero }
 

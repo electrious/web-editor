@@ -8,9 +8,10 @@ import Data.Filterable (filter)
 import Data.Maybe (Maybe(..), fromJust, isJust)
 import Effect (Effect)
 import Effect.Now (now)
+import Effect.Ref as Ref
 import Effect.Timer (clearTimeout, setTimeout)
 import FRP.Behavior (gate, step)
-import FRP.Event (Event, count, create, makeEvent, subscribe, withLast)
+import FRP.Event (Event, count, makeEvent, subscribe, withLast)
 import Partial.Unsafe (unsafePartial)
 
 ffi :: forall a. Array String -> String -> a
@@ -34,9 +35,6 @@ delay n evt = makeEvent \k -> do
     subscribe evt \v -> do
         setTimeout n (k v)
 
-unwrap :: forall a. Event (Maybe a) -> Event a
-unwrap e = unsafePartial (fromJust <$> filter isJust e)
-
 -- | skip first n occurrences of the event
 skip :: forall a. Int -> Event a -> Event a
 skip n evt = gate skipped evt
@@ -53,3 +51,13 @@ performEvent :: forall a. Event (Effect a) -> Event a
 performEvent evt = makeEvent \k -> do
     canceller <- subscribe evt \act -> act >>= k
     pure canceller
+
+-- | fold events with Effect actions 
+foldEffect :: forall a b. (a -> b -> Effect b) -> Event a -> b -> Event b
+foldEffect act e b = makeEvent \k -> do
+    result <- Ref.new b
+    subscribe e \a -> do
+        curB <- Ref.read result
+        newB <- act a curB
+        Ref.write newB result
+        k newB

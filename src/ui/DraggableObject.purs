@@ -10,7 +10,6 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Editor.SceneEvent (isDragEnd, isDragStart)
 import Effect (Effect)
 import Effect.Unsafe (unsafePerformEffect)
-import FRP.Behavior (Behavior, step)
 import FRP.Event (Event, fold, subscribe)
 import Three.Core.Geometry (Geometry, mkCircleGeometry)
 import Three.Core.Material (Material, mkMeshBasicMaterial, setOpacity, setTransparent)
@@ -22,7 +21,7 @@ type DraggableObject a = {
     object     :: Object3D a,
     tapped     :: Event Int,
     position   :: Event Vector3,
-    isDragging :: Behavior Boolean,
+    isDragging :: Event Boolean,
     disposable :: Effect Unit
 }
 
@@ -111,6 +110,6 @@ createDraggableObject active index position customGeo customMat = do
         object: dragObj,
         tapped: const index <$> mesh.tapped,
         position: newPos,
-        isDragging: step false dragging,
+        isDragging: dragging,
         disposable: sequence_ [disp1, disp2, disp3]
     }

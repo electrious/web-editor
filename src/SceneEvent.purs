@@ -4,6 +4,7 @@ import Prelude
 
 import Control.Alt ((<|>))
 import Data.Array (filter, head)
+import Data.Compactable (compact)
 import Data.Maybe (Maybe(..))
 import Data.Time.Duration (Milliseconds(..))
 import Data.Traversable (traverse)
@@ -17,7 +18,7 @@ import Three.Core.Face3 (Face3)
 import Three.Core.Object3D (Object3D)
 import Three.Core.Raycaster (Intersection, distance, face, intersectObject, mkRaycaster, object, point, setFromCamera)
 import Three.Math.Vector (Vector2, Vector3, mkVec2, vecX, vecY)
-import Util (ffi, fpi, performEvent, unwrap)
+import Util (ffi, fpi, performEvent)
 
 type Size = {
     width  :: Number,
@@ -58,7 +59,7 @@ isDragEnd e = e.type == DragEnd
 -- | add end event to SceneDragEvent stream if there's no input for a while
 -- and no end event.
 mkDragEndable :: Event SceneDragEvent -> Event SceneDragEvent
-mkDragEndable evt = evt <|> unwrap (f <$> e)
+mkDragEndable evt = evt <|> compact (f <$> e)
     where e = debounce (Milliseconds 2000.0) evt
           f d = if d.type /= DragEnd
                 then Just { type: DragEnd, distance: d.distance, point: d.point }

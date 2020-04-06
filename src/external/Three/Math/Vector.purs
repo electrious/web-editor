@@ -1,7 +1,7 @@
 module Three.Math.Vector (
   Vector2, Vector3, mkVec2, mkVec3, class HasX, vecX,
   class HasY, vecY, class HasZ, vecZ,
-  class Vector, dot, (<.>), (<+>), (<->), length, cross, add, addScaled, sub
+  class Vector, dot, (<.>), (<+>), (<->), length, dist, cross, add, addScaled, sub
   ) where
 
 import Prelude
@@ -68,6 +68,9 @@ vDot = ffi ["v1", "v2"] "v1.dot(v2)"
 vLength :: forall a. a -> Number
 vLength = ffi ["v"] "v.length()"
 
+vDist :: forall a. a -> a -> Number
+vDist = ffi ["v1", "v2"] "v1.distanceTo(v2)"
+
 foreign import vCross :: forall a. a -> a -> a
 foreign import vAdd :: forall a. a -> a -> a
 foreign import vAddScaled :: forall a. a -> a -> Number -> a
@@ -76,6 +79,7 @@ foreign import vSub :: forall a. a -> a -> a
 class Vector a where
   dot :: a -> a -> Number
   length :: a -> Number
+  dist :: a -> a -> Number
   cross :: a -> a -> a
   add :: a -> a -> a
   addScaled :: a -> a -> Number -> a
@@ -89,6 +93,7 @@ infixr 6 sub as <->
 instance vecVec2 :: Vector Vector2 where
   dot = vDot
   length = vLength
+  dist = vDist
   cross = vCross
   add = vAdd
   addScaled = vAddScaled
@@ -97,6 +102,7 @@ instance vecVec2 :: Vector Vector2 where
 instance vecVec3 :: Vector Vector3 where
   dot = vDot
   length = vLength
+  dist = vDist
   cross = vCross
   add = vAdd
   addScaled = vAddScaled

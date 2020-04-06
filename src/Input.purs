@@ -3,7 +3,7 @@ module Editor.Input where
 import Prelude
 
 import Control.Alt ((<|>))
-import Data.Filterable (filter)
+import Data.Filterable (compact, filter)
 import Data.Generic.Rep (class Generic)
 import Data.Int (toNumber)
 import Data.Maybe (Maybe(..))
@@ -12,7 +12,7 @@ import FRP.Behavior (gate, sampleBy, sample_, step)
 import FRP.Event (Event, fix, makeEvent, withLast)
 import FRP.Event.Time (debounce)
 import Math (sqrt)
-import Util (delay, ffi, skip, unwrap)
+import Util (delay, ffi, skip)
 import Web.DOM (Element)
 import Web.DOM.Element (toEventTarget)
 import Web.Event.Event (EventType)
@@ -90,7 +90,7 @@ distance e1 e2 = sqrt (dx * dx + dy * dy)
 -- wait for 2 seconds and see if there're new events
 -- if not, make sure the last one is DragEnd
 mkDragEndable :: Event DragEvent -> Event DragEvent
-mkDragEndable evt = evt <|> unwrap (f <$> e)
+mkDragEndable evt = evt <|> compact (f <$> e)
     where e = debounce (Milliseconds 1500.0) evt
           f d = if d.dragType /= DragEnd
                 then Just {
@@ -121,7 +121,7 @@ dragged start move end = fix \possibleEnd ->
 
           dstart = mkDrag DragStart <$> start
           startPos = step Nothing (Just <$> dstart)
-          dragMove = unwrap (sampleBy checkDist startPos realMove)
+          dragMove = compact (sampleBy checkDist startPos realMove)
 
           -- when user is actually dragging
           dragging = step false ((const false <$> start) <|>
@@ -129,11 +129,11 @@ dragged start move end = fix \possibleEnd ->
                                  (const false <$> end))
           notDragging = not <$> dragging
           -- the drag start should be the first drag event attached with start position
-          dragStart = unwrap (sample_ startPos (gate notDragging dragMove))
+          dragStart = compact (sample_ startPos (gate notDragging dragMove))
 
           -- calculate the new drag end event
           lastPos = step Nothing (Just <$> dragMove)
-          lastDrag = unwrap (sample_ lastPos (gate dragging end))
+          lastDrag = compact (sample_ lastPos (gate dragging end))
           dragEnd = updateDragType DragEnd <$> lastDrag
 
           def = {dragType: DragStart, dragX: 0.0, dragY: 0.0, deltaX: 0.0, deltaY: 0.0}
@@ -160,19 +160,19 @@ type InputEvents = {
 }
 
 mouseEvent :: EventType -> EventTarget -> Event ME.MouseEvent
-mouseEvent t target = unwrap $ makeEvent \k -> do
+mouseEvent t target = compact $ makeEvent \k -> do
     listener <- eventListener \e -> k (ME.fromEvent e)
     addEventListener t listener false target
     pure $ removeEventListener t listener false target
 
 touchEvent :: EventType -> EventTarget -> Event TE.TouchEvent
-touchEvent t target = unwrap $ makeEvent \k -> do
+touchEvent t target = compact $ makeEvent \k -> do
     listener <- eventListener \e -> k (TE.fromEvent e)
     addEventListener t listener false target
     pure $ removeEventListener t listener false target
 
 wheelEvent :: EventTarget -> Event WE.WheelEvent
-wheelEvent target = unwrap $ makeEvent \k -> do
+wheelEvent target = compact $ makeEvent \k -> do
     listener <- eventListener \e -> k (WE.fromEvent e)
     addEventListener wheel listener false target
     pure $ removeEventListener wheel listener false target
@@ -208,9 +208,9 @@ setupInput elem =
         mouseMove  = mouseTap <$> filter (not <<< shiftKey) mm
         mouseEnd   = mouseTap <$> mu
 
-        touchStart = unwrap $ touchTap elem <$> touchEvent touchstart target
-        touchMove = unwrap $ touchTap elem <$> touchEvent touchmove target
-        touchEnd = unwrap $ touchTap elem <$> touchEvent touchend target
+        touchStart = compact $ touchTap elem <$> touchEvent touchstart target
+        touchMove = compact $ touchTap elem <$> touchEvent touchmove target
+        touchEnd = compact $ touchTap elem <$> touchEvent touchend target
 
         wheelEvt = wheelEvent target
 

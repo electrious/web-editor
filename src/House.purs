@@ -4,6 +4,7 @@ import Prelude hiding (add)
 
 import Algorithm.MeshFlatten (VertexItem, buildRTree)
 import Data.Array (range)
+import Data.Compactable (compact)
 import Data.Foldable (find, traverse_)
 import Data.Maybe (Maybe)
 import Data.Traversable (traverse)
@@ -17,7 +18,6 @@ import Three.Core.Mesh (Mesh, bufferGeometry, geometry, isMesh, mkMesh)
 import Three.Core.Object3D (Object3D, add, children, remove, setCastShadow, setName, setReceiveShadow)
 import Three.Loader.ObjLoader (loadMTL, loadOBJ, makeMTLLoader, makeOBJLoader2, setPath)
 import Three.Math.Vector (Vector3, mkVec3)
-import Util (unwrap)
 
 
 meshPath :: String -> Int -> String
@@ -78,7 +78,7 @@ loadHouse serverUrl leadId = do
             setCastShadow true o
             setReceiveShadow true o
 
-    pure $ unwrap $ makeEvent \k -> do
+    pure $ compact $ makeEvent \k -> do
         setPath path mtlLoader
         loadMTL mtlLoader "scene.mtl" \materials -> do
             preload materials
