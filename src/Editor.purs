@@ -1,7 +1,8 @@
-module Editor.Editor where
+module Editor.Editor (WebEditor, createEditor) where
 
 import Prelude hiding (add)
 
+import Data.Array (cons)
 import Data.Foldable (sequence_)
 import Data.Int (toNumber)
 import Editor.House (loadHouse)
@@ -9,6 +10,7 @@ import Editor.Input (DragEvent, setupInput)
 import Editor.RoofManager (createRoofManager)
 import Editor.SceneEvent (Size, setupRaycasting)
 import Effect (Effect)
+import Effect.Ref as Ref
 import FRP.Event (Event, create, sampleOn, subscribe)
 import Models.RoofPlate (JSRoofPlate, RoofEdited, fromJSRoofPlate)
 import Three.Core.Camera (PerspectiveCamera, mkPerspectiveCamera, setAspect, updateProjectionMatrix)
@@ -160,25 +162,33 @@ createEditor width height elem = do
     es <- createScene width height elem
     w <- window
 
+    disposables <- Ref.new [es.dispose]
+    
+    let addDisposable d = Ref.modify (cons d) disposables
+
     -- start the rednerring
     renderLoop es w
 
     let loadHouseFunc url leadId roofs roofEdited = do
-            let loadRoofs md = do
-                    mgr <- createRoofManager md (fromJSRoofPlate <$> roofs)
-                    es.addContent mgr.roofWrapper
-                    d <- subscribe mgr.editedRoofs roofEdited
-                    pure unit
-            
-                f hmd = do
+            let f hmd = do
                     es.addContent hmd.wrapper
-                    loadRoofs hmd
+                    mgr <- createRoofManager hmd (fromJSRoofPlate <$> roofs)
+                    es.addContent mgr.roofWrapper
+                    _ <- addDisposable mgr.disposable
+                    d <- subscribe mgr.editedRoofs roofEdited
+                    addDisposable d
             e <- loadHouse url leadId
             d <- subscribe e f
+            _ <- addDisposable d
             pure unit
+        
+        disposeFunc = do
+            l <- Ref.read disposables
+            sequence_ l
+            Ref.write [] disposables
     
     pure {
         resize: es.resize,
-        dispose: sequence_ [],
+        dispose: disposeFunc,
         loadHouse: loadHouseFunc
     }
