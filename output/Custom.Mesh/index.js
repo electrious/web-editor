@@ -117,8 +117,8 @@ var mkDraggableMesh = function (geo) {
     return function (mat) {
         return function __do() {
             var mesh = Three_Core_Mesh.mkMesh(geo)(mat)();
-            var dragged = dragEvtOn(mesh);
-            var dragDelta = calcDragDelta(toLocal(mesh))(dragged);
+            var dragged = Util.multicast(dragEvtOn(mesh));
+            var dragDelta = Util.multicast(calcDragDelta(toLocal(mesh))(dragged));
             return {
                 mesh: mesh,
                 dragged: dragged,

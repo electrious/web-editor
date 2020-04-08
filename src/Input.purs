@@ -12,7 +12,7 @@ import FRP.Behavior (gate, sampleBy, sample_, step)
 import FRP.Event (Event, fix, makeEvent, withLast)
 import FRP.Event.Time (debounce)
 import Math (sqrt)
-import Util (delay, ffi, skip)
+import Util (delay, ffi, multicast, skip)
 import Web.DOM (Element)
 import Web.DOM.Element (toEventTarget)
 import Web.Event.Event (EventType)
@@ -200,34 +200,34 @@ setupInput :: Element -> InputEvents
 setupInput elem =
     let target = toEventTarget elem
         -- get input events
-        md = mouseEvent mousedown target
-        mm = mouseEvent mousemove target
-        mu = mouseEvent mouseup target
+        md = multicast $ mouseEvent mousedown target
+        mm = multicast $ mouseEvent mousemove target
+        mu = multicast $ mouseEvent mouseup target
 
         mouseStart = mouseTap <$> filter (not <<< shiftKey) md
         mouseMove  = mouseTap <$> filter (not <<< shiftKey) mm
         mouseEnd   = mouseTap <$> mu
 
-        touchStart = compact $ touchTap elem <$> touchEvent touchstart target
-        touchMove = compact $ touchTap elem <$> touchEvent touchmove target
-        touchEnd = compact $ touchTap elem <$> touchEvent touchend target
+        touchStart = compact $ touchTap elem <$> multicast (touchEvent touchstart target)
+        touchMove = compact $ touchTap elem <$> multicast (touchEvent touchmove target)
+        touchEnd = compact $ touchTap elem <$> multicast (touchEvent touchend target)
 
-        wheelEvt = wheelEvent target
+        wheelEvt = multicast $ wheelEvent target
 
         shiftStart = mouseTap <$> filter shiftKey md
         shiftMove = mouseTap <$> filter shiftKey mm
 
-        start = mouseStart <|> touchStart
-        move = mouseMove <|> touchMove
-        end = mouseEnd <|> touchEnd
+        start = multicast $ mouseStart <|> touchStart
+        move = multicast $ mouseMove <|> touchMove
+        end = multicast $ mouseEnd <|> touchEnd
 
         drag = dragged start move end
         shiftDrag = dragged shiftStart shiftMove mouseEnd
 
     in {
-        tapped: tapped start end,
+        tapped: multicast $ tapped start end,
         zoomed: wheelEvt,
-        dragged: drag,
-        shiftDragged: shiftDrag,
+        dragged: multicast drag,
+        shiftDragged: multicast shiftDrag,
         mouseMove: mouseMoveEvent <$> mm
     }

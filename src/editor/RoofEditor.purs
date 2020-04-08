@@ -22,7 +22,7 @@ import Three.Core.Object3D (Object3D, add, remove, setPosition, setVisible)
 import Three.Math.Vector (Vector2, Vector3, dist, mkVec2, mkVec3, vecX, vecY)
 import UI.DraggableObject (DraggableObject, createDraggableObject)
 import Unsafe.Coerce (unsafeCoerce)
-import Util (foldEffect, performEvent)
+import Util (foldEffect, multicast, performEvent)
 
 toVec2 :: Vector3 -> Vector2
 toVec2 v = mkVec2 (vecX v) (vecY v)
@@ -40,7 +40,7 @@ mkRedMarkers roofActive activeMarker ps = traverse mkMarker psIdx
               let f act Nothing = act
                   f act (Just actIdx) = act && actIdx == idx
               
-                  isActive = lift2 f roofActive activeMarker
+                  isActive = multicast $ lift2 f roofActive activeMarker
               createDraggableObject isActive idx pos Nothing Nothing
 
 
@@ -149,7 +149,7 @@ updateMarkers parent ps oldObjs | length ps == length oldObjs = sequence (zipWit
 mkGreenMarkers :: forall a. Object3D a -> Event Boolean -> Event (Array Vector2) -> Event GreenMarkerPoint
 mkGreenMarkers parent active vertices = keepLatest $ getTapForAll <$> markers
     where mPosList = greenMarkerPositions <$> vertices
-          markers = foldEffect (updateMarkers parent) mPosList []
+          markers = multicast $ foldEffect (updateMarkers parent) mPosList []
           res = performEvent $ lift2 setActive markers active
 
           getTap m = const m.point <$> m.mesh.tapped
@@ -200,7 +200,7 @@ createRoofEditor parent active ps = do
 
     -- create new markers and attach them to the parent object
     let markerObjs = performEvent $ mkRedMarkers roofActive activeMarker <$> vertices
-        markers = foldEffect (attachObjs parent) markerObjs []
+        markers = multicast $ foldEffect (attachObjs parent) markerObjs []
 
         -- event for active red marker
         actMarker = getRedMarkerActiveStatus markers
@@ -210,9 +210,9 @@ createRoofEditor parent active ps = do
     let vertsAfterDrag = keepLatest $ getPosition <$> markers
 
         -- merge new vertices after dragging and vertices after adding/deleting
-        newVertices = vertices <|> vertsAfterDrag
+        newVertices = multicast $ vertices <|> vertsAfterDrag
     
-        greenActive = lift2 (\ra am -> ra && am == Nothing) roofActive activeMarker
+        greenActive = multicast $ lift2 (\ra am -> ra && am == Nothing) roofActive activeMarker
         -- create green markers for adding new vertices
         toAddEvt = mkGreenMarkers parent greenActive newVertices
         addVert pns p = insertAt p.vertIndex p.position pns

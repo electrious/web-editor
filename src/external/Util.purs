@@ -4,14 +4,16 @@ import Prelude
 
 import Data.DateTime.Instant (Instant)
 import Data.Filterable (filter)
+import Data.Foldable (sequence_)
 import Data.Foreign.EasyFFI (unsafeForeignFunction, unsafeForeignProcedure)
 import Data.Maybe (Maybe(..))
 import Effect (Effect)
 import Effect.Now (now)
 import Effect.Ref as Ref
 import Effect.Timer (clearTimeout, setTimeout)
+import Effect.Unsafe (unsafePerformEffect)
 import FRP.Behavior (gate, step)
-import FRP.Event (Event, count, makeEvent, subscribe, withLast)
+import FRP.Event (Event, count, create, makeEvent, subscribe, withLast)
 
 ffi :: forall a. Array String -> String -> a
 ffi = unsafeForeignFunction
@@ -47,9 +49,7 @@ distinct evt = getNow <$> filter isDiff (withLast evt)
 
 -- | Perform events with actions inside.
 performEvent :: forall a. Event (Effect a) -> Event a
-performEvent evt = makeEvent \k -> do
-    canceller <- subscribe evt \act -> act >>= k
-    pure canceller
+performEvent evt = makeEvent \k -> subscribe evt \act -> act >>= k
 
 -- | fold events with Effect actions 
 foldEffect :: forall a b. (a -> b -> Effect b) -> Event a -> b -> Event b
@@ -60,3 +60,11 @@ foldEffect act e b = makeEvent \k -> do
         newB <- act a curB
         Ref.write newB result
         k newB
+
+multicast :: forall a. Event a -> Event a
+multicast evt = unsafePerformEffect $ do
+    { event: newEvt, push: p } <- create
+    dispose <- subscribe evt p
+    pure $ makeEvent \k -> do
+        disposeN <- subscribe newEvt k
+        pure $ sequence_ [dispose, disposeN]

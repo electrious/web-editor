@@ -2,8 +2,8 @@ module UI.DraggableObject where
 
 import Prelude hiding (add)
 
-import Custom.Mesh (DraggableMesh, TapDragMesh, calcDragDelta, mkDraggableMesh, mkTapDragMesh, validateDrag)
 import Control.Alt ((<|>))
+import Custom.Mesh (DraggableMesh, TapDragMesh, calcDragDelta, mkDraggableMesh, mkTapDragMesh, validateDrag)
 import Data.Filterable (filter)
 import Data.Foldable (sequence_)
 import Data.Maybe (Maybe(..), fromMaybe)
@@ -16,6 +16,7 @@ import Three.Core.Material (Material, mkMeshBasicMaterial, setOpacity, setTransp
 import Three.Core.Object3D (Object3D, add, hasParent, mkObject3D, parent, setName, setPosition, setRenderOrder, setVisible, worldToLocal)
 import Three.Math.Vector (Vector2, Vector3, mkVec3, vecX, vecY, (<+>))
 import Unsafe.Coerce (unsafeCoerce)
+import Util (multicast)
 
 type DraggableObject a = {
     object     :: Object3D a,
@@ -82,8 +83,8 @@ createDraggableObject active index position customGeo customMat = do
 
     disp1 <- subscribe active (flip setVisible mesh.mesh)
 
-    let dragEvts = mesh.dragged <|> invCircle.dragged
-        evts = validateDrag dragEvts
+    let dragEvts = multicast $ mesh.dragged <|> invCircle.dragged
+        evts = multicast $ validateDrag dragEvts
         startEvt = filter isDragStart evts
         endEvt = filter isDragEnd evts
 
@@ -109,7 +110,7 @@ createDraggableObject active index position customGeo customMat = do
     pure {
         object: dragObj,
         tapped: const index <$> mesh.tapped,
-        position: newPos,
-        isDragging: dragging,
+        position: multicast newPos,
+        isDragging: multicast dragging,
         disposable: sequence_ [disp1, disp2, disp3]
     }

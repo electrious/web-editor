@@ -163,7 +163,7 @@ var setupRaycasting = function (camera) {
                     var unraycastedDrag = Util.performEvent(FRP_Event_Class.sampleOn(FRP_Event.eventIsEvent)(size)(Data_Functor.map(FRP_Event.functorEvent)(raycastDrag)(input.dragged)));
                     var e2 = Util.performEvent(FRP_Event_Class.sampleOn(FRP_Event.eventIsEvent)(size)(Data_Functor.map(FRP_Event.functorEvent)(raycastMouse)(input.mouseMove)));
                     var e1 = Util.performEvent(FRP_Event_Class.sampleOn(FRP_Event.eventIsEvent)(size)(Data_Functor.map(FRP_Event.functorEvent)(raycastTap)(input.tapped)));
-                    return unraycastedDrag;
+                    return Util.multicast(unraycastedDrag);
                 };
             };
         };

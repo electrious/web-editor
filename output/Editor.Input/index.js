@@ -279,38 +279,38 @@ var dragged = function (start) {
 };
 var setupInput = function (elem) {
     var target = Web_DOM_Element.toEventTarget(elem);
-    var touchEnd = Data_Compactable.compact(FRP_Event.compactableEvent)(Data_Functor.map(FRP_Event.functorEvent)(touchTap(elem))(touchEvent(Web_TouchEvent_EventTypes.touchend)(target)));
-    var touchMove = Data_Compactable.compact(FRP_Event.compactableEvent)(Data_Functor.map(FRP_Event.functorEvent)(touchTap(elem))(touchEvent(Web_TouchEvent_EventTypes.touchmove)(target)));
-    var touchStart = Data_Compactable.compact(FRP_Event.compactableEvent)(Data_Functor.map(FRP_Event.functorEvent)(touchTap(elem))(touchEvent(Web_TouchEvent_EventTypes.touchstart)(target)));
-    var wheelEvt = wheelEvent(target);
-    var mu = mouseEvent(Web_UIEvent_MouseEvent_EventTypes.mouseup)(target);
+    var touchEnd = Data_Compactable.compact(FRP_Event.compactableEvent)(Data_Functor.map(FRP_Event.functorEvent)(touchTap(elem))(Util.multicast(touchEvent(Web_TouchEvent_EventTypes.touchend)(target))));
+    var touchMove = Data_Compactable.compact(FRP_Event.compactableEvent)(Data_Functor.map(FRP_Event.functorEvent)(touchTap(elem))(Util.multicast(touchEvent(Web_TouchEvent_EventTypes.touchmove)(target))));
+    var touchStart = Data_Compactable.compact(FRP_Event.compactableEvent)(Data_Functor.map(FRP_Event.functorEvent)(touchTap(elem))(Util.multicast(touchEvent(Web_TouchEvent_EventTypes.touchstart)(target))));
+    var wheelEvt = Util.multicast(wheelEvent(target));
+    var mu = Util.multicast(mouseEvent(Web_UIEvent_MouseEvent_EventTypes.mouseup)(target));
     var mouseEnd = Data_Functor.map(FRP_Event.functorEvent)(mouseTap)(mu);
-    var mm = mouseEvent(Web_UIEvent_MouseEvent_EventTypes.mousemove)(target);
+    var mm = Util.multicast(mouseEvent(Web_UIEvent_MouseEvent_EventTypes.mousemove)(target));
     var mouseMove = Data_Functor.map(FRP_Event.functorEvent)(mouseTap)(Data_Filterable.filter(FRP_Event.filterableEvent)((function () {
         var $24 = Data_HeytingAlgebra.not(Data_HeytingAlgebra.heytingAlgebraBoolean);
         return function ($25) {
             return $24(Web_UIEvent_MouseEvent.shiftKey($25));
         };
     })())(mm));
-    var move = Control_Alt.alt(FRP_Event.altEvent)(mouseMove)(touchMove);
+    var move = Util.multicast(Control_Alt.alt(FRP_Event.altEvent)(mouseMove)(touchMove));
     var shiftMove = Data_Functor.map(FRP_Event.functorEvent)(mouseTap)(Data_Filterable.filter(FRP_Event.filterableEvent)(Web_UIEvent_MouseEvent.shiftKey)(mm));
-    var md = mouseEvent(Web_UIEvent_MouseEvent_EventTypes.mousedown)(target);
+    var md = Util.multicast(mouseEvent(Web_UIEvent_MouseEvent_EventTypes.mousedown)(target));
     var mouseStart = Data_Functor.map(FRP_Event.functorEvent)(mouseTap)(Data_Filterable.filter(FRP_Event.filterableEvent)((function () {
         var $26 = Data_HeytingAlgebra.not(Data_HeytingAlgebra.heytingAlgebraBoolean);
         return function ($27) {
             return $26(Web_UIEvent_MouseEvent.shiftKey($27));
         };
     })())(md));
-    var start = Control_Alt.alt(FRP_Event.altEvent)(mouseStart)(touchStart);
+    var start = Util.multicast(Control_Alt.alt(FRP_Event.altEvent)(mouseStart)(touchStart));
     var shiftStart = Data_Functor.map(FRP_Event.functorEvent)(mouseTap)(Data_Filterable.filter(FRP_Event.filterableEvent)(Web_UIEvent_MouseEvent.shiftKey)(md));
     var shiftDrag = dragged(shiftStart)(shiftMove)(mouseEnd);
-    var end = Control_Alt.alt(FRP_Event.altEvent)(mouseEnd)(touchEnd);
+    var end = Util.multicast(Control_Alt.alt(FRP_Event.altEvent)(mouseEnd)(touchEnd));
     var drag = dragged(start)(move)(end);
     return {
-        tapped: tapped(start)(end),
+        tapped: Util.multicast(tapped(start)(end)),
         zoomed: wheelEvt,
-        dragged: drag,
-        shiftDragged: shiftDrag,
+        dragged: Util.multicast(drag),
+        shiftDragged: Util.multicast(shiftDrag),
         mouseMove: Data_Functor.map(FRP_Event.functorEvent)(mouseMoveEvent)(mm)
     };
 };

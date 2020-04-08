@@ -22,7 +22,7 @@ import FRP.Event (Event, create, fold, keepLatest, subscribe, withLast)
 import FRP.Event.Time (debounce)
 import Models.RoofPlate (RoofEdited, RoofOperation(..), RoofPlate, toRoofEdited)
 import Three.Core.Object3D (Object3D, add, mkObject3D, remove, setName)
-import Util (performEvent, skip)
+import Util (multicast, performEvent, skip)
 
 type RoofManager a = {
     roofWrapper :: Object3D a,
@@ -80,7 +80,7 @@ createRoofManager meshData defRoofs = do
     d1 <- subscribe (const Nothing <$> meshData.mesh.tapped) updateActive
 
     { event: roofsData, push: updateRoofsData } <- create
-    let mkNode roof = createRoofNode roof (((==) (Just roof.id)) <$> activeRoof)
+    let mkNode roof = createRoofNode roof (multicast $ ((==) (Just roof.id)) <$> activeRoof)
         defRoofDict = roofDict defRoofs
 
         -- get roofs to be rerendered
@@ -93,15 +93,15 @@ createRoofManager meshData defRoofs = do
             traverse_ (\o -> add o.roofObject wrapper) now
             pure now
         -- create roofnode for each roof
-        nodes = performEvent $ (traverse mkNode <$> rsToRenderArr)
+        nodes = multicast $ performEvent $ (traverse mkNode <$> rsToRenderArr)
         renderedNodes = performEvent $ renderNodes <$> withLast nodes
 
-        deleteRoofOp = keepLatest $ getRoofDelete <$> renderedNodes
+        deleteRoofOp = multicast $ keepLatest $ getRoofDelete <$> renderedNodes
         updateRoofOp = keepLatest $ getRoofUpdate <$> renderedNodes
 
         -- event of new roofs that will be updated on any change and
         -- run the roof flatten algorithm whenever there's new roof change
-        newRoofs = _.roofs <$> roofsData
+        newRoofs = multicast $ _.roofs <$> roofsData
         flattened = performEvent $ doFlatten meshData <$> newRoofs
 
         -- create the roof recognizer and add it to the roof wrapper object
@@ -114,7 +114,7 @@ createRoofManager meshData defRoofs = do
 
     add recognizer.marker wrapper
 
-    let addRoofOp = RoofOpCreate <$> recognizer.addedNewRoof
+    let addRoofOp = multicast $ RoofOpCreate <$> recognizer.addedNewRoof
         ops = addRoofOp <|> deleteRoofOp <|> updateRoofOp
 
     d2 <- subscribe (Just <$> (keepLatest $ getActivated <$> renderedNodes)) updateActive
@@ -131,6 +131,6 @@ createRoofManager meshData defRoofs = do
     -- skipe the first roof in teh editedRoofs event, because it's the default data
     pure {
         roofWrapper: wrapper,
-        editedRoofs: debounce (Milliseconds 1000.0) $ getRoofEdited <$> skip 1 newRoofs,
+        editedRoofs: multicast $ debounce (Milliseconds 1000.0) $ getRoofEdited <$> skip 1 newRoofs,
         disposable: sequence_ [d1, d2]
     }

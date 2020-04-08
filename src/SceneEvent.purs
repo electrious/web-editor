@@ -18,7 +18,7 @@ import Three.Core.Face3 (Face3)
 import Three.Core.Object3D (Object3D)
 import Three.Core.Raycaster (Intersection, distance, face, intersectObject, mkRaycaster, object, point, setFromCamera)
 import Three.Math.Vector (Vector2, Vector3, mkVec2, vecX, vecY)
-import Util (ffi, fpi, performEvent)
+import Util (ffi, fpi, multicast, performEvent)
 
 type Size = {
     width  :: Int,
@@ -185,4 +185,4 @@ setupRaycasting camera scene input size = do
         e2 = performEvent $ sampleOn size (raycastMouse <$> input.mouseMove)
         unraycastedDrag = performEvent $ sampleOn size (raycastDrag <$> input.dragged)
 
-    pure unraycastedDrag
+    pure $ multicast unraycastedDrag

@@ -138,7 +138,7 @@ var createRoofNode = function (roof) {
             return {
                 roofId: roof.id,
                 roofDelete: Data_Functor.map(FRP_Event.functorEvent)(Data_Function["const"](new Models_RoofPlate.RoofOpDelete(roof.id)))(delRoofEvt),
-                roofUpdate: newRoofs,
+                roofUpdate: Util.multicast(newRoofs),
                 tapped: tapped,
                 roofObject: obj,
                 disposable: Data_Foldable.sequence_(Effect.applicativeEffect)(Data_Foldable.foldableArray)([ d1, editor.disposable ])

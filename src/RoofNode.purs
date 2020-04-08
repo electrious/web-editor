@@ -23,7 +23,7 @@ import Three.Core.Mesh (setMaterial)
 import Three.Core.Object3D (Object3D, add, matrix, mkObject3D, remove, rotateX, rotateZ, setName, setPosition, updateMatrix, updateMatrixWorld, worldToLocal)
 import Three.Math.Vector (Vector2, Vector3, applyMatrix, mkVec2, mkVec3, vecX, vecY, vecZ)
 import Unsafe.Coerce (unsafeCoerce)
-import Util (performEvent)
+import Util (multicast, performEvent)
 
 type RoofNode a = {
     roofId     :: String,
@@ -136,7 +136,7 @@ createRoofNode roof isActive = do
     pure {
         roofId: roof.id,
         roofDelete: const (RoofOpDelete roof.id) <$> delRoofEvt,
-        roofUpdate: newRoofs,
+        roofUpdate: multicast newRoofs,
         tapped: tapped,
         roofObject: obj,
         disposable: sequence_ [d1, editor.disposable]

@@ -14,7 +14,7 @@ import Three.Core.Material (Material)
 import Three.Core.Mesh (Mesh, mkMesh)
 import Three.Core.Object3D (Object3D, hasParent, parent, worldToLocal)
 import Three.Math.Vector (Vector3, mkVec3, (<->))
-import Util (performEvent)
+import Util (multicast, performEvent)
 
 type TappableMesh a = {
     mesh   :: Mesh a,
@@ -83,8 +83,8 @@ mkDraggableMesh :: forall a geo mat. Geometry geo -> Material mat -> Effect (Dra
 mkDraggableMesh geo mat = do
     mesh <- mkMesh geo mat
 
-    let dragged = dragEvtOn mesh
-        dragDelta = calcDragDelta (toLocal mesh) dragged
+    let dragged = multicast $ dragEvtOn mesh
+        dragDelta = multicast $ calcDragDelta (toLocal mesh) dragged
     
     pure {
         mesh      : mesh,
