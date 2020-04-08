@@ -1,7 +1,7 @@
 const path = require('path')
 
 module.exports = {
-    entry: './src/editor.ts',
+    entry: './src/Editor.purs',
     output: {
         path: path.resolve(__dirname, 'dist'),
         filename: 'web-editor.js',
@@ -10,11 +10,6 @@ module.exports = {
     },
     module: {
         rules: [
-            {
-                test: /\.ts$/,
-                exclude: /node_modules/,
-                loader: 'ts-loader'
-            },
             {
                 test: /\.purs$/,
                 exclude: /node_modules/,
@@ -29,7 +24,7 @@ module.exports = {
     },
 
     resolve: {
-        extensions: ['.ts', '.js', '.purs']
+        extensions: ['.js', '.purs']
     },
 
     stats: {

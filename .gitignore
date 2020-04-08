@@ -1,6 +1,5 @@
 node_modules
 *.log
-output/
 .spago/
 .psc-ide-port
 .purs-repl

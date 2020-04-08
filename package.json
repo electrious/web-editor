@@ -1,9 +1,8 @@
 {
   "name": "web-editor",
-  "version": "1.1.0",
+  "version": "2.0.0",
   "description": "a web editor library to edit Electrious 3D contents.",
-  "main": "lib/src/editor.js",
-  "types": "lib/src/editor.d.ts",
+  "main": "output/Editor/Editor/index.js",
   "repository": "https://github.com/electrious/web-editor",
   "author": "Eric Wong",
   "license": "CopyrightsReserved",
@@ -11,12 +10,10 @@
   "mode": "development",
   "scripts": {
     "demo": "webpack-dev-server --mode development --host 0.0.0.0 --config example.webpack.config.js",
-    "build-lib": "rm -rf lib && tsc",
+    "build-lib": "rm -rf output && spago build",
     "build": "rm -rf dist && webpack --mode production"
   },
   "devDependencies": {
-    "@typescript-eslint/eslint-plugin": "^2.4.0",
-    "@typescript-eslint/parser": "^2.4.0",
     "eslint": "^6.5.1",
     "eslint-config-prettier": "^6.4.0",
     "eslint-plugin-prettier": "^3.1.1",
@@ -27,24 +24,15 @@
     "purescript-psa": "^0.7.3",
     "purs-loader": "^3.7.1",
     "spago": "^0.14.0",
-    "ts-loader": "^6.2.0",
-    "typescript": "^3.6.4",
     "webpack": "^4.41.1",
     "webpack-cli": "^3.3.9",
     "webpack-dev-server": "^3.8.2"
   },
   "dependencies": {
-    "@most/adapter": "^1.0.0",
-    "@most/core": "^1.5.0",
-    "@most/dom-event": "^2.2.0",
-    "@most/scheduler": "^1.2.3",
-    "@types/ramda": "^0.26.33",
-    "@types/rbush": "^3.0.0",
-    "@types/uuid": "^3.4.6",
-    "ramda": "^0.26.1",
     "rbush": "^3.0.1",
     "shamos-hoey": "^1.0.1",
     "three": "^0.110.0",
-    "uuid": "^3.3.3"
+    "uuid": "^3.3.3",
+    "uuid-validate": "^0.0.3"
   }
 }
