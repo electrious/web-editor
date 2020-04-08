@@ -104,7 +104,7 @@ var createRoofNode = function (roof) {
             var v = FRP_Event.create();
             var editor = Editor_RoofEditor.createRoofEditor(obj)(isActive)(ps)();
             var vertices = Control_Alt.alt(FRP_Event.altEvent)(v.event)(editor.roofVertices);
-            var meshEvt = Util.performEvent(Control_Apply.lift2(FRP_Event.applyEvent)(createRoofMesh)(vertices)(isActive));
+            var meshEvt = Util.multicast(Util.performEvent(Control_Apply.lift2(FRP_Event.applyEvent)(createRoofMesh)(vertices)(isActive)));
             var d1 = FRP_Event.subscribe(FRP_Event_Class.withLast(FRP_Event.eventIsEvent)(meshEvt))(function (v1) {
                 return function __do() {
                     Data_Foldable.traverse_(Effect.applicativeEffect)(Data_Foldable.foldableMaybe)(function (o) {
@@ -113,13 +113,16 @@ var createRoofNode = function (roof) {
                     return Three_Core_Object3D.add(v1.now.mesh)(obj)();
                 };
             })();
-            var v1 = Util.performEvent(Control_Apply.lift2(FRP_Event.applyEvent)(function (m) {
+            var e = Util.performEvent(Control_Apply.lift2(FRP_Event.applyEvent)(function (m) {
                 return function (a) {
                     return Three_Core_Mesh.setMaterial(getMaterial(a))(m.mesh);
                 };
             })(meshEvt)(isActive));
-            var toParent = function (v2) {
-                return Three_Math_Vector.applyMatrix(Three_Core_Object3D.matrix(obj))(Three_Math_Vector.mkVec3(Three_Math_Vector.vecX(Three_Math_Vector.hasXVec2)(v2))(Three_Math_Vector.vecY(Three_Math_Vector.hasYVec2)(v2))(0.0));
+            var d2 = FRP_Event.subscribe(e)(function (v1) {
+                return Control_Applicative.pure(Effect.applicativeEffect)(Data_Array.init);
+            })();
+            var toParent = function (v1) {
+                return Three_Math_Vector.applyMatrix(Three_Core_Object3D.matrix(obj))(Three_Math_Vector.mkVec3(Three_Math_Vector.vecX(Three_Math_Vector.hasXVec2)(v1))(Three_Math_Vector.vecY(Three_Math_Vector.hasYVec2)(v1))(0.0));
             };
             var tapped = FRP_Event_Class.keepLatest(FRP_Event.eventIsEvent)(Data_Functor.map(FRP_Event.functorEvent)(function (m) {
                 return m.tapped;
@@ -131,17 +134,17 @@ var createRoofNode = function (roof) {
                     return Models_RoofPlate.RoofOpUpdate.create($19($20($21)));
                 };
             })())(editor.roofVertices);
-            var v2 = FRP_Event.create();
-            var delRoofEvt = Control_Alt.alt(FRP_Event.altEvent)(v2.event)(Data_Functor.map(FRP_Event.functorEvent)(Data_Function["const"](Data_Unit.unit))(editor.deleteRoof));
+            var v1 = FRP_Event.create();
+            var delRoofEvt = Control_Alt.alt(FRP_Event.altEvent)(v1.event)(Data_Functor.map(FRP_Event.functorEvent)(Data_Function["const"](Data_Unit.unit))(editor.deleteRoof));
             v.push(ps)();
-            Control_Applicative.when(Effect.applicativeEffect)(!testSimplePolygon(ps))(Data_Functor["void"](Effect.functorEffect)(Effect_Timer.setTimeout(1000)(v2.push(Data_Unit.unit))))();
+            Control_Applicative.when(Effect.applicativeEffect)(!testSimplePolygon(ps))(Data_Functor["void"](Effect.functorEffect)(Effect_Timer.setTimeout(1000)(v1.push(Data_Unit.unit))))();
             return {
                 roofId: roof.id,
-                roofDelete: Data_Functor.map(FRP_Event.functorEvent)(Data_Function["const"](new Models_RoofPlate.RoofOpDelete(roof.id)))(delRoofEvt),
+                roofDelete: Util.multicast(Data_Functor.map(FRP_Event.functorEvent)(Data_Function["const"](new Models_RoofPlate.RoofOpDelete(roof.id)))(delRoofEvt)),
                 roofUpdate: Util.multicast(newRoofs),
-                tapped: tapped,
+                tapped: Util.multicast(tapped),
                 roofObject: obj,
-                disposable: Data_Foldable.sequence_(Effect.applicativeEffect)(Data_Foldable.foldableArray)([ d1, editor.disposable ])
+                disposable: Data_Foldable.sequence_(Effect.applicativeEffect)(Data_Foldable.foldableArray)([ d1, d2, editor.disposable ])
             };
         };
     };

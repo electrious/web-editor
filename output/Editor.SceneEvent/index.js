@@ -6,10 +6,12 @@ var Control_Apply = require("../Control.Apply/index.js");
 var Data_Array = require("../Data.Array/index.js");
 var Data_Compactable = require("../Data.Compactable/index.js");
 var Data_Eq = require("../Data.Eq/index.js");
+var Data_Foldable = require("../Data.Foldable/index.js");
 var Data_Functor = require("../Data.Functor/index.js");
 var Data_Int = require("../Data.Int/index.js");
 var Data_Maybe = require("../Data.Maybe/index.js");
 var Data_Traversable = require("../Data.Traversable/index.js");
+var Data_Unit = require("../Data.Unit/index.js");
 var Editor_Input = require("../Editor.Input/index.js");
 var Effect = require("../Effect/index.js");
 var FRP_Event = require("../FRP.Event/index.js");
@@ -26,8 +28,8 @@ var sendMouseMoveEvent = Util.fpi([ "obj", "evt", "" ])("obj.mouseMove(evt)()");
 var sendDragEvent = Util.fpi([ "obj", "evt", "" ])("obj.dragged(evt)()");
 var mkDragEndable = function (evt) {
     var f = function (d) {
-        var $0 = Data_Eq.notEq(Editor_Input.eqDragType)(d.type)(Editor_Input.DragEnd.value);
-        if ($0) {
+        var $1 = Data_Eq.notEq(Editor_Input.eqDragType)(d.type)(Editor_Input.DragEnd.value);
+        if ($1) {
             return new Data_Maybe.Just({
                 type: Editor_Input.DragEnd.value,
                 distance: d.distance,
@@ -45,8 +47,8 @@ var makeDraggable = Util.fpi([ "obj", "cb", "" ])("obj.dragged = cb");
 var isTappable = Util.ffi([ "obj" ])("obj.tapped !== undefined");
 var processTapObjects = function (domPos) {
     return function (objs) {
-        var target = Data_Array.head(Data_Array.filter(function ($1) {
-            return isTappable(Three_Core_Raycaster.object($1));
+        var target = Data_Array.head(Data_Array.filter(function ($2) {
+            return isTappable(Three_Core_Raycaster.object($2));
         })(objs));
         var doTap = function (o) {
             return sendTapEvent(Three_Core_Raycaster.object(o))({
@@ -61,8 +63,8 @@ var processTapObjects = function (domPos) {
 var isMouseMove = Util.ffi([ "obj" ])("obj.mouseMove !== undefined");
 var processMouseOverObjects = function (domPos) {
     return function (objs) {
-        var target = Data_Array.head(Data_Array.filter(function ($2) {
-            return isMouseMove(Three_Core_Raycaster.object($2));
+        var target = Data_Array.head(Data_Array.filter(function ($3) {
+            return isMouseMove(Three_Core_Raycaster.object($3));
         })(objs));
         var doMove = function (o) {
             return sendMouseMoveEvent(Three_Core_Raycaster.object(o))({
@@ -78,8 +80,8 @@ var processMouseOverObjects = function (domPos) {
 var isDraggable = Util.ffi([ "obj" ])("obj.dragged !== undefined");
 var processDragObjects = function (e) {
     return function (objs) {
-        var target = Data_Array.head(Data_Array.filter(function ($3) {
-            return isDraggable(Three_Core_Raycaster.object($3));
+        var target = Data_Array.head(Data_Array.filter(function ($4) {
+            return isDraggable(Three_Core_Raycaster.object($4));
         })(objs));
         var doDrag = function (o) {
             return sendDragEvent(Three_Core_Raycaster.object(o))({
@@ -161,9 +163,17 @@ var setupRaycasting = function (camera) {
                         };
                     };
                     var unraycastedDrag = Util.performEvent(FRP_Event_Class.sampleOn(FRP_Event.eventIsEvent)(size)(Data_Functor.map(FRP_Event.functorEvent)(raycastDrag)(input.dragged)));
+                    var f = function (v) {
+                        return Control_Applicative.pure(Effect.applicativeEffect)(Data_Unit.unit);
+                    };
                     var e2 = Util.performEvent(FRP_Event_Class.sampleOn(FRP_Event.eventIsEvent)(size)(Data_Functor.map(FRP_Event.functorEvent)(raycastMouse)(input.mouseMove)));
                     var e1 = Util.performEvent(FRP_Event_Class.sampleOn(FRP_Event.eventIsEvent)(size)(Data_Functor.map(FRP_Event.functorEvent)(raycastTap)(input.tapped)));
-                    return Util.multicast(unraycastedDrag);
+                    var d1 = FRP_Event.subscribe(e1)(f)();
+                    var d2 = FRP_Event.subscribe(e2)(f)();
+                    return {
+                        dragEvent: Util.multicast(unraycastedDrag),
+                        dispose: Data_Foldable.sequence_(Effect.applicativeEffect)(Data_Foldable.foldableArray)([ d1, d2 ])
+                    };
                 };
             };
         };

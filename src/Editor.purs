@@ -133,9 +133,10 @@ createScene width height elem = do
     
     rcs <- setupRaycasting camera scene inputEvts sizeEvt
 
-    d2 <- subscribe rcs (rotateContentWithDrag rotWrapper)
+    d2 <- subscribe rcs.dragEvent (rotateContentWithDrag rotWrapper)
 
     let shiftDragEvt = performEvent $ sampleOn scaleEvt (moveWithShiftDrag content <$> inputEvts.shiftDragged) 
+    d3 <- subscribe shiftDragEvt (\_ -> pure unit)
 
     updateSize({ width: width, height: height})
 
@@ -147,7 +148,7 @@ createScene width height elem = do
         render: renderFunc,
         resize: \w h -> updateSize({ width: w, height: h }),
         addContent: addContentFunc,
-        dispose: sequence_ [d1, d2, disposeScene scene]
+        dispose: sequence_ [d1, d2, d3, disposeScene scene, rcs.dispose]
     }
 
 -- | renderLoop is the function to render scene repeatedly

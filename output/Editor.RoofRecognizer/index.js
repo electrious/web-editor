@@ -9,7 +9,6 @@ var Data_Functor = require("../Data.Functor/index.js");
 var Data_Maybe = require("../Data.Maybe/index.js");
 var Effect = require("../Effect/index.js");
 var Effect_Unsafe = require("../Effect.Unsafe/index.js");
-var FRP_Behavior = require("../FRP.Behavior/index.js");
 var FRP_Event = require("../FRP.Event/index.js");
 var FRP_Event_Class = require("../FRP.Event.Class/index.js");
 var Models_RoofPlate = require("../Models.RoofPlate/index.js");
@@ -44,7 +43,7 @@ var showMarker = function (adder) {
                 };
             };
         };
-        throw new Error("Failed pattern match at Editor.RoofRecognizer (line 60, column 1 - line 60, column 84): " + [ adder.constructor.name, v.constructor.name ]);
+        throw new Error("Failed pattern match at Editor.RoofRecognizer (line 59, column 1 - line 59, column 84): " + [ adder.constructor.name, v.constructor.name ]);
     };
 };
 var adderMarkerMat = Effect_Unsafe.unsafePerformEffect(Three_Core_Material.mkMeshBasicMaterial(2237183));
@@ -83,10 +82,10 @@ var createRoofRecognizer = function (houseWrapper) {
                         };
                     };
                     var point = Util.performEvent(FRP_Event_Class.sampleOn(FRP_Event.eventIsEvent)(roofs)(Data_Functor.map(FRP_Event.functorEvent)(f)(mouseMove)));
-                    var roof = Data_Functor.map(FRP_Event.functorEvent)(mkRoof)(Util.performEvent(Data_Functor.map(FRP_Event.functorEvent)(showMarker(adder))(FRP_Behavior.gate(FRP_Event.eventIsEvent)(canShow)(point))));
+                    var roof = Data_Functor.map(FRP_Event.functorEvent)(mkRoof)(Util.performEvent(Data_Functor.map(FRP_Event.functorEvent)(showMarker(adder))(FRP_Event_Class.gate(FRP_Event.eventIsEvent)(canShow)(point))));
                     return {
                         marker: adder.marker.mesh,
-                        addedNewRoof: Util.performEvent(roof)
+                        addedNewRoof: Util.multicast(Util.performEvent(roof))
                     };
                 };
             };

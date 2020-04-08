@@ -108,7 +108,7 @@ createRoofNode roof isActive = do
     editor <- createRoofEditor obj isActive ps
 
     let vertices = defVerts <|> editor.roofVertices
-        meshEvt = performEvent (lift2 createRoofMesh vertices isActive)
+        meshEvt = multicast $ performEvent (lift2 createRoofMesh vertices isActive)
     
     -- add/remove mesh to the obj
     d1 <- subscribe (withLast meshEvt) \{last, now} -> do
@@ -116,9 +116,10 @@ createRoofNode roof isActive = do
               add now.mesh obj
     
     -- set mesh material based on activity state
-    let _ = performEvent $ lift2 (\m a -> setMaterial (getMaterial a) m.mesh) meshEvt isActive
-    
-        tapped = keepLatest $ (\m -> m.tapped) <$> meshEvt
+    let e = performEvent $ lift2 (\m a -> setMaterial (getMaterial a) m.mesh) meshEvt isActive
+    d2 <- subscribe e (\_ -> pure init)
+
+    let tapped = keepLatest $ (\m -> m.tapped) <$> meshEvt
 
         toParent v = applyMatrix (matrix obj) (mkVec3 (vecX v) (vecY v) 0.0)
         
@@ -135,9 +136,9 @@ createRoofNode roof isActive = do
 
     pure {
         roofId: roof.id,
-        roofDelete: const (RoofOpDelete roof.id) <$> delRoofEvt,
+        roofDelete: multicast $ const (RoofOpDelete roof.id) <$> delRoofEvt,
         roofUpdate: multicast newRoofs,
-        tapped: tapped,
+        tapped: multicast tapped,
         roofObject: obj,
-        disposable: sequence_ [d1, editor.disposable]
+        disposable: sequence_ [d1, d2, editor.disposable]
     }

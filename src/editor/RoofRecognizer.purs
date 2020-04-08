@@ -8,8 +8,7 @@ import Data.Maybe (Maybe(..))
 import Editor.SceneEvent (SceneMouseMoveEvent)
 import Effect (Effect)
 import Effect.Unsafe (unsafePerformEffect)
-import FRP.Behavior (Behavior, gate)
-import FRP.Event (Event, sampleOn)
+import FRP.Event (Event, gate, sampleOn)
 import Models.RoofPlate (RoofPlate, newRoofPlate)
 import Three.Core.Face3 (normal)
 import Three.Core.Geometry (Geometry, mkCircleGeometry)
@@ -18,7 +17,7 @@ import Three.Core.Mesh (Mesh)
 import Three.Core.Object3D (Object3D, hasParent, localToWorld, lookAt, parent, setName, setPosition, setVisible)
 import Three.Math.Vector (Vector3, addScaled, mkVec3, (<+>))
 import Unsafe.Coerce (unsafeCoerce)
-import Util (performEvent)
+import Util (multicast, performEvent)
 
 -- | RoofRecognizer will be able to let user add new roof
 type RoofRecognizer a = {
@@ -83,7 +82,7 @@ showMarker adder (Just p) | not (hasParent adder.marker.mesh) = setVisible false
 createRoofRecognizer :: forall a b. Object3D a
                                -> Event (Array RoofPlate)
                                -> Event SceneMouseMoveEvent
-                               -> Behavior Boolean
+                               -> Event Boolean
                                -> Effect (RoofRecognizer b)
 createRoofRecognizer houseWrapper roofs mouseMove canShow = do
     adder <- createAdderMarker
@@ -107,5 +106,5 @@ createRoofRecognizer houseWrapper roofs mouseMove canShow = do
         roof = mkRoof <$> performEvent (showMarker adder <$> gate canShow point)
     pure {
         marker: marker.mesh,
-        addedNewRoof: performEvent roof
+        addedNewRoof: multicast $ performEvent roof
     }

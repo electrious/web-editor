@@ -8,10 +8,10 @@ import Data.Compactable (compact)
 import Data.Int (toNumber)
 import Data.Maybe (Maybe(..))
 import Data.Time.Duration (Milliseconds(..))
-import Data.Traversable (traverse)
+import Data.Traversable (sequence_, traverse)
 import Editor.Input (DragEvent, DragType(..), InputEvents, MouseMoveEvent, TapEvent)
 import Effect (Effect)
-import FRP.Event (Event, sampleOn)
+import FRP.Event (Event, sampleOn, subscribe)
 import FRP.Event.Time (debounce)
 import Three.Core.Camera (Camera)
 import Three.Core.Face3 (Face3)
@@ -156,10 +156,14 @@ processDragObjects e objs = traverse doDrag target *> pure e
               point: point o
             }
 
+type RaycastSetup = {
+    dragEvent :: Event DragEvent,
+    dispose   :: Effect Unit
+}
 
 -- | setup all raycasting needed to process user inputs and send
 -- them to the corresponding 3D object in the scene
-setupRaycasting :: forall a b. Camera a -> Object3D b -> InputEvents -> Event Size -> Effect (Event DragEvent)
+setupRaycasting :: forall a b. Camera a -> Object3D b -> InputEvents -> Event Size -> Effect RaycastSetup
 setupRaycasting camera scene input size = do
     raycaster <- mkRaycaster
     
@@ -185,4 +189,12 @@ setupRaycasting camera scene input size = do
         e2 = performEvent $ sampleOn size (raycastMouse <$> input.mouseMove)
         unraycastedDrag = performEvent $ sampleOn size (raycastDrag <$> input.dragged)
 
-    pure $ multicast unraycastedDrag
+        f _ = pure unit
+    
+    d1 <- subscribe e1 f
+    d2 <- subscribe e2 f
+
+    pure {
+        dragEvent: multicast unraycastedDrag,
+        dispose: sequence_ [d1, d2]
+    }

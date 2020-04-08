@@ -5,17 +5,17 @@ import Prelude
 import Control.Alt ((<|>))
 import Data.Filterable (compact, filter)
 import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Show (genericShow)
 import Data.Int (toNumber)
 import Data.Maybe (Maybe(..))
 import Data.Time.Duration (Milliseconds(..))
-import FRP.Behavior (gate, sampleBy, sample_, step)
-import FRP.Event (Event, fix, makeEvent, withLast)
+import FRP.Event (Event, fix, gate, makeEvent, sampleOn, sampleOn_, withLast)
 import FRP.Event.Time (debounce)
 import Math (sqrt)
-import Util (delay, ffi, multicast, skip)
+import Util (debug, delay, ffi, multicast, skip)
 import Web.DOM (Element)
 import Web.DOM.Element (toEventTarget)
-import Web.Event.Event (EventType)
+import Web.Event.Event (EventType, preventDefault)
 import Web.Event.EventTarget (addEventListener, eventListener, removeEventListener)
 import Web.Event.Internal.Types (EventTarget)
 import Web.HTML.HTMLElement (DOMRect)
@@ -41,7 +41,7 @@ tapped :: Event TapEvent -> Event TapEvent -> Event TapEvent
 tapped start end = gate canBeTap tapCheck
     where s = const false <$> start
           e = const true <$> end
-          canBeTap = step false $ s <|> e
+          canBeTap = s <|> e
           -- the touch should end in less than 0.32 seconds to be
           -- considered a tap.
           tapCheck = delay 320 start
@@ -61,6 +61,9 @@ data DragType = DragStart
 
 derive instance genericDragType :: Generic DragType _
 derive instance eqDragType :: Eq DragType
+
+instance showDragType :: Show DragType where
+    show = genericShow
 
 type DragEvent = {
     dragType :: DragType,
@@ -110,7 +113,7 @@ dragged start move end = fix \possibleEnd ->
 
           posEnd = const false <$> possibleEnd
           -- we're only interested in move events between start and end
-          touching = step false (startDrag <|> endDrag <|> posEnd)
+          touching = startDrag <|> endDrag <|> posEnd
           -- only move events in between touching is real move
           realMove = mkDrag Drag <$> gate touching move
           mkDrag t e = { dragType: t, dragX: e.tapX, dragY: e.tapY, deltaX: 0.0, deltaY: 0.0 }
@@ -119,21 +122,20 @@ dragged start move end = fix \possibleEnd ->
           checkDist (Just s) p = if distance s p >= 1.0 then Just p else Nothing
           checkDist Nothing p  = Nothing
 
-          dstart = mkDrag DragStart <$> start
-          startPos = step Nothing (Just <$> dstart)
-          dragMove = compact (sampleBy checkDist startPos realMove)
+          startPos = multicast $ (Just <<< mkDrag DragStart) <$> start
+          dragMove = multicast $ compact (sampleOn startPos (flip checkDist <$> realMove))
 
           -- when user is actually dragging
-          dragging = step false ((const false <$> start) <|>
+          dragging = multicast $ (const false <$> start) <|>
                                  (const true <$> dragMove) <|>
-                                 (const false <$> end))
+                                 (const false <$> end)
           notDragging = not <$> dragging
           -- the drag start should be the first drag event attached with start position
-          dragStart = compact (sample_ startPos (gate notDragging dragMove))
+          dragStart = compact (sampleOn_ startPos (gate notDragging dragMove))
 
           -- calculate the new drag end event
-          lastPos = step Nothing (Just <$> dragMove)
-          lastDrag = compact (sample_ lastPos (gate dragging end))
+          lastPos = Just <$> dragMove
+          lastDrag = compact (sampleOn_ lastPos (gate dragging end))
           dragEnd = updateDragType DragEnd <$> lastDrag
 
           def = {dragType: DragStart, dragX: 0.0, dragY: 0.0, deltaX: 0.0, deltaY: 0.0}
@@ -147,7 +149,7 @@ dragged start move end = fix \possibleEnd ->
                                                 deltaY: now.dragY - l.dragY
                                                }
                                     Nothing -> now
-          resEvt = mkDragEndable $ skip 1 $ calcDelta <$> withLast evts
+          resEvt = multicast $ mkDragEndable $ skip 1 $ calcDelta <$> withLast evts
         in { input: filter isEnd resEvt, output: resEvt }
 
 
@@ -173,7 +175,7 @@ touchEvent t target = compact $ makeEvent \k -> do
 
 wheelEvent :: EventTarget -> Event WE.WheelEvent
 wheelEvent target = compact $ makeEvent \k -> do
-    listener <- eventListener \e -> k (WE.fromEvent e)
+    listener <- eventListener \e -> preventDefault e *> k (WE.fromEvent e)
     addEventListener wheel listener false target
     pure $ removeEventListener wheel listener false target
 

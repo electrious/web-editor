@@ -16,14 +16,13 @@ var Effect_Now = require("../Effect.Now/index.js");
 var Effect_Ref = require("../Effect.Ref/index.js");
 var Effect_Timer = require("../Effect.Timer/index.js");
 var Effect_Unsafe = require("../Effect.Unsafe/index.js");
-var FRP_Behavior = require("../FRP.Behavior/index.js");
 var FRP_Event = require("../FRP.Event/index.js");
 var FRP_Event_Class = require("../FRP.Event.Class/index.js");
 var skip = function (n) {
     return function (evt) {
-        var c = FRP_Behavior.step(FRP_Event.eventIsEvent)(0)(FRP_Event_Class.count(FRP_Event.eventIsEvent)(evt));
-        var skipped = Data_Functor.map(FRP_Behavior.functorABehavior(FRP_Event.functorEvent))(Data_Ord.greaterThan(Data_Ord.ordInt)(n))(c);
-        return FRP_Behavior.gate(FRP_Event.eventIsEvent)(skipped)(evt);
+        var c = FRP_Event_Class.count(FRP_Event.eventIsEvent)(evt);
+        var skipped = Data_Functor.map(FRP_Event.functorEvent)(Data_Ord.greaterThan(Data_Ord.ordInt)(n))(c);
+        return FRP_Event_Class.gate(FRP_Event.eventIsEvent)(skipped)(evt);
     };
 };
 var performEvent = function (evt) {
@@ -86,6 +85,14 @@ var delay = function (n) {
         });
     };
 };
+var debugWith = function (f) {
+    return function (evt) {
+        var g = function (v) {
+            return Control_Apply.applySecond(Effect.applyEffect)(f(v))(Control_Applicative.pure(Effect.applicativeEffect)(v));
+        };
+        return performEvent(Data_Functor.map(FRP_Event.functorEvent)(g)(evt));
+    };
+};
 var debug = function (dictShow) {
     return function (evt) {
         var f = function (v) {
@@ -115,5 +122,6 @@ module.exports = {
     performEvent: performEvent,
     foldEffect: foldEffect,
     multicast: multicast,
-    debug: debug
+    debug: debug,
+    debugWith: debugWith
 };

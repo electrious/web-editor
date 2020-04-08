@@ -127,9 +127,9 @@ var createScene = function (width) {
                 var renderFunc = Three_Core_WebGLRenderer.render(scene)(camera)(renderer);
                 var inputEvts = Editor_Input.setupInput(elem);
                 var newDistEvt = Util.performEvent(Data_Functor.map(FRP_Event.functorEvent)((function () {
-                    var $10 = zoomCamera(camera);
-                    return function ($11) {
-                        return $10(Web_UIEvent_WheelEvent.deltaY($11));
+                    var $11 = zoomCamera(camera);
+                    return function ($12) {
+                        return $11(Web_UIEvent_WheelEvent.deltaY($12));
                     };
                 })())(inputEvts.zoomed));
                 var scaleEvt = Data_Functor.map(FRP_Event.functorEvent)(function (d) {
@@ -139,8 +139,11 @@ var createScene = function (width) {
                     return Three_Core_Object3D.add(c)(content);
                 };
                 var rcs = Editor_SceneEvent.setupRaycasting(camera)(scene)(inputEvts)(v.event)();
-                var d2 = FRP_Event.subscribe(rcs)(rotateContentWithDrag(rotWrapper))();
+                var d2 = FRP_Event.subscribe(rcs.dragEvent)(rotateContentWithDrag(rotWrapper))();
                 var shiftDragEvt = Util.performEvent(FRP_Event_Class.sampleOn(FRP_Event.eventIsEvent)(scaleEvt)(Data_Functor.map(FRP_Event.functorEvent)(moveWithShiftDrag(content))(inputEvts.shiftDragged)));
+                var d3 = FRP_Event.subscribe(shiftDragEvt)(function (v1) {
+                    return Control_Applicative.pure(Effect.applicativeEffect)(Data_Unit.unit);
+                })();
                 v.push({
                     width: width,
                     height: height
@@ -160,7 +163,7 @@ var createScene = function (width) {
                         };
                     },
                     addContent: addContentFunc,
-                    dispose: Data_Foldable.sequence_(Effect.applicativeEffect)(Data_Foldable.foldableArray)([ d1, d2, Three_Core_Scene.disposeScene(scene) ])
+                    dispose: Data_Foldable.sequence_(Effect.applicativeEffect)(Data_Foldable.foldableArray)([ d1, d2, d3, Three_Core_Scene.disposeScene(scene), rcs.dispose ])
                 };
             };
         };

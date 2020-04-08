@@ -17,7 +17,6 @@ import Editor.House (HouseMeshData)
 import Editor.RoofNode (RoofNode, createRoofNode)
 import Editor.RoofRecognizer (createRoofRecognizer)
 import Effect (Effect)
-import FRP.Behavior (step)
 import FRP.Event (Event, create, fold, keepLatest, subscribe, withLast)
 import FRP.Event.Time (debounce)
 import Models.RoofPlate (RoofEdited, RoofOperation(..), RoofPlate, toRoofEdited)
@@ -110,7 +109,7 @@ createRoofManager meshData defRoofs = do
     recognizer <- createRoofRecognizer meshData.wrapper
                                        ((toUnfoldable <<< values) <$> newRoofs)
                                        meshData.mesh.mouseMove
-                                       (step true canShowRecognizer)
+                                       canShowRecognizer
 
     add recognizer.marker wrapper
 

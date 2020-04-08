@@ -13,8 +13,7 @@ import Effect.Now (now)
 import Effect.Ref as Ref
 import Effect.Timer (clearTimeout, setTimeout)
 import Effect.Unsafe (unsafePerformEffect)
-import FRP.Behavior (gate, step)
-import FRP.Event (Event, count, create, makeEvent, subscribe, withLast)
+import FRP.Event (Event, count, create, gate, makeEvent, subscribe, withLast)
 
 ffi :: forall a. Array String -> String -> a
 ffi = unsafeForeignFunction
@@ -40,7 +39,7 @@ delay n evt = makeEvent \k -> do
 -- | skip first n occurrences of the event
 skip :: forall a. Int -> Event a -> Event a
 skip n evt = gate skipped evt
-    where c = step 0 (count evt)
+    where c = count evt
           skipped = ((>) n) <$> c
 
 distinct :: forall a. Eq a => Event a -> Event a
@@ -73,3 +72,7 @@ multicast evt = unsafePerformEffect $ do
 debug :: forall a. Show a => Event a -> Event a
 debug evt = performEvent $ f <$> evt
     where f v = logShow v *> pure v
+
+debugWith :: forall a. (a -> Effect Unit) -> Event a -> Event a
+debugWith f evt = performEvent $ g <$> evt
+    where g v = f v *> pure v
