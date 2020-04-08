@@ -8,7 +8,7 @@ import Data.Maybe (Maybe(..))
 import Editor.SceneEvent (SceneMouseMoveEvent)
 import Effect (Effect)
 import Effect.Unsafe (unsafePerformEffect)
-import FRP.Event (Event, gate, sampleOn)
+import FRP.Event (Event, gate, keepLatest, sampleOn)
 import Models.RoofPlate (RoofPlate, newRoofPlate)
 import Three.Core.Face3 (normal)
 import Three.Core.Geometry (Geometry, mkCircleGeometry)
@@ -103,7 +103,9 @@ createRoofRecognizer houseWrapper roofs mouseMove canShow = do
         point = performEvent $ sampleOn roofs (f <$> mouseMove)
     
         mkRoof a = newRoofPlate a.position a.normal
-        roof = mkRoof <$> performEvent (showMarker adder <$> gate canShow point)
+        adderEvt = performEvent (showMarker adder <$> gate canShow point)
+        adderTapped a = const a <$> a.marker.tapped
+        roof = mkRoof <$> keepLatest (adderTapped <$> adderEvt)
     pure {
         marker: marker.mesh,
         addedNewRoof: multicast $ performEvent roof
