@@ -56,6 +56,18 @@ rotateY = fpi ["r", "o", ""] "o.rotateY(r)"
 rotateZ :: forall a. Number -> Object3D a -> Effect Unit
 rotateZ = fpi ["r", "o", ""] "o.rotateZ(r)"
 
+rotateOnWorldAxis :: forall a. Vector3 -> Number -> Object3D a -> Effect Unit
+rotateOnWorldAxis = fpi ["v", "d", "o", ""] "o.rotateOnWorldAxis(v, d)"
+
+translateX :: forall a. Number -> Object3D a -> Effect Unit
+translateX = fpi ["x", "o", ""] "o.translateX(x)"
+
+translateY :: forall a. Number -> Object3D a -> Effect Unit
+translateY = fpi ["y", "o", ""] "o.translateY(y)"
+
+translateZ :: forall a. Number -> Object3D a -> Effect Unit
+translateZ = fpi ["z", "o", ""] "o.translateZ(z)"
+
 setRenderOrder :: forall a. Int -> Object3D a -> Effect Unit
 setRenderOrder = fpi ["r", "o", ""] "o.renderOrder = r"
 

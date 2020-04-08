@@ -53,6 +53,20 @@ exports.vSub = v1 => {
     }
 }
 
+exports.vMultiplyScalar = v => {
+    return s => {
+        const r = v.clone()
+        r.multiplyScalar(s)
+        return r
+    }
+}
+
+exports.vNormal = v => {
+    const r = v.clone()
+    r.normalize()
+    return r
+}
+
 exports.applyMatrix = m => {
     return v => {
         const nv = v.clone()

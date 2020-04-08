@@ -1,6 +1,6 @@
 module Editor.RoofManager where
 
-import Prelude
+import Prelude hiding (add)
 
 import Algorithm.MeshFlatten (flattenRoofPlates)
 import Control.Alt ((<|>))

@@ -1,8 +1,8 @@
 module Three.Math.Vector (
   Vector2, Vector3, mkVec2, mkVec3, class HasX, vecX,
   class HasY, vecY, class HasZ, vecZ,
-  class Vector, dot, (<.>), (<+>), (<->), length, dist, cross, add, addScaled, sub,
-  applyMatrix
+  class Vector, dot, (<.>), (<+>), (<->), length, dist, cross, add, addScaled, sub, normal,
+  multiplyScalar, applyMatrix
   ) where
 
 import Prelude
@@ -77,6 +77,8 @@ foreign import vCross :: forall a. a -> a -> a
 foreign import vAdd :: forall a. a -> a -> a
 foreign import vAddScaled :: forall a. a -> a -> Number -> a
 foreign import vSub :: forall a. a -> a -> a
+foreign import vMultiplyScalar :: forall a. a -> Number -> a
+foreign import vNormal :: forall a. a -> a
 
 class Vector a where
   dot :: a -> a -> Number
@@ -86,6 +88,8 @@ class Vector a where
   add :: a -> a -> a
   addScaled :: a -> a -> Number -> a
   sub :: a -> a -> a
+  multiplyScalar :: a -> Number -> a
+  normal :: a -> a
 
 infixr 5 dot as <.>
 infixr 6 add as <+>
@@ -100,6 +104,8 @@ instance vecVec2 :: Vector Vector2 where
   add = vAdd
   addScaled = vAddScaled
   sub = vSub
+  multiplyScalar = vMultiplyScalar
+  normal = vNormal
 
 instance vecVec3 :: Vector Vector3 where
   dot = vDot
@@ -109,5 +115,7 @@ instance vecVec3 :: Vector Vector3 where
   add = vAdd
   addScaled = vAddScaled
   sub = vSub
+  multiplyScalar = vMultiplyScalar
+  normal = vNormal
 
 foreign import applyMatrix :: Matrix4 -> Vector3 -> Vector3
