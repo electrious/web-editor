@@ -131,7 +131,7 @@ createRoofNode roof isActive = do
     -- set default vertices
     setDefVerts ps
 
-    when (testSimplePolygon ps) (void $ setTimeout 1000 (toDel unit))
+    when (not $ testSimplePolygon ps) (void $ setTimeout 1000 (toDel unit))
 
     pure {
         roofId: roof.id,

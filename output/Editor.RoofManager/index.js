@@ -48,7 +48,7 @@ var updateRoofDict = function (v) {
                 roofsToRender: Data_Maybe.Nothing.value
             };
         };
-        throw new Error("Failed pattern match at Editor.RoofManager (line 47, column 1 - line 47, column 64): " + [ v.constructor.name, rd.constructor.name ]);
+        throw new Error("Failed pattern match at Editor.RoofManager (line 46, column 1 - line 46, column 64): " + [ v.constructor.name, rd.constructor.name ]);
     };
 };
 var roofDict = (function () {

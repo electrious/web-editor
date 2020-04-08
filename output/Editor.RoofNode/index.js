@@ -134,7 +134,7 @@ var createRoofNode = function (roof) {
             var v2 = FRP_Event.create();
             var delRoofEvt = Control_Alt.alt(FRP_Event.altEvent)(v2.event)(Data_Functor.map(FRP_Event.functorEvent)(Data_Function["const"](Data_Unit.unit))(editor.deleteRoof));
             v.push(ps)();
-            Control_Applicative.when(Effect.applicativeEffect)(testSimplePolygon(ps))(Data_Functor["void"](Effect.functorEffect)(Effect_Timer.setTimeout(1000)(v2.push(Data_Unit.unit))))();
+            Control_Applicative.when(Effect.applicativeEffect)(!testSimplePolygon(ps))(Data_Functor["void"](Effect.functorEffect)(Effect_Timer.setTimeout(1000)(v2.push(Data_Unit.unit))))();
             return {
                 roofId: roof.id,
                 roofDelete: Data_Functor.map(FRP_Event.functorEvent)(Data_Function["const"](new Models_RoofPlate.RoofOpDelete(roof.id)))(delRoofEvt),
