@@ -8,6 +8,7 @@ import Data.Foldable (sequence_)
 import Data.Foreign.EasyFFI (unsafeForeignFunction, unsafeForeignProcedure)
 import Data.Maybe (Maybe(..))
 import Effect (Effect)
+import Effect.Console (logShow)
 import Effect.Now (now)
 import Effect.Ref as Ref
 import Effect.Timer (clearTimeout, setTimeout)
@@ -68,3 +69,7 @@ multicast evt = unsafePerformEffect $ do
     pure $ makeEvent \k -> do
         disposeN <- subscribe newEvt k
         pure $ sequence_ [dispose, disposeN]
+
+debug :: forall a. Show a => Event a -> Event a
+debug evt = performEvent $ f <$> evt
+    where f v = logShow v *> pure v

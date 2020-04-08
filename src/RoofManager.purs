@@ -17,12 +17,13 @@ import Editor.House (HouseMeshData)
 import Editor.RoofNode (RoofNode, createRoofNode)
 import Editor.RoofRecognizer (createRoofRecognizer)
 import Effect (Effect)
+import Effect.Class.Console (logShow)
 import FRP.Behavior (step)
 import FRP.Event (Event, create, fold, keepLatest, subscribe, withLast)
 import FRP.Event.Time (debounce)
 import Models.RoofPlate (RoofEdited, RoofOperation(..), RoofPlate, toRoofEdited)
 import Three.Core.Object3D (Object3D, add, mkObject3D, remove, setName)
-import Util (multicast, performEvent, skip)
+import Util (multicast, performEvent, skip, debug)
 
 type RoofManager a = {
     roofWrapper :: Object3D a,
@@ -93,8 +94,8 @@ createRoofManager meshData defRoofs = do
             traverse_ (\o -> add o.roofObject wrapper) now
             pure now
         -- create roofnode for each roof
-        nodes = multicast $ performEvent $ (traverse mkNode <$> rsToRenderArr)
-        renderedNodes = performEvent $ renderNodes <$> withLast nodes
+        nodes = performEvent $ (traverse mkNode <$> rsToRenderArr)
+        renderedNodes = multicast $ performEvent $ renderNodes <$> withLast nodes
 
         deleteRoofOp = multicast $ keepLatest $ getRoofDelete <$> renderedNodes
         updateRoofOp = keepLatest $ getRoofUpdate <$> renderedNodes
@@ -124,6 +125,8 @@ createRoofManager meshData defRoofs = do
         roofData = fold updateRoofDict ops defRoofData
     d3 <- subscribe roofData updateRoofsData
 
+    updateRoofsData defRoofData
+    
     updateActive Nothing
 
     let getRoofEdited = map toRoofEdited <<< toUnfoldable <<< values

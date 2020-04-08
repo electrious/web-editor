@@ -48,7 +48,7 @@ var updateRoofDict = function (v) {
                 roofsToRender: Data_Maybe.Nothing.value
             };
         };
-        throw new Error("Failed pattern match at Editor.RoofManager (line 46, column 1 - line 46, column 64): " + [ v.constructor.name, rd.constructor.name ]);
+        throw new Error("Failed pattern match at Editor.RoofManager (line 47, column 1 - line 47, column 64): " + [ v.constructor.name, rd.constructor.name ]);
     };
 };
 var roofDict = (function () {
@@ -116,8 +116,8 @@ var createRoofManager = function (meshData) {
             var mkNode = function (roof) {
                 return Editor_RoofNode.createRoofNode(roof)(Util.multicast(Data_Functor.map(FRP_Event.functorEvent)(Data_Eq.eq(Data_Maybe.eqMaybe(Data_Eq.eqString))(new Data_Maybe.Just(roof.id)))(v.event)));
             };
-            var nodes = Util.multicast(Util.performEvent(Data_Functor.map(FRP_Event.functorEvent)(Data_Traversable.traverse(Data_Traversable.traversableArray)(Effect.applicativeEffect)(mkNode))(rsToRenderArr)));
-            var renderedNodes = Util.performEvent(Data_Functor.map(FRP_Event.functorEvent)(renderNodes)(FRP_Event_Class.withLast(FRP_Event.eventIsEvent)(nodes)));
+            var nodes = Util.performEvent(Data_Functor.map(FRP_Event.functorEvent)(Data_Traversable.traverse(Data_Traversable.traversableArray)(Effect.applicativeEffect)(mkNode))(rsToRenderArr));
+            var renderedNodes = Util.multicast(Util.performEvent(Data_Functor.map(FRP_Event.functorEvent)(renderNodes)(FRP_Event_Class.withLast(FRP_Event.eventIsEvent)(nodes))));
             var updateRoofOp = FRP_Event_Class.keepLatest(FRP_Event.eventIsEvent)(Data_Functor.map(FRP_Event.functorEvent)(getRoofUpdate)(renderedNodes));
             var flattened = Util.performEvent(Data_Functor.map(FRP_Event.functorEvent)(doFlatten(meshData))(newRoofs));
             var deleteRoofOp = Util.multicast(FRP_Event_Class.keepLatest(FRP_Event.eventIsEvent)(Data_Functor.map(FRP_Event.functorEvent)(getRoofDelete)(renderedNodes)));
@@ -139,6 +139,7 @@ var createRoofManager = function (meshData) {
             };
             var roofData = FRP_Event_Class.fold(FRP_Event.eventIsEvent)(updateRoofDict)(ops)(defRoofData);
             var d3 = FRP_Event.subscribe(roofData)(v1.push)();
+            v1.push(defRoofData)();
             v.push(Data_Maybe.Nothing.value)();
             var getRoofEdited = (function () {
                 var $29 = Data_Functor.map(Data_Functor.functorArray)(Models_RoofPlate.toRoofEdited);
