@@ -1,6 +1,6 @@
 module Editor.RoofEditor where
 
-import Prelude
+import Prelude hiding (add)
 
 import Control.Alt ((<|>))
 import Control.Apply (lift2)
@@ -8,7 +8,7 @@ import Control.Plus (empty)
 import Custom.Mesh (TappableMesh, mkTappableMesh)
 import Data.Array (deleteAt, filter, foldl, head, insertAt, length, mapWithIndex, range, snoc, tail, take, takeEnd, zip, zipWith)
 import Data.Compactable (compact)
-import Data.Int (Parity(..), toNumber)
+import Data.Int (toNumber)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Traversable (sequence, sequence_, sum, traverse, traverse_)
 import Data.Tuple (Tuple(..), fst, snd)
@@ -215,7 +215,7 @@ createRoofEditor parent active ps = do
         greenActive = lift2 (\ra am -> ra && am == Nothing) roofActive activeMarker
         -- create green markers for adding new vertices
         toAddEvt = mkGreenMarkers parent greenActive newVertices
-        addVert ps p = insertAt p.vertIndex p.position ps
+        addVert pns p = insertAt p.vertIndex p.position pns
         vertsAfterAdd = compact (sampleOn toAddEvt (addVert <$> newVertices))
 
         -- get delete event of tapping on a marker

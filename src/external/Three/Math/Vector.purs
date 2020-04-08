@@ -5,7 +5,7 @@ module Three.Math.Vector (
   multiplyScalar, applyMatrix
   ) where
 
-import Prelude
+import Prelude hiding (add, sub)
 
 import Three.Math.Matrix (Matrix4)
 import Util (ffi)

@@ -1,18 +1,17 @@
 module Util where
 
-import Data.Foreign.EasyFFI
 import Prelude
 
 import Data.DateTime.Instant (Instant)
 import Data.Filterable (filter)
-import Data.Maybe (Maybe(..), fromJust, isJust)
+import Data.Foreign.EasyFFI (unsafeForeignFunction, unsafeForeignProcedure)
+import Data.Maybe (Maybe(..))
 import Effect (Effect)
 import Effect.Now (now)
 import Effect.Ref as Ref
 import Effect.Timer (clearTimeout, setTimeout)
 import FRP.Behavior (gate, step)
 import FRP.Event (Event, count, makeEvent, subscribe, withLast)
-import Partial.Unsafe (unsafePartial)
 
 ffi :: forall a. Array String -> String -> a
 ffi = unsafeForeignFunction

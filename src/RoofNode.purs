@@ -1,6 +1,6 @@
 module Editor.RoofNode where
 
-import Prelude
+import Prelude hiding (add)
 
 import Control.Alt ((<|>))
 import Control.Apply (lift2)
