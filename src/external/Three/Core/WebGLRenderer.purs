@@ -10,8 +10,7 @@ import Web.DOM (Element)
 
 foreign import data WebGLRenderer :: Type
 
-mkWebGLRenderer :: Effect WebGLRenderer
-mkWebGLRenderer = ffi [""] "new THREE.WebGLRenderer()"
+foreign import mkWebGLRenderer :: Effect WebGLRenderer
 
 setSize :: Int -> Int -> WebGLRenderer -> Effect Unit
 setSize = fpi ["w", "h", "r", ""] "r.setSize(w, h)"

@@ -12,8 +12,7 @@ import Util (fpi, ffi)
 foreign import data Raycaster :: Type
 foreign import data Intersection :: Type
 
-mkRaycaster :: Effect Raycaster
-mkRaycaster = ffi [""] "new THREE.Raycaster()"
+foreign import mkRaycaster :: Effect Raycaster
 
 -- | Updates the ray with a new origin and direction.
 setFromCamera :: forall a. Raycaster -> Vector2 -> Camera a -> Effect Unit

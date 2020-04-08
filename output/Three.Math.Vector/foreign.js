@@ -1,13 +1,15 @@
+const three = require('three')
+
 exports.mkVec2 = x => {
     return y => {
-        return new THREE.Vector2(x, y)
+        return new three.Vector2(x, y)
     }
 }
 
 exports.mkVec3 = x => {
     return y => {
         return z => {
-            return new THREE.Vector3(x, y, z)
+            return new three.Vector3(x, y, z)
         }
     }
 }

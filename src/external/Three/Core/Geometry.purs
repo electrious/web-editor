@@ -19,30 +19,23 @@ clone = ffi ["geo", ""] "geo.clone()"
 foreign import data JSCircleGeometry :: Type -> Type
 type CircleGeometry a = Geometry (JSCircleGeometry a)
 
-mkCircleGeometry :: forall a. Number -> Int -> Effect (CircleGeometry a)
-mkCircleGeometry = ffi ["radius", "segs", ""] "new THREE.CircleGeometry(radius, segs)"
-
+foreign import mkCircleGeometry :: forall a. Number -> Int -> Effect (CircleGeometry a)
 
 foreign import data JSShapeGeometry :: Type -> Type
 type ShapeGeometry a = Geometry (JSShapeGeometry a)
 
 foreign import data Shape :: Type
 
-mkShape :: Array Vector2 -> Effect Shape
-mkShape = ffi ["ps", ""] "new THREE.Shape(ps)"
+foreign import mkShape :: Array Vector2 -> Effect Shape
 
-mkShapeGeometry :: forall a. Shape -> Effect (ShapeGeometry a)
-mkShapeGeometry = ffi ["shp", ""] "new THREE.ShapeGeometry(shp)"
+foreign import mkShapeGeometry :: forall a. Shape -> Effect (ShapeGeometry a)
 
-isBufferGeometry :: forall a. Geometry a -> Boolean
-isBufferGeometry = ffi ["geo"] "geo instanceof THREE.BufferGeometry"
+foreign import isBufferGeometry :: forall a. Geometry a -> Boolean
 
 getAttribute :: forall a. String -> BufferGeometry a -> BufferAttribute
 getAttribute = ffi ["name", "geo"] "geo.getAttribute(name)"
 
-
-isBufferAttribute :: BufferAttribute -> Boolean
-isBufferAttribute = ffi ["attr"] "attr instanceof THREE.BufferAttribute"
+foreign import isBufferAttribute :: BufferAttribute -> Boolean
 
 setXYZ :: Int -> Number -> Number -> Number -> BufferAttribute -> Effect Unit
 setXYZ = fpi ["idx", "x", "y", "z", "attr", ""] "attr.setXYZ(idx, x, y, z)"

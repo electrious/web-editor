@@ -13,9 +13,7 @@ foreign import data JSMeshBasicMaterial :: Type -> Type
 
 type MeshBasicMaterial a = Material (JSMeshBasicMaterial a)
 
-mkMeshBasicMaterial :: forall a. Int -> Effect (MeshBasicMaterial a)
-mkMeshBasicMaterial = ffi ["c", ""] "new THREE.MeshBasicMaterial({ color: c })"
-
+foreign import mkMeshBasicMaterial :: forall a. Int -> Effect (MeshBasicMaterial a)
 
 setTransparent :: forall a. Boolean -> Material a -> Effect Unit
 setTransparent = fpi ["t", "mat", ""] "mat.transparent = t"

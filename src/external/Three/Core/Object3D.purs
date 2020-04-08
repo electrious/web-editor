@@ -10,8 +10,7 @@ import Util (ffi, fpi)
 foreign import data JSObject3D :: Type -> Type
 type Object3D = JSObject3D
 
-mkObject3D :: forall a. Effect (Object3D a)
-mkObject3D = ffi [""] "new THREE.Object3D()"
+foreign import mkObject3D :: forall a. Effect (Object3D a)
 
 -- | Whether the object gets rendered into shadow map, default False
 castShadow :: forall a. Object3D a -> Boolean

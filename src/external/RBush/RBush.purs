@@ -14,8 +14,7 @@ type BBox a = {
 
 foreign import data RBush :: Type -> Type
 
-mkRBush :: forall a. Effect (RBush a)
-mkRBush = ffi [""] "new RBush.RBush()"
+foreign import mkRBush :: forall a. Effect (RBush a)
 
 load :: forall a. Array (BBox a) -> RBush (BBox a) -> Effect Unit
 load = fpi ["items", "tree", ""] "tree.load(items)"

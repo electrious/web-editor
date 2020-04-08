@@ -45,7 +45,7 @@ var mkHouseMesh = function (geo) {
 };
 var meshPath = function (serverUrl) {
     return function (leadId) {
-        return serverUrl + ("/leads/" + (Data_Show.show(Data_Show.showInt)(leadId) + "/mesh"));
+        return serverUrl + ("/leads/" + (Data_Show.show(Data_Show.showInt)(leadId) + "/mesh/"));
     };
 };
 var getGeometryInfo = function (mesh) {

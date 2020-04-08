@@ -5,16 +5,13 @@ import Prelude
 import Effect (Effect)
 import Three.Core.Material (MaterialCreator)
 import Three.Core.Object3D (Object3D)
-import Util (ffi, fpi)
+import Util (fpi)
   
 foreign import data MTLLoader :: Type 
 foreign import data OBJLoader2 :: Type
 
-makeMTLLoader :: Effect MTLLoader
-makeMTLLoader = ffi [""] "new THREE.MTLLoader()"
-
-makeOBJLoader2 :: Effect OBJLoader2
-makeOBJLoader2 = ffi [""] "new THREE.OBJLoader2()"
+foreign import makeMTLLoader :: Effect MTLLoader
+foreign import makeOBJLoader2 :: Effect OBJLoader2
 
 setPath :: String -> MTLLoader -> Effect Unit
 setPath = fpi ["path", "loader", ""] "loader.setPath(path)"

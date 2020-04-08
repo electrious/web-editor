@@ -12,11 +12,9 @@ foreign import data JSMesh :: Type -> Type
 
 type Mesh a = Object3D (JSMesh a)
 
-mkMesh :: forall a geo mat. Geometry geo -> Material mat -> Effect (Mesh a)
-mkMesh = ffi ["geo", "mat", ""] "new THREE.Mesh(geo, mat)"
+foreign import mkMesh :: forall a geo mat. Geometry geo -> Material mat -> Effect (Mesh a)
 
-isMesh :: forall a. Mesh a -> Boolean
-isMesh = ffi ["m"] "m instanceof THREE.Mesh"
+foreign import isMesh :: forall a. Mesh a -> Boolean
 
 geometry :: forall a geo. Mesh a -> Geometry geo
 geometry = ffi ["mesh"] "mesh.geometry"

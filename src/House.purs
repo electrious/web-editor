@@ -21,7 +21,7 @@ import Three.Math.Vector (Vector3, mkVec3)
 
 
 meshPath :: String -> Int -> String
-meshPath serverUrl leadId = serverUrl <> "/leads/" <> show leadId <> "/mesh"
+meshPath serverUrl leadId = serverUrl <> "/leads/" <> show leadId <> "/mesh/"
 
 type HouseMesh = {
     mesh      :: Mesh Unit,
