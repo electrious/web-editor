@@ -129,6 +129,7 @@ processDrag evt st | evt.dragType == DragStart = { canDrag: true, isDragging: fa
                    | evt.dragType == DragEnd && st.isDragging = let oEvt = fromMaybe evt st.lastDragEvt
                                                                     nEvt = calcDelta evt oEvt
                                                                 in st { canDrag = false, isDragging = false, lastDragEvt = Just nEvt, curDragEvt = Just nEvt }
+                   | evt.dragType == DragEnd && not st.isDragging && st.canDrag = st { canDrag = false, curDragEvt = Nothing, lastDragEvt = Just evt }
                    | otherwise = st { curDragEvt = Nothing, lastDragEvt = Just evt }
 
 -- | drag gesture recognizer for both mouse and touch events
