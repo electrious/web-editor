@@ -11,7 +11,7 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Time.Duration (Milliseconds(..))
 import FRP.Event (Event, fold, gate, makeEvent)
 import Math (sqrt)
-import Util (delay, ffi, multicast, debounce)
+import Util (debounce, debug, delay, ffi, multicast)
 import Web.DOM (Element)
 import Web.DOM.Element (toEventTarget)
 import Web.Event.Event (EventType, preventDefault)
@@ -126,9 +126,9 @@ processDrag evt st | evt.dragType == DragStart = { canDrag: true, isDragging: fa
                    | evt.dragType == Drag && st.isDragging = let oEvt = fromMaybe evt st.lastDragEvt
                                                                  nEvt = calcDelta evt oEvt
                                                              in st { lastDragEvt = Just nEvt, curDragEvt = Just nEvt }
-                   | evt.dragType == DragEnd = let oEvt = fromMaybe evt st.lastDragEvt
-                                                   nEvt = calcDelta evt oEvt
-                                               in st { canDrag = false, isDragging = false, lastDragEvt = Just nEvt, curDragEvt = Just nEvt }
+                   | evt.dragType == DragEnd && st.isDragging = let oEvt = fromMaybe evt st.lastDragEvt
+                                                                    nEvt = calcDelta evt oEvt
+                                                                in st { canDrag = false, isDragging = false, lastDragEvt = Just nEvt, curDragEvt = Just nEvt }
                    | otherwise = st { curDragEvt = Nothing, lastDragEvt = Just evt }
 
 -- | drag gesture recognizer for both mouse and touch events
