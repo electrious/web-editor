@@ -14,7 +14,7 @@ import Three.Core.Face3 (normal)
 import Three.Core.Geometry (Geometry, mkCircleGeometry)
 import Three.Core.Material (Material, mkMeshBasicMaterial)
 import Three.Core.Mesh (Mesh)
-import Three.Core.Object3D (Object3D, hasParent, localToWorld, lookAt, parent, setName, setPosition, setVisible)
+import Three.Core.Object3D (Object3D, hasParent, localToWorld, lookAt, parent, setName, setPosition, setVisible, worldToLocal)
 import Three.Math.Vector (Vector3, addScaled, mkVec3, (<+>))
 import Unsafe.Coerce (unsafeCoerce)
 import Util (multicast, performEvent)
@@ -71,11 +71,7 @@ showMarker adder (Just p) | not (hasParent adder.marker.mesh) = setVisible false
                               let target = p.position <+> p.faceNormal
                               targetW <- localToWorld target (parent adder.marker.mesh)
                               lookAt targetW adder.marker.mesh
-                              pure {
-                                  marker: adder.marker,
-                                  position: np,
-                                  normal: p.faceNormal
-                              }
+                              pure $ adder { position = np, normal = p.faceNormal }
 
 
 -- | create a roof recognizer
@@ -94,10 +90,9 @@ createRoofRecognizer houseWrapper roofs mouseMove canShow = do
     let f evt rs = do
             isRoof <- couldBeRoof houseWrapper rs evt
             if isRoof
-            then pure $ Just {
-                position: evt.point,
-                faceNormal: normal (evt.face)
-                }
+            then do
+                np <- worldToLocal evt.point houseWrapper
+                pure $ Just { position: np, faceNormal: normal evt.face }
             else pure Nothing
 
         point = performEvent $ sampleOn roofs (f <$> mouseMove)

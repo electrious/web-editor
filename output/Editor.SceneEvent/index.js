@@ -15,7 +15,6 @@ var Data_Unit = require("../Data.Unit/index.js");
 var Editor_Input = require("../Editor.Input/index.js");
 var Effect = require("../Effect/index.js");
 var FRP_Event = require("../FRP.Event/index.js");
-var FRP_Event_Class = require("../FRP.Event.Class/index.js");
 var Three_Core_Raycaster = require("../Three.Core.Raycaster/index.js");
 var Three_Math_Vector = require("../Three.Math.Vector/index.js");
 var Util = require("../Util/index.js");
@@ -135,16 +134,16 @@ var setupRaycasting = function (camera) {
                             return Three_Core_Raycaster.intersectObject(raycaster)(scene)(true)();
                         };
                     };
-                    var raycastDrag = function (e) {
-                        return function (sz) {
+                    var raycastDrag = function (sz) {
+                        return function (e) {
                             return function __do() {
                                 var res = doRaycast(dragPosition(sz)(e))();
                                 return processDragObjects(e)(res)();
                             };
                         };
                     };
-                    var raycastMouse = function (e) {
-                        return function (sz) {
+                    var raycastMouse = function (sz) {
+                        return function (e) {
                             var domPos = Three_Math_Vector.mkVec2(e.mouseX)(e.mouseY);
                             return function __do() {
                                 var res = doRaycast(mousePosition(sz)(e))();
@@ -152,8 +151,8 @@ var setupRaycasting = function (camera) {
                             };
                         };
                     };
-                    var raycastTap = function (e) {
-                        return function (sz) {
+                    var raycastTap = function (sz) {
+                        return function (e) {
                             var domPos = Three_Math_Vector.mkVec2(e.tapX)(e.tapY);
                             return function __do() {
                                 var res = doRaycast(tapPosition(sz)(e))();
@@ -161,12 +160,12 @@ var setupRaycasting = function (camera) {
                             };
                         };
                     };
-                    var unraycastedDrag = Util.performEvent(FRP_Event_Class.sampleOn(FRP_Event.eventIsEvent)(size)(Data_Functor.map(FRP_Event.functorEvent)(raycastDrag)(input.dragged)));
+                    var unraycastedDrag = Util.performEvent(Control_Apply.lift2(FRP_Event.applyEvent)(raycastDrag)(size)(input.dragged));
                     var f = function (v) {
                         return Control_Applicative.pure(Effect.applicativeEffect)(Data_Unit.unit);
                     };
-                    var e2 = Util.performEvent(FRP_Event_Class.sampleOn(FRP_Event.eventIsEvent)(size)(Data_Functor.map(FRP_Event.functorEvent)(raycastMouse)(input.mouseMove)));
-                    var e1 = Util.performEvent(FRP_Event_Class.sampleOn(FRP_Event.eventIsEvent)(size)(Data_Functor.map(FRP_Event.functorEvent)(raycastTap)(input.tapped)));
+                    var e2 = Util.performEvent(Control_Apply.lift2(FRP_Event.applyEvent)(raycastMouse)(size)(input.mouseMove));
+                    var e1 = Util.performEvent(Control_Apply.lift2(FRP_Event.applyEvent)(raycastTap)(size)(input.tapped));
                     var d1 = FRP_Event.subscribe(e1)(f)();
                     var d2 = FRP_Event.subscribe(e2)(f)();
                     return {

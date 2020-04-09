@@ -262,12 +262,12 @@ var createRoofEditor = function (parent) {
                 var toAddEvt = mkGreenMarkers(parent)(greenActive)(newVertices);
                 var delEvts = FRP_Event_Class.keepLatest(FRP_Event.eventIsEvent)(Data_Functor.map(FRP_Event.functorEvent)(getDelEvt)(markers));
                 var vertsAfterDel = Control_Apply.lift2(FRP_Event.applyEvent)(delMarker)(newVertices)(delEvts);
-                var addVert = function (pns) {
-                    return function (p) {
+                var addVert = function (p) {
+                    return function (pns) {
                         return Data_Array.insertAt(p.vertIndex)(p.position)(pns);
                     };
                 };
-                var vertsAfterAdd = Data_Compactable.compact(FRP_Event.compactableEvent)(FRP_Event_Class.sampleOn(FRP_Event.eventIsEvent)(toAddEvt)(Data_Functor.map(FRP_Event.functorEvent)(addVert)(newVertices)));
+                var vertsAfterAdd = Data_Compactable.compact(FRP_Event.compactableEvent)(Control_Apply.lift2(FRP_Event.applyEvent)(addVert)(toAddEvt)(newVertices));
                 var d3 = FRP_Event.subscribe(Control_Alt.alt(FRP_Event.altEvent)(vertsAfterAdd)(vertsAfterDel))(function (vs) {
                     return function __do() {
                         v1.push(vs)();

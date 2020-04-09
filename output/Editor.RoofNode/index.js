@@ -80,7 +80,9 @@ var createRoofMesh = function (ps) {
         return function __do() {
             var shp = Three_Core_Geometry.mkShape(ps)();
             var geo = Three_Core_Geometry.mkShapeGeometry(shp)();
-            return Custom_Mesh.mkTappableMesh(geo)(getMaterial(active))();
+            var m = Custom_Mesh.mkTappableMesh(geo)(getMaterial(active))();
+            Three_Core_Object3D.setName("roof-mesh")(m.mesh)();
+            return m;
         };
     };
 };
@@ -124,14 +126,14 @@ var createRoofNode = function (roof) {
             var toParent = function (v1) {
                 return Three_Math_Vector.applyMatrix(Three_Core_Object3D.matrix(obj))(Three_Math_Vector.mkVec3(Three_Math_Vector.vecX(Three_Math_Vector.hasXVec2)(v1))(Three_Math_Vector.vecY(Three_Math_Vector.hasYVec2)(v1))(0.0));
             };
-            var tapped = FRP_Event_Class.keepLatest(FRP_Event.eventIsEvent)(Data_Functor.map(FRP_Event.functorEvent)(function (m) {
-                return m.tapped;
+            var tapped = FRP_Event_Class.keepLatest(FRP_Event.eventIsEvent)(Data_Functor.map(FRP_Event.functorEvent)(function (v1) {
+                return v1.tapped;
             })(meshEvt));
             var newRoofs = Data_Functor.map(FRP_Event.functorEvent)((function () {
-                var $19 = Data_Function.flip(updateRoofPlate)(roof);
-                var $20 = Data_Functor.map(Data_Functor.functorArray)(toParent);
-                return function ($21) {
-                    return Models_RoofPlate.RoofOpUpdate.create($19($20($21)));
+                var $20 = Data_Function.flip(updateRoofPlate)(roof);
+                var $21 = Data_Functor.map(Data_Functor.functorArray)(toParent);
+                return function ($22) {
+                    return Models_RoofPlate.RoofOpUpdate.create($20($21($22)));
                 };
             })())(editor.roofVertices);
             var v1 = FRP_Event.create();

@@ -23,7 +23,7 @@ import Three.Core.Mesh (setMaterial)
 import Three.Core.Object3D (Object3D, add, matrix, mkObject3D, remove, rotateX, rotateZ, setName, setPosition, updateMatrix, updateMatrixWorld, worldToLocal)
 import Three.Math.Vector (Vector2, Vector3, applyMatrix, mkVec2, mkVec3, vecX, vecY, vecZ)
 import Unsafe.Coerce (unsafeCoerce)
-import Util (multicast, performEvent)
+import Util (debug, multicast, performEvent)
 
 type RoofNode a = {
     roofId     :: String,
@@ -59,7 +59,9 @@ createRoofMesh :: forall a. Array Vector2 -> Boolean -> Effect (TappableMesh a)
 createRoofMesh ps active = do
     shp <- mkShape ps
     geo <- mkShapeGeometry shp
-    mkTappableMesh geo (getMaterial active)
+    m <- mkTappableMesh geo (getMaterial active)
+    setName "roof-mesh" m.mesh
+    pure m
 
 updateRoofPlate :: Array Vector3 -> RoofPlate -> RoofPlate
 updateRoofPlate [] roof = roof
@@ -119,7 +121,7 @@ createRoofNode roof isActive = do
     let e = performEvent $ lift2 (\m a -> setMaterial (getMaterial a) m.mesh) meshEvt isActive
     d2 <- subscribe e (\_ -> pure init)
 
-    let tapped = keepLatest $ (\m -> m.tapped) <$> meshEvt
+    let tapped = keepLatest $ _.tapped <$> meshEvt
 
         toParent v = applyMatrix (matrix obj) (mkVec3 (vecX v) (vecY v) 0.0)
         

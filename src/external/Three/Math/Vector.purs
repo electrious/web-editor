@@ -2,10 +2,10 @@ module Three.Math.Vector (
   Vector2, Vector3, mkVec2, mkVec3, class HasX, vecX,
   class HasY, vecY, class HasZ, vecZ,
   class Vector, dot, (<.>), (<+>), (<->), length, dist, cross, add, addScaled, sub, normal,
-  multiplyScalar, applyMatrix
+  multiplyScalar, clone, applyMatrix
   ) where
 
-import Prelude hiding (add, sub)
+import Prelude hiding (add,sub)
 
 import Three.Math.Matrix (Matrix4)
 import Util (ffi)
@@ -16,6 +16,7 @@ foreign import data Vector3 :: Type
 foreign import mkVec2 :: Number -> Number -> Vector2
 foreign import mkVec3 :: Number -> Number -> Number -> Vector3
 
+foreign import vClone :: forall a. a -> a
 foreign import vEq :: forall a. a -> a -> Boolean
 
 instance eqVec2 :: Eq Vector2 where
@@ -90,6 +91,7 @@ class Vector a where
   sub :: a -> a -> a
   multiplyScalar :: a -> Number -> a
   normal :: a -> a
+  clone :: a -> a
 
 infixr 5 dot as <.>
 infixr 6 add as <+>
@@ -106,6 +108,7 @@ instance vecVec2 :: Vector Vector2 where
   sub = vSub
   multiplyScalar = vMultiplyScalar
   normal = vNormal
+  clone = vClone
 
 instance vecVec3 :: Vector Vector3 where
   dot = vDot
@@ -117,5 +120,6 @@ instance vecVec3 :: Vector Vector3 where
   sub = vSub
   multiplyScalar = vMultiplyScalar
   normal = vNormal
+  clone = vClone
 
 foreign import applyMatrix :: Matrix4 -> Vector3 -> Vector3

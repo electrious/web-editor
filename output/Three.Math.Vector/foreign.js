@@ -14,6 +14,10 @@ exports.mkVec3 = x => {
     }
 }
 
+exports.vClone = v => {
+    return v.clone()
+}
+
 exports.vEq = v1 => {
     return v2 => {
         return v1.equals(v2)

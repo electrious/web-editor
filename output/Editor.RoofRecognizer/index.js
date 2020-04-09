@@ -37,9 +37,9 @@ var showMarker = function (adder) {
                     var targetW = Three_Core_Object3D.localToWorld(target)(Three_Core_Object3D.parent(adder.marker.mesh))();
                     Three_Core_Object3D.lookAt(targetW)(adder.marker.mesh)();
                     return {
-                        marker: adder.marker,
                         position: np,
-                        normal: v.value0.faceNormal
+                        normal: v.value0.faceNormal,
+                        marker: adder.marker
                     };
                 };
             };
@@ -73,8 +73,9 @@ var createRoofRecognizer = function (houseWrapper) {
                             return function __do() {
                                 var isRoof = Algorithm_RoofCheck.couldBeRoof(houseWrapper)(rs)(evt)();
                                 if (isRoof) {
+                                    var np = Three_Core_Object3D.worldToLocal(evt.point)(houseWrapper)();
                                     return new Data_Maybe.Just({
-                                        position: evt.point,
+                                        position: np,
                                         faceNormal: Three_Core_Face3.normal(evt.face)
                                     });
                                 };

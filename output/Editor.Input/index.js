@@ -3,6 +3,7 @@
 var $foreign = require("./foreign.js");
 var Control_Alt = require("../Control.Alt/index.js");
 var Control_Apply = require("../Control.Apply/index.js");
+var Data_Boolean = require("../Data.Boolean/index.js");
 var Data_Compactable = require("../Data.Compactable/index.js");
 var Data_Eq = require("../Data.Eq/index.js");
 var Data_Filterable = require("../Data.Filterable/index.js");
@@ -190,8 +191,8 @@ var isEnd = function (e) {
 };
 var mkDragEndable = function (evt) {
     var f = function (d) {
-        var $14 = Data_Eq.notEq(eqDragType)(d.dragType)(DragEnd.value);
-        if ($14) {
+        var $21 = Data_Eq.notEq(eqDragType)(d.dragType)(DragEnd.value);
+        if ($21) {
             return new Data_Maybe.Just({
                 dragType: DragEnd.value,
                 dragX: d.dragX,
@@ -212,82 +213,117 @@ var distance = function (e1) {
         return $$Math.sqrt(dx * dx + dy * dy);
     };
 };
+var defState = {
+    canDrag: false,
+    isDragging: false,
+    lastDragEvt: Data_Maybe.Nothing.value,
+    curDragEvt: Data_Maybe.Nothing.value
+};
+var calcDelta = function (evt) {
+    return function (oEvt) {
+        return {
+            dragType: evt.dragType,
+            dragX: evt.dragX,
+            dragY: evt.dragY,
+            deltaX: evt.dragX - oEvt.dragX,
+            deltaY: evt.dragY - oEvt.dragY
+        };
+    };
+};
+var processDrag = function (evt) {
+    return function (st) {
+        if (Data_Eq.eq(eqDragType)(evt.dragType)(DragStart.value)) {
+            return {
+                canDrag: true,
+                isDragging: false,
+                lastDragEvt: new Data_Maybe.Just(evt),
+                curDragEvt: Data_Maybe.Nothing.value
+            };
+        };
+        if (Data_Eq.eq(eqDragType)(evt.dragType)(Drag.value) && (!st.isDragging && st.canDrag)) {
+            var $24 = distance(evt)(Data_Maybe.fromMaybe(evt)(st.lastDragEvt)) > 1.0;
+            if ($24) {
+                var nEvt = {
+                    dragType: DragStart.value,
+                    deltaX: evt.deltaX,
+                    deltaY: evt.deltaY,
+                    dragX: evt.dragX,
+                    dragY: evt.dragY
+                };
+                return {
+                    canDrag: st.canDrag,
+                    isDragging: true,
+                    lastDragEvt: new Data_Maybe.Just(nEvt),
+                    curDragEvt: new Data_Maybe.Just(nEvt)
+                };
+            };
+            return {
+                canDrag: st.canDrag,
+                isDragging: st.isDragging,
+                lastDragEvt: new Data_Maybe.Just(evt),
+                curDragEvt: st.curDragEvt
+            };
+        };
+        if (Data_Eq.eq(eqDragType)(evt.dragType)(Drag.value) && st.isDragging) {
+            var oEvt = Data_Maybe.fromMaybe(evt)(st.lastDragEvt);
+            var nEvt = calcDelta(evt)(oEvt);
+            return {
+                canDrag: st.canDrag,
+                isDragging: st.isDragging,
+                lastDragEvt: new Data_Maybe.Just(nEvt),
+                curDragEvt: new Data_Maybe.Just(nEvt)
+            };
+        };
+        if (Data_Eq.eq(eqDragType)(evt.dragType)(DragEnd.value) && st.isDragging) {
+            var oEvt = Data_Maybe.fromMaybe(evt)(st.lastDragEvt);
+            var nEvt = calcDelta(evt)(oEvt);
+            return {
+                canDrag: false,
+                isDragging: false,
+                lastDragEvt: new Data_Maybe.Just(nEvt),
+                curDragEvt: new Data_Maybe.Just(nEvt)
+            };
+        };
+        if (Data_Eq.eq(eqDragType)(evt.dragType)(DragEnd.value) && (!st.isDragging && st.canDrag)) {
+            return {
+                canDrag: false,
+                isDragging: st.isDragging,
+                lastDragEvt: new Data_Maybe.Just(evt),
+                curDragEvt: Data_Maybe.Nothing.value
+            };
+        };
+        if (Data_Boolean.otherwise) {
+            return {
+                canDrag: st.canDrag,
+                isDragging: st.isDragging,
+                lastDragEvt: new Data_Maybe.Just(evt),
+                curDragEvt: Data_Maybe.Nothing.value
+            };
+        };
+        throw new Error("Failed pattern match at Editor.Input (line 120, column 1 - line 120, column 51): " + [ evt.constructor.name, st.constructor.name ]);
+    };
+};
 var dragged = function (start) {
     return function (move) {
         return function (end) {
-            return FRP_Event_Class.fix(FRP_Event.eventIsEvent)(function (possibleEnd) {
-                var startDrag = Data_Functor.map(FRP_Event.functorEvent)(Data_Function["const"](true))(start);
-                var posEnd = Data_Functor.map(FRP_Event.functorEvent)(Data_Function["const"](false))(possibleEnd);
-                var mkDrag = function (t) {
-                    return function (e) {
-                        return {
-                            dragType: t,
-                            dragX: e.tapX,
-                            dragY: e.tapY,
-                            deltaX: 0.0,
-                            deltaY: 0.0
-                        };
+            var mkDrag = function (t) {
+                return function (e) {
+                    return {
+                        dragType: t,
+                        dragX: e.tapX,
+                        dragY: e.tapY,
+                        deltaX: 0.0,
+                        deltaY: 0.0
                     };
                 };
-                var startPos = Util.multicast(Data_Functor.map(FRP_Event.functorEvent)((function () {
-                    var $24 = mkDrag(DragStart.value);
-                    return function ($25) {
-                        return Data_Maybe.Just.create($24($25));
-                    };
-                })())(start));
-                var endDrag = Data_Functor.map(FRP_Event.functorEvent)(Data_Function["const"](false))(end);
-                var touching = Control_Alt.alt(FRP_Event.altEvent)(Control_Alt.alt(FRP_Event.altEvent)(startDrag)(endDrag))(posEnd);
-                var realMove = Data_Functor.map(FRP_Event.functorEvent)(mkDrag(Drag.value))(FRP_Event_Class.gate(FRP_Event.eventIsEvent)(touching)(move));
-                var checkDist = function (v) {
-                    return function (p) {
-                        if (v instanceof Data_Maybe.Just) {
-                            var $17 = distance(v.value0)(p) >= 1.0;
-                            if ($17) {
-                                return new Data_Maybe.Just(p);
-                            };
-                            return Data_Maybe.Nothing.value;
-                        };
-                        if (v instanceof Data_Maybe.Nothing) {
-                            return Data_Maybe.Nothing.value;
-                        };
-                        throw new Error("Failed pattern match at Editor.Input (line 121, column 11 - line 121, column 81): " + [ v.constructor.name, p.constructor.name ]);
-                    };
-                };
-                var dragMove = Util.multicast(Data_Compactable.compact(FRP_Event.compactableEvent)(FRP_Event_Class.sampleOn(FRP_Event.eventIsEvent)(startPos)(Data_Functor.map(FRP_Event.functorEvent)(Data_Function.flip(checkDist))(realMove))));
-                var dragging = Util.multicast(Control_Alt.alt(FRP_Event.altEvent)(Control_Alt.alt(FRP_Event.altEvent)(Data_Functor.map(FRP_Event.functorEvent)(Data_Function["const"](false))(start))(Data_Functor.map(FRP_Event.functorEvent)(Data_Function["const"](true))(dragMove)))(Data_Functor.map(FRP_Event.functorEvent)(Data_Function["const"](false))(end)));
-                var notDragging = Data_Functor.map(FRP_Event.functorEvent)(Data_HeytingAlgebra.not(Data_HeytingAlgebra.heytingAlgebraBoolean))(dragging);
-                var dragStart = Data_Compactable.compact(FRP_Event.compactableEvent)(FRP_Event_Class.sampleOn_(FRP_Event.eventIsEvent)(startPos)(FRP_Event_Class.gate(FRP_Event.eventIsEvent)(notDragging)(dragMove)));
-                var lastPos = Data_Functor.map(FRP_Event.functorEvent)(Data_Maybe.Just.create)(dragMove);
-                var lastDrag = Data_Compactable.compact(FRP_Event.compactableEvent)(FRP_Event_Class.sampleOn_(FRP_Event.eventIsEvent)(lastPos)(FRP_Event_Class.gate(FRP_Event.eventIsEvent)(dragging)(end)));
-                var dragEnd = Data_Functor.map(FRP_Event.functorEvent)(updateDragType(DragEnd.value))(lastDrag);
-                var evts = Control_Alt.alt(FRP_Event.altEvent)(Control_Alt.alt(FRP_Event.altEvent)(dragStart)(dragMove))(dragEnd);
-                var calcDelta = function (v) {
-                    if (v.last instanceof Data_Maybe.Just) {
-                        return {
-                            dragType: v.now.dragType,
-                            dragX: v.now.dragX,
-                            dragY: v.now.dragY,
-                            deltaX: v.now.dragX - v.last.value0.dragX,
-                            deltaY: v.now.dragY - v.last.value0.dragY
-                        };
-                    };
-                    if (v.last instanceof Data_Maybe.Nothing) {
-                        return {
-                            dragType: v.now.dragType,
-                            dragX: v.now.dragX,
-                            dragY: v.now.dragY,
-                            deltaX: 0.0,
-                            deltaY: 0.0
-                        };
-                    };
-                    throw new Error("Failed pattern match at Editor.Input (line 142, column 37 - line 154, column 50): " + [ v.last.constructor.name ]);
-                };
-                var resEvt = Util.multicast(mkDragEndable(Data_Functor.map(FRP_Event.functorEvent)(calcDelta)(FRP_Event_Class.withLast(FRP_Event.eventIsEvent)(evts))));
-                return {
-                    input: Data_Filterable.filter(FRP_Event.filterableEvent)(isEnd)(resEvt),
-                    output: resEvt
-                };
-            });
+            };
+            var dragStart = Data_Functor.map(FRP_Event.functorEvent)(mkDrag(DragStart.value))(start);
+            var dragMove = Data_Functor.map(FRP_Event.functorEvent)(mkDrag(Drag.value))(move);
+            var dragEnd = Data_Functor.map(FRP_Event.functorEvent)(mkDrag(DragEnd.value))(end);
+            var evts = mkDragEndable(Control_Alt.alt(FRP_Event.altEvent)(Control_Alt.alt(FRP_Event.altEvent)(dragStart)(dragMove))(dragEnd));
+            return Data_Compactable.compact(FRP_Event.compactableEvent)(Data_Functor.map(FRP_Event.functorEvent)(function (v) {
+                return v.curDragEvt;
+            })(FRP_Event_Class.fold(FRP_Event.eventIsEvent)(processDrag)(evts)(defState)));
         };
     };
 };
@@ -301,18 +337,18 @@ var setupInput = function (elem) {
     var mouseEnd = Data_Functor.map(FRP_Event.functorEvent)(mouseTap)(mu);
     var mm = Util.multicast(mouseEvent(Web_UIEvent_MouseEvent_EventTypes.mousemove)(target));
     var mouseMove = Data_Functor.map(FRP_Event.functorEvent)(mouseTap)(Data_Filterable.filter(FRP_Event.filterableEvent)((function () {
-        var $26 = Data_HeytingAlgebra.not(Data_HeytingAlgebra.heytingAlgebraBoolean);
-        return function ($27) {
-            return $26(Web_UIEvent_MouseEvent.shiftKey($27));
+        var $25 = Data_HeytingAlgebra.not(Data_HeytingAlgebra.heytingAlgebraBoolean);
+        return function ($26) {
+            return $25(Web_UIEvent_MouseEvent.shiftKey($26));
         };
     })())(mm));
     var move = Util.multicast(Control_Alt.alt(FRP_Event.altEvent)(mouseMove)(touchMove));
     var shiftMove = Data_Functor.map(FRP_Event.functorEvent)(mouseTap)(Data_Filterable.filter(FRP_Event.filterableEvent)(Web_UIEvent_MouseEvent.shiftKey)(mm));
     var md = Util.multicast(mouseEvent(Web_UIEvent_MouseEvent_EventTypes.mousedown)(target));
     var mouseStart = Data_Functor.map(FRP_Event.functorEvent)(mouseTap)(Data_Filterable.filter(FRP_Event.filterableEvent)((function () {
-        var $28 = Data_HeytingAlgebra.not(Data_HeytingAlgebra.heytingAlgebraBoolean);
-        return function ($29) {
-            return $28(Web_UIEvent_MouseEvent.shiftKey($29));
+        var $27 = Data_HeytingAlgebra.not(Data_HeytingAlgebra.heytingAlgebraBoolean);
+        return function ($28) {
+            return $27(Web_UIEvent_MouseEvent.shiftKey($28));
         };
     })())(md));
     var start = Util.multicast(Control_Alt.alt(FRP_Event.altEvent)(mouseStart)(touchStart));
@@ -338,6 +374,9 @@ module.exports = {
     updateDragType: updateDragType,
     distance: distance,
     mkDragEndable: mkDragEndable,
+    defState: defState,
+    calcDelta: calcDelta,
+    processDrag: processDrag,
     dragged: dragged,
     mouseEvent: mouseEvent,
     touchEvent: touchEvent,

@@ -19,8 +19,8 @@ import Editor.RoofRecognizer (createRoofRecognizer)
 import Effect (Effect)
 import FRP.Event (Event, create, fold, keepLatest, subscribe, withLast)
 import Models.RoofPlate (RoofEdited, RoofOperation(..), RoofPlate, toRoofEdited)
-import Three.Core.Object3D (Object3D, add, mkObject3D, remove, setName)
-import Util (debounce, multicast, performEvent, skip)
+import Three.Core.Object3D (Object3D, add, localToWorld, mkObject3D, remove, setName, worldToLocal)
+import Util (debounce, delay, multicast, performEvent, skip)
 
 type RoofManager a = {
     roofWrapper :: Object3D a,
@@ -112,15 +112,17 @@ createRoofManager meshData defRoofs = do
 
     add recognizer.marker wrapper
 
-    let addRoofOp = multicast $ RoofOpCreate <$> recognizer.addedNewRoof
+    let addedNewRoof = recognizer.addedNewRoof
+        addRoofOp = RoofOpCreate <$> addedNewRoof
         ops = addRoofOp <|> deleteRoofOp <|> updateRoofOp
 
     d2 <- subscribe (Just <$> (keepLatest $ getActivated <$> renderedNodes)) updateActive
-    
+    d3 <- subscribe (delay 10 $ const Nothing <$> (addRoofOp <|> deleteRoofOp)) updateActive
+
     -- manage all roofs and update it with user operations.
     let defRoofData = { roofs: defRoofDict, roofsToRender: Just defRoofDict }
         roofData = fold updateRoofDict ops defRoofData
-    d3 <- subscribe roofData updateRoofsData
+    d4 <- subscribe roofData updateRoofsData
 
     updateRoofsData defRoofData
 
@@ -132,5 +134,5 @@ createRoofManager meshData defRoofs = do
     pure {
         roofWrapper: wrapper,
         editedRoofs: multicast $ debounce (Milliseconds 1000.0) $ getRoofEdited <$> skip 1 newRoofs,
-        disposable: sequence_ [d1, d2]
+        disposable: sequence_ [d1, d2, d3, d4]
     }

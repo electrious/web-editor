@@ -15,7 +15,7 @@ import Data.Tuple (Tuple(..), fst, snd)
 import Editor.SceneEvent (SceneTapEvent)
 import Effect (Effect)
 import Effect.Unsafe (unsafePerformEffect)
-import FRP.Event (Event, create, keepLatest, sampleOn, subscribe)
+import FRP.Event (Event, create, keepLatest, subscribe)
 import Three.Core.Geometry (Geometry, mkCircleGeometry)
 import Three.Core.Material (Material, mkMeshBasicMaterial)
 import Three.Core.Object3D (Object3D, add, remove, setPosition, setVisible)
@@ -215,8 +215,8 @@ createRoofEditor parent active ps = do
         greenActive = multicast $ lift2 (\ra am -> ra && am == Nothing) roofActive activeMarker
         -- create green markers for adding new vertices
         toAddEvt = mkGreenMarkers parent greenActive newVertices
-        addVert pns p = insertAt p.vertIndex p.position pns
-        vertsAfterAdd = compact (sampleOn toAddEvt (addVert <$> newVertices))
+        addVert p pns = insertAt p.vertIndex p.position pns
+        vertsAfterAdd = compact (lift2 addVert toAddEvt newVertices)
 
         -- get delete event of tapping on a marker
         delEvts = keepLatest (getDelEvt <$> markers)

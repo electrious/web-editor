@@ -4,9 +4,10 @@ var $foreign = require("./foreign.js");
 var Data_Eq = require("../Data.Eq/index.js");
 var Data_Show = require("../Data.Show/index.js");
 var Util = require("../Util/index.js");
-var Vector = function (add, addScaled, cross, dist, dot, length, multiplyScalar, normal, sub) {
+var Vector = function (add, addScaled, clone, cross, dist, dot, length, multiplyScalar, normal, sub) {
     this.add = add;
     this.addScaled = addScaled;
+    this.clone = clone;
     this.cross = cross;
     this.dist = dist;
     this.dot = dot;
@@ -36,8 +37,8 @@ var vecX = function (dict) {
 var vLength = Util.ffi([ "v" ])("v.length()");
 var vDot = Util.ffi([ "v1", "v2" ])("v1.dot(v2)");
 var vDist = Util.ffi([ "v1", "v2" ])("v1.distanceTo(v2)");
-var vecVec2 = new Vector($foreign.vAdd, $foreign.vAddScaled, $foreign.vCross, vDist, vDot, vLength, $foreign.vMultiplyScalar, $foreign.vNormal, $foreign.vSub);
-var vecVec3 = new Vector($foreign.vAdd, $foreign.vAddScaled, $foreign.vCross, vDist, vDot, vLength, $foreign.vMultiplyScalar, $foreign.vNormal, $foreign.vSub);
+var vecVec2 = new Vector($foreign.vAdd, $foreign.vAddScaled, $foreign.vClone, $foreign.vCross, vDist, vDot, vLength, $foreign.vMultiplyScalar, $foreign.vNormal, $foreign.vSub);
+var vecVec3 = new Vector($foreign.vAdd, $foreign.vAddScaled, $foreign.vClone, $foreign.vCross, vDist, vDot, vLength, $foreign.vMultiplyScalar, $foreign.vNormal, $foreign.vSub);
 var sub = function (dict) {
     return dict.sub;
 };
@@ -71,6 +72,9 @@ var dist = function (dict) {
 var cross = function (dict) {
     return dict.cross;
 };
+var clone = function (dict) {
+    return dict.clone;
+};
 var addScaled = function (dict) {
     return dict.addScaled;
 };
@@ -94,6 +98,7 @@ module.exports = {
     sub: sub,
     normal: normal,
     multiplyScalar: multiplyScalar,
+    clone: clone,
     eqVec2: eqVec2,
     eqVec3: eqVec3,
     hasXVec2: hasXVec2,
