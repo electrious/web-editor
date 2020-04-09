@@ -3,6 +3,7 @@ module Editor.SceneEvent where
 import Prelude
 
 import Control.Alt ((<|>))
+import Control.Apply (lift2)
 import Data.Array (filter, head)
 import Data.Compactable (compact)
 import Data.Int (toNumber)
@@ -11,7 +12,7 @@ import Data.Time.Duration (Milliseconds(..))
 import Data.Traversable (sequence_, traverse)
 import Editor.Input (DragEvent, DragType(..), InputEvents, MouseMoveEvent, TapEvent)
 import Effect (Effect)
-import FRP.Event (Event, sampleOn, subscribe)
+import FRP.Event (Event, subscribe)
 import Three.Core.Camera (Camera)
 import Three.Core.Face3 (Face3)
 import Three.Core.Object3D (Object3D)
@@ -170,23 +171,23 @@ setupRaycasting camera scene input size = do
             setFromCamera raycaster tp camera
             intersectObject raycaster scene true
         
-        raycastTap e sz = do
+        raycastTap sz e = do
             let domPos = mkVec2 e.tapX e.tapY
             res <- doRaycast (tapPosition sz e)
             processTapObjects domPos res
 
-        raycastMouse e sz = do
+        raycastMouse sz e = do
             let domPos = mkVec2 e.mouseX e.mouseY
             res <- doRaycast (mousePosition sz e)
             processMouseOverObjects domPos res
         
-        raycastDrag e sz = do
+        raycastDrag sz e = do
             res <- doRaycast (dragPosition sz e)
             processDragObjects e res
     
-    let e1 = performEvent $ sampleOn size (raycastTap <$> input.tapped)
-        e2 = performEvent $ sampleOn size (raycastMouse <$> input.mouseMove)
-        unraycastedDrag = performEvent $ sampleOn size (raycastDrag <$> input.dragged)
+    let e1 = performEvent $ lift2 raycastTap size input.tapped
+        e2 = performEvent $ lift2 raycastMouse size input.mouseMove
+        unraycastedDrag = performEvent $ lift2 raycastDrag size input.dragged
 
         f _ = pure unit
     

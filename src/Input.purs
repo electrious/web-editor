@@ -7,11 +7,11 @@ import Data.Filterable (compact, filter)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Int (toNumber)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Time.Duration (Milliseconds(..))
-import FRP.Event (Event, fix, gate, makeEvent, sampleOn, sampleOn_, withLast)
+import FRP.Event (Event, fold, gate, makeEvent)
 import Math (sqrt)
-import Util (debug, delay, ffi, multicast, skip, debounce)
+import Util (delay, ffi, multicast, debounce)
 import Web.DOM (Element)
 import Web.DOM.Element (toEventTarget)
 import Web.Event.Event (EventType, preventDefault)
@@ -104,56 +104,42 @@ mkDragEndable evt = evt <|> compact (f <$> e)
                 }
                 else Nothing
 
+type DragState = {
+    canDrag     :: Boolean,
+    isDragging  :: Boolean,
+    lastDragEvt :: Maybe DragEvent,
+    curDragEvt  :: Maybe DragEvent
+}
+
+defState :: DragState
+defState = { canDrag: false, isDragging: false, lastDragEvt: Nothing, curDragEvt: Nothing }
+
+calcDelta :: DragEvent -> DragEvent -> DragEvent
+calcDelta evt oEvt = evt { deltaX = evt.dragX - oEvt.dragX, deltaY = evt.dragY - oEvt.dragY }
+
+processDrag :: DragEvent -> DragState -> DragState
+processDrag evt st | evt.dragType == DragStart = { canDrag: true, isDragging: false, lastDragEvt: Just evt, curDragEvt: Nothing }
+                   | evt.dragType == Drag && not st.isDragging && st.canDrag = if distance evt (fromMaybe evt st.lastDragEvt) > 1.0
+                                                                               then let nEvt = evt { dragType = DragStart }
+                                                                                    in st { isDragging = true, lastDragEvt = Just nEvt, curDragEvt = Just nEvt }
+                                                                               else st { lastDragEvt = Just evt }
+                   | evt.dragType == Drag && st.isDragging = let oEvt = fromMaybe evt st.lastDragEvt
+                                                                 nEvt = calcDelta evt oEvt
+                                                             in st { lastDragEvt = Just nEvt, curDragEvt = Just nEvt }
+                   | evt.dragType == DragEnd = let oEvt = fromMaybe evt st.lastDragEvt
+                                                   nEvt = calcDelta evt oEvt
+                                               in st { canDrag = false, isDragging = false, lastDragEvt = Just nEvt, curDragEvt = Just nEvt }
+                   | otherwise = st { curDragEvt = Nothing, lastDragEvt = Just evt }
+
 -- | drag gesture recognizer for both mouse and touch events
 dragged :: Event TapEvent -> Event TapEvent -> Event TapEvent -> Event DragEvent
-dragged start move end = fix \possibleEnd ->
-      let startDrag = const true <$> start
-          endDrag   = const false <$> end
+dragged start move end = multicast $ compact $ _.curDragEvt <$> fold processDrag evts defState
+      where mkDrag t e = { dragType: t, dragX: e.tapX, dragY: e.tapY, deltaX: 0.0, deltaY: 0.0 }
 
-          posEnd = const false <$> possibleEnd
-          -- we're only interested in move events between start and end
-          touching = startDrag <|> endDrag <|> posEnd
-          -- only move events in between touching is real move
-          realMove = mkDrag Drag <$> gate touching move
-          mkDrag t e = { dragType: t, dragX: e.tapX, dragY: e.tapY, deltaX: 0.0, deltaY: 0.0 }
-
-          -- make sure user did move the mouse/touch
-          checkDist (Just s) p = if distance s p >= 1.0 then Just p else Nothing
-          checkDist Nothing p  = Nothing
-
-          startPos = multicast $ (Just <<< mkDrag DragStart) <$> start
-          dragMove = multicast $ compact (sampleOn startPos (flip checkDist <$> realMove))
-
-          -- when user is actually dragging
-          dragging = multicast $ (const false <$> start) <|>
-                                 (const true <$> dragMove) <|>
-                                 (const false <$> end)
-          notDragging = not <$> dragging
-          -- the drag start should be the first drag event attached with start position
-          dragStart = compact (sampleOn_ startPos (gate notDragging dragMove))
-
-          -- calculate the new drag end event
-          lastPos = Just <$> dragMove
-          lastDrag = compact (sampleOn_ lastPos (gate dragging end))
-          dragEnd = updateDragType DragEnd <$> lastDrag
-
-          evts = dragStart <|> dragMove <|> dragEnd
-
-          calcDelta { last, now } = case last of
-                                    Just l -> { dragType: now.dragType,
-                                                dragX: now.dragX,
-                                                dragY: now.dragY,
-                                                deltaX: now.dragX - l.dragX,
-                                                deltaY: now.dragY - l.dragY
-                                               }
-                                    Nothing -> { dragType: now.dragType,
-                                                 dragX: now.dragX,
-                                                 dragY: now.dragY,
-                                                 deltaX: 0.0,
-                                                 deltaY: 0.0
-                                                }
-          resEvt = multicast $ mkDragEndable $ calcDelta <$> withLast evts
-        in { input: filter isEnd resEvt, output: resEvt }
+            dragStart = mkDrag DragStart <$> start
+            dragMove  = mkDrag Drag <$> move
+            dragEnd   = mkDrag DragEnd <$> end
+            evts = mkDragEndable $ dragStart <|> dragMove <|> dragEnd
 
 
 type InputEvents = {
