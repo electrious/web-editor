@@ -6,7 +6,9 @@ import Data.DateTime.Instant (Instant)
 import Data.Filterable (filter)
 import Data.Foldable (sequence_)
 import Data.Foreign.EasyFFI (unsafeForeignFunction, unsafeForeignProcedure)
-import Data.Maybe (Maybe(..))
+import Data.Int (fromNumber)
+import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Time.Duration (Milliseconds(..))
 import Effect (Effect)
 import Effect.Console (logShow)
 import Effect.Now (now)
@@ -36,6 +38,24 @@ delay n evt = makeEvent \k -> do
     subscribe evt \v -> do
         setTimeout n (k v)
 
+debounce :: forall a. Milliseconds -> Event a -> Event a
+debounce (Milliseconds period) evt = unsafePerformEffect do
+    { event: newEvt, push: p } <- create
+    timer <- Ref.new Nothing
+    let timerFunc v = do
+            _ <- Ref.modify (const Nothing) timer
+            p v
+    
+    dispose <- subscribe evt \e -> do
+        tf <- Ref.read timer
+        case tf of
+            Just t -> clearTimeout t
+            Nothing -> pure unit
+        newT <- setTimeout (fromMaybe 0 $ fromNumber period) (timerFunc e)
+        Ref.write (Just newT) timer
+
+    pure newEvt
+
 -- | skip first n occurrences of the event
 skip :: forall a. Int -> Event a -> Event a
 skip n evt = gate skipped evt
@@ -49,7 +69,7 @@ distinct evt = getNow <$> filter isDiff (withLast evt)
 
 -- | Perform events with actions inside.
 performEvent :: forall a. Event (Effect a) -> Event a
-performEvent evt = makeEvent \k -> subscribe evt \act -> act >>= k
+performEvent evt = multicast $ makeEvent \k -> subscribe evt \act -> act >>= k
 
 -- | fold events with Effect actions 
 foldEffect :: forall a b. (a -> b -> Effect b) -> Event a -> b -> Event b
@@ -65,9 +85,7 @@ multicast :: forall a. Event a -> Event a
 multicast evt = unsafePerformEffect $ do
     { event: newEvt, push: p } <- create
     dispose <- subscribe evt p
-    pure $ makeEvent \k -> do
-        disposeN <- subscribe newEvt k
-        pure $ sequence_ [dispose, disposeN]
+    pure newEvt
 
 debug :: forall a. Show a => Event a -> Event a
 debug evt = performEvent $ f <$> evt

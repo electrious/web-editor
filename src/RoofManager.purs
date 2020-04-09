@@ -18,10 +18,9 @@ import Editor.RoofNode (RoofNode, createRoofNode)
 import Editor.RoofRecognizer (createRoofRecognizer)
 import Effect (Effect)
 import FRP.Event (Event, create, fold, keepLatest, subscribe, withLast)
-import FRP.Event.Time (debounce)
 import Models.RoofPlate (RoofEdited, RoofOperation(..), RoofPlate, toRoofEdited)
 import Three.Core.Object3D (Object3D, add, mkObject3D, remove, setName)
-import Util (debug, multicast, performEvent, skip)
+import Util (debounce, debug, multicast, performEvent, skip)
 
 type RoofManager a = {
     roofWrapper :: Object3D a,

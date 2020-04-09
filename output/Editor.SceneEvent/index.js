@@ -16,7 +16,6 @@ var Editor_Input = require("../Editor.Input/index.js");
 var Effect = require("../Effect/index.js");
 var FRP_Event = require("../FRP.Event/index.js");
 var FRP_Event_Class = require("../FRP.Event.Class/index.js");
-var FRP_Event_Time = require("../FRP.Event.Time/index.js");
 var Three_Core_Raycaster = require("../Three.Core.Raycaster/index.js");
 var Three_Math_Vector = require("../Three.Math.Vector/index.js");
 var Util = require("../Util/index.js");
@@ -38,7 +37,7 @@ var mkDragEndable = function (evt) {
         };
         return Data_Maybe.Nothing.value;
     };
-    var e = FRP_Event_Time.debounce(2000.0)(evt);
+    var e = Util.debounce(2000.0)(evt);
     return Control_Alt.alt(FRP_Event.altEvent)(evt)(Data_Compactable.compact(FRP_Event.compactableEvent)(Data_Functor.map(FRP_Event.functorEvent)(f)(e)));
 };
 var makeTappable = Util.fpi([ "obj", "cb", "" ])("obj.tapped = cb");

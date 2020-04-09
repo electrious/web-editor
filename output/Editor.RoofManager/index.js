@@ -20,7 +20,6 @@ var Editor_RoofRecognizer = require("../Editor.RoofRecognizer/index.js");
 var Effect = require("../Effect/index.js");
 var FRP_Event = require("../FRP.Event/index.js");
 var FRP_Event_Class = require("../FRP.Event.Class/index.js");
-var FRP_Event_Time = require("../FRP.Event.Time/index.js");
 var Models_RoofPlate = require("../Models.RoofPlate/index.js");
 var Three_Core_Object3D = require("../Three.Core.Object3D/index.js");
 var Util = require("../Util/index.js");
@@ -47,7 +46,7 @@ var updateRoofDict = function (v) {
                 roofsToRender: Data_Maybe.Nothing.value
             };
         };
-        throw new Error("Failed pattern match at Editor.RoofManager (line 45, column 1 - line 45, column 64): " + [ v.constructor.name, rd.constructor.name ]);
+        throw new Error("Failed pattern match at Editor.RoofManager (line 44, column 1 - line 44, column 64): " + [ v.constructor.name, rd.constructor.name ]);
     };
 };
 var roofDict = (function () {
@@ -149,7 +148,7 @@ var createRoofManager = function (meshData) {
             })();
             return {
                 roofWrapper: wrapper,
-                editedRoofs: Util.multicast(FRP_Event_Time.debounce(1000.0)(Data_Functor.map(FRP_Event.functorEvent)(getRoofEdited)(Util.skip(1)(newRoofs)))),
+                editedRoofs: Util.multicast(Util.debounce(1000.0)(Data_Functor.map(FRP_Event.functorEvent)(getRoofEdited)(Util.skip(1)(newRoofs)))),
                 disposable: Data_Foldable.sequence_(Effect.applicativeEffect)(Data_Foldable.foldableArray)([ d1, d2 ])
             };
         };

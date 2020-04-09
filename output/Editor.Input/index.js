@@ -18,7 +18,6 @@ var Data_Symbol = require("../Data.Symbol/index.js");
 var Effect = require("../Effect/index.js");
 var FRP_Event = require("../FRP.Event/index.js");
 var FRP_Event_Class = require("../FRP.Event.Class/index.js");
-var FRP_Event_Time = require("../FRP.Event.Time/index.js");
 var $$Math = require("../Math/index.js");
 var Util = require("../Util/index.js");
 var Web_DOM_Element = require("../Web.DOM.Element/index.js");
@@ -152,7 +151,7 @@ var genericDragType = new Data_Generic_Rep.Generic(function (x) {
     if (x instanceof DragEnd) {
         return new Data_Generic_Rep.Inr(new Data_Generic_Rep.Inr(Data_Generic_Rep.NoArguments.value));
     };
-    throw new Error("Failed pattern match at Editor.Input (line 62, column 1 - line 62, column 54): " + [ x.constructor.name ]);
+    throw new Error("Failed pattern match at Editor.Input (line 61, column 1 - line 61, column 54): " + [ x.constructor.name ]);
 }, function (x) {
     if (x instanceof Data_Generic_Rep.Inl) {
         return DragStart.value;
@@ -163,7 +162,7 @@ var genericDragType = new Data_Generic_Rep.Generic(function (x) {
     if (x instanceof Data_Generic_Rep.Inr && x.value0 instanceof Data_Generic_Rep.Inr) {
         return DragEnd.value;
     };
-    throw new Error("Failed pattern match at Editor.Input (line 62, column 1 - line 62, column 54): " + [ x.constructor.name ]);
+    throw new Error("Failed pattern match at Editor.Input (line 61, column 1 - line 61, column 54): " + [ x.constructor.name ]);
 });
 var showDragType = new Data_Show.Show(Data_Generic_Rep_Show.genericShow(genericDragType)(Data_Generic_Rep_Show.genericShowSum(Data_Generic_Rep_Show.genericShowConstructor(Data_Generic_Rep_Show.genericShowArgsNoArguments)(new Data_Symbol.IsSymbol(function () {
     return "DragStart";
@@ -203,7 +202,7 @@ var mkDragEndable = function (evt) {
         };
         return Data_Maybe.Nothing.value;
     };
-    var e = FRP_Event_Time.debounce(1500.0)(evt);
+    var e = Util.debounce(1500.0)(evt);
     return Control_Alt.alt(FRP_Event.altEvent)(evt)(Data_Compactable.compact(FRP_Event.compactableEvent)(Data_Functor.map(FRP_Event.functorEvent)(f)(e)));
 };
 var distance = function (e1) {
@@ -239,13 +238,6 @@ var dragged = function (start) {
                 var endDrag = Data_Functor.map(FRP_Event.functorEvent)(Data_Function["const"](false))(end);
                 var touching = Control_Alt.alt(FRP_Event.altEvent)(Control_Alt.alt(FRP_Event.altEvent)(startDrag)(endDrag))(posEnd);
                 var realMove = Data_Functor.map(FRP_Event.functorEvent)(mkDrag(Drag.value))(FRP_Event_Class.gate(FRP_Event.eventIsEvent)(touching)(move));
-                var def = {
-                    dragType: DragStart.value,
-                    dragX: 0.0,
-                    dragY: 0.0,
-                    deltaX: 0.0,
-                    deltaY: 0.0
-                };
                 var checkDist = function (v) {
                     return function (p) {
                         if (v instanceof Data_Maybe.Just) {
@@ -258,7 +250,7 @@ var dragged = function (start) {
                         if (v instanceof Data_Maybe.Nothing) {
                             return Data_Maybe.Nothing.value;
                         };
-                        throw new Error("Failed pattern match at Editor.Input (line 122, column 11 - line 122, column 81): " + [ v.constructor.name, p.constructor.name ]);
+                        throw new Error("Failed pattern match at Editor.Input (line 121, column 11 - line 121, column 81): " + [ v.constructor.name, p.constructor.name ]);
                     };
                 };
                 var dragMove = Util.multicast(Data_Compactable.compact(FRP_Event.compactableEvent)(FRP_Event_Class.sampleOn(FRP_Event.eventIsEvent)(startPos)(Data_Functor.map(FRP_Event.functorEvent)(Data_Function.flip(checkDist))(realMove))));
@@ -280,11 +272,17 @@ var dragged = function (start) {
                         };
                     };
                     if (v.last instanceof Data_Maybe.Nothing) {
-                        return v.now;
+                        return {
+                            dragType: v.now.dragType,
+                            dragX: v.now.dragX,
+                            dragY: v.now.dragY,
+                            deltaX: 0.0,
+                            deltaY: 0.0
+                        };
                     };
-                    throw new Error("Failed pattern match at Editor.Input (line 144, column 37 - line 151, column 51): " + [ v.last.constructor.name ]);
+                    throw new Error("Failed pattern match at Editor.Input (line 142, column 37 - line 154, column 50): " + [ v.last.constructor.name ]);
                 };
-                var resEvt = Util.multicast(mkDragEndable(Util.skip(1)(Data_Functor.map(FRP_Event.functorEvent)(calcDelta)(FRP_Event_Class.withLast(FRP_Event.eventIsEvent)(evts)))));
+                var resEvt = Util.multicast(mkDragEndable(Data_Functor.map(FRP_Event.functorEvent)(calcDelta)(FRP_Event_Class.withLast(FRP_Event.eventIsEvent)(evts))));
                 return {
                     input: Data_Filterable.filter(FRP_Event.filterableEvent)(isEnd)(resEvt),
                     output: resEvt

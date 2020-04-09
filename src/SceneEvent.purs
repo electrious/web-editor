@@ -12,13 +12,12 @@ import Data.Traversable (sequence_, traverse)
 import Editor.Input (DragEvent, DragType(..), InputEvents, MouseMoveEvent, TapEvent)
 import Effect (Effect)
 import FRP.Event (Event, sampleOn, subscribe)
-import FRP.Event.Time (debounce)
 import Three.Core.Camera (Camera)
 import Three.Core.Face3 (Face3)
 import Three.Core.Object3D (Object3D)
 import Three.Core.Raycaster (Intersection, distance, face, intersectObject, mkRaycaster, object, point, setFromCamera)
 import Three.Math.Vector (Vector2, Vector3, mkVec2, vecX, vecY)
-import Util (ffi, fpi, multicast, performEvent)
+import Util (debounce, ffi, fpi, multicast, performEvent)
 
 type Size = {
     width  :: Int,

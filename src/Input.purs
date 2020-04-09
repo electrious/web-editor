@@ -10,9 +10,8 @@ import Data.Int (toNumber)
 import Data.Maybe (Maybe(..))
 import Data.Time.Duration (Milliseconds(..))
 import FRP.Event (Event, fix, gate, makeEvent, sampleOn, sampleOn_, withLast)
-import FRP.Event.Time (debounce)
 import Math (sqrt)
-import Util (debug, delay, ffi, multicast, skip)
+import Util (debug, delay, ffi, multicast, skip, debounce)
 import Web.DOM (Element)
 import Web.DOM.Element (toEventTarget)
 import Web.Event.Event (EventType, preventDefault)
@@ -138,7 +137,6 @@ dragged start move end = fix \possibleEnd ->
           lastDrag = compact (sampleOn_ lastPos (gate dragging end))
           dragEnd = updateDragType DragEnd <$> lastDrag
 
-          def = {dragType: DragStart, dragX: 0.0, dragY: 0.0, deltaX: 0.0, deltaY: 0.0}
           evts = dragStart <|> dragMove <|> dragEnd
 
           calcDelta { last, now } = case last of
@@ -148,8 +146,13 @@ dragged start move end = fix \possibleEnd ->
                                                 deltaX: now.dragX - l.dragX,
                                                 deltaY: now.dragY - l.dragY
                                                }
-                                    Nothing -> now
-          resEvt = multicast $ mkDragEndable $ skip 1 $ calcDelta <$> withLast evts
+                                    Nothing -> { dragType: now.dragType,
+                                                 dragX: now.dragX,
+                                                 dragY: now.dragY,
+                                                 deltaX: 0.0,
+                                                 deltaY: 0.0
+                                                }
+          resEvt = multicast $ mkDragEndable $ calcDelta <$> withLast evts
         in { input: filter isEnd resEvt, output: resEvt }
 
 

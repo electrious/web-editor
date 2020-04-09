@@ -104,7 +104,7 @@ var createRoofNode = function (roof) {
             var v = FRP_Event.create();
             var editor = Editor_RoofEditor.createRoofEditor(obj)(isActive)(ps)();
             var vertices = Control_Alt.alt(FRP_Event.altEvent)(v.event)(editor.roofVertices);
-            var meshEvt = Util.multicast(Util.performEvent(Control_Apply.lift2(FRP_Event.applyEvent)(createRoofMesh)(vertices)(isActive)));
+            var meshEvt = Util.performEvent(Control_Apply.lift2(FRP_Event.applyEvent)(createRoofMesh)(vertices)(isActive));
             var d1 = FRP_Event.subscribe(FRP_Event_Class.withLast(FRP_Event.eventIsEvent)(meshEvt))(function (v1) {
                 return function __do() {
                     Data_Foldable.traverse_(Effect.applicativeEffect)(Data_Foldable.foldableMaybe)(function (o) {

@@ -108,7 +108,7 @@ createRoofNode roof isActive = do
     editor <- createRoofEditor obj isActive ps
 
     let vertices = defVerts <|> editor.roofVertices
-        meshEvt = multicast $ performEvent (lift2 createRoofMesh vertices isActive)
+        meshEvt = performEvent (lift2 createRoofMesh vertices isActive)
     
     -- add/remove mesh to the obj
     d1 <- subscribe (withLast meshEvt) \{last, now} -> do
