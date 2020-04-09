@@ -133,7 +133,7 @@ processDrag evt st | evt.dragType == DragStart = { canDrag: true, isDragging: fa
 
 -- | drag gesture recognizer for both mouse and touch events
 dragged :: Event TapEvent -> Event TapEvent -> Event TapEvent -> Event DragEvent
-dragged start move end = multicast $ compact $ _.curDragEvt <$> fold processDrag evts defState
+dragged start move end = compact $ _.curDragEvt <$> fold processDrag evts defState
       where mkDrag t e = { dragType: t, dragX: e.tapX, dragY: e.tapY, deltaX: 0.0, deltaY: 0.0 }
 
             dragStart = mkDrag DragStart <$> start
