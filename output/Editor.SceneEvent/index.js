@@ -26,8 +26,8 @@ var sendMouseMoveEvent = Util.fpi([ "obj", "evt", "" ])("obj.mouseMove(evt)()");
 var sendDragEvent = Util.fpi([ "obj", "evt", "" ])("obj.dragged(evt)()");
 var mkDragEndable = function (evt) {
     var f = function (d) {
-        var $1 = Data_Eq.notEq(Editor_Input.eqDragType)(d.type)(Editor_Input.DragEnd.value);
-        if ($1) {
+        var $2 = Data_Eq.notEq(Editor_Input.eqDragType)(d.type)(Editor_Input.DragEnd.value);
+        if ($2) {
             return new Data_Maybe.Just({
                 type: Editor_Input.DragEnd.value,
                 distance: d.distance,
@@ -45,8 +45,8 @@ var makeDraggable = Util.fpi([ "obj", "cb", "" ])("obj.dragged = cb");
 var isTappable = Util.ffi([ "obj" ])("obj.tapped !== undefined");
 var processTapObjects = function (domPos) {
     return function (objs) {
-        var target = Data_Array.head(Data_Array.filter(function ($2) {
-            return isTappable(Three_Core_Raycaster.object($2));
+        var target = Data_Array.head(Data_Array.filter(function ($5) {
+            return isTappable(Three_Core_Raycaster.object($5));
         })(objs));
         var doTap = function (o) {
             return sendTapEvent(Three_Core_Raycaster.object(o))({
@@ -61,8 +61,8 @@ var processTapObjects = function (domPos) {
 var isMouseMove = Util.ffi([ "obj" ])("obj.mouseMove !== undefined");
 var processMouseOverObjects = function (domPos) {
     return function (objs) {
-        var target = Data_Array.head(Data_Array.filter(function ($3) {
-            return isMouseMove(Three_Core_Raycaster.object($3));
+        var target = Data_Array.head(Data_Array.filter(function ($6) {
+            return isMouseMove(Three_Core_Raycaster.object($6));
         })(objs));
         var doMove = function (o) {
             return sendMouseMoveEvent(Three_Core_Raycaster.object(o))({
@@ -78,9 +78,18 @@ var processMouseOverObjects = function (domPos) {
 var isDraggable = Util.ffi([ "obj" ])("obj.dragged !== undefined");
 var processDragObjects = function (e) {
     return function (objs) {
-        var target = Data_Array.head(Data_Array.filter(function ($4) {
-            return isDraggable(Three_Core_Raycaster.object($4));
+        var target = Data_Array.head(Data_Array.filter(function ($7) {
+            return isDraggable(Three_Core_Raycaster.object($7));
         })(objs));
+        var f = function (v) {
+            if (v instanceof Data_Maybe.Just) {
+                return Data_Maybe.Nothing.value;
+            };
+            if (v instanceof Data_Maybe.Nothing) {
+                return new Data_Maybe.Just(e);
+            };
+            throw new Error("Failed pattern match at Editor.SceneEvent (line 158, column 11 - line 158, column 31): " + [ v.constructor.name ]);
+        };
         var doDrag = function (o) {
             return sendDragEvent(Three_Core_Raycaster.object(o))({
                 type: e.dragType,
@@ -88,7 +97,7 @@ var processDragObjects = function (e) {
                 point: Three_Core_Raycaster.point(o)
             });
         };
-        return Control_Apply.applySecond(Effect.applyEffect)(Data_Traversable.traverse(Data_Traversable.traversableMaybe)(Effect.applicativeEffect)(doDrag)(target))(Control_Applicative.pure(Effect.applicativeEffect)(e));
+        return Control_Apply.applySecond(Effect.applyEffect)(Data_Traversable.traverse(Data_Traversable.traversableMaybe)(Effect.applicativeEffect)(doDrag)(target))(Control_Applicative.pure(Effect.applicativeEffect)(f(target)));
     };
 };
 var isDragStart = function (e) {
@@ -160,7 +169,7 @@ var setupRaycasting = function (camera) {
                             };
                         };
                     };
-                    var unraycastedDrag = Util.performEvent(Control_Apply.lift2(FRP_Event.applyEvent)(raycastDrag)(size)(input.dragged));
+                    var unraycastedDrag = Data_Compactable.compact(FRP_Event.compactableEvent)(Util.performEvent(Control_Apply.lift2(FRP_Event.applyEvent)(raycastDrag)(size)(input.dragged)));
                     var f = function (v) {
                         return Control_Applicative.pure(Effect.applicativeEffect)(Data_Unit.unit);
                     };

@@ -147,14 +147,16 @@ processMouseOverObjects domPos objs = void $ traverse doMove target
               domPosition : domPos
           }
 
-processDragObjects :: DragEvent -> Array Intersection -> Effect DragEvent
-processDragObjects e objs = traverse doDrag target *> pure e
+processDragObjects :: DragEvent -> Array Intersection -> Effect (Maybe DragEvent)
+processDragObjects e objs = traverse doDrag target *> pure (f target)
     where target = head $ filter (isDraggable <<< object) objs
           doDrag o = sendDragEvent (object o) {
               type: e.dragType,
               distance: distance o,
               point: point o
             }
+          f (Just _) = Nothing
+          f Nothing  = Just e
 
 type RaycastSetup = {
     dragEvent :: Event DragEvent,
@@ -187,7 +189,7 @@ setupRaycasting camera scene input size = do
     
     let e1 = performEvent $ lift2 raycastTap size input.tapped
         e2 = performEvent $ lift2 raycastMouse size input.mouseMove
-        unraycastedDrag = performEvent $ lift2 raycastDrag size input.dragged
+        unraycastedDrag = compact $ performEvent $ lift2 raycastDrag size input.dragged
 
         f _ = pure unit
     
