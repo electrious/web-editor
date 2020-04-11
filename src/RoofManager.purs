@@ -117,12 +117,13 @@ createRoofManager meshData defRoofs = do
         ops = addRoofOp <|> deleteRoofOp <|> updateRoofOp
 
     d2 <- subscribe (Just <$> (keepLatest $ getActivated <$> renderedNodes)) updateActive
-    d3 <- subscribe (delay 10 $ const Nothing <$> (addRoofOp <|> deleteRoofOp)) updateActive
+    d3 <- subscribe (delay 1 $ const Nothing <$> deleteRoofOp) updateActive
+    d4 <- subscribe (delay 1 $ (\o -> Just o.id) <$> addedNewRoof) updateActive
 
     -- manage all roofs and update it with user operations.
     let defRoofData = { roofs: defRoofDict, roofsToRender: Just defRoofDict }
         roofData = fold updateRoofDict ops defRoofData
-    d4 <- subscribe roofData updateRoofsData
+    d5 <- subscribe roofData updateRoofsData
 
     updateRoofsData defRoofData
 
@@ -134,5 +135,5 @@ createRoofManager meshData defRoofs = do
     pure {
         roofWrapper: wrapper,
         editedRoofs: multicast $ debounce (Milliseconds 1000.0) $ getRoofEdited <$> skip 1 newRoofs,
-        disposable: sequence_ [d1, d2, d3, d4]
+        disposable: sequence_ [d1, d2, d3, d4, d5]
     }

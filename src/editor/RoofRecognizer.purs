@@ -3,6 +3,7 @@ module Editor.RoofRecognizer where
 import Prelude
 
 import Algorithm.RoofCheck (couldBeRoof)
+import Control.Apply (lift2)
 import Custom.Mesh (TappableMesh, mkTappableMesh)
 import Data.Maybe (Maybe(..))
 import Editor.SceneEvent (SceneMouseMoveEvent)
@@ -87,7 +88,7 @@ createRoofRecognizer houseWrapper roofs mouseMove canShow = do
     -- hide the marker by default
     setVisible false marker.mesh
 
-    let f evt rs = do
+    let getCandidatePoint evt rs = do
             isRoof <- couldBeRoof houseWrapper rs evt
             if isRoof
             then do
@@ -95,13 +96,19 @@ createRoofRecognizer houseWrapper roofs mouseMove canShow = do
                 pure $ Just { position: np, faceNormal: normal evt.face }
             else pure Nothing
 
-        point = performEvent $ sampleOn roofs (f <$> mouseMove)
+        point = performEvent $ sampleOn roofs (getCandidatePoint <$> gate canShow mouseMove)
     
         mkRoof a = newRoofPlate a.position a.normal
-        adderEvt = performEvent (showMarker adder <$> gate canShow point)
+
+        -- update candidate point with canShow status
+        pointCanShow true p = p
+        pointCanShow false _ = Nothing
+
+        adderEvt = performEvent $ showMarker adder <$> lift2 pointCanShow canShow point
+
         adderTapped a = const a <$> a.marker.tapped
-        roof = mkRoof <$> keepLatest (adderTapped <$> adderEvt)
+        roof = performEvent $ mkRoof <$> keepLatest (adderTapped <$> adderEvt)
     pure {
         marker: marker.mesh,
-        addedNewRoof: multicast $ performEvent roof
+        addedNewRoof: multicast roof
     }
