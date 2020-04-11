@@ -15,14 +15,14 @@ import Data.Tuple (Tuple(..), fst, snd)
 import Editor.SceneEvent (SceneTapEvent)
 import Effect (Effect)
 import Effect.Unsafe (unsafePerformEffect)
-import FRP.Event (Event, create, keepLatest, subscribe)
+import FRP.Event (Event, create, keepLatest, sampleOn, subscribe)
 import Three.Core.Geometry (Geometry, mkCircleGeometry)
 import Three.Core.Material (Material, mkMeshBasicMaterial)
 import Three.Core.Object3D (Object3D, add, remove, setPosition, setVisible)
 import Three.Math.Vector (Vector2, Vector3, dist, mkVec2, mkVec3, vecX, vecY)
 import UI.DraggableObject (DraggableObject, createDraggableObject)
 import Unsafe.Coerce (unsafeCoerce)
-import Util (foldEffect, mergeArray, mergeArrayWithDef, multicast, performEvent)
+import Util (debug, foldEffect, mergeArray, multicast, performEvent)
 
 toVec2 :: Vector3 -> Vector2
 toVec2 v = mkVec2 (vecX v) (vecY v)
@@ -182,8 +182,8 @@ getDelEvt :: forall a. Array (DraggableObject a) -> Event Int
 getDelEvt os = foldl (<|>) empty (f <$> os)
     where f o = o.tapped
 
-delMarker :: Array Vector2 -> Int -> Array Vector2
-delMarker ps idx = fromMaybe [] (deleteAt idx ps)
+delMarker :: Int -> Array Vector2 -> Array Vector2
+delMarker idx ps = fromMaybe [] (deleteAt idx ps)
 
 -- | create roof editor
 createRoofEditor :: forall a. Object3D a -> Event Boolean -> Array Vector2 -> Effect RoofEditor
@@ -216,12 +216,12 @@ createRoofEditor parent active ps = do
         -- create green markers for adding new vertices
         toAddEvt = mkGreenMarkers parent greenActive newVertices
         addVert p pns = insertAt p.vertIndex p.position pns
-        vertsAfterAdd = compact (lift2 addVert toAddEvt newVertices)
+        vertsAfterAdd = compact (sampleOn newVertices $ addVert <$> toAddEvt)
 
         -- get delete event of tapping on a marker
         delEvts = keepLatest (getDelEvt <$> markers)
         -- calculate new vertices after deleting a vertex
-        vertsAfterDel = lift2 delMarker newVertices delEvts
+        vertsAfterDel = sampleOn newVertices (delMarker <$> delEvts)
     
     -- update the real vertex list after adding/deleting
     d3 <- subscribe (vertsAfterAdd <|> vertsAfterDel) \vs -> do
