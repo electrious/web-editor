@@ -10,13 +10,13 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Editor.SceneEvent (isDragEnd, isDragStart)
 import Effect (Effect)
 import Effect.Unsafe (unsafePerformEffect)
-import FRP.Event (Event, fold, subscribe)
+import FRP.Event (Event, subscribe)
 import Three.Core.Geometry (Geometry, mkCircleGeometry)
 import Three.Core.Material (Material, mkMeshBasicMaterial, setOpacity, setTransparent)
 import Three.Core.Object3D (Object3D, add, hasParent, mkObject3D, parent, setName, setPosition, setRenderOrder, setVisible, worldToLocal)
 import Three.Math.Vector (Vector2, Vector3, mkVec3, vecX, vecY, (<+>))
 import Unsafe.Coerce (unsafeCoerce)
-import Util (multicast)
+import Util (foldWithDef, multicast)
 
 type DraggableObject a = {
     object     :: Object3D a,
@@ -101,7 +101,7 @@ createDraggableObject active index position customGeo customMat = do
     let updatePos d lastPos = lastPos <+> zeroZ d
         zeroZ v = mkVec3 (vecX v) (vecY v) 0.0
 
-        newPos = fold updatePos delta defPosition
+        newPos = multicast $ foldWithDef updatePos delta defPosition
     
     disp3 <- subscribe newPos \p -> do
                 setPosition p mesh.mesh
@@ -110,7 +110,7 @@ createDraggableObject active index position customGeo customMat = do
     pure {
         object: dragObj,
         tapped: const index <$> mesh.tapped,
-        position: multicast newPos,
+        position: newPos,
         isDragging: multicast dragging,
         disposable: sequence_ [disp1, disp2, disp3]
     }

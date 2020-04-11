@@ -22,7 +22,7 @@ import Three.Core.Object3D (Object3D, add, remove, setPosition, setVisible)
 import Three.Math.Vector (Vector2, Vector3, dist, mkVec2, mkVec3, vecX, vecY)
 import UI.DraggableObject (DraggableObject, createDraggableObject)
 import Unsafe.Coerce (unsafeCoerce)
-import Util (foldEffect, multicast, performEvent)
+import Util (foldEffect, mergeArray, mergeArrayWithDef, multicast, performEvent)
 
 toVec2 :: Vector3 -> Vector2
 toVec2 v = mkVec2 (vecX v) (vecY v)
@@ -174,9 +174,9 @@ type RoofEditor = {
 
 -- get new positions after dragging
 getPosition :: forall a. Array (DraggableObject a) -> Event (Array Vector2)
-getPosition os = foldl (<>) empty (f <$> os)
+getPosition os = mergeArray (f <$> os)
     where f o = g <$> o.position
-          g p = [toVec2 p]
+          g p = toVec2 p
 
 getDelEvt :: forall a. Array (DraggableObject a) -> Event Int
 getDelEvt os = foldl (<|>) empty (f <$> os)
