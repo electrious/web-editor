@@ -13,7 +13,7 @@ import Data.Maybe (fromMaybe)
 import Data.UUID (genUUID, toString)
 import Effect (Effect)
 import Math as Math
-import Math.Angle (Angle, atan2, degree, degreeVal, radian)
+import Math.Angle (Angle, acos, atan2, degree, degreeVal, radian)
 import Three.Math.Vector (class Vector, Vector2, Vector3, addScaled, cross, length, mkVec2, mkVec3, vecX, vecY, vecZ, (<.>))
 
 -- | define the Orientation data and instances for common typeclasses
@@ -126,7 +126,7 @@ getRoofPolygon r = f <$> r.borderPoints
 
 -- | helper function to calculate angle between two Vector3
 angleBetween :: forall a. Vector a => a -> a -> Angle
-angleBetween v1 v2 = radian $ d / (length v1 * length v2)
+angleBetween v1 v2 = acos $ d / (length v1 * length v2)
     where d = v1 <.> v2
 
 -- | calculate the gutter vector based on roof normal vector
