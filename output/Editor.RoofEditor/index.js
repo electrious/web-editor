@@ -206,12 +206,12 @@ var getRedMarkerActiveStatus = function (ms) {
 };
 var getPosition = function (os) {
     var g = function (p) {
-        return [ toVec2(p) ];
+        return toVec2(p);
     };
     var f = function (o) {
         return Data_Functor.map(FRP_Event.functorEvent)(g)(o.position);
     };
-    return Data_Foldable.foldl(Data_Foldable.foldableArray)(Data_Semigroup.append(FRP_Event.semigroupEvent(Data_Semigroup.semigroupArray)))(Control_Plus.empty(FRP_Event.plusEvent))(Data_Functor.map(Data_Functor.functorArray)(f)(os));
+    return Util.mergeArray(Data_Functor.map(Data_Functor.functorArray)(f)(os));
 };
 var getDelEvt = function (os) {
     var f = function (o) {
@@ -219,8 +219,8 @@ var getDelEvt = function (os) {
     };
     return Data_Foldable.foldl(Data_Foldable.foldableArray)(Control_Alt.alt(FRP_Event.altEvent))(Control_Plus.empty(FRP_Event.plusEvent))(Data_Functor.map(Data_Functor.functorArray)(f)(os));
 };
-var delMarker = function (ps) {
-    return function (idx) {
+var delMarker = function (idx) {
+    return function (ps) {
         return Data_Maybe.fromMaybe([  ])(Data_Array.deleteAt(idx)(ps));
     };
 };
@@ -261,13 +261,13 @@ var createRoofEditor = function (parent) {
                 })(v.event)(v2.event));
                 var toAddEvt = mkGreenMarkers(parent)(greenActive)(newVertices);
                 var delEvts = FRP_Event_Class.keepLatest(FRP_Event.eventIsEvent)(Data_Functor.map(FRP_Event.functorEvent)(getDelEvt)(markers));
-                var vertsAfterDel = Control_Apply.lift2(FRP_Event.applyEvent)(delMarker)(newVertices)(delEvts);
+                var vertsAfterDel = FRP_Event_Class.sampleOn(FRP_Event.eventIsEvent)(newVertices)(Data_Functor.map(FRP_Event.functorEvent)(delMarker)(delEvts));
                 var addVert = function (p) {
                     return function (pns) {
                         return Data_Array.insertAt(p.vertIndex)(p.position)(pns);
                     };
                 };
-                var vertsAfterAdd = Data_Compactable.compact(FRP_Event.compactableEvent)(Control_Apply.lift2(FRP_Event.applyEvent)(addVert)(toAddEvt)(newVertices));
+                var vertsAfterAdd = Data_Compactable.compact(FRP_Event.compactableEvent)(FRP_Event_Class.sampleOn(FRP_Event.eventIsEvent)(newVertices)(Data_Functor.map(FRP_Event.functorEvent)(addVert)(toAddEvt)));
                 var d3 = FRP_Event.subscribe(Control_Alt.alt(FRP_Event.altEvent)(vertsAfterAdd)(vertsAfterDel))(function (vs) {
                     return function __do() {
                         v1.push(vs)();

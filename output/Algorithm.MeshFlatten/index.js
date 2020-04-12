@@ -84,7 +84,7 @@ var flattenRoofplate = function (tree) {
             };
             var checkDistAndAngle = function (c) {
                 var dist = distToRoof(flattener)(c.vertex);
-                var angle = Math_Angle.acos(Three_Math_Vector.dot(Three_Math_Vector.vecVec3)(flattener.roofNormal)(c.normal));
+                var angle = Models_RoofPlate.angleBetween(Three_Math_Vector.vecVec3)(flattener.roofNormal)(c.normal);
                 return dist < 0.5 && dist >= 0.0 || dist < 0.0 && (dist > -1.0 && Math_Angle.degreeVal(angle) < 20.0);
             };
             var f = function (c) {

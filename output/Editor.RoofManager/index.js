@@ -131,13 +131,16 @@ var createRoofManager = function (meshData) {
             var addRoofOp = Data_Functor.map(FRP_Event.functorEvent)(Models_RoofPlate.RoofOpCreate.create)(recognizer.addedNewRoof);
             var ops = Control_Alt.alt(FRP_Event.altEvent)(Control_Alt.alt(FRP_Event.altEvent)(addRoofOp)(deleteRoofOp))(updateRoofOp);
             var d2 = FRP_Event.subscribe(Data_Functor.map(FRP_Event.functorEvent)(Data_Maybe.Just.create)(FRP_Event_Class.keepLatest(FRP_Event.eventIsEvent)(Data_Functor.map(FRP_Event.functorEvent)(getActivated)(renderedNodes))))(v.push)();
-            var d3 = FRP_Event.subscribe(Util.delay(10)(Data_Functor.map(FRP_Event.functorEvent)(Data_Function["const"](Data_Maybe.Nothing.value))(Control_Alt.alt(FRP_Event.altEvent)(addRoofOp)(deleteRoofOp))))(v.push)();
+            var d3 = FRP_Event.subscribe(Util.delay(1)(Data_Functor.map(FRP_Event.functorEvent)(Data_Function["const"](Data_Maybe.Nothing.value))(deleteRoofOp)))(v.push)();
+            var d4 = FRP_Event.subscribe(Util.delay(1)(Data_Functor.map(FRP_Event.functorEvent)(function (o) {
+                return new Data_Maybe.Just(o.id);
+            })(recognizer.addedNewRoof)))(v.push)();
             var defRoofData = {
                 roofs: defRoofDict,
                 roofsToRender: new Data_Maybe.Just(defRoofDict)
             };
             var roofData = FRP_Event_Class.fold(FRP_Event.eventIsEvent)(updateRoofDict)(ops)(defRoofData);
-            var d4 = FRP_Event.subscribe(roofData)(v1.push)();
+            var d5 = FRP_Event.subscribe(roofData)(v1.push)();
             v1.push(defRoofData)();
             v.push(Data_Maybe.Nothing.value)();
             var getRoofEdited = (function () {
@@ -150,7 +153,7 @@ var createRoofManager = function (meshData) {
             return {
                 roofWrapper: wrapper,
                 editedRoofs: Util.multicast(Util.debounce(1000.0)(Data_Functor.map(FRP_Event.functorEvent)(getRoofEdited)(Util.skip(1)(newRoofs)))),
-                disposable: Data_Foldable.sequence_(Effect.applicativeEffect)(Data_Foldable.foldableArray)([ d1, d2, d3, d4 ])
+                disposable: Data_Foldable.sequence_(Effect.applicativeEffect)(Data_Foldable.foldableArray)([ d1, d2, d3, d4, d5, recognizer.disposable ])
             };
         };
     };

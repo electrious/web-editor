@@ -377,7 +377,7 @@ var angleBetween = function (dictVector) {
     return function (v1) {
         return function (v2) {
             var d = Three_Math_Vector.dot(dictVector)(v1)(v2);
-            return Math_Angle.radian(d / (Three_Math_Vector.length(dictVector)(v1) * Three_Math_Vector.length(dictVector)(v2)));
+            return Math_Angle.acos(d / (Three_Math_Vector.length(dictVector)(v1) * Three_Math_Vector.length(dictVector)(v2)));
         };
     };
 };

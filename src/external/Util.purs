@@ -17,7 +17,7 @@ import Effect.Now (now)
 import Effect.Ref as Ref
 import Effect.Timer (clearTimeout, setTimeout)
 import Effect.Unsafe (unsafePerformEffect)
-import FRP.Event (Event, count, create, gate, makeEvent, subscribe, withLast)
+import FRP.Event (Event, create, makeEvent, subscribe, withLast)
 import Partial.Unsafe (unsafePartial)
 
 ffi :: forall a. Array String -> String -> a
@@ -42,28 +42,26 @@ delay n evt = makeEvent \k -> do
         setTimeout n (k v)
 
 debounce :: forall a. Milliseconds -> Event a -> Event a
-debounce (Milliseconds period) evt = unsafePerformEffect do
-    { event: newEvt, push: p } <- create
+debounce (Milliseconds period) evt = makeEvent \k -> do
     timer <- Ref.new Nothing
-    let timerFunc v = do
-            _ <- Ref.modify (const Nothing) timer
-            p v
     
-    dispose <- subscribe evt \e -> do
+    subscribe evt \v -> do
         tf <- Ref.read timer
         case tf of
             Just t -> clearTimeout t
             Nothing -> pure unit
-        newT <- setTimeout (fromMaybe 0 $ fromNumber period) (timerFunc e)
+        newT <- setTimeout (fromMaybe 1 $ fromNumber period) (k v)
         Ref.write (Just newT) timer
-
-    pure newEvt
 
 -- | skip first n occurrences of the event
 skip :: forall a. Int -> Event a -> Event a
-skip n evt = gate skipped evt
-    where c = count evt
-          skipped = ((>) n) <$> c
+skip n evt = makeEvent \k -> do
+    fired <- Ref.new 0
+    subscribe evt \v -> do
+        newCount <- Ref.modify ((+) 1) fired
+        if newCount > n
+        then k v
+        else pure unit
 
 distinct :: forall a. Eq a => Event a -> Event a
 distinct evt = getNow <$> filter isDiff (withLast evt)

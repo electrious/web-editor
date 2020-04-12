@@ -12,7 +12,6 @@ var Editor_SceneEvent = require("../Editor.SceneEvent/index.js");
 var Effect = require("../Effect/index.js");
 var Effect_Unsafe = require("../Effect.Unsafe/index.js");
 var FRP_Event = require("../FRP.Event/index.js");
-var FRP_Event_Class = require("../FRP.Event.Class/index.js");
 var Three_Core_Geometry = require("../Three.Core.Geometry/index.js");
 var Three_Core_Material = require("../Three.Core.Material/index.js");
 var Three_Core_Object3D = require("../Three.Core.Object3D/index.js");
@@ -21,7 +20,7 @@ var Util = require("../Util/index.js");
 var invisibleMaterial = Effect_Unsafe.unsafePerformEffect(function __do() {
     var mat = Three_Core_Material.mkMeshBasicMaterial(0)();
     Three_Core_Material.setTransparent(true)(mat)();
-    Three_Core_Material.setOpacity(1.0e-2)(mat)();
+    Three_Core_Material.setOpacity(1.0e-3)(mat)();
     return mat;
 });
 var defMaterial = Effect_Unsafe.unsafePerformEffect(Three_Core_Material.mkMeshBasicMaterial(16720418));
@@ -80,7 +79,7 @@ var createDraggableObject = function (active) {
                                 return Three_Math_Vector.add(Three_Math_Vector.vecVec3)(lastPos)(zeroZ(d));
                             };
                         };
-                        var newPos = FRP_Event_Class.fold(FRP_Event.eventIsEvent)(updatePos)(delta)(defPosition);
+                        var newPos = Util.multicast(Util.foldWithDef(updatePos)(delta)(defPosition));
                         var disp3 = FRP_Event.subscribe(newPos)(function (p) {
                             return function __do() {
                                 Three_Core_Object3D.setPosition(p)(mesh.mesh)();
@@ -90,7 +89,7 @@ var createDraggableObject = function (active) {
                         return {
                             object: dragObj,
                             tapped: Data_Functor.map(FRP_Event.functorEvent)(Data_Function["const"](index))(mesh.tapped),
-                            position: Util.multicast(newPos),
+                            position: newPos,
                             isDragging: Util.multicast(dragging),
                             disposable: Data_Foldable.sequence_(Effect.applicativeEffect)(Data_Foldable.foldableArray)([ disp1, disp2, disp3 ])
                         };

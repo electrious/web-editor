@@ -20,7 +20,7 @@ import Effect (Effect)
 import FRP.Event (Event, create, fold, keepLatest, subscribe, withLast)
 import Models.RoofPlate (RoofEdited, RoofOperation(..), RoofPlate, toRoofEdited)
 import Three.Core.Object3D (Object3D, add, localToWorld, mkObject3D, remove, setName, worldToLocal)
-import Util (debounce, delay, multicast, performEvent, skip)
+import Util (debounce, debug, delay, multicast, performEvent, skip)
 
 type RoofManager a = {
     roofWrapper :: Object3D a,
