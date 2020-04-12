@@ -10,7 +10,7 @@ import Data.Traversable (traverse)
 import Data.Tuple (fst, snd)
 import Effect (Effect)
 import Math.Angle (acos, degreeVal)
-import Models.RoofPlate (Polygon, RoofPlate, getRoofPolygon)
+import Models.RoofPlate (Polygon, RoofPlate, angleBetween, getRoofPolygon)
 import RBush.RBush (BBox, RBush, load, mkRBush, search)
 import Three.Core.Geometry (BufferGeometry, clone, getAttribute, isBufferAttribute, setNeedsUpdate, setXYZ)
 import Three.Core.Mesh (Mesh, setBufferGeometry)
@@ -116,7 +116,7 @@ flattenRoofplate tree roof = do
         
         -- check the distance to the roof and angle between its normal
         -- vector with the roof normal vector.
-        checkDistAndAngle c = let angle = acos (flattener.roofNormal <.> c.normal)
+        checkDistAndAngle c = let angle = angleBetween flattener.roofNormal c.normal
                                   dist = distToRoof flattener c.vertex
                               in (dist < 0.5 && dist >= 0.0) || (dist < 0.0 && dist > -1.0 && degreeVal angle < 20.0)
     

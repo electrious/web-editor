@@ -50,7 +50,7 @@ getX :: Int -> BufferAttribute -> Number
 getX = ffi ["idx", "attr"] "attr.getX(idx)"
 
 getY :: Int -> BufferAttribute -> Number
-getY = ffi ["idx", "attr"] "attr.getX(idx)"
+getY = ffi ["idx", "attr"] "attr.getY(idx)"
 
 getZ :: Int -> BufferAttribute -> Number
-getZ = ffi ["idx", "attr"] "attr.getX(idx)"
+getZ = ffi ["idx", "attr"] "attr.getZ(idx)"
