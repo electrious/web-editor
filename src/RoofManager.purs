@@ -135,5 +135,5 @@ createRoofManager meshData defRoofs = do
     pure {
         roofWrapper: wrapper,
         editedRoofs: multicast $ debounce (Milliseconds 1000.0) $ getRoofEdited <$> skip 1 newRoofs,
-        disposable: sequence_ [d1, d2, d3, d4, d5]
+        disposable: sequence_ [d1, d2, d3, d4, d5, recognizer.disposable]
     }

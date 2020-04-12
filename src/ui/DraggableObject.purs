@@ -35,7 +35,7 @@ invisibleMaterial :: forall a. Material a
 invisibleMaterial = unsafeCoerce $ unsafePerformEffect do
     mat <- mkMeshBasicMaterial 0
     setTransparent true mat
-    setOpacity 0.01 mat
+    setOpacity 0.001 mat
     pure mat
 
 -- | create visible part of the object, user can specify custom geometry

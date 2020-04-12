@@ -5,25 +5,28 @@ import Prelude
 import Algorithm.RoofCheck (couldBeRoof)
 import Control.Apply (lift2)
 import Custom.Mesh (TappableMesh, mkTappableMesh)
+import Data.Compactable (compact)
 import Data.Maybe (Maybe(..))
+import Data.Traversable (traverse)
 import Editor.SceneEvent (SceneMouseMoveEvent)
 import Effect (Effect)
 import Effect.Unsafe (unsafePerformEffect)
-import FRP.Event (Event, gate, keepLatest, sampleOn)
+import FRP.Event (Event, gate, sampleOn, subscribe)
 import Models.RoofPlate (RoofPlate, newRoofPlate)
 import Three.Core.Face3 (normal)
 import Three.Core.Geometry (Geometry, mkCircleGeometry)
 import Three.Core.Material (Material, mkMeshBasicMaterial)
 import Three.Core.Mesh (Mesh)
 import Three.Core.Object3D (Object3D, hasParent, localToWorld, lookAt, parent, setName, setPosition, setVisible, worldToLocal)
-import Three.Math.Vector (Vector3, addScaled, mkVec3, (<+>))
+import Three.Math.Vector (Vector3, addScaled, (<+>))
 import Unsafe.Coerce (unsafeCoerce)
 import Util (multicast, performEvent)
 
 -- | RoofRecognizer will be able to let user add new roof
 type RoofRecognizer a = {
     marker       :: Mesh a,
-    addedNewRoof :: Event RoofPlate
+    addedNewRoof :: Event RoofPlate,
+    disposable   :: Effect Unit
 }
 
 -- | Candidate point that will allow user to show the adder marker
@@ -38,41 +41,28 @@ adderMarkerMat = unsafeCoerce $ unsafePerformEffect (mkMeshBasicMaterial 0x2222f
 adderMarkerGeo :: forall geo. Geometry geo
 adderMarkerGeo = unsafeCoerce $ unsafePerformEffect (mkCircleGeometry 1.0 32)
 
-
-type RoofAdder a = {
-    marker   :: TappableMesh a,
-    position :: Vector3,
-    normal   :: Vector3
-}
-
-createAdderMarker :: forall a. Effect (RoofAdder a)
+createAdderMarker :: forall a. Effect (TappableMesh a)
 createAdderMarker = do
     marker <- mkTappableMesh adderMarkerGeo adderMarkerMat
     setName "add-roof-marker" marker.mesh
-
-    pure {
-        marker: marker,
-        position: mkVec3 0.0 0.0 0.0,
-        normal: mkVec3 0.0 1.0 0.0
-    }
+    pure marker
 
 
-showMarker :: forall a. RoofAdder a -> Maybe CandidatePoint -> Effect (RoofAdder a)
-showMarker adder Nothing = setVisible false adder.marker.mesh *> pure adder
-showMarker adder (Just p) | not (hasParent adder.marker.mesh) = setVisible false adder.marker.mesh *> pure adder
-                          | otherwise = do
-                              setVisible true adder.marker.mesh
-                              -- get the local position of the candidate point
-                              -- and move it along the normal vector a bit.
-                              -- then used as the new position of the marker
-                              let np = addScaled p.position p.faceNormal 0.03
-                              setPosition np adder.marker.mesh
+showMarker :: forall a. TappableMesh a -> Maybe CandidatePoint -> Effect Unit
+showMarker marker Nothing = setVisible false marker.mesh
+showMarker marker (Just p) | not (hasParent marker.mesh) = setVisible false marker.mesh
+                           | otherwise = do
+                                 setVisible true marker.mesh
+                                 -- get the local position of the candidate point
+                                 -- and move it along the normal vector a bit.
+                                 -- then used as the new position of the marker
+                                 let np = addScaled p.position p.faceNormal 0.03
+                                 setPosition np marker.mesh
 
-                              -- set the target direction of the marker
-                              let target = p.position <+> p.faceNormal
-                              targetW <- localToWorld target (parent adder.marker.mesh)
-                              lookAt targetW adder.marker.mesh
-                              pure $ adder { position = np, normal = p.faceNormal }
+                                 -- set the target direction of the marker
+                                 let target = p.position <+> p.faceNormal
+                                 targetW <- localToWorld target (parent marker.mesh)
+                                 lookAt targetW marker.mesh
 
 
 -- | create a roof recognizer
@@ -82,8 +72,7 @@ createRoofRecognizer :: forall a b. Object3D a
                                -> Event Boolean
                                -> Effect (RoofRecognizer b)
 createRoofRecognizer houseWrapper roofs mouseMove canShow = do
-    adder <- createAdderMarker
-    let marker = adder.marker
+    marker <- createAdderMarker
 
     -- hide the marker by default
     setVisible false marker.mesh
@@ -98,17 +87,17 @@ createRoofRecognizer houseWrapper roofs mouseMove canShow = do
 
         point = performEvent $ sampleOn roofs (getCandidatePoint <$> gate canShow mouseMove)
     
-        mkRoof a = newRoofPlate a.position a.normal
+        mkRoof _ p = newRoofPlate p.position p.faceNormal
 
         -- update candidate point with canShow status
         pointCanShow true p = p
         pointCanShow false _ = Nothing
 
-        adderEvt = performEvent $ showMarker adder <$> lift2 pointCanShow canShow point
+    d <- subscribe (lift2 pointCanShow canShow point) (showMarker marker)
 
-        adderTapped a = const a <$> a.marker.tapped
-        roof = performEvent $ mkRoof <$> keepLatest (adderTapped <$> adderEvt)
+    let roof = compact $ performEvent $ sampleOn point (traverse <<< mkRoof <$> marker.tapped)
     pure {
         marker: marker.mesh,
-        addedNewRoof: multicast roof
+        addedNewRoof: multicast roof,
+        disposable: d
     }
