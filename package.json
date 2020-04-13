@@ -9,9 +9,9 @@
   "private": true,
   "mode": "development",
   "scripts": {
-    "demo": "webpack-dev-server --mode development --host 0.0.0.0 --config example.webpack.config.js",
+    "demo": "spago build && webpack-dev-server --mode development --host 0.0.0.0 --config example.webpack.config.js",
     "build-lib": "rm -rf output && spago build",
-    "build": "rm -rf dist && webpack --mode production"
+    "build": "spago build && rm -rf dist && webpack --mode production"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^2.4.0",
