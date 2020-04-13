@@ -2,7 +2,7 @@
   "name": "web-editor",
   "version": "2.0.0",
   "description": "a web editor library to edit Electrious 3D contents.",
-  "main": "output/Editor.Editor/index.js",
+  "main": "index.js",
   "repository": "https://github.com/electrious/web-editor",
   "author": "Eric Wong",
   "license": "CopyrightsReserved",
