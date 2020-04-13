@@ -19,8 +19,8 @@ import Editor.RoofRecognizer (createRoofRecognizer)
 import Effect (Effect)
 import FRP.Event (Event, create, fold, keepLatest, subscribe, withLast)
 import Models.RoofPlate (RoofEdited, RoofOperation(..), RoofPlate, toRoofEdited)
-import Three.Core.Object3D (Object3D, add, localToWorld, mkObject3D, remove, setName, worldToLocal)
-import Util (debounce, debug, delay, multicast, performEvent, skip)
+import Three.Core.Object3D (Object3D, add, mkObject3D, remove, setName)
+import Util (debounce, delay, multicast, performEvent, skip)
 
 type RoofManager a = {
     roofWrapper :: Object3D a,
@@ -134,6 +134,6 @@ createRoofManager meshData defRoofs = do
     -- skipe the first roof in teh editedRoofs event, because it's the default data
     pure {
         roofWrapper: wrapper,
-        editedRoofs: multicast $ debounce (Milliseconds 1000.0) $ getRoofEdited <$> skip 1 newRoofs,
+        editedRoofs: multicast $ skip 1 $ debounce (Milliseconds 1000.0) $ getRoofEdited <$> newRoofs,
         disposable: sequence_ [d1, d2, d3, d4, d5, recognizer.disposable]
     }
