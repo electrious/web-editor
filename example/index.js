@@ -10,5 +10,10 @@ if (parent != null) {
     // convert test data to RoofPlate objects
     const roofs = testRoofs.roofplates
     // load the house and roofs
-    editor.loadHouse(serverUrl)(296285)(roofs)(console.log)()
+    let updateF = v => {
+        return _ => {
+            console.log(v)
+        }
+    }
+    editor.loadHouse(serverUrl)(296285)(roofs)(updateF)()
 }
