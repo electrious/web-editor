@@ -1,4 +1,4 @@
-# A 3D editor built with TypeScript and Three.js
+# A 3D editor built with PureScript and Three.js
 
 ## How to install:
 * install the 'yarn' package manager on your platform.
@@ -7,10 +7,6 @@
         yarn install
 
 ## How to use:
-* build the development version with:
-
-        yarn dev
-
 * build the demo web server with:
 
         yarn demo
@@ -22,4 +18,4 @@
 
 ## API
 
-Check out the example/index.ts on how to use the library API to build an app.
+Check out the example/index.js on how to use the library API to build an app.
