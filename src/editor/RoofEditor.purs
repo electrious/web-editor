@@ -22,7 +22,7 @@ import Three.Core.Object3D (Object3D, add, remove, setPosition, setVisible)
 import Three.Math.Vector (Vector2, Vector3, dist, mkVec2, mkVec3, vecX, vecY)
 import UI.DraggableObject (DraggableObject, createDraggableObject)
 import Unsafe.Coerce (unsafeCoerce)
-import Util (debug, foldEffect, mergeArray, multicast, performEvent)
+import FRP.Event.Extra (foldEffect, mergeArray, multicast, performEvent)
 
 toVec2 :: Vector3 -> Vector2
 toVec2 v = mkVec2 (vecX v) (vecY v)

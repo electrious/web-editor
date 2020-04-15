@@ -16,7 +16,7 @@ import Three.Core.Material (Material, mkMeshBasicMaterial, setOpacity, setTransp
 import Three.Core.Object3D (Object3D, add, hasParent, mkObject3D, parent, setName, setPosition, setRenderOrder, setVisible, worldToLocal)
 import Three.Math.Vector (Vector2, Vector3, mkVec3, vecX, vecY, (<+>))
 import Unsafe.Coerce (unsafeCoerce)
-import Util (foldWithDef, multicast)
+import FRP.Event.Extra (foldWithDef, multicast)
 
 type DraggableObject a = {
     object     :: Object3D a,

@@ -17,6 +17,7 @@ var Effect_Timer = require("../Effect.Timer/index.js");
 var Effect_Unsafe = require("../Effect.Unsafe/index.js");
 var FRP_Event = require("../FRP.Event/index.js");
 var FRP_Event_Class = require("../FRP.Event.Class/index.js");
+var FRP_Event_Extra = require("../FRP.Event.Extra/index.js");
 var Math_Angle = require("../Math.Angle/index.js");
 var Models_RoofPlate = require("../Models.RoofPlate/index.js");
 var SimplePolygon = require("../SimplePolygon/index.js");
@@ -25,7 +26,6 @@ var Three_Core_Material = require("../Three.Core.Material/index.js");
 var Three_Core_Mesh = require("../Three.Core.Mesh/index.js");
 var Three_Core_Object3D = require("../Three.Core.Object3D/index.js");
 var Three_Math_Vector = require("../Three.Math.Vector/index.js");
-var Util = require("../Util/index.js");
 var updateRoofPlate = function (v) {
     return function (roof) {
         if (v.length === 0) {
@@ -106,7 +106,7 @@ var createRoofNode = function (roof) {
             var v = FRP_Event.create();
             var editor = Editor_RoofEditor.createRoofEditor(obj)(isActive)(ps)();
             var vertices = Control_Alt.alt(FRP_Event.altEvent)(v.event)(editor.roofVertices);
-            var meshEvt = Util.performEvent(Control_Apply.lift2(FRP_Event.applyEvent)(createRoofMesh)(vertices)(isActive));
+            var meshEvt = FRP_Event_Extra.performEvent(Control_Apply.lift2(FRP_Event.applyEvent)(createRoofMesh)(vertices)(isActive));
             var d1 = FRP_Event.subscribe(FRP_Event_Class.withLast(FRP_Event.eventIsEvent)(meshEvt))(function (v1) {
                 return function __do() {
                     Data_Foldable.traverse_(Effect.applicativeEffect)(Data_Foldable.foldableMaybe)(function (o) {
@@ -115,7 +115,7 @@ var createRoofNode = function (roof) {
                     return Three_Core_Object3D.add(v1.now.mesh)(obj)();
                 };
             })();
-            var e = Util.performEvent(Control_Apply.lift2(FRP_Event.applyEvent)(function (m) {
+            var e = FRP_Event_Extra.performEvent(Control_Apply.lift2(FRP_Event.applyEvent)(function (m) {
                 return function (a) {
                     return Three_Core_Mesh.setMaterial(getMaterial(a))(m.mesh);
                 };
@@ -142,9 +142,9 @@ var createRoofNode = function (roof) {
             Control_Applicative.when(Effect.applicativeEffect)(!testSimplePolygon(ps))(Data_Functor["void"](Effect.functorEffect)(Effect_Timer.setTimeout(1000)(v1.push(Data_Unit.unit))))();
             return {
                 roofId: roof.id,
-                roofDelete: Util.multicast(Data_Functor.map(FRP_Event.functorEvent)(Data_Function["const"](new Models_RoofPlate.RoofOpDelete(roof.id)))(delRoofEvt)),
-                roofUpdate: Util.multicast(newRoofs),
-                tapped: Util.multicast(tapped),
+                roofDelete: FRP_Event_Extra.multicast(Data_Functor.map(FRP_Event.functorEvent)(Data_Function["const"](new Models_RoofPlate.RoofOpDelete(roof.id)))(delRoofEvt)),
+                roofUpdate: FRP_Event_Extra.multicast(newRoofs),
+                tapped: FRP_Event_Extra.multicast(tapped),
                 roofObject: obj,
                 disposable: Data_Foldable.sequence_(Effect.applicativeEffect)(Data_Foldable.foldableArray)([ d1, d2, editor.disposable ])
             };

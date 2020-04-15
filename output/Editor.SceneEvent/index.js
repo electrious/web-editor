@@ -15,6 +15,7 @@ var Data_Unit = require("../Data.Unit/index.js");
 var Editor_Input = require("../Editor.Input/index.js");
 var Effect = require("../Effect/index.js");
 var FRP_Event = require("../FRP.Event/index.js");
+var FRP_Event_Extra = require("../FRP.Event.Extra/index.js");
 var Three_Core_Raycaster = require("../Three.Core.Raycaster/index.js");
 var Three_Math_Vector = require("../Three.Math.Vector/index.js");
 var Util = require("../Util/index.js");
@@ -36,7 +37,7 @@ var mkDragEndable = function (evt) {
         };
         return Data_Maybe.Nothing.value;
     };
-    var e = Util.debounce(2000.0)(evt);
+    var e = FRP_Event_Extra.debounce(2000.0)(evt);
     return Control_Alt.alt(FRP_Event.altEvent)(evt)(Data_Compactable.compact(FRP_Event.compactableEvent)(Data_Functor.map(FRP_Event.functorEvent)(f)(e)));
 };
 var makeTappable = Util.fpi([ "obj", "cb", "" ])("obj.tapped = cb");
@@ -88,7 +89,7 @@ var processDragObjects = function (e) {
             if (v instanceof Data_Maybe.Nothing) {
                 return new Data_Maybe.Just(e);
             };
-            throw new Error("Failed pattern match at Editor.SceneEvent (line 158, column 11 - line 158, column 31): " + [ v.constructor.name ]);
+            throw new Error("Failed pattern match at Editor.SceneEvent (line 159, column 11 - line 159, column 31): " + [ v.constructor.name ]);
         };
         var doDrag = function (o) {
             return sendDragEvent(Three_Core_Raycaster.object(o))({
@@ -169,16 +170,16 @@ var setupRaycasting = function (camera) {
                             };
                         };
                     };
-                    var unraycastedDrag = Data_Compactable.compact(FRP_Event.compactableEvent)(Util.performEvent(Control_Apply.lift2(FRP_Event.applyEvent)(raycastDrag)(size)(input.dragged)));
+                    var unraycastedDrag = Data_Compactable.compact(FRP_Event.compactableEvent)(FRP_Event_Extra.performEvent(Control_Apply.lift2(FRP_Event.applyEvent)(raycastDrag)(size)(input.dragged)));
                     var f = function (v) {
                         return Control_Applicative.pure(Effect.applicativeEffect)(Data_Unit.unit);
                     };
-                    var e2 = Util.performEvent(Control_Apply.lift2(FRP_Event.applyEvent)(raycastMouse)(size)(input.mouseMove));
-                    var e1 = Util.performEvent(Control_Apply.lift2(FRP_Event.applyEvent)(raycastTap)(size)(input.tapped));
+                    var e2 = FRP_Event_Extra.performEvent(Control_Apply.lift2(FRP_Event.applyEvent)(raycastMouse)(size)(input.mouseMove));
+                    var e1 = FRP_Event_Extra.performEvent(Control_Apply.lift2(FRP_Event.applyEvent)(raycastTap)(size)(input.tapped));
                     var d1 = FRP_Event.subscribe(e1)(f)();
                     var d2 = FRP_Event.subscribe(e2)(f)();
                     return {
-                        dragEvent: Util.multicast(unraycastedDrag),
+                        dragEvent: FRP_Event_Extra.multicast(unraycastedDrag),
                         dispose: Data_Foldable.sequence_(Effect.applicativeEffect)(Data_Foldable.foldableArray)([ d1, d2 ])
                     };
                 };

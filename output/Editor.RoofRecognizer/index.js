@@ -12,13 +12,13 @@ var Effect = require("../Effect/index.js");
 var Effect_Unsafe = require("../Effect.Unsafe/index.js");
 var FRP_Event = require("../FRP.Event/index.js");
 var FRP_Event_Class = require("../FRP.Event.Class/index.js");
+var FRP_Event_Extra = require("../FRP.Event.Extra/index.js");
 var Models_RoofPlate = require("../Models.RoofPlate/index.js");
 var Three_Core_Face3 = require("../Three.Core.Face3/index.js");
 var Three_Core_Geometry = require("../Three.Core.Geometry/index.js");
 var Three_Core_Material = require("../Three.Core.Material/index.js");
 var Three_Core_Object3D = require("../Three.Core.Object3D/index.js");
 var Three_Math_Vector = require("../Three.Math.Vector/index.js");
-var Util = require("../Util/index.js");
 var showMarker = function (marker) {
     return function (v) {
         if (v instanceof Data_Maybe.Nothing) {
@@ -87,9 +87,9 @@ var createRoofRecognizer = function (houseWrapper) {
                             };
                         };
                     };
-                    var point = Util.performEvent(FRP_Event_Class.sampleOn(FRP_Event.eventIsEvent)(roofs)(Data_Functor.map(FRP_Event.functorEvent)(getCandidatePoint)(FRP_Event_Class.gate(FRP_Event.eventIsEvent)(canShow)(mouseMove))));
+                    var point = FRP_Event_Extra.performEvent(FRP_Event_Class.sampleOn(FRP_Event.eventIsEvent)(roofs)(Data_Functor.map(FRP_Event.functorEvent)(getCandidatePoint)(FRP_Event_Class.gate(FRP_Event.eventIsEvent)(canShow)(mouseMove))));
                     var d = FRP_Event.subscribe(Control_Apply.lift2(FRP_Event.applyEvent)(pointCanShow)(canShow)(point))(showMarker(marker))();
-                    var roof = Data_Compactable.compact(FRP_Event.compactableEvent)(Util.performEvent(FRP_Event_Class.sampleOn(FRP_Event.eventIsEvent)(point)(Data_Functor.map(FRP_Event.functorEvent)((function () {
+                    var roof = Data_Compactable.compact(FRP_Event.compactableEvent)(FRP_Event_Extra.performEvent(FRP_Event_Class.sampleOn(FRP_Event.eventIsEvent)(point)(Data_Functor.map(FRP_Event.functorEvent)((function () {
                         var $10 = Data_Traversable.traverse(Data_Traversable.traversableMaybe)(Effect.applicativeEffect);
                         return function ($11) {
                             return $10(mkRoof($11));
@@ -97,7 +97,7 @@ var createRoofRecognizer = function (houseWrapper) {
                     })())(marker.tapped))));
                     return {
                         marker: marker.mesh,
-                        addedNewRoof: Util.multicast(roof),
+                        addedNewRoof: FRP_Event_Extra.multicast(roof),
                         disposable: d
                     };
                 };

@@ -22,12 +22,12 @@ var Effect = require("../Effect/index.js");
 var Effect_Unsafe = require("../Effect.Unsafe/index.js");
 var FRP_Event = require("../FRP.Event/index.js");
 var FRP_Event_Class = require("../FRP.Event.Class/index.js");
+var FRP_Event_Extra = require("../FRP.Event.Extra/index.js");
 var Three_Core_Geometry = require("../Three.Core.Geometry/index.js");
 var Three_Core_Material = require("../Three.Core.Material/index.js");
 var Three_Core_Object3D = require("../Three.Core.Object3D/index.js");
 var Three_Math_Vector = require("../Three.Math.Vector/index.js");
 var UI_DraggableObject = require("../UI.DraggableObject/index.js");
-var Util = require("../Util/index.js");
 var verticesCenter = function (v) {
     if (v.length === 0) {
         return Three_Math_Vector.mkVec3(0.0)(0.0)(1.0e-2);
@@ -76,7 +76,7 @@ var mkRedMarkers = function (roofActive) {
                         throw new Error("Failed pattern match at Editor.RoofEditor (line 40, column 19 - line 40, column 38): " + [ act.constructor.name, v1.constructor.name ]);
                     };
                 };
-                var isActive = Util.multicast(Control_Apply.lift2(FRP_Event.applyEvent)(f)(roofActive)(activeMarker));
+                var isActive = FRP_Event_Extra.multicast(Control_Apply.lift2(FRP_Event.applyEvent)(f)(roofActive)(activeMarker));
                 return UI_DraggableObject.createDraggableObject(isActive)(v.value1)(v.value0)(Data_Maybe.Nothing.value)(Data_Maybe.Nothing.value);
             };
             return Data_Traversable.traverse(Data_Traversable.traversableArray)(Effect.applicativeEffect)(mkMarker)(psIdx);
@@ -174,8 +174,8 @@ var mkGreenMarkers = function (parent) {
     return function (active) {
         return function (vertices) {
             var mPosList = Data_Functor.map(FRP_Event.functorEvent)(greenMarkerPositions)(vertices);
-            var markers = Util.multicast(Util.foldEffect(updateMarkers(parent))(mPosList)([  ]));
-            var res = Util.performEvent(Control_Apply.lift2(FRP_Event.applyEvent)(setActive)(markers)(active));
+            var markers = FRP_Event_Extra.multicast(FRP_Event_Extra.foldEffect(updateMarkers(parent))(mPosList)([  ]));
+            var res = FRP_Event_Extra.performEvent(Control_Apply.lift2(FRP_Event.applyEvent)(setActive)(markers)(active));
             var getTap = function (m) {
                 return Data_Functor.map(FRP_Event.functorEvent)(Data_Function["const"](m.point))(m.mesh.tapped);
             };
@@ -211,7 +211,7 @@ var getPosition = function (os) {
     var f = function (o) {
         return Data_Functor.map(FRP_Event.functorEvent)(g)(o.position);
     };
-    return Util.mergeArray(Data_Functor.map(Data_Functor.functorArray)(f)(os));
+    return FRP_Event_Extra.mergeArray(Data_Functor.map(Data_Functor.functorArray)(f)(os));
 };
 var getDelEvt = function (os) {
     var f = function (o) {
@@ -248,13 +248,13 @@ var createRoofEditor = function (parent) {
                 var d1 = FRP_Event.subscribe(active)(v.push)();
                 var v1 = FRP_Event.create();
                 var v2 = FRP_Event.create();
-                var markerObjs = Util.performEvent(Data_Functor.map(FRP_Event.functorEvent)(mkRedMarkers(v.event)(v2.event))(v1.event));
-                var markers = Util.multicast(Util.foldEffect(attachObjs(parent))(markerObjs)([  ]));
+                var markerObjs = FRP_Event_Extra.performEvent(Data_Functor.map(FRP_Event.functorEvent)(mkRedMarkers(v.event)(v2.event))(v1.event));
+                var markers = FRP_Event_Extra.multicast(FRP_Event_Extra.foldEffect(attachObjs(parent))(markerObjs)([  ]));
                 var actMarker = getRedMarkerActiveStatus(markers);
                 var d2 = FRP_Event.subscribe(actMarker)(v2.push)();
                 var vertsAfterDrag = FRP_Event_Class.keepLatest(FRP_Event.eventIsEvent)(Data_Functor.map(FRP_Event.functorEvent)(getPosition)(markers));
-                var newVertices = Util.multicast(Control_Alt.alt(FRP_Event.altEvent)(v1.event)(vertsAfterDrag));
-                var greenActive = Util.multicast(Control_Apply.lift2(FRP_Event.applyEvent)(function (ra) {
+                var newVertices = FRP_Event_Extra.multicast(Control_Alt.alt(FRP_Event.altEvent)(v1.event)(vertsAfterDrag));
+                var greenActive = FRP_Event_Extra.multicast(Control_Apply.lift2(FRP_Event.applyEvent)(function (ra) {
                     return function (am) {
                         return ra && Data_Eq.eq(Data_Maybe.eqMaybe(Data_Eq.eqInt))(am)(Data_Maybe.Nothing.value);
                     };

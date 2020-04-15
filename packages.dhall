@@ -128,6 +128,11 @@ let additions = {
         dependencies = ["prelude"],
         repo = "https://github.com/pelotom/purescript-easy-ffi.git",
         version = "master"
+    },
+    event-extra = {
+        dependencies = ["event"],
+        repo = "https://github.com/manyoo/event-extra.git",
+        version = "master"
     }
 }
 

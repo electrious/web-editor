@@ -8,6 +8,7 @@ You can edit this file as you like.
   , "easy-ffi"
   , "effect"
   , "event"
+  , "event-extra"
   , "generics-rep"
   , "js-timers"
   , "math"

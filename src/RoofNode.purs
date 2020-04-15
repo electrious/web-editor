@@ -23,7 +23,7 @@ import Three.Core.Mesh (setMaterial)
 import Three.Core.Object3D (Object3D, add, matrix, mkObject3D, remove, rotateX, rotateZ, setName, setPosition, updateMatrix, updateMatrixWorld, worldToLocal)
 import Three.Math.Vector (Vector2, Vector3, applyMatrix, mkVec2, mkVec3, vecX, vecY, vecZ)
 import Unsafe.Coerce (unsafeCoerce)
-import Util (multicast, performEvent)
+import FRP.Event.Extra (multicast, performEvent)
 
 type RoofNode a = {
     roofId     :: String,

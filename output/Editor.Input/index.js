@@ -19,6 +19,7 @@ var Data_Symbol = require("../Data.Symbol/index.js");
 var Effect = require("../Effect/index.js");
 var FRP_Event = require("../FRP.Event/index.js");
 var FRP_Event_Class = require("../FRP.Event.Class/index.js");
+var FRP_Event_Extra = require("../FRP.Event.Extra/index.js");
 var $$Math = require("../Math/index.js");
 var Util = require("../Util/index.js");
 var Web_DOM_Element = require("../Web.DOM.Element/index.js");
@@ -108,7 +109,7 @@ var touchEvent = function (t) {
 };
 var tapped = function (start) {
     return function (end) {
-        var tapCheck = Util.delay(320)(start);
+        var tapCheck = FRP_Event_Extra.delay(320)(start);
         var s = Data_Functor.map(FRP_Event.functorEvent)(Data_Function["const"](false))(start);
         var e = Data_Functor.map(FRP_Event.functorEvent)(Data_Function["const"](true))(end);
         var canBeTap = Control_Alt.alt(FRP_Event.altEvent)(s)(e);
@@ -152,7 +153,7 @@ var genericDragType = new Data_Generic_Rep.Generic(function (x) {
     if (x instanceof DragEnd) {
         return new Data_Generic_Rep.Inr(new Data_Generic_Rep.Inr(Data_Generic_Rep.NoArguments.value));
     };
-    throw new Error("Failed pattern match at Editor.Input (line 61, column 1 - line 61, column 54): " + [ x.constructor.name ]);
+    throw new Error("Failed pattern match at Editor.Input (line 62, column 1 - line 62, column 54): " + [ x.constructor.name ]);
 }, function (x) {
     if (x instanceof Data_Generic_Rep.Inl) {
         return DragStart.value;
@@ -163,7 +164,7 @@ var genericDragType = new Data_Generic_Rep.Generic(function (x) {
     if (x instanceof Data_Generic_Rep.Inr && x.value0 instanceof Data_Generic_Rep.Inr) {
         return DragEnd.value;
     };
-    throw new Error("Failed pattern match at Editor.Input (line 61, column 1 - line 61, column 54): " + [ x.constructor.name ]);
+    throw new Error("Failed pattern match at Editor.Input (line 62, column 1 - line 62, column 54): " + [ x.constructor.name ]);
 });
 var showDragType = new Data_Show.Show(Data_Generic_Rep_Show.genericShow(genericDragType)(Data_Generic_Rep_Show.genericShowSum(Data_Generic_Rep_Show.genericShowConstructor(Data_Generic_Rep_Show.genericShowArgsNoArguments)(new Data_Symbol.IsSymbol(function () {
     return "DragStart";
@@ -203,7 +204,7 @@ var mkDragEndable = function (evt) {
         };
         return Data_Maybe.Nothing.value;
     };
-    var e = Util.debounce(1500.0)(evt);
+    var e = FRP_Event_Extra.debounce(1500.0)(evt);
     return Control_Alt.alt(FRP_Event.altEvent)(evt)(Data_Compactable.compact(FRP_Event.compactableEvent)(Data_Functor.map(FRP_Event.functorEvent)(f)(e)));
 };
 var distance = function (e1) {
@@ -300,7 +301,7 @@ var processDrag = function (evt) {
                 curDragEvt: Data_Maybe.Nothing.value
             };
         };
-        throw new Error("Failed pattern match at Editor.Input (line 120, column 1 - line 120, column 51): " + [ evt.constructor.name, st.constructor.name ]);
+        throw new Error("Failed pattern match at Editor.Input (line 121, column 1 - line 121, column 51): " + [ evt.constructor.name, st.constructor.name ]);
     };
 };
 var dragged = function (start) {
@@ -329,38 +330,38 @@ var dragged = function (start) {
 };
 var setupInput = function (elem) {
     var target = Web_DOM_Element.toEventTarget(elem);
-    var touchEnd = Data_Compactable.compact(FRP_Event.compactableEvent)(Data_Functor.map(FRP_Event.functorEvent)(touchTap(elem))(Util.multicast(touchEvent(Web_TouchEvent_EventTypes.touchend)(target))));
-    var touchMove = Data_Compactable.compact(FRP_Event.compactableEvent)(Data_Functor.map(FRP_Event.functorEvent)(touchTap(elem))(Util.multicast(touchEvent(Web_TouchEvent_EventTypes.touchmove)(target))));
-    var touchStart = Data_Compactable.compact(FRP_Event.compactableEvent)(Data_Functor.map(FRP_Event.functorEvent)(touchTap(elem))(Util.multicast(touchEvent(Web_TouchEvent_EventTypes.touchstart)(target))));
-    var wheelEvt = Util.multicast(wheelEvent(target));
-    var mu = Util.multicast(mouseEvent(Web_UIEvent_MouseEvent_EventTypes.mouseup)(target));
+    var touchEnd = Data_Compactable.compact(FRP_Event.compactableEvent)(Data_Functor.map(FRP_Event.functorEvent)(touchTap(elem))(FRP_Event_Extra.multicast(touchEvent(Web_TouchEvent_EventTypes.touchend)(target))));
+    var touchMove = Data_Compactable.compact(FRP_Event.compactableEvent)(Data_Functor.map(FRP_Event.functorEvent)(touchTap(elem))(FRP_Event_Extra.multicast(touchEvent(Web_TouchEvent_EventTypes.touchmove)(target))));
+    var touchStart = Data_Compactable.compact(FRP_Event.compactableEvent)(Data_Functor.map(FRP_Event.functorEvent)(touchTap(elem))(FRP_Event_Extra.multicast(touchEvent(Web_TouchEvent_EventTypes.touchstart)(target))));
+    var wheelEvt = FRP_Event_Extra.multicast(wheelEvent(target));
+    var mu = FRP_Event_Extra.multicast(mouseEvent(Web_UIEvent_MouseEvent_EventTypes.mouseup)(target));
     var mouseEnd = Data_Functor.map(FRP_Event.functorEvent)(mouseTap)(mu);
-    var mm = Util.multicast(mouseEvent(Web_UIEvent_MouseEvent_EventTypes.mousemove)(target));
+    var mm = FRP_Event_Extra.multicast(mouseEvent(Web_UIEvent_MouseEvent_EventTypes.mousemove)(target));
     var mouseMove = Data_Functor.map(FRP_Event.functorEvent)(mouseTap)(Data_Filterable.filter(FRP_Event.filterableEvent)((function () {
         var $25 = Data_HeytingAlgebra.not(Data_HeytingAlgebra.heytingAlgebraBoolean);
         return function ($26) {
             return $25(Web_UIEvent_MouseEvent.shiftKey($26));
         };
     })())(mm));
-    var move = Util.multicast(Control_Alt.alt(FRP_Event.altEvent)(mouseMove)(touchMove));
+    var move = FRP_Event_Extra.multicast(Control_Alt.alt(FRP_Event.altEvent)(mouseMove)(touchMove));
     var shiftMove = Data_Functor.map(FRP_Event.functorEvent)(mouseTap)(Data_Filterable.filter(FRP_Event.filterableEvent)(Web_UIEvent_MouseEvent.shiftKey)(mm));
-    var md = Util.multicast(mouseEvent(Web_UIEvent_MouseEvent_EventTypes.mousedown)(target));
+    var md = FRP_Event_Extra.multicast(mouseEvent(Web_UIEvent_MouseEvent_EventTypes.mousedown)(target));
     var mouseStart = Data_Functor.map(FRP_Event.functorEvent)(mouseTap)(Data_Filterable.filter(FRP_Event.filterableEvent)((function () {
         var $27 = Data_HeytingAlgebra.not(Data_HeytingAlgebra.heytingAlgebraBoolean);
         return function ($28) {
             return $27(Web_UIEvent_MouseEvent.shiftKey($28));
         };
     })())(md));
-    var start = Util.multicast(Control_Alt.alt(FRP_Event.altEvent)(mouseStart)(touchStart));
+    var start = FRP_Event_Extra.multicast(Control_Alt.alt(FRP_Event.altEvent)(mouseStart)(touchStart));
     var shiftStart = Data_Functor.map(FRP_Event.functorEvent)(mouseTap)(Data_Filterable.filter(FRP_Event.filterableEvent)(Web_UIEvent_MouseEvent.shiftKey)(md));
     var shiftDrag = dragged(shiftStart)(shiftMove)(mouseEnd);
-    var end = Util.multicast(Control_Alt.alt(FRP_Event.altEvent)(mouseEnd)(touchEnd));
+    var end = FRP_Event_Extra.multicast(Control_Alt.alt(FRP_Event.altEvent)(mouseEnd)(touchEnd));
     var drag = dragged(start)(move)(end);
     return {
-        tapped: Util.multicast(tapped(start)(end)),
+        tapped: FRP_Event_Extra.multicast(tapped(start)(end)),
         zoomed: wheelEvt,
-        dragged: Util.multicast(drag),
-        shiftDragged: Util.multicast(shiftDrag),
+        dragged: FRP_Event_Extra.multicast(drag),
+        shiftDragged: FRP_Event_Extra.multicast(shiftDrag),
         mouseMove: Data_Functor.map(FRP_Event.functorEvent)(mouseMoveEvent)(mm)
     };
 };

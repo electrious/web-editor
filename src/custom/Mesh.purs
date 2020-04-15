@@ -14,7 +14,7 @@ import Three.Core.Material (Material)
 import Three.Core.Mesh (Mesh, mkMesh)
 import Three.Core.Object3D (Object3D, hasParent, parent, worldToLocal)
 import Three.Math.Vector (Vector3, mkVec3, (<->))
-import Util (multicast, performEvent)
+import FRP.Event.Extra (multicast, performEvent)
 
 type TappableMesh a = {
     mesh   :: Mesh a,

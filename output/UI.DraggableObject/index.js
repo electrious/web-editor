@@ -12,11 +12,11 @@ var Editor_SceneEvent = require("../Editor.SceneEvent/index.js");
 var Effect = require("../Effect/index.js");
 var Effect_Unsafe = require("../Effect.Unsafe/index.js");
 var FRP_Event = require("../FRP.Event/index.js");
+var FRP_Event_Extra = require("../FRP.Event.Extra/index.js");
 var Three_Core_Geometry = require("../Three.Core.Geometry/index.js");
 var Three_Core_Material = require("../Three.Core.Material/index.js");
 var Three_Core_Object3D = require("../Three.Core.Object3D/index.js");
 var Three_Math_Vector = require("../Three.Math.Vector/index.js");
-var Util = require("../Util/index.js");
 var invisibleMaterial = Effect_Unsafe.unsafePerformEffect(function __do() {
     var mat = Three_Core_Material.mkMeshBasicMaterial(0)();
     Three_Core_Material.setTransparent(true)(mat)();
@@ -57,8 +57,8 @@ var createDraggableObject = function (active) {
                         Three_Core_Object3D.setRenderOrder(10)(invCircle.mesh)();
                         Three_Core_Object3D.add(invCircle.mesh)(dragObj)();
                         var disp1 = FRP_Event.subscribe(active)(Data_Function.flip(Three_Core_Object3D.setVisible)(mesh.mesh))();
-                        var dragEvts = Util.multicast(Control_Alt.alt(FRP_Event.altEvent)(mesh.dragged)(invCircle.dragged));
-                        var evts = Util.multicast(Custom_Mesh.validateDrag(dragEvts));
+                        var dragEvts = FRP_Event_Extra.multicast(Control_Alt.alt(FRP_Event.altEvent)(mesh.dragged)(invCircle.dragged));
+                        var evts = FRP_Event_Extra.multicast(Custom_Mesh.validateDrag(dragEvts));
                         var endEvt = Data_Filterable.filter(FRP_Event.filterableEvent)(Editor_SceneEvent.isDragEnd)(evts);
                         var startEvt = Data_Filterable.filter(FRP_Event.filterableEvent)(Editor_SceneEvent.isDragStart)(evts);
                         var dragging = Control_Alt.alt(FRP_Event.altEvent)(Data_Functor.map(FRP_Event.functorEvent)(Data_Function["const"](true))(startEvt))(Data_Functor.map(FRP_Event.functorEvent)(Data_Function["const"](false))(endEvt));
@@ -79,7 +79,7 @@ var createDraggableObject = function (active) {
                                 return Three_Math_Vector.add(Three_Math_Vector.vecVec3)(lastPos)(zeroZ(d));
                             };
                         };
-                        var newPos = Util.multicast(Util.foldWithDef(updatePos)(delta)(defPosition));
+                        var newPos = FRP_Event_Extra.multicast(FRP_Event_Extra.foldWithDef(updatePos)(delta)(defPosition));
                         var disp3 = FRP_Event.subscribe(newPos)(function (p) {
                             return function __do() {
                                 Three_Core_Object3D.setPosition(p)(mesh.mesh)();
@@ -90,7 +90,7 @@ var createDraggableObject = function (active) {
                             object: dragObj,
                             tapped: Data_Functor.map(FRP_Event.functorEvent)(Data_Function["const"](index))(mesh.tapped),
                             position: newPos,
-                            isDragging: Util.multicast(dragging),
+                            isDragging: FRP_Event_Extra.multicast(dragging),
                             disposable: Data_Foldable.sequence_(Effect.applicativeEffect)(Data_Foldable.foldableArray)([ disp1, disp2, disp3 ])
                         };
                     };

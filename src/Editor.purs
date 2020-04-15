@@ -19,7 +19,7 @@ import Three.Core.Object3D (Object3D, add, hasParent, lookAt, mkObject3D, parent
 import Three.Core.Scene (Scene, disposeScene, mkScene)
 import Three.Core.WebGLRenderer (WebGLRenderer, domElement, mkWebGLRenderer, render, setSize)
 import Three.Math.Vector (length, mkVec3, multiplyScalar, normal, vecX, vecY)
-import Util (performEvent)
+import FRP.Event.Extra (performEvent)
 import Web.DOM (Element)
 import Web.DOM.Element (toNode)
 import Web.DOM.Node (appendChild)

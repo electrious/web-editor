@@ -12,10 +12,10 @@ var Editor_SceneEvent = require("../Editor.SceneEvent/index.js");
 var Effect = require("../Effect/index.js");
 var FRP_Event = require("../FRP.Event/index.js");
 var FRP_Event_Class = require("../FRP.Event.Class/index.js");
+var FRP_Event_Extra = require("../FRP.Event.Extra/index.js");
 var Three_Core_Mesh = require("../Three.Core.Mesh/index.js");
 var Three_Core_Object3D = require("../Three.Core.Object3D/index.js");
 var Three_Math_Vector = require("../Three.Math.Vector/index.js");
-var Util = require("../Util/index.js");
 var validateDrag = function (evt) {
     var f = function (e) {
         return function (canDrag) {
@@ -93,7 +93,7 @@ var calcDragDelta = function (toLocalF) {
         var f = function (d) {
             return Data_Functor.map(Effect.functorEffect)(Data_Functor.map(Data_Maybe.functorMaybe)(mkNewDrag(d)))(toLocalF(d.point));
         };
-        var e = Data_Compactable.compact(FRP_Event.compactableEvent)(Util.performEvent(Data_Functor.map(FRP_Event.functorEvent)(f)(evt)));
+        var e = Data_Compactable.compact(FRP_Event.compactableEvent)(FRP_Event_Extra.performEvent(Data_Functor.map(FRP_Event.functorEvent)(f)(evt)));
         var def = {
             type: Editor_Input.DragStart.value,
             distance: 0.0,
@@ -117,8 +117,8 @@ var mkDraggableMesh = function (geo) {
     return function (mat) {
         return function __do() {
             var mesh = Three_Core_Mesh.mkMesh(geo)(mat)();
-            var dragged = Util.multicast(dragEvtOn(mesh));
-            var dragDelta = Util.multicast(calcDragDelta(toLocal(mesh))(dragged));
+            var dragged = FRP_Event_Extra.multicast(dragEvtOn(mesh));
+            var dragDelta = FRP_Event_Extra.multicast(calcDragDelta(toLocal(mesh))(dragged));
             return {
                 mesh: mesh,
                 dragged: dragged,

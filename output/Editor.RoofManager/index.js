@@ -20,9 +20,9 @@ var Editor_RoofRecognizer = require("../Editor.RoofRecognizer/index.js");
 var Effect = require("../Effect/index.js");
 var FRP_Event = require("../FRP.Event/index.js");
 var FRP_Event_Class = require("../FRP.Event.Class/index.js");
+var FRP_Event_Extra = require("../FRP.Event.Extra/index.js");
 var Models_RoofPlate = require("../Models.RoofPlate/index.js");
 var Three_Core_Object3D = require("../Three.Core.Object3D/index.js");
-var Util = require("../Util/index.js");
 var updateRoofDict = function (v) {
     return function (rd) {
         if (v instanceof Models_RoofPlate.RoofOpCreate) {
@@ -108,17 +108,17 @@ var createRoofManager = function (meshData) {
                     return v2.now;
                 };
             };
-            var newRoofs = Util.multicast(Data_Functor.map(FRP_Event.functorEvent)(function (v2) {
+            var newRoofs = FRP_Event_Extra.multicast(Data_Functor.map(FRP_Event.functorEvent)(function (v2) {
                 return v2.roofs;
             })(v1.event));
             var mkNode = function (roof) {
-                return Editor_RoofNode.createRoofNode(roof)(Util.multicast(Data_Functor.map(FRP_Event.functorEvent)(Data_Eq.eq(Data_Maybe.eqMaybe(Data_Eq.eqString))(new Data_Maybe.Just(roof.id)))(v.event)));
+                return Editor_RoofNode.createRoofNode(roof)(FRP_Event_Extra.multicast(Data_Functor.map(FRP_Event.functorEvent)(Data_Eq.eq(Data_Maybe.eqMaybe(Data_Eq.eqString))(new Data_Maybe.Just(roof.id)))(v.event)));
             };
-            var nodes = Util.performEvent(Data_Functor.map(FRP_Event.functorEvent)(Data_Traversable.traverse(Data_Traversable.traversableArray)(Effect.applicativeEffect)(mkNode))(rsToRenderArr));
-            var renderedNodes = Util.multicast(Util.performEvent(Data_Functor.map(FRP_Event.functorEvent)(renderNodes)(FRP_Event_Class.withLast(FRP_Event.eventIsEvent)(nodes))));
+            var nodes = FRP_Event_Extra.performEvent(Data_Functor.map(FRP_Event.functorEvent)(Data_Traversable.traverse(Data_Traversable.traversableArray)(Effect.applicativeEffect)(mkNode))(rsToRenderArr));
+            var renderedNodes = FRP_Event_Extra.multicast(FRP_Event_Extra.performEvent(Data_Functor.map(FRP_Event.functorEvent)(renderNodes)(FRP_Event_Class.withLast(FRP_Event.eventIsEvent)(nodes))));
             var updateRoofOp = FRP_Event_Class.keepLatest(FRP_Event.eventIsEvent)(Data_Functor.map(FRP_Event.functorEvent)(getRoofUpdate)(renderedNodes));
-            var flattened = Util.performEvent(Data_Functor.map(FRP_Event.functorEvent)(doFlatten(meshData))(newRoofs));
-            var deleteRoofOp = Util.multicast(FRP_Event_Class.keepLatest(FRP_Event.eventIsEvent)(Data_Functor.map(FRP_Event.functorEvent)(getRoofDelete)(renderedNodes)));
+            var flattened = FRP_Event_Extra.performEvent(Data_Functor.map(FRP_Event.functorEvent)(doFlatten(meshData))(newRoofs));
+            var deleteRoofOp = FRP_Event_Extra.multicast(FRP_Event_Class.keepLatest(FRP_Event.eventIsEvent)(Data_Functor.map(FRP_Event.functorEvent)(getRoofDelete)(renderedNodes)));
             var defRoofDict = roofDict(defRoofs);
             var canShowRecognizer = Data_Functor.map(FRP_Event.functorEvent)(Data_Maybe.isNothing)(v.event);
             var recognizer = Editor_RoofRecognizer.createRoofRecognizer(meshData.wrapper)(Data_Functor.map(FRP_Event.functorEvent)((function () {
@@ -131,8 +131,8 @@ var createRoofManager = function (meshData) {
             var addRoofOp = Data_Functor.map(FRP_Event.functorEvent)(Models_RoofPlate.RoofOpCreate.create)(recognizer.addedNewRoof);
             var ops = Control_Alt.alt(FRP_Event.altEvent)(Control_Alt.alt(FRP_Event.altEvent)(addRoofOp)(deleteRoofOp))(updateRoofOp);
             var d2 = FRP_Event.subscribe(Data_Functor.map(FRP_Event.functorEvent)(Data_Maybe.Just.create)(FRP_Event_Class.keepLatest(FRP_Event.eventIsEvent)(Data_Functor.map(FRP_Event.functorEvent)(getActivated)(renderedNodes))))(v.push)();
-            var d3 = FRP_Event.subscribe(Util.delay(1)(Data_Functor.map(FRP_Event.functorEvent)(Data_Function["const"](Data_Maybe.Nothing.value))(deleteRoofOp)))(v.push)();
-            var d4 = FRP_Event.subscribe(Util.delay(1)(Data_Functor.map(FRP_Event.functorEvent)(function (o) {
+            var d3 = FRP_Event.subscribe(FRP_Event_Extra.delay(1)(Data_Functor.map(FRP_Event.functorEvent)(Data_Function["const"](Data_Maybe.Nothing.value))(deleteRoofOp)))(v.push)();
+            var d4 = FRP_Event.subscribe(FRP_Event_Extra.delay(1)(Data_Functor.map(FRP_Event.functorEvent)(function (o) {
                 return new Data_Maybe.Just(o.id);
             })(recognizer.addedNewRoof)))(v.push)();
             var defRoofData = {
@@ -152,7 +152,7 @@ var createRoofManager = function (meshData) {
             })();
             return {
                 roofWrapper: wrapper,
-                editedRoofs: Util.multicast(Util.skip(1)(Util.debounce(1000.0)(Data_Functor.map(FRP_Event.functorEvent)(getRoofEdited)(newRoofs)))),
+                editedRoofs: FRP_Event_Extra.multicast(FRP_Event_Extra.skip(1)(FRP_Event_Extra.debounce(1000.0)(Data_Functor.map(FRP_Event.functorEvent)(getRoofEdited)(newRoofs)))),
                 disposable: Data_Foldable.sequence_(Effect.applicativeEffect)(Data_Foldable.foldableArray)([ d1, d2, d3, d4, d5, recognizer.disposable ])
             };
         };

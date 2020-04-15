@@ -15,6 +15,7 @@ var Effect = require("../Effect/index.js");
 var Effect_Ref = require("../Effect.Ref/index.js");
 var FRP_Event = require("../FRP.Event/index.js");
 var FRP_Event_Class = require("../FRP.Event.Class/index.js");
+var FRP_Event_Extra = require("../FRP.Event.Extra/index.js");
 var Models_RoofPlate = require("../Models.RoofPlate/index.js");
 var Three_Core_Camera = require("../Three.Core.Camera/index.js");
 var Three_Core_Light = require("../Three.Core.Light/index.js");
@@ -22,7 +23,6 @@ var Three_Core_Object3D = require("../Three.Core.Object3D/index.js");
 var Three_Core_Scene = require("../Three.Core.Scene/index.js");
 var Three_Core_WebGLRenderer = require("../Three.Core.WebGLRenderer/index.js");
 var Three_Math_Vector = require("../Three.Math.Vector/index.js");
-var Util = require("../Util/index.js");
 var Web_DOM_Element = require("../Web.DOM.Element/index.js");
 var Web_DOM_Node = require("../Web.DOM.Node/index.js");
 var Web_HTML = require("../Web.HTML/index.js");
@@ -126,7 +126,7 @@ var createScene = function (width) {
                 Three_Core_Object3D.add(content)(rotWrapper)();
                 var renderFunc = Three_Core_WebGLRenderer.render(scene)(camera)(renderer);
                 var inputEvts = Editor_Input.setupInput(elem);
-                var newDistEvt = Util.performEvent(Data_Functor.map(FRP_Event.functorEvent)((function () {
+                var newDistEvt = FRP_Event_Extra.performEvent(Data_Functor.map(FRP_Event.functorEvent)((function () {
                     var $11 = zoomCamera(camera);
                     return function ($12) {
                         return $11(Web_UIEvent_WheelEvent.deltaY($12));
@@ -140,7 +140,7 @@ var createScene = function (width) {
                 };
                 var rcs = Editor_SceneEvent.setupRaycasting(camera)(scene)(inputEvts)(v.event)();
                 var d2 = FRP_Event.subscribe(rcs.dragEvent)(rotateContentWithDrag(rotWrapper))();
-                var shiftDragEvt = Util.performEvent(FRP_Event_Class.sampleOn(FRP_Event.eventIsEvent)(scaleEvt)(Data_Functor.map(FRP_Event.functorEvent)(moveWithShiftDrag(content))(inputEvts.shiftDragged)));
+                var shiftDragEvt = FRP_Event_Extra.performEvent(FRP_Event_Class.sampleOn(FRP_Event.eventIsEvent)(scaleEvt)(Data_Functor.map(FRP_Event.functorEvent)(moveWithShiftDrag(content))(inputEvts.shiftDragged)));
                 var d3 = FRP_Event.subscribe(shiftDragEvt)(function (v1) {
                     return Control_Applicative.pure(Effect.applicativeEffect)(Data_Unit.unit);
                 })();

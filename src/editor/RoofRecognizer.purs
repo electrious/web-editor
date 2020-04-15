@@ -20,7 +20,7 @@ import Three.Core.Mesh (Mesh)
 import Three.Core.Object3D (Object3D, hasParent, localToWorld, lookAt, parent, setName, setPosition, setVisible, worldToLocal)
 import Three.Math.Vector (Vector3, addScaled, (<+>))
 import Unsafe.Coerce (unsafeCoerce)
-import Util (multicast, performEvent)
+import FRP.Event.Extra (multicast, performEvent)
 
 -- | RoofRecognizer will be able to let user add new roof
 type RoofRecognizer a = {
