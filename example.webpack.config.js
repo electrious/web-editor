@@ -21,7 +21,7 @@ module.exports = {
                 query: {
                     psc: 'psa',
                     spago: true,
-                    src: ['src/**/*.purs']
+                    src: ['src/**/*.purs', 'example/**/*.purs']
                 }
             }
         ]

@@ -11,7 +11,8 @@ import Editor.RoofManager (createRoofManager)
 import Editor.SceneEvent (Size, setupRaycasting)
 import Effect (Effect)
 import Effect.Ref as Ref
-import FRP.Event (Event, create, sampleOn, subscribe)
+import FRP.Event (Event, create, keepLatest, sampleOn, subscribe)
+import FRP.Event.Extra (performEvent)
 import Models.RoofPlate (JSRoofPlate, RoofEdited, fromJSRoofPlate)
 import Three.Core.Camera (PerspectiveCamera, mkPerspectiveCamera, setAspect, updateProjectionMatrix)
 import Three.Core.Light (mkAmbientLight, mkDirectionalLight)
@@ -19,7 +20,6 @@ import Three.Core.Object3D (Object3D, add, hasParent, lookAt, mkObject3D, parent
 import Three.Core.Scene (Scene, disposeScene, mkScene)
 import Three.Core.WebGLRenderer (WebGLRenderer, domElement, mkWebGLRenderer, render, setSize)
 import Three.Math.Vector (length, mkVec3, multiplyScalar, normal, vecX, vecY)
-import FRP.Event.Extra (performEvent)
 import Web.DOM (Element)
 import Web.DOM.Element (toNode)
 import Web.DOM.Node (appendChild)
@@ -31,7 +31,7 @@ import Web.UIEvent.WheelEvent (deltaY)
 type WebEditor = {
     resize    :: Int -> Int -> Effect Unit,
     dispose   :: Effect Unit,
-    loadHouse :: String -> Int -> Array JSRoofPlate -> (Array RoofEdited -> Effect Unit) -> Effect Unit
+    loadHouse :: String -> Int -> Array JSRoofPlate -> Effect (Event (Array RoofEdited))
 }
 
 -- | internal record that defines all components for threejs related objects
@@ -170,18 +170,15 @@ createEditor width height elem = do
     -- start the rednerring
     renderLoop es w
 
-    let loadHouseFunc url leadId roofs roofEdited = do
+    let loadHouseFunc url leadId roofs = do
             let f hmd = do
                     es.addContent hmd.wrapper
                     mgr <- createRoofManager hmd (fromJSRoofPlate <$> roofs)
                     es.addContent mgr.roofWrapper
                     _ <- addDisposable mgr.disposable
-                    d <- subscribe mgr.editedRoofs roofEdited
-                    addDisposable d
+                    pure mgr.editedRoofs
             e <- loadHouse url leadId
-            d <- subscribe e f
-            _ <- addDisposable d
-            pure unit
+            pure $ keepLatest $ performEvent $ f <$> e
         
         disposeFunc = do
             l <- Ref.read disposables
