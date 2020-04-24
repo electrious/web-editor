@@ -67,8 +67,8 @@ applyMaterialCreator matCreator obj = do
 
 
 -- | load the house mesh of the specified lead
-loadHouse :: forall geo. String -> Int -> Effect (Event (HouseMeshData geo))
-loadHouse serverUrl leadId = do
+loadHouseModel :: forall geo. String -> Int -> Effect (Event (HouseMeshData geo))
+loadHouseModel serverUrl leadId = do
     objLoader <- makeOBJLoader2
     mtlLoader <- makeMTLLoader
 

@@ -3,7 +3,7 @@ module Test where
 import Prelude
 
 import Data.Maybe (Maybe(..))
-import Editor.Editor (createEditor)
+import Editor.Editor (createEditor, loadHouse)
 import Effect (Effect)
 import Effect.Class.Console (logShow)
 import FRP.Event (subscribe)
@@ -26,7 +26,7 @@ doTest roofs = do
         Nothing -> pure unit
         Just e -> do
             editor <- createEditor 800 600 e
-            res <- editor.loadHouse serverUrl 296285 roofs
+            res <- loadHouse serverUrl 296285 roofs editor
             
             _ <- subscribe res logShow
             pure unit

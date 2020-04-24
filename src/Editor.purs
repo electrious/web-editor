@@ -1,15 +1,16 @@
-module Editor.Editor (WebEditor, createEditor) where
+module Editor.Editor (WebEditor, createEditor, loadHouse, resize, dispose) where
 
 import Prelude hiding (add)
 
 import Data.Array (cons)
 import Data.Foldable (sequence_)
 import Data.Int (toNumber)
-import Editor.House (loadHouse)
+import Editor.House (loadHouseModel)
 import Editor.Input (DragEvent, setupInput)
 import Editor.RoofManager (createRoofManager)
 import Editor.SceneEvent (Size, setupRaycasting)
 import Effect (Effect)
+import Effect.Ref (Ref)
 import Effect.Ref as Ref
 import FRP.Event (Event, create, keepLatest, sampleOn, subscribe)
 import FRP.Event.Extra (performEvent)
@@ -28,10 +29,9 @@ import Web.HTML.Window (requestAnimationFrame)
 import Web.UIEvent.WheelEvent (deltaY)
 
 -- | Public interface for the main WebEditor
-type WebEditor = {
-    resize    :: Int -> Int -> Effect Unit,
-    dispose   :: Effect Unit,
-    loadHouse :: String -> Int -> Array JSRoofPlate -> Effect (Event (Array RoofEdited))
+newtype WebEditor = WebEditor {
+    scene :: EditorScene Unit,
+    disposables :: Ref (Array (Effect Unit))
 }
 
 -- | internal record that defines all components for threejs related objects
@@ -164,29 +164,32 @@ createEditor width height elem = do
     w <- window
 
     disposables <- Ref.new [es.dispose]
-    
-    let addDisposable d = Ref.modify (cons d) disposables
 
     -- start the rednerring
     renderLoop es w
 
-    let loadHouseFunc url leadId roofs = do
-            let f hmd = do
-                    es.addContent hmd.wrapper
-                    mgr <- createRoofManager hmd (fromJSRoofPlate <$> roofs)
-                    es.addContent mgr.roofWrapper
-                    _ <- addDisposable mgr.disposable
-                    pure mgr.editedRoofs
-            e <- loadHouse url leadId
-            pure $ keepLatest $ performEvent $ f <$> e
-        
-        disposeFunc = do
-            l <- Ref.read disposables
-            sequence_ l
-            Ref.write [] disposables
-    
-    pure {
-        resize: es.resize,
-        dispose: disposeFunc,
-        loadHouse: loadHouseFunc
+    pure $ WebEditor {
+        scene: es,
+        disposables: disposables
     }
+
+resize :: Int -> Int -> WebEditor -> Effect Unit
+resize w h (WebEditor { scene }) = scene.resize w h
+
+dispose :: WebEditor -> Effect Unit
+dispose (WebEditor { disposables }) = do
+    l <- Ref.read disposables
+    sequence_ l
+    Ref.write [] disposables
+
+loadHouse :: String -> Int -> Array JSRoofPlate -> WebEditor -> Effect (Event (Array RoofEdited))
+loadHouse url leadId roofs (WebEditor editor)= do
+    let addDisposable d = Ref.modify (cons d) editor.disposables
+        f hmd = do
+            editor.scene.addContent hmd.wrapper
+            mgr <- createRoofManager hmd (fromJSRoofPlate <$> roofs)
+            editor.scene.addContent mgr.roofWrapper
+            _ <- addDisposable mgr.disposable
+            pure mgr.editedRoofs
+    e <- loadHouseModel url leadId
+    pure $ keepLatest $ performEvent $ f <$> e
