@@ -7,7 +7,12 @@ import Data.Filterable (compact, filter)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Int (toNumber)
+import Data.Lens (Lens', view, (.~), (^.))
+import Data.Lens.Iso.Newtype (_Newtype)
+import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Newtype (class Newtype)
+import Data.Symbol (SProxy(..))
 import Data.Time.Duration (Milliseconds(..))
 import FRP.Event (Event, fold, gate, makeEvent)
 import FRP.Event.Extra (debounce, delay, multicast)
@@ -31,10 +36,18 @@ import Web.UIEvent.WheelEvent as WE
 import Web.UIEvent.WheelEvent.EventTypes (wheel)
 
 -- | TapEvent
-type TapEvent = {
+newtype TapEvent = TapEvent {
     tapX :: Number,
     tapY :: Number
 }
+
+derive instance newtypeTapEvent :: Newtype TapEvent _
+
+_tapX :: Lens' TapEvent Number
+_tapX = _Newtype <<< prop (SProxy :: SProxy "tapX")
+
+_tapY :: Lens' TapEvent Number
+_tapY = _Newtype <<< prop (SProxy :: SProxy "tapY")
 
 -- | tap gesture recognizer for touches
 tapped :: Event TapEvent -> Event TapEvent -> Event TapEvent
@@ -47,13 +60,21 @@ tapped start end = gate canBeTap tapCheck
           tapCheck = delay 320 start
 
 -- | MouseMoveEvent encode the mouse position for MouseMove event
-type MouseMoveEvent = {
+newtype MouseMoveEvent = MouseMoveEvent {
     mouseX :: Number,
     mouseY :: Number
 }
 
+derive instance newtypeMouseMoveEvent :: Newtype MouseMoveEvent _
+
+_mouseX :: Lens' MouseMoveEvent Number
+_mouseX = _Newtype <<< prop (SProxy :: SProxy "mouseX")
+
+_mouseY :: Lens' MouseMoveEvent Number
+_mouseY = _Newtype <<< prop (SProxy :: SProxy "mouseY")
+
 mouseMoveEvent :: MouseEvent -> MouseMoveEvent
-mouseMoveEvent e = { mouseX: offsetX e, mouseY: offsetY e }
+mouseMoveEvent e = MouseMoveEvent { mouseX: offsetX e, mouseY: offsetY e }
 
 data DragType = DragStart
               | Drag
@@ -65,7 +86,7 @@ derive instance eqDragType :: Eq DragType
 instance showDragType :: Show DragType where
     show = genericShow
 
-type DragEvent = {
+newtype DragEvent = DragEvent {
     dragType :: DragType,
     dragX    :: Number,
     dragY    :: Number,
@@ -73,70 +94,105 @@ type DragEvent = {
     deltaY   :: Number
 }
 
+derive instance newtypeDragEvent :: Newtype DragEvent _
+
+_dragType :: Lens' DragEvent DragType
+_dragType = _Newtype <<< prop (SProxy :: SProxy "dragType")
+
+_dragX :: Lens' DragEvent Number
+_dragX = _Newtype <<< prop (SProxy :: SProxy "dragX")
+
+_dragY :: Lens' DragEvent Number
+_dragY = _Newtype <<< prop (SProxy :: SProxy "dragY")
+
+_deltaX :: Lens' DragEvent Number
+_deltaX = _Newtype <<< prop (SProxy :: SProxy "deltaX")
+
+_deltaY :: Lens' DragEvent Number
+_deltaY = _Newtype <<< prop (SProxy :: SProxy "deltaY")
+
 isEnd :: DragEvent -> Boolean
-isEnd e = e.dragType == DragEnd
+isEnd (DragEvent e) = e.dragType == DragEnd
 
 updateDragType :: DragType -> DragEvent -> DragEvent
-updateDragType t e = {
-    dragType : t,
-    dragX    : e.dragX,
-    dragY    : e.dragY,
-    deltaX   : e.deltaX,
-    deltaY   : e.deltaY
-}
+updateDragType t e = e # _dragType .~ t
 
 distance :: DragEvent -> DragEvent -> Number
 distance e1 e2 = sqrt (dx * dx + dy * dy)
-    where dx = e1.dragX - e2.dragX
-          dy = e1.dragY - e2.dragY
+    where dx = e1 ^. _dragX - e2 ^. _dragX
+          dy = e1 ^. _dragY - e2 ^. _dragY
 
 -- wait for 2 seconds and see if there're new events
 -- if not, make sure the last one is DragEnd
 mkDragEndable :: Event DragEvent -> Event DragEvent
 mkDragEndable evt = evt <|> compact (f <$> e)
     where e = debounce (Milliseconds 1500.0) evt
-          f d = if d.dragType /= DragEnd
-                then Just {
-                    dragType: DragEnd,
-                    dragX: d.dragX,
-                    dragY: d.dragY,
-                    deltaX: 0.0,
-                    deltaY: 0.0
-                }
+          f d = if d ^. _dragType /= DragEnd
+                then Just $ d # _dragType .~ DragEnd
+                              # _deltaX .~ 0.0
+                              # _deltaY .~ 0.0
                 else Nothing
 
-type DragState = {
+newtype DragState = DragState {
     canDrag     :: Boolean,
     isDragging  :: Boolean,
     lastDragEvt :: Maybe DragEvent,
     curDragEvt  :: Maybe DragEvent
 }
 
+derive instance newtypeDragState :: Newtype DragState _
+
+_canDrag :: Lens' DragState Boolean
+_canDrag = _Newtype <<< prop (SProxy :: SProxy "canDrag")
+
+_isDragging :: Lens' DragState Boolean
+_isDragging = _Newtype <<< prop (SProxy :: SProxy "isDragging")
+
+_lastDragEvt :: Lens' DragState (Maybe DragEvent)
+_lastDragEvt = _Newtype <<< prop (SProxy :: SProxy "lastDragEvt")
+
+_curDragEvt :: Lens' DragState (Maybe DragEvent)
+_curDragEvt = _Newtype <<< prop (SProxy :: SProxy "curDragEvt")
+
 defState :: DragState
-defState = { canDrag: false, isDragging: false, lastDragEvt: Nothing, curDragEvt: Nothing }
+defState = DragState { canDrag: false, isDragging: false, lastDragEvt: Nothing, curDragEvt: Nothing }
 
 calcDelta :: DragEvent -> DragEvent -> DragEvent
-calcDelta evt oEvt = evt { deltaX = evt.dragX - oEvt.dragX, deltaY = evt.dragY - oEvt.dragY }
+calcDelta evt oEvt = evt # _deltaX .~ evt ^. _dragX - oEvt ^. _dragX
+                         # _deltaY .~ evt ^. _dragY - oEvt ^. _dragY
 
 processDrag :: DragEvent -> DragState -> DragState
-processDrag evt st | evt.dragType == DragStart = { canDrag: true, isDragging: false, lastDragEvt: Just evt, curDragEvt: Nothing }
-                   | evt.dragType == Drag && not st.isDragging && st.canDrag = if distance evt (fromMaybe evt st.lastDragEvt) > 1.0
-                                                                               then let nEvt = evt { dragType = DragStart }
-                                                                                    in st { isDragging = true, lastDragEvt = Just nEvt, curDragEvt = Just nEvt }
-                                                                               else st { lastDragEvt = Just evt }
-                   | evt.dragType == Drag && st.isDragging = let oEvt = fromMaybe evt st.lastDragEvt
-                                                                 nEvt = calcDelta evt oEvt
-                                                             in st { lastDragEvt = Just nEvt, curDragEvt = Just nEvt }
-                   | evt.dragType == DragEnd && st.isDragging = let oEvt = fromMaybe evt st.lastDragEvt
-                                                                    nEvt = calcDelta evt oEvt
-                                                                in st { canDrag = false, isDragging = false, lastDragEvt = Just nEvt, curDragEvt = Just nEvt }
-                   | evt.dragType == DragEnd && not st.isDragging && st.canDrag = st { canDrag = false, curDragEvt = Nothing, lastDragEvt = Just evt }
-                   | otherwise = st { curDragEvt = Nothing, lastDragEvt = Just evt }
+processDrag evt st | evt ^. _dragType == DragStart = DragState { canDrag: true, isDragging: false, lastDragEvt: Just evt, curDragEvt: Nothing }
+                   | evt ^. _dragType == Drag && not (st ^. _isDragging) && st ^. _canDrag =
+                        if distance evt (fromMaybe evt $ st ^. _lastDragEvt) > 1.0
+                        then let nEvt = evt # _dragType .~ DragStart
+                             in st # _isDragging .~ true
+                                   # _lastDragEvt .~ Just nEvt
+                                   # _curDragEvt .~ Just nEvt
+                        else st # _lastDragEvt .~ Just evt
+                   | evt ^. _dragType == Drag && st ^. _isDragging =
+                        let oEvt = fromMaybe evt $ st ^. _lastDragEvt
+                            nEvt = calcDelta evt oEvt
+                        in st # _lastDragEvt .~ Just nEvt
+                              # _curDragEvt .~ Just nEvt
+                   | evt ^. _dragType == DragEnd && st ^. _isDragging =
+                        let oEvt = fromMaybe evt $ st ^. _lastDragEvt
+                            nEvt = calcDelta evt oEvt
+                        in st # _canDrag .~ false
+                              # _isDragging .~ false
+                              # _lastDragEvt .~ Just nEvt
+                              # _curDragEvt .~ Just nEvt
+                   | evt ^. _dragType == DragEnd && not (st ^. _isDragging) && st ^. _canDrag =
+                        st # _canDrag .~ false
+                           # _curDragEvt .~ Nothing
+                           # _lastDragEvt .~ Just evt
+                   | otherwise = st # _curDragEvt .~ Nothing
+                                    # _lastDragEvt .~ Just evt
 
 -- | drag gesture recognizer for both mouse and touch events
 dragged :: Event TapEvent -> Event TapEvent -> Event TapEvent -> Event DragEvent
-dragged start move end = compact $ _.curDragEvt <$> fold processDrag evts defState
-      where mkDrag t e = { dragType: t, dragX: e.tapX, dragY: e.tapY, deltaX: 0.0, deltaY: 0.0 }
+dragged start move end = compact $ view _curDragEvt <$> fold processDrag evts defState
+      where mkDrag t e = DragEvent { dragType: t, dragX: e ^. _tapX, dragY: e ^. _tapY, deltaX: 0.0, deltaY: 0.0 }
 
             dragStart = mkDrag DragStart <$> start
             dragMove  = mkDrag Drag <$> move
@@ -144,13 +200,30 @@ dragged start move end = compact $ _.curDragEvt <$> fold processDrag evts defSta
             evts = mkDragEndable $ dragStart <|> dragMove <|> dragEnd
 
 
-type InputEvents = {
+newtype InputEvents = InputEvents {
     tapped       :: Event TapEvent,
     zoomed       :: Event WE.WheelEvent,
     dragged      :: Event DragEvent,
     shiftDragged :: Event DragEvent,
     mouseMove    :: Event MouseMoveEvent
 }
+
+derive instance newtypeInputEvents :: Newtype InputEvents _
+
+_tapped :: Lens' InputEvents (Event TapEvent)
+_tapped = _Newtype <<< prop (SProxy :: SProxy "tapped")
+
+_zoomed :: Lens' InputEvents (Event WE.WheelEvent)
+_zoomed = _Newtype <<< prop (SProxy :: SProxy "zoomed")
+
+_dragged :: Lens' InputEvents (Event DragEvent)
+_dragged = _Newtype <<< prop (SProxy :: SProxy "dragged")
+
+_shiftDragged :: Lens' InputEvents (Event DragEvent)
+_shiftDragged = _Newtype <<< prop (SProxy :: SProxy "shiftDragged")
+
+_mouseMove :: Lens' InputEvents (Event MouseMoveEvent)
+_mouseMove = _Newtype <<< prop (SProxy :: SProxy "mouseMove")
 
 mouseEvent :: EventType -> EventTarget -> Event ME.MouseEvent
 mouseEvent t target = compact $ makeEvent \k -> do
@@ -171,7 +244,7 @@ wheelEvent target = compact $ makeEvent \k -> do
     pure $ removeEventListener wheel listener false target
 
 mouseTap :: MouseEvent -> TapEvent
-mouseTap e = { tapX: offsetX e, tapY: offsetY e }
+mouseTap e = TapEvent { tapX: offsetX e, tapY: offsetY e }
 
 offsetX :: MouseEvent -> Number
 offsetX = ffi ["mouseEvt"] "mouseEvt.offsetX"
@@ -181,7 +254,7 @@ offsetY = ffi ["mouseEvt"] "mouseEvt.offsetY"
 
 touchTap :: Element -> TouchEvent -> Maybe TapEvent
 touchTap elem e = tapT <$> item 0 (touches e)
-    where tapT t = { tapX: getX t, tapY: getY t }
+    where tapT t = TapEvent { tapX: getX t, tapY: getY t }
           rect = getBoundingClientRect elem
           getX t = toNumber (pageX t) - rect.left
           getY t = toNumber (clientY t) - rect.top
@@ -202,25 +275,25 @@ setupInput elem =
         mouseEnd   = mouseTap <$> mu
 
         touchStart = compact $ touchTap elem <$> multicast (touchEvent touchstart target)
-        touchMove = compact $ touchTap elem <$> multicast (touchEvent touchmove target)
-        touchEnd = compact $ touchTap elem <$> multicast (touchEvent touchend target)
+        touchMove  = compact $ touchTap elem <$> multicast (touchEvent touchmove target)
+        touchEnd   = compact $ touchTap elem <$> multicast (touchEvent touchend target)
 
         wheelEvt = multicast $ wheelEvent target
 
         shiftStart = mouseTap <$> filter shiftKey md
-        shiftMove = mouseTap <$> filter shiftKey mm
+        shiftMove  = mouseTap <$> filter shiftKey mm
 
         start = multicast $ mouseStart <|> touchStart
-        move = multicast $ mouseMove <|> touchMove
-        end = multicast $ mouseEnd <|> touchEnd
+        move  = multicast $ mouseMove <|> touchMove
+        end   = multicast $ mouseEnd <|> touchEnd
 
-        drag = dragged start move end
+        drag      = dragged start move end
         shiftDrag = dragged shiftStart shiftMove mouseEnd
 
-    in {
-        tapped: multicast $ tapped start end,
-        zoomed: wheelEvt,
-        dragged: multicast drag,
-        shiftDragged: multicast shiftDrag,
-        mouseMove: mouseMoveEvent <$> mm
+    in InputEvents {
+        tapped       : multicast $ tapped start end,
+        zoomed       : wheelEvt,
+        dragged      : multicast drag,
+        shiftDragged : multicast shiftDrag,
+        mouseMove    : mouseMoveEvent <$> mm
     }

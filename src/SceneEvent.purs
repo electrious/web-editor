@@ -7,10 +7,11 @@ import Control.Apply (lift2)
 import Data.Array (filter, head)
 import Data.Compactable (compact)
 import Data.Int (toNumber)
+import Data.Lens ((^.))
 import Data.Maybe (Maybe(..))
 import Data.Time.Duration (Milliseconds(..))
 import Data.Traversable (sequence_, traverse)
-import Editor.Input (DragEvent, DragType(..), InputEvents, MouseMoveEvent, TapEvent)
+import Editor.Input (DragEvent, DragType(..), InputEvents, MouseMoveEvent, TapEvent, _dragType, _dragX, _dragY, _dragged, _mouseMove, _mouseX, _mouseY, _tapX, _tapY, _tapped)
 import Effect (Effect)
 import FRP.Event (Event, subscribe)
 import FRP.Event.Extra (debounce, multicast, performEvent)
@@ -117,15 +118,15 @@ calcPosition s pos = mkVec2 x y
 
 -- | convert a TapEvent to position used for raycasting
 tapPosition :: Size -> TapEvent -> Vector2
-tapPosition s e = calcPosition s $ mkVec2 e.tapX e.tapY
+tapPosition s e = calcPosition s $ mkVec2 (e ^. _tapX) (e ^. _tapY)
 
 -- | convert a MouseMoveEvent to position used for raycasting
 mousePosition :: Size -> MouseMoveEvent -> Vector2
-mousePosition s e = calcPosition s $ mkVec2 e.mouseX e.mouseY
+mousePosition s e = calcPosition s $ mkVec2 (e ^. _mouseX) (e ^. _mouseY)
 
 -- | convert a DragEvent to position used for raycasting
 dragPosition :: Size -> DragEvent -> Vector2
-dragPosition s e = calcPosition s $ mkVec2 e.dragX e.dragY
+dragPosition s e = calcPosition s $ mkVec2 (e ^. _dragX) (e ^. _dragY)
 
 -- | Find first object in the intersections array that is Tappable and
 -- send the event to it.
@@ -152,7 +153,7 @@ processDragObjects :: DragEvent -> Array Intersection -> Effect (Maybe DragEvent
 processDragObjects e objs = traverse doDrag target *> pure (f target)
     where target = head $ filter (isDraggable <<< object) objs
           doDrag o = sendDragEvent (object o) {
-              type: e.dragType,
+              type: e ^. _dragType,
               distance: distance o,
               point: point o
             }
@@ -175,12 +176,12 @@ setupRaycasting camera scene input size = do
             intersectObject raycaster scene true
         
         raycastTap sz e = do
-            let domPos = mkVec2 e.tapX e.tapY
+            let domPos = mkVec2 (e ^. _tapX) (e ^. _tapY)
             res <- doRaycast (tapPosition sz e)
             processTapObjects domPos res
 
         raycastMouse sz e = do
-            let domPos = mkVec2 e.mouseX e.mouseY
+            let domPos = mkVec2 (e ^. _mouseX) (e ^. _mouseY)
             res <- doRaycast (mousePosition sz e)
             processMouseOverObjects domPos res
         
@@ -188,9 +189,9 @@ setupRaycasting camera scene input size = do
             res <- doRaycast (dragPosition sz e)
             processDragObjects e res
     
-    let e1 = performEvent $ lift2 raycastTap size input.tapped
-        e2 = performEvent $ lift2 raycastMouse size input.mouseMove
-        unraycastedDrag = compact $ performEvent $ lift2 raycastDrag size input.dragged
+    let e1 = performEvent $ lift2 raycastTap size (input ^. _tapped)
+        e2 = performEvent $ lift2 raycastMouse size (input ^. _mouseMove)
+        unraycastedDrag = compact $ performEvent $ lift2 raycastDrag size (input ^. _dragged)
 
         f _ = pure unit
     

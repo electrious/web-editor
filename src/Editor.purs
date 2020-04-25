@@ -5,8 +5,9 @@ import Prelude hiding (add)
 import Data.Array (cons)
 import Data.Foldable (sequence_)
 import Data.Int (toNumber)
+import Data.Lens ((^.))
 import Editor.House (loadHouseModel)
-import Editor.Input (DragEvent, setupInput)
+import Editor.Input (DragEvent, _deltaX, _deltaY, _shiftDragged, _zoomed, setupInput)
 import Editor.RoofManager (createRoofManager)
 import Editor.SceneEvent (Size, setupRaycasting)
 import Effect (Effect)
@@ -63,14 +64,14 @@ zoomCamera camera zoom = do
 
 rotateContentWithDrag :: forall a. Object3D a -> DragEvent -> Effect Unit
 rotateContentWithDrag obj drag = do
-    rotateZ (drag.deltaX / 360.0) obj
-    rotateOnWorldAxis (mkVec3 1.0 0.0 0.0) (drag.deltaY / 360.0) obj
+    rotateZ ((drag ^. _deltaX) / 360.0) obj
+    rotateOnWorldAxis (mkVec3 1.0 0.0 0.0) ((drag ^. _deltaY) / 360.0) obj
 
 moveWithShiftDrag :: forall a. Object3D a -> DragEvent -> Number -> Effect Unit
 moveWithShiftDrag obj drag scale | not (hasParent obj) = pure unit
                                  | otherwise = do
                                     let p = parent obj
-                                        vec = mkVec3 drag.deltaX (- drag.deltaY) 0.0
+                                        vec = mkVec3 (drag ^. _deltaX) (- (drag ^. _deltaY)) 0.0
                                     lVec <- worldToLocal vec p
                                     translateX (vecX lVec * scale / 10.0) obj
                                     translateY (vecY lVec * scale / 10.0) obj
@@ -128,14 +129,14 @@ createScene width height elem = do
     
         inputEvts = setupInput elem
     
-        newDistEvt = performEvent $ (zoomCamera camera <<< deltaY) <$> inputEvts.zoomed
+        newDistEvt = performEvent $ (zoomCamera camera <<< deltaY) <$> inputEvts ^. _zoomed
         scaleEvt = (\d -> d / cameraDefDist) <$> newDistEvt
     
     rcs <- setupRaycasting camera scene inputEvts sizeEvt
 
     d2 <- subscribe rcs.dragEvent (rotateContentWithDrag rotWrapper)
 
-    let shiftDragEvt = performEvent $ sampleOn scaleEvt (moveWithShiftDrag content <$> inputEvts.shiftDragged) 
+    let shiftDragEvt = performEvent $ sampleOn scaleEvt (moveWithShiftDrag content <$> inputEvts ^. _shiftDragged) 
     d3 <- subscribe shiftDragEvt (\_ -> pure unit)
 
     updateSize({ width: width, height: height})

@@ -12,6 +12,8 @@ You can edit this file as you like.
   , "generics-rep"
   , "js-timers"
   , "math"
+  , "newtype"
+  , "profunctor-lenses"
   , "psci-support"
   , "uuid"
   , "web-touchevents"
