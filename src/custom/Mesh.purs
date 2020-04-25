@@ -3,18 +3,19 @@ module Custom.Mesh where
 import Prelude
 
 import Data.Compactable (compact)
+import Data.Lens ((^.), (.~))
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
 import Editor.Input (DragType(..))
-import Editor.SceneEvent (SceneDragEvent, SceneTapEvent, makeDraggable, makeTappable, stopDraggable, stopTappable)
+import Editor.SceneEvent (SceneDragEvent(..), SceneTapEvent, _dragPoint, _type, makeDraggable, makeTappable, stopDraggable, stopTappable)
 import Effect (Effect)
 import FRP.Event (Event, makeEvent, mapAccum)
+import FRP.Event.Extra (multicast, performEvent)
 import Three.Core.Geometry (Geometry)
 import Three.Core.Material (Material)
 import Three.Core.Mesh (Mesh, mkMesh)
 import Three.Core.Object3D (Object3D, hasParent, parent, worldToLocal)
 import Three.Math.Vector (Vector3, mkVec3, (<->))
-import FRP.Event.Extra (multicast, performEvent)
 
 type TappableMesh a = {
     mesh   :: Mesh a,
@@ -39,27 +40,27 @@ mkTappableMesh geo mat = do
 -- with dragStart and end with dragEnd
 validateDrag :: Event SceneDragEvent -> Event SceneDragEvent
 validateDrag evt = compact (mapAccum f evt false)
-    where f e canDrag | e.type == DragStart = if canDrag
-                                              then Tuple true Nothing  -- if there's a repeated drag start, omit it
-                                              else Tuple true (Just e)
-                      | canDrag && e.type == Drag = Tuple true (Just e)
-                      | e.type == DragEnd = if canDrag
-                                            then Tuple false (Just e) -- stop dragging, send the end event
-                                            else Tuple false Nothing  -- already ended, omit the end event
+    where f e canDrag | e ^. _type == DragStart = if canDrag
+                                                  then Tuple true Nothing  -- if there's a repeated drag start, omit it
+                                                  else Tuple true (Just e)
+                      | canDrag && e ^. _type == Drag = Tuple true (Just e)
+                      | e ^. _type == DragEnd = if canDrag
+                                                then Tuple false (Just e) -- stop dragging, send the end event
+                                                else Tuple false Nothing  -- already ended, omit the end event
                       | otherwise = Tuple false Nothing -- unknown state. omit
 
 -- | calculate local delta distances for all drag events
 calcDragDelta :: (Vector3 -> Effect (Maybe Vector3)) -> Event SceneDragEvent -> Event Vector3
 calcDragDelta toLocalF evt = mapAccum calcDelta e def
-    where f d = map (mkNewDrag d) <$> toLocalF d.point
-          mkNewDrag d p = { distance: d.distance, type: d.type, point: p }
+    where f d = map (mkNewDrag d) <$> toLocalF (d ^. _dragPoint)
+          mkNewDrag d p = d # _dragPoint .~ p
           -- convert drag event to use local coordinate system
           e = compact (performEvent $ f <$> evt)
           zero = mkVec3 0.0 0.0 0.0
-          def = { type: DragStart, distance: 0.0, point: zero }
+          def = SceneDragEvent { type: DragStart, distance: 0.0, point: zero }
 
-          calcDelta ne oldE | ne.type == DragStart = Tuple ne zero
-                            | otherwise            = Tuple ne (ne.point <-> oldE.point)
+          calcDelta ne oldE | ne ^. _type == DragStart = Tuple ne zero
+                            | otherwise                = Tuple ne (ne ^. _dragPoint <-> oldE ^. _dragPoint)
 
 
 type DraggableMesh a = {

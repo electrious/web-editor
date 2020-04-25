@@ -4,7 +4,8 @@ import Prelude
 
 import Algorithm.PointInPolygon (pointInPolygon)
 import Data.Foldable (any)
-import Editor.SceneEvent (SceneMouseMoveEvent)
+import Data.Lens ((^.))
+import Editor.SceneEvent (SceneMouseMoveEvent, _face, _mousePoint)
 import Effect (Effect)
 import Math.Angle (acos, degreeVal)
 import Models.RoofPlate (RoofPlate, getRoofPolygon)
@@ -18,7 +19,7 @@ couldBeRoof house roofs e = do
     let roofPoly = getRoofPolygon <$> roofs
     
     -- get the local coordinate of the intersection point in the house mesh
-    localPoint <- worldToLocal e.point house
+    localPoint <- worldToLocal (e ^. _mousePoint) house
 
     let -- 2D projection of the intersection point
         flatP = mkVec2 (vecX localPoint) (vecY localPoint)
@@ -27,4 +28,4 @@ couldBeRoof house roofs e = do
     -- check if the point is under any roof
     if any (flip pointInPolygon flatP) roofPoly
         then pure false
-        else pure $ degreeVal (calcAngle (normal e.face)) < 60.0
+        else pure $ degreeVal (calcAngle (normal $ e ^. _face)) < 60.0

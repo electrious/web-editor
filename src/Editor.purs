@@ -9,7 +9,7 @@ import Data.Lens ((^.))
 import Editor.House (loadHouseModel)
 import Editor.Input (DragEvent, _deltaX, _deltaY, _shiftDragged, _zoomed, setupInput)
 import Editor.RoofManager (createRoofManager)
-import Editor.SceneEvent (Size, setupRaycasting)
+import Editor.SceneEvent (Size(..), _dispose, _dragEvent, _height, _width, setupRaycasting)
 import Effect (Effect)
 import Effect.Ref (Ref)
 import Effect.Ref as Ref
@@ -85,9 +85,9 @@ createScene width height elem = do
 
     -- function to update camera and renderer when resized
     let resized s = do
-            setAspect (toNumber s.width / toNumber s.height) camera
+            setAspect (toNumber (s ^. _width) / toNumber (s ^. _height)) camera
             updateProjectionMatrix camera
-            setSize s.width s.height renderer
+            setSize (s ^. _width) (s ^. _height) renderer
     
     { event: sizeEvt, push: updateSize } <- create
     d1 <- subscribe sizeEvt resized
@@ -134,12 +134,12 @@ createScene width height elem = do
     
     rcs <- setupRaycasting camera scene inputEvts sizeEvt
 
-    d2 <- subscribe rcs.dragEvent (rotateContentWithDrag rotWrapper)
+    d2 <- subscribe (rcs ^. _dragEvent) (rotateContentWithDrag rotWrapper)
 
     let shiftDragEvt = performEvent $ sampleOn scaleEvt (moveWithShiftDrag content <$> inputEvts ^. _shiftDragged) 
     d3 <- subscribe shiftDragEvt (\_ -> pure unit)
 
-    updateSize({ width: width, height: height})
+    updateSize(Size { width: width, height: height})
 
     pure {
         scene: scene,
@@ -147,9 +147,9 @@ createScene width height elem = do
         renderer: renderer,
         size: sizeEvt,
         render: renderFunc,
-        resize: \w h -> updateSize({ width: w, height: h }),
+        resize: \w h -> updateSize(Size { width: w, height: h }),
         addContent: addContentFunc,
-        dispose: sequence_ [d1, d2, d3, disposeScene scene, rcs.dispose]
+        dispose: sequence_ [d1, d2, d3, disposeScene scene, rcs ^. _dispose]
     }
 
 -- | renderLoop is the function to render scene repeatedly

@@ -6,12 +6,14 @@ import Algorithm.RoofCheck (couldBeRoof)
 import Control.Apply (lift2)
 import Custom.Mesh (TappableMesh, mkTappableMesh)
 import Data.Compactable (compact)
+import Data.Lens ((^.))
 import Data.Maybe (Maybe(..))
 import Data.Traversable (traverse)
-import Editor.SceneEvent (SceneMouseMoveEvent)
+import Editor.SceneEvent (SceneMouseMoveEvent, _face, _mousePoint)
 import Effect (Effect)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Event (Event, gate, sampleOn, subscribe)
+import FRP.Event.Extra (multicast, performEvent)
 import Models.RoofPlate (RoofPlate, newRoofPlate)
 import Three.Core.Face3 (normal)
 import Three.Core.Geometry (Geometry, mkCircleGeometry)
@@ -20,7 +22,6 @@ import Three.Core.Mesh (Mesh)
 import Three.Core.Object3D (Object3D, hasParent, localToWorld, lookAt, parent, setName, setPosition, setVisible, worldToLocal)
 import Three.Math.Vector (Vector3, addScaled, (<+>))
 import Unsafe.Coerce (unsafeCoerce)
-import FRP.Event.Extra (multicast, performEvent)
 
 -- | RoofRecognizer will be able to let user add new roof
 type RoofRecognizer a = {
@@ -81,8 +82,8 @@ createRoofRecognizer houseWrapper roofs mouseMove canShow = do
             isRoof <- couldBeRoof houseWrapper rs evt
             if isRoof
             then do
-                np <- worldToLocal evt.point houseWrapper
-                pure $ Just { position: np, faceNormal: normal evt.face }
+                np <- worldToLocal (evt ^. _mousePoint) houseWrapper
+                pure $ Just { position: np, faceNormal: normal (evt ^. _face) }
             else pure Nothing
 
         point = performEvent $ sampleOn roofs (getCandidatePoint <$> gate canShow mouseMove)
