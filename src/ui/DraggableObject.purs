@@ -6,25 +6,47 @@ import Control.Alt ((<|>))
 import Custom.Mesh (DraggableMesh, TapDragMesh, calcDragDelta, mkDraggableMesh, mkTapDragMesh, validateDrag)
 import Data.Filterable (filter)
 import Data.Foldable (sequence_)
+import Data.Lens (Lens')
+import Data.Lens.Iso.Newtype (_Newtype)
+import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Newtype (class Newtype)
+import Data.Symbol (SProxy(..))
 import Editor.SceneEvent (isDragEnd, isDragStart)
 import Effect (Effect)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Event (Event, subscribe)
+import FRP.Event.Extra (foldWithDef, multicast)
 import Three.Core.Geometry (Geometry, mkCircleGeometry)
 import Three.Core.Material (Material, mkMeshBasicMaterial, setOpacity, setTransparent)
 import Three.Core.Object3D (Object3D, add, hasParent, mkObject3D, parent, setName, setPosition, setRenderOrder, setVisible, worldToLocal)
 import Three.Math.Vector (Vector2, Vector3, mkVec3, vecX, vecY, (<+>))
 import Unsafe.Coerce (unsafeCoerce)
-import FRP.Event.Extra (foldWithDef, multicast)
 
-type DraggableObject a = {
+newtype DraggableObject a = DraggableObject {
     object     :: Object3D a,
     tapped     :: Event Int,
     position   :: Event Vector3,
     isDragging :: Event Boolean,
     disposable :: Effect Unit
 }
+
+derive instance newtypeDraggableEvent :: Newtype (DraggableObject a) _
+
+_draggableObject :: forall a. Lens' (DraggableObject a) (Object3D a)
+_draggableObject = _Newtype <<< prop (SProxy :: SProxy "object")
+
+_tapped :: forall a. Lens' (DraggableObject a) (Event Int)
+_tapped = _Newtype <<< prop (SProxy :: SProxy "tapped")
+
+_position :: forall a. Lens' (DraggableObject a) (Event Vector3)
+_position = _Newtype <<< prop (SProxy :: SProxy "position")
+
+_isDragging :: forall a. Lens' (DraggableObject a) (Event Boolean)
+_isDragging = _Newtype <<< prop (SProxy :: SProxy "isDragging")
+
+_disposable :: forall a. Lens' (DraggableObject a) (Effect Unit)
+_disposable = _Newtype <<< prop (SProxy :: SProxy "disposable")
 
 -- | create the default material
 defMaterial :: forall a. Material a
@@ -107,7 +129,7 @@ createDraggableObject active index position customGeo customMat = do
                 setPosition p mesh.mesh
                 setPosition p invCircle.mesh
 
-    pure {
+    pure $ DraggableObject {
         object: dragObj,
         tapped: const index <$> mesh.tapped,
         position: newPos,

@@ -8,6 +8,7 @@ import Control.Plus (empty)
 import Data.Compactable (compact)
 import Data.Foldable (foldl, sequence_, traverse_)
 import Data.List (toUnfoldable)
+import Data.Lens ((^.))
 import Data.Map (Map, delete, fromFoldable, insert, values)
 import Data.Maybe (Maybe(..), fromMaybe, isNothing)
 import Data.Time.Duration (Milliseconds(..))
@@ -18,9 +19,9 @@ import Editor.RoofNode (RoofNode, createRoofNode)
 import Editor.RoofRecognizer (createRoofRecognizer)
 import Effect (Effect)
 import FRP.Event (Event, create, fold, keepLatest, subscribe, withLast)
-import Models.RoofPlate (RoofEdited, RoofOperation(..), RoofPlate, toRoofEdited)
-import Three.Core.Object3D (Object3D, add, mkObject3D, remove, setName)
 import FRP.Event.Extra (debounce, delay, multicast, performEvent, skip)
+import Models.RoofPlate (RoofEdited, RoofOperation(..), RoofPlate, _roofId, toRoofEdited)
+import Three.Core.Object3D (Object3D, add, mkObject3D, remove, setName)
 
 type RoofManager a = {
     roofWrapper :: Object3D a,
@@ -32,7 +33,7 @@ type RoofDict = Map String RoofPlate
 
 roofDict :: Array RoofPlate -> RoofDict
 roofDict = fromFoldable <<< map f
-    where f r = Tuple r.id r
+    where f r = Tuple (r ^. _roofId) r
 
 -- internal data structure used to manage roofs
 type RoofDictData = {
@@ -42,11 +43,11 @@ type RoofDictData = {
 
 -- | update the managed roof dict with new operation
 updateRoofDict :: RoofOperation -> RoofDictData -> RoofDictData
-updateRoofDict (RoofOpCreate roof) rd = let roofs = insert roof.id roof rd.roofs
+updateRoofDict (RoofOpCreate roof) rd = let roofs = insert (roof ^. _roofId) roof rd.roofs
                                       in { roofs: roofs, roofsToRender: Just roofs }
 updateRoofDict (RoofOpDelete rid) rd = let roofs = delete rid rd.roofs
                                         in { roofs: roofs, roofsToRender: Just roofs }
-updateRoofDict (RoofOpUpdate roof) rd = let roofs = insert roof.id roof rd.roofs
+updateRoofDict (RoofOpUpdate roof) rd = let roofs = insert (roof ^. _roofId) roof rd.roofs
                                         in { roofs: roofs, roofsToRender: Nothing }
 
 doFlatten :: forall a. HouseMeshData a -> RoofDict -> Effect Unit
@@ -78,7 +79,7 @@ createRoofManager meshData defRoofs = do
     d1 <- subscribe (const Nothing <$> meshData.mesh.tapped) updateActive
 
     { event: roofsData, push: updateRoofsData } <- create
-    let mkNode roof = createRoofNode roof (multicast $ ((==) (Just roof.id)) <$> activeRoof)
+    let mkNode roof = createRoofNode roof (multicast $ ((==) (Just $ roof ^. _roofId)) <$> activeRoof)
         defRoofDict = roofDict defRoofs
 
         -- get roofs to be rerendered
@@ -118,7 +119,7 @@ createRoofManager meshData defRoofs = do
 
     d2 <- subscribe (Just <$> (keepLatest $ getActivated <$> renderedNodes)) updateActive
     d3 <- subscribe (delay 1 $ const Nothing <$> deleteRoofOp) updateActive
-    d4 <- subscribe (delay 1 $ (\o -> Just o.id) <$> addedNewRoof) updateActive
+    d4 <- subscribe (delay 1 $ (\o -> Just $ o ^. _roofId) <$> addedNewRoof) updateActive
 
     -- manage all roofs and update it with user operations.
     let defRoofData = { roofs: defRoofDict, roofsToRender: Just defRoofDict }

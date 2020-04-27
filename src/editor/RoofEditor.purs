@@ -9,6 +9,7 @@ import Custom.Mesh (TappableMesh, mkTappableMesh)
 import Data.Array (deleteAt, filter, foldl, head, insertAt, length, mapWithIndex, range, snoc, tail, take, takeEnd, zip, zipWith)
 import Data.Compactable (compact)
 import Data.Int (toNumber)
+import Data.Lens (view, (^.))
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Traversable (sequence, sequence_, sum, traverse, traverse_)
 import Data.Tuple (Tuple(..), fst, snd)
@@ -16,13 +17,13 @@ import Editor.SceneEvent (SceneTapEvent)
 import Effect (Effect)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Event (Event, create, keepLatest, sampleOn, subscribe)
+import FRP.Event.Extra (foldEffect, mergeArray, multicast, performEvent)
 import Three.Core.Geometry (Geometry, mkCircleGeometry)
 import Three.Core.Material (Material, mkMeshBasicMaterial)
 import Three.Core.Object3D (Object3D, add, remove, setPosition, setVisible)
 import Three.Math.Vector (Vector2, Vector3, dist, mkVec2, mkVec3, vecX, vecY)
-import UI.DraggableObject (DraggableObject, createDraggableObject)
+import UI.DraggableObject (DraggableObject, _disposable, _draggableObject, _isDragging, _position, _tapped, createDraggableObject)
 import Unsafe.Coerce (unsafeCoerce)
-import FRP.Event.Extra (foldEffect, mergeArray, multicast, performEvent)
 
 toVec2 :: Vector3 -> Vector2
 toVec2 v = mkVec2 (vecX v) (vecY v)
@@ -47,7 +48,7 @@ mkRedMarkers roofActive activeMarker ps = traverse mkMarker psIdx
 -- | get red markers' active status event
 getRedMarkerActiveStatus :: forall a. Event (Array (DraggableObject a)) -> Event (Maybe Int)
 getRedMarkerActiveStatus ms = statusForDragging <|> statusForNewMarker
-    where g idx m = (\d -> if d then Just idx else Nothing) <$> m.isDragging
+    where g idx m = (\d -> if d then Just idx else Nothing) <$> m ^. _isDragging
           h objs = foldl (<|>) empty (mapWithIndex g objs)
 
           statusForDragging = keepLatest (h <$> ms)
@@ -56,8 +57,8 @@ getRedMarkerActiveStatus ms = statusForDragging <|> statusForNewMarker
 -- | delete old marker objects and add new ones.
 attachObjs :: forall a b c. Object3D a -> Array (DraggableObject b) -> Array (DraggableObject c) -> Effect (Array (DraggableObject b))
 attachObjs parent newObjs objs = do
-    traverse_ (\o -> remove o.object parent *> o.disposable) objs
-    traverse_ (\o -> add o.object parent) newObjs
+    traverse_ (\o -> remove (o ^. _draggableObject) parent *> (o ^. _disposable)) objs
+    traverse_ (view _draggableObject >>> flip add parent) newObjs
     pure newObjs
 
 roofDeleteMaterial :: forall a. Material a
@@ -175,12 +176,12 @@ type RoofEditor = {
 -- get new positions after dragging
 getPosition :: forall a. Array (DraggableObject a) -> Event (Array Vector2)
 getPosition os = mergeArray (f <$> os)
-    where f o = g <$> o.position
+    where f o = g <$> o ^. _position
           g p = toVec2 p
 
 getDelEvt :: forall a. Array (DraggableObject a) -> Event Int
 getDelEvt os = foldl (<|>) empty (f <$> os)
-    where f o = o.tapped
+    where f o = o ^. _tapped
 
 delMarker :: Int -> Array Vector2 -> Array Vector2
 delMarker idx ps = fromMaybe [] (deleteAt idx ps)

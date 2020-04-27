@@ -6,6 +6,7 @@ import Control.Alt ((<|>))
 import Control.Apply (lift2)
 import Custom.Mesh (TappableMesh, mkTappableMesh)
 import Data.Array (head, init, snoc)
+import Data.Lens ((^.), (.~))
 import Data.Maybe (fromMaybe)
 import Data.Traversable (sequence_, traverse, traverse_)
 import Editor.RoofEditor (createRoofEditor)
@@ -14,8 +15,9 @@ import Effect (Effect)
 import Effect.Timer (setTimeout)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Event (Event, create, keepLatest, subscribe, withLast)
+import FRP.Event.Extra (multicast, performEvent)
 import Math.Angle (radianVal)
-import Models.RoofPlate (RoofOperation(..), RoofPlate)
+import Models.RoofPlate (RoofOperation(..), RoofPlate, _azimuth, _borderPoints, _center, _roofId, _slope)
 import SimplePolygon (isSimplePolygon)
 import Three.Core.Geometry (mkShape, mkShapeGeometry)
 import Three.Core.Material (Material, mkMeshBasicMaterial, setOpacity, setTransparent)
@@ -23,7 +25,6 @@ import Three.Core.Mesh (setMaterial)
 import Three.Core.Object3D (Object3D, add, matrix, mkObject3D, remove, rotateX, rotateZ, setName, setPosition, updateMatrix, updateMatrixWorld, worldToLocal)
 import Three.Math.Vector (Vector2, Vector3, applyMatrix, mkVec2, mkVec3, vecX, vecY, vecZ)
 import Unsafe.Coerce (unsafeCoerce)
-import FRP.Event.Extra (multicast, performEvent)
 
 type RoofNode a = {
     roofId     :: String,
@@ -65,8 +66,8 @@ createRoofMesh ps active = do
 
 updateRoofPlate :: Array Vector3 -> RoofPlate -> RoofPlate
 updateRoofPlate [] roof = roof
-updateRoofPlate ps roof = roof { borderPoints = newPs }
-    where newPs = fromMaybe roof.borderPoints $ snoc ps <$> head ps
+updateRoofPlate ps roof = roof # _borderPoints .~ newPs
+    where newPs = fromMaybe (roof ^. _borderPoints) $ snoc ps <$> head ps
 
 
 -- test if a polygon is simple or with self-intersections
@@ -82,12 +83,12 @@ createRoofNode roof isActive = do
     setName "roofplate" obj
 
     -- set the roof node position
-    let c = roof.center
+    let c = roof ^. _center
     setPosition (mkVec3 (vecX c) (vecY c) (vecZ c + 0.05)) obj
 
     -- rotate the roof node to the right azimuth and slope angles
-    rotateZ (- radianVal roof.azimuth) obj
-    rotateX (- radianVal roof.slope) obj
+    rotateZ (- radianVal (roof ^. _azimuth)) obj
+    rotateX (- radianVal (roof ^. _slope)) obj
 
     -- make sure the matrix and matrixWorld are updated immediately after
     -- position and rotation changed, so that worldToLocal can use them to
@@ -102,7 +103,7 @@ createRoofNode roof isActive = do
     let toLocal p = do
             np <- worldToLocal p obj
             pure $ mkVec2 (vecX np) (vecY np)
-    ps <- traverse toLocal $ fromMaybe [] (init roof.borderPoints)
+    ps <- traverse toLocal $ fromMaybe [] (init $ roof ^. _borderPoints)
 
     { event: defVerts, push: setDefVerts } <- create
 
@@ -137,8 +138,8 @@ createRoofNode roof isActive = do
     when (not $ testSimplePolygon ps) (void $ setTimeout 1000 (toDel unit))
 
     pure {
-        roofId: roof.id,
-        roofDelete: multicast $ const (RoofOpDelete roof.id) <$> delRoofEvt,
+        roofId: roof ^. _roofId,
+        roofDelete: multicast $ const (RoofOpDelete $ roof ^. _roofId) <$> delRoofEvt,
         roofUpdate: multicast newRoofs,
         tapped: multicast tapped,
         roofObject: obj,

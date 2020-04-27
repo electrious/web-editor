@@ -8,12 +8,18 @@ import Data.Enum (class BoundedEnum, class Enum, toEnum)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Bounded (genericBottom, genericTop)
 import Data.Generic.Rep.Enum (genericCardinality, genericFromEnum, genericPred, genericSucc, genericToEnum)
+import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
+import Data.Lens (Lens', (^.))
+import Data.Lens.Iso.Newtype (_Newtype)
+import Data.Lens.Record (prop)
 import Data.Maybe (fromMaybe)
+import Data.Newtype (class Newtype)
+import Data.Symbol (SProxy(..))
 import Data.UUID (genUUID, toString)
 import Effect (Effect)
 import Math as Math
-import Math.Angle (Angle, acos, atan2, degree, degreeVal, radian)
+import Math.Angle (Angle, acos, atan2, degree, degreeVal)
 import Three.Math.Vector (class Vector, Vector2, Vector3, addScaled, cross, length, mkVec2, mkVec3, vecX, vecY, vecZ, (<.>))
 
 -- | define the Orientation data and instances for common typeclasses
@@ -63,7 +69,7 @@ instance showAlignment :: Show Alignment where
     show = genericShow
 
 -- | define the core RoofPlate type as a record
-type RoofPlate = {
+newtype RoofPlate = RoofPlate {
     id           :: String,
     intId        :: Int,
     leadId       :: Int,
@@ -77,6 +83,43 @@ type RoofPlate = {
     azimuth      :: Angle,
     rotation     :: Angle
 }
+
+derive instance newtypeRoofplate :: Newtype RoofPlate _
+derive instance genericRoofplate :: Generic RoofPlate _
+instance showRoofplate :: Show RoofPlate where
+    show = genericShow
+instance eqRoofplate :: Eq RoofPlate where
+    eq = genericEq
+
+_roofId :: Lens' RoofPlate String
+_roofId = _Newtype <<< prop (SProxy :: SProxy "id")
+
+_leadId :: Lens' RoofPlate Int
+_leadId = _Newtype <<< prop (SProxy :: SProxy "leadId")
+
+_borderPoints :: Lens' RoofPlate (Array Vector3)
+_borderPoints = _Newtype <<< prop (SProxy :: SProxy "borderPoints")
+
+_center :: Lens' RoofPlate Vector3
+_center = _Newtype <<< prop (SProxy :: SProxy "center")
+
+_normal :: Lens' RoofPlate Vector3
+_normal = _Newtype <<< prop (SProxy :: SProxy "normal")
+
+_orientation :: Lens' RoofPlate Orientation
+_orientation = _Newtype <<< prop (SProxy :: SProxy "orientation")
+
+_alignment :: Lens' RoofPlate Alignment
+_alignment = _Newtype <<< prop (SProxy :: SProxy "alignment")
+
+_slope :: Lens' RoofPlate Angle
+_slope = _Newtype <<< prop (SProxy :: SProxy "slope")
+
+_azimuth :: Lens' RoofPlate Angle
+_azimuth = _Newtype <<< prop (SProxy :: SProxy "azimuth")
+
+_rotation :: Lens' RoofPlate Angle
+_rotation = _Newtype <<< prop (SProxy :: SProxy "rotation")
 
 -- | external JSRoofPlate model used in JS code. The data received from user and
 -- updates sent back to user should be in this format
@@ -101,7 +144,7 @@ arrVec _ = mkVec3 0.0 0.0 0.0
 
 -- | Convert external JSroofPlate to internal RoofPlate
 fromJSRoofPlate :: JSRoofPlate -> RoofPlate
-fromJSRoofPlate r = {
+fromJSRoofPlate r = RoofPlate {
     id           : r.uuid,
     intId        : r.id,
     leadId       : r.lead_id,
@@ -121,7 +164,7 @@ type Polygon = Array Vector2
 
 -- | get the 2D polygon for a roof plate
 getRoofPolygon :: RoofPlate -> Polygon
-getRoofPolygon r = f <$> r.borderPoints
+getRoofPolygon r = f <$> r ^. _borderPoints
     where f v = mkVec2 (vecX v) (vecY v)
 
 -- | helper function to calculate angle between two Vector3
@@ -183,7 +226,7 @@ newRoofPlate center normal = do
         rafter = rafterVector normal gutter
         borderPoints = defBorderPoints center gutter rafter
 
-    pure {
+    pure $ RoofPlate {
         id           : toString u,
         intId        : 0,
         leadId       : 0,
@@ -232,8 +275,8 @@ type RoofEdited = {
 toRoofEdited :: RoofPlate -> RoofEdited
 toRoofEdited r = { ground: vec2Point gutter,
                    inclined: vec2Point rafter,
-                   contours: vec2Point <$> r.borderPoints,
-                   indices: 1..(Arr.length r.borderPoints)
+                   contours: vec2Point <$> r ^. _borderPoints,
+                   indices: 1..(Arr.length $ r ^. _borderPoints)
                  }
-    where gutter = gutterVector r.normal
-          rafter = rafterVector r.normal gutter
+    where gutter = gutterVector $ r ^. _normal
+          rafter = rafterVector (r ^. _normal) gutter
