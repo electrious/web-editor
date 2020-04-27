@@ -97,10 +97,18 @@ roofFlattener :: RoofPlate -> RoofFlattener
 roofFlattener r = RoofFlattener { roofNormal: r ^. _normal, roofCenter: r ^. _center, roofPolygon: getRoofPolygon r}
 
 -- | flattened vertex info
-type FlattenedVertex = {
+newtype FlattenedVertex = FlattenedVertex {
     index  :: Int,
     newPos :: Vector3
 }
+
+derive instance newtypeFlattendVertex :: Newtype FlattenedVertex _
+
+_index :: Lens' FlattenedVertex Int
+_index = _Newtype <<< prop (SProxy :: SProxy "index")
+
+_newPos :: Lens' FlattenedVertex Vector3
+_newPos = _Newtype <<< prop (SProxy :: SProxy "newPos")
 
 -- | apply the flattened vertices to the BufferGeometry and return a new one
 applyFlattenedVertex :: forall geo. BufferGeometry geo -> Array FlattenedVertex -> Effect (BufferGeometry geo)
@@ -110,8 +118,8 @@ applyFlattenedVertex geo fvs = do
     if isBufferAttribute attr
     then do
         let apply fv = do
-                let p = fv.newPos
-                setXYZ fv.index (vecX p) (vecY p) (vecZ p) attr
+                let p = fv ^. _newPos
+                setXYZ (fv ^. _index) (vecX p) (vecY p) (vecZ p) attr
         sequence_ (apply <$> fvs)
         setNeedsUpdate true attr
         pure newGeo
@@ -138,7 +146,7 @@ flattenRoofplate tree roof = do
     
         -- filter function
         f c = pointInRoof c && checkDistAndAngle c
-        flattenF c = { index: c.index, newPos: flatten flattener c.vertex }
+        flattenF c = FlattenedVertex { index: c.index, newPos: flatten flattener c.vertex }
     
     pure $ flattenF <$> filter f candidates
 

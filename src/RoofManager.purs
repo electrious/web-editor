@@ -7,10 +7,14 @@ import Control.Alt ((<|>))
 import Control.Plus (empty)
 import Data.Compactable (compact)
 import Data.Foldable (foldl, sequence_, traverse_)
+import Data.Lens (Lens', view, (^.))
+import Data.Lens.Iso.Newtype (_Newtype)
+import Data.Lens.Record (prop)
 import Data.List (toUnfoldable)
-import Data.Lens ((^.))
 import Data.Map (Map, delete, fromFoldable, insert, values)
 import Data.Maybe (Maybe(..), fromMaybe, isNothing)
+import Data.Newtype (class Newtype)
+import Data.Symbol (SProxy(..))
 import Data.Time.Duration (Milliseconds(..))
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
@@ -23,11 +27,22 @@ import FRP.Event.Extra (debounce, delay, multicast, performEvent, skip)
 import Models.RoofPlate (RoofEdited, RoofOperation(..), RoofPlate, _roofId, toRoofEdited)
 import Three.Core.Object3D (Object3D, add, mkObject3D, remove, setName)
 
-type RoofManager a = {
+newtype RoofManager a = RoofManager {
     roofWrapper :: Object3D a,
     editedRoofs :: Event (Array RoofEdited),
     disposable  :: Effect Unit
 }
+
+derive instance newtypeRoofManager :: Newtype (RoofManager a) _
+
+_roofWrapper :: forall a. Lens' (RoofManager a) (Object3D a)
+_roofWrapper = _Newtype <<< prop (SProxy :: SProxy "roofWrapper")
+
+_editedRoofs :: forall a. Lens' (RoofManager a) (Event (Array RoofEdited))
+_editedRoofs = _Newtype <<< prop (SProxy :: SProxy "editedRoofs")
+
+_disposable :: forall a. Lens' (RoofManager a) (Effect Unit)
+_disposable = _Newtype <<< prop (SProxy :: SProxy "disposable")
 
 type RoofDict = Map String RoofPlate
 
@@ -36,19 +51,27 @@ roofDict = fromFoldable <<< map f
     where f r = Tuple (r ^. _roofId) r
 
 -- internal data structure used to manage roofs
-type RoofDictData = {
+newtype RoofDictData = RoofDictData {
     roofs :: RoofDict,  -- all roofs manaaged, will be updated on any changes
     roofsToRender :: Maybe RoofDict  -- roofs used for rerenderring
 }
 
+derive instance newtypeRoofDictData :: Newtype RoofDictData _
+
+_roofs :: Lens' RoofDictData RoofDict
+_roofs = _Newtype <<< prop (SProxy :: SProxy "roofs")
+
+_roofsToRender :: Lens' RoofDictData (Maybe RoofDict)
+_roofsToRender = _Newtype <<< prop (SProxy :: SProxy "roofsToRender")
+
 -- | update the managed roof dict with new operation
 updateRoofDict :: RoofOperation -> RoofDictData -> RoofDictData
-updateRoofDict (RoofOpCreate roof) rd = let roofs = insert (roof ^. _roofId) roof rd.roofs
-                                      in { roofs: roofs, roofsToRender: Just roofs }
-updateRoofDict (RoofOpDelete rid) rd = let roofs = delete rid rd.roofs
-                                        in { roofs: roofs, roofsToRender: Just roofs }
-updateRoofDict (RoofOpUpdate roof) rd = let roofs = insert (roof ^. _roofId) roof rd.roofs
-                                        in { roofs: roofs, roofsToRender: Nothing }
+updateRoofDict (RoofOpCreate roof) rd = let roofs = insert (roof ^. _roofId) roof (rd ^. _roofs)
+                                      in RoofDictData { roofs: roofs, roofsToRender: Just roofs }
+updateRoofDict (RoofOpDelete rid) rd = let roofs = delete rid $ rd ^. _roofs
+                                        in RoofDictData { roofs: roofs, roofsToRender: Just roofs }
+updateRoofDict (RoofOpUpdate roof) rd = let roofs = insert (roof ^. _roofId) roof (rd ^. _roofs)
+                                        in RoofDictData { roofs: roofs, roofsToRender: Nothing }
 
 doFlatten :: forall a. HouseMeshData a -> RoofDict -> Effect Unit
 doFlatten meshData rd = flattenRoofPlates meshData.geometry meshData.verticeTree meshData.mesh.mesh (toUnfoldable $ values rd)
@@ -83,7 +106,7 @@ createRoofManager meshData defRoofs = do
         defRoofDict = roofDict defRoofs
 
         -- get roofs to be rerendered
-        rsToRender = compact $ _.roofsToRender <$> roofsData
+        rsToRender = compact $ view _roofsToRender <$> roofsData
         rsToRenderArr = (toUnfoldable <<< values) <$> rsToRender
 
         -- helper function to deleta and re-add roof nodes
@@ -100,7 +123,7 @@ createRoofManager meshData defRoofs = do
 
         -- event of new roofs that will be updated on any change and
         -- run the roof flatten algorithm whenever there's new roof change
-        newRoofs = multicast $ _.roofs <$> roofsData
+        newRoofs = multicast $ view _roofs <$> roofsData
         flattened = performEvent $ doFlatten meshData <$> newRoofs
 
         -- create the roof recognizer and add it to the roof wrapper object
@@ -122,7 +145,7 @@ createRoofManager meshData defRoofs = do
     d4 <- subscribe (delay 1 $ (\o -> Just $ o ^. _roofId) <$> addedNewRoof) updateActive
 
     -- manage all roofs and update it with user operations.
-    let defRoofData = { roofs: defRoofDict, roofsToRender: Just defRoofDict }
+    let defRoofData = RoofDictData { roofs: defRoofDict, roofsToRender: Just defRoofDict }
         roofData = fold updateRoofDict ops defRoofData
     d5 <- subscribe roofData updateRoofsData
 
@@ -133,7 +156,7 @@ createRoofManager meshData defRoofs = do
     let getRoofEdited = map toRoofEdited <<< toUnfoldable <<< values
 
     -- skipe the first roof in teh editedRoofs event, because it's the default data
-    pure {
+    pure $ RoofManager {
         roofWrapper: wrapper,
         editedRoofs: multicast $ skip 1 $ debounce (Milliseconds 1000.0) $ getRoofEdited <$> newRoofs,
         disposable: sequence_ [d1, d2, d3, d4, d5, recognizer.disposable]

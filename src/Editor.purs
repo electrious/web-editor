@@ -8,7 +8,7 @@ import Data.Int (toNumber)
 import Data.Lens ((^.))
 import Editor.House (loadHouseModel)
 import Editor.Input (DragEvent, _deltaX, _deltaY, _shiftDragged, _zoomed, setupInput)
-import Editor.RoofManager (createRoofManager)
+import Editor.RoofManager (_disposable, _editedRoofs, _roofWrapper, createRoofManager)
 import Editor.SceneEvent (Size(..), _dispose, _dragEvent, _height, _width, setupRaycasting)
 import Effect (Effect)
 import Effect.Ref (Ref)
@@ -189,8 +189,8 @@ loadHouse url leadId roofs (WebEditor editor)= do
         f hmd = do
             editor.scene.addContent hmd.wrapper
             mgr <- createRoofManager hmd (fromJSRoofPlate <$> roofs)
-            editor.scene.addContent mgr.roofWrapper
-            _ <- addDisposable mgr.disposable
-            pure mgr.editedRoofs
+            editor.scene.addContent (mgr ^. _roofWrapper)
+            _ <- addDisposable (mgr ^. _disposable)
+            pure (mgr ^. _editedRoofs)
     e <- loadHouseModel url leadId
     pure $ keepLatest $ performEvent $ f <$> e
