@@ -26,7 +26,7 @@ import Editor.RoofRecognizer (_addedNewRoof, _marker, createRoofRecognizer)
 import Effect (Effect)
 import FRP.Event (Event, create, fold, keepLatest, subscribe, withLast)
 import FRP.Event.Extra (debounce, delay, multicast, performEvent, skip)
-import Models.RoofPlate (RoofEdited, RoofOperation(..), RoofPlate, _roofId, toRoofEdited)
+import Models.Roof.RoofPlate (RoofEdited, RoofOperation(..), RoofPlate, _roofId, toRoofEdited)
 import Three.Core.Object3D (Object3D, add, mkObject3D, remove, setName)
 
 newtype RoofManager a = RoofManager {

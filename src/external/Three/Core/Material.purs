@@ -3,6 +3,7 @@ module Three.Core.Material where
 import Prelude
 
 import Effect (Effect)
+import Three.Loader.TextureLoader (Texture)
 import Util (ffi, fpi)
   
 foreign import data JSMaterial :: Type -> Type
@@ -14,6 +15,7 @@ foreign import data JSMeshBasicMaterial :: Type -> Type
 type MeshBasicMaterial a = Material (JSMeshBasicMaterial a)
 
 foreign import mkMeshBasicMaterial :: forall a. Int -> Effect (MeshBasicMaterial a)
+foreign import mkMeshBasicMaterialWithTexture :: forall a. Texture -> Effect (MeshBasicMaterial a)
 
 setTransparent :: forall a. Boolean -> Material a -> Effect Unit
 setTransparent = fpi ["t", "mat", ""] "mat.transparent = t"
