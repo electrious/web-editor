@@ -4,19 +4,19 @@ import Prelude hiding (degree)
 
 import Data.Array ((..))
 import Data.Array as Arr
-import Data.Enum (toEnum)
+import Data.Enum (fromEnum, toEnum)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Lens (Lens', (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.Maybe (Maybe, fromMaybe)
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.UUID (genUUID, toString)
 import Effect (Effect)
-import Foreign.Generic (class Decode, class Encode, defaultOptions, genericDecode, genericEncode)
+import Foreign.Generic (class Decode, class Encode, decode, defaultOptions, encode, genericDecode, genericEncode)
 import Math as Math
 import Math.Angle (Angle, acos, atan2, degree, degreeVal)
 import Models.Panel (Alignment(..), Orientation(..))
@@ -24,18 +24,19 @@ import Three.Math.Vector (class Vector, Vector2, Vector3, addScaled, cross, leng
 
 -- | define the core RoofPlate type as a record
 newtype RoofPlate = RoofPlate {
-    id           :: String,
-    intId        :: Int,
-    leadId       :: Int,
-    borderPoints :: Array Vector3,
-    coefs        :: Array Number,
-    center       :: Vector3,
-    normal       :: Vector3,
-    orientation  :: Orientation,
-    alignment    :: Alignment,
-    slope        :: Angle,
-    azimuth      :: Angle,
-    rotation     :: Angle
+    id            :: String,
+    intId         :: Int,
+    leadId        :: Int,
+    borderPoints  :: Array Vector3,
+    unifiedPoints :: Maybe (Array UnifiedPoint),
+    coefs         :: Array Number,
+    center        :: Vector3,
+    normal        :: Vector3,
+    orientation   :: Orientation,
+    alignment     :: Alignment,
+    slope         :: Angle,
+    azimuth       :: Angle,
+    rotation      :: Angle
 }
 
 derive instance newtypeRoofplate :: Newtype RoofPlate _
@@ -44,15 +45,28 @@ instance showRoofplate :: Show RoofPlate where
     show = genericShow
 instance eqRoofplate :: Eq RoofPlate where
     eq = genericEq
+instance encodeRoofPlate :: Encode RoofPlate where
+    encode = encode <<< toJSRoofPlate
+instance decodeRoofPlate :: Decode RoofPlate where
+    decode = map fromJSRoofPlate <<< decode
 
 _roofId :: Lens' RoofPlate String
 _roofId = _Newtype <<< prop (SProxy :: SProxy "id")
+
+_roofIntId :: Lens' RoofPlate Int
+_roofIntId = _Newtype <<< prop (SProxy :: SProxy "intId")
 
 _leadId :: Lens' RoofPlate Int
 _leadId = _Newtype <<< prop (SProxy :: SProxy "leadId")
 
 _borderPoints :: Lens' RoofPlate (Array Vector3)
 _borderPoints = _Newtype <<< prop (SProxy :: SProxy "borderPoints")
+
+_unifiedPoints :: Lens' RoofPlate (Maybe (Array UnifiedPoint))
+_unifiedPoints = _Newtype <<< prop (SProxy :: SProxy "unifiedPoints")
+
+_coefs :: Lens' RoofPlate (Array Number)
+_coefs = _Newtype <<< prop (SProxy :: SProxy "coefs")
 
 _center :: Lens' RoofPlate Vector3
 _center = _Newtype <<< prop (SProxy :: SProxy "center")
@@ -108,6 +122,7 @@ newtype UnifiedPoint = UnifiedPoint {
 }
 
 derive instance genericUnifiedPoint :: Generic UnifiedPoint _
+derive instance eqUnifiedPoint :: Eq UnifiedPoint
 instance showUnifiedPoint :: Show UnifiedPoint where
     show = genericShow
 instance encodeUnifiedPoint :: Encode UnifiedPoint where
@@ -120,7 +135,6 @@ instance decodeUnifiedPoint :: Decode UnifiedPoint where
 newtype JSRoofPlate = JSRoofPlate {
     id                :: Int,
     uuid              :: String,
-    created_at        :: String,
     lead_id           :: Int,
     border_points     :: Array Point,
     unified_points    :: Maybe (Array UnifiedPoint),
@@ -146,21 +160,42 @@ arrVec :: Array Number -> Vector3
 arrVec [x, y, z] = mkVec3 x y z
 arrVec _ = mkVec3 0.0 0.0 0.0
 
+vecArr :: Vector3 -> Array Number
+vecArr v = [vecX v, vecY v, vecZ v]
+
 -- | Convert external JSRoofPlate to internal RoofPlate
 fromJSRoofPlate :: JSRoofPlate -> RoofPlate
 fromJSRoofPlate (JSRoofPlate r) = RoofPlate {
-    id           : r.uuid,
-    intId        : r.id,
-    leadId       : r.lead_id,
-    borderPoints : point2Vec <$> r.border_points,
-    coefs        : r.coefs,
-    center       : arrVec r.center,
-    normal       : arrVec r.normal,
-    orientation  : fromMaybe Landscape (toEnum r.orientation),
-    alignment    : fromMaybe Grid (toEnum r.alignment),
-    slope        : degree r.slope,
-    azimuth      : degree r.azimuth,
-    rotation     : degree r.rotation_override
+    id            : r.uuid,
+    intId         : r.id,
+    leadId        : r.lead_id,
+    borderPoints  : point2Vec <$> r.border_points,
+    unifiedPoints : r.unified_points,
+    coefs         : r.coefs,
+    center        : arrVec r.center,
+    normal        : arrVec r.normal,
+    orientation   : fromMaybe Landscape (toEnum r.orientation),
+    alignment     : fromMaybe Grid (toEnum r.alignment),
+    slope         : degree r.slope,
+    azimuth       : degree r.azimuth,
+    rotation      : degree r.rotation_override
+}
+
+toJSRoofPlate :: RoofPlate -> JSRoofPlate
+toJSRoofPlate r = JSRoofPlate {
+    id                : r ^. _roofIntId,
+    uuid              : r ^. _roofId,
+    lead_id           : r ^. _leadId,
+    border_points     : vec2Point <$> r ^. _borderPoints,
+    unified_points    : r ^. _unifiedPoints,
+    orientation       : fromEnum $ r ^. _orientation,
+    alignment         : fromEnum $ r ^. _alignment,
+    slope             : degreeVal $ r ^. _slope,
+    coefs             : r ^. _coefs,
+    center            : vecArr $ r ^. _center,
+    normal            : vecArr $ r ^. _normal,
+    azimuth           : degreeVal $ r ^. _azimuth,
+    rotation_override : degreeVal $ r ^. _rotation
 }
 
 -- | 2D polygon for roof plate projection on ground
@@ -231,18 +266,19 @@ newRoofPlate center normal = do
         borderPoints = defBorderPoints center gutter rafter
 
     pure $ RoofPlate {
-        id           : toString u,
-        intId        : 0,
-        leadId       : 0,
-        borderPoints : borderPoints,
-        coefs        : [],
-        center       : center,
-        normal       : normal,
-        orientation  : Landscape,
-        alignment    : Brick,
-        slope        : slope,
-        azimuth      : azimuth,
-        rotation     : degree 0.0
+        id            : toString u,
+        intId         : 0,
+        leadId        : 0,
+        borderPoints  : borderPoints,
+        unifiedPoints : Nothing,
+        coefs         : [],
+        center        : center,
+        normal        : normal,
+        orientation   : Landscape,
+        alignment     : Brick,
+        slope         : slope,
+        azimuth       : azimuth,
+        rotation      : degree 0.0
     }
 
 -- | Types of operations applied to roofs
