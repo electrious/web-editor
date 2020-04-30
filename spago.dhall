@@ -9,6 +9,7 @@ You can edit this file as you like.
   , "effect"
   , "event"
   , "event-extra"
+  , "foreign-generic"
   , "generics-rep"
   , "js-timers"
   , "math"

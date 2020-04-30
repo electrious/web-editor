@@ -4,69 +4,23 @@ import Prelude hiding (degree)
 
 import Data.Array ((..))
 import Data.Array as Arr
-import Data.Enum (class BoundedEnum, class Enum, toEnum)
+import Data.Enum (toEnum)
 import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Bounded (genericBottom, genericTop)
-import Data.Generic.Rep.Enum (genericCardinality, genericFromEnum, genericPred, genericSucc, genericToEnum)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Lens (Lens', (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.Maybe (fromMaybe)
+import Data.Maybe (Maybe, fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.UUID (genUUID, toString)
 import Effect (Effect)
+import Foreign.Generic (class Decode, class Encode, defaultOptions, genericDecode, genericEncode)
 import Math as Math
 import Math.Angle (Angle, acos, atan2, degree, degreeVal)
+import Models.Panel (Alignment(..), Orientation(..))
 import Three.Math.Vector (class Vector, Vector2, Vector3, addScaled, cross, length, mkVec2, mkVec3, vecX, vecY, vecZ, (<.>))
-
--- | define the Orientation data and instances for common typeclasses
-data Orientation = Landscape | Portrait
-
-derive instance genericOrient :: Generic Orientation _
-derive instance eqOrient :: Eq Orientation
-derive instance ordOrient :: Ord Orientation
-
-instance boundedOrient :: Bounded Orientation where
-    top = genericTop
-    bottom = genericBottom
-
-instance enumOrient :: Enum Orientation where
-    succ = genericSucc
-    pred = genericPred
-
-instance boundenumOrient :: BoundedEnum Orientation where
-    cardinality = genericCardinality
-    toEnum = genericToEnum
-    fromEnum = genericFromEnum
-
-instance showOrient :: Show Orientation where
-    show = genericShow
-
--- | define the Alignment type and instances for common typeclasses
-data Alignment = Grid | Brick
-
-derive instance eqAlignment :: Eq Alignment
-derive instance ordAlighment :: Ord Alignment
-derive instance genericAlignment :: Generic Alignment _
-
-instance enumAlignment :: Enum Alignment where
-    succ = genericSucc
-    pred = genericPred
-
-instance boundedAlignment :: Bounded Alignment where
-    top = genericTop
-    bottom = genericBottom
-
-instance boundedEnumALignment :: BoundedEnum Alignment where
-    cardinality = genericCardinality
-    toEnum = genericToEnum
-    fromEnum = genericFromEnum
-
-instance showAlignment :: Show Alignment where
-    show = genericShow
 
 -- | define the core RoofPlate type as a record
 newtype RoofPlate = RoofPlate {
@@ -121,34 +75,84 @@ _azimuth = _Newtype <<< prop (SProxy :: SProxy "azimuth")
 _rotation :: Lens' RoofPlate Angle
 _rotation = _Newtype <<< prop (SProxy :: SProxy "rotation")
 
+
+-- | Point defines a 3D point used in external values
+newtype Point = Point {
+    x :: Number,
+    y :: Number,
+    z :: Number
+}
+
+derive instance newtypePoint :: Newtype Point _
+derive instance genericPoint :: Generic Point _
+instance showPoint :: Show Point where
+    show = genericShow
+instance encodePoint :: Encode Point where
+    encode = genericEncode (defaultOptions { unwrapSingleConstructors = true })
+instance decodePoint :: Decode Point where
+    decode = genericDecode (defaultOptions { unwrapSingleConstructors = true })
+
+vec2Point :: Vector3 -> Point
+vec2Point v = Point { x: vecX v, y: vecY v, z: vecZ v }
+
+point2Vec :: Point -> Vector3
+point2Vec (Point { x, y, z}) = mkVec3 x y z
+
+
+newtype UnifiedPoint = UnifiedPoint {
+    x      :: Number,
+    y      :: Number,
+    z      :: Number,
+    shade  :: Number,
+    rating :: Number
+}
+
+derive instance genericUnifiedPoint :: Generic UnifiedPoint _
+instance showUnifiedPoint :: Show UnifiedPoint where
+    show = genericShow
+instance encodeUnifiedPoint :: Encode UnifiedPoint where
+    encode = genericEncode (defaultOptions { unwrapSingleConstructors = true })
+instance decodeUnifiedPoint :: Decode UnifiedPoint where
+    decode = genericDecode (defaultOptions { unwrapSingleConstructors = true })
+
 -- | external JSRoofPlate model used in JS code. The data received from user and
 -- updates sent back to user should be in this format
-type JSRoofPlate = {
-    uuid              :: String,
+newtype JSRoofPlate = JSRoofPlate {
     id                :: Int,
+    uuid              :: String,
+    created_at        :: String,
     lead_id           :: Int,
-    border_points     :: Array { x :: Number, y :: Number, z :: Number },
-    coefs             :: Array Number,
-    center            :: Array Number,
-    normal            :: Array Number,
+    border_points     :: Array Point,
+    unified_points    :: Maybe (Array UnifiedPoint),
     orientation       :: Int,
     alignment         :: Int,
     slope             :: Number,
+    coefs             :: Array Number,
+    center            :: Array Number,
+    normal            :: Array Number,
     azimuth           :: Number,
     rotation_override :: Number
 }
+
+derive instance genericJSRoofPlate :: Generic JSRoofPlate _
+instance showJSRoofPlate :: Show JSRoofPlate where
+    show = genericShow
+instance encodeJSRoofPlate :: Encode JSRoofPlate where
+    encode = genericEncode (defaultOptions { unwrapSingleConstructors = true })
+instance decodeJSRoofPlate :: Decode JSRoofPlate where
+    decode = genericDecode (defaultOptions { unwrapSingleConstructors = true })
 
 arrVec :: Array Number -> Vector3
 arrVec [x, y, z] = mkVec3 x y z
 arrVec _ = mkVec3 0.0 0.0 0.0
 
--- | Convert external JSroofPlate to internal RoofPlate
+-- | Convert external JSRoofPlate to internal RoofPlate
 fromJSRoofPlate :: JSRoofPlate -> RoofPlate
-fromJSRoofPlate r = RoofPlate {
+fromJSRoofPlate (JSRoofPlate r) = RoofPlate {
     id           : r.uuid,
     intId        : r.id,
     leadId       : r.lead_id,
-    borderPoints : (\v -> mkVec3 v.x v.y v.z) <$> r.border_points,
+    borderPoints : point2Vec <$> r.border_points,
     coefs        : r.coefs,
     center       : arrVec r.center,
     normal       : arrVec r.normal,
@@ -253,30 +257,40 @@ instance showRoofOp :: Show RoofOperation where
     show = genericShow
 
 
--- | Point defines a 3D point used in exported RoofEdited value
-type Point = {
-    x :: Number,
-    y :: Number,
-    z :: Number
-}
-
-vec2Point :: Vector3 -> Point
-vec2Point v = { x: vecX v, y: vecY v, z: vecZ v }
-
 -- | RoofEdited defines data required by the final API to actually
 -- update the roofpaltes on server
-type RoofEdited = {
+newtype RoofEdited = RoofEdited {
     ground   :: Point,
     inclined :: Point,
     contours :: Array Point,
     indices  :: Array Int
 }
 
+derive instance newtypeRoofEdited :: Newtype RoofEdited _
+derive instance genericRoofEdited :: Generic RoofEdited _
+instance showRoofEdited :: Show RoofEdited where
+    show = genericShow
+instance encodeRoofEdited :: Encode RoofEdited where
+    encode = genericEncode (defaultOptions { unwrapSingleConstructors = true })
+
+_ground :: Lens' RoofEdited Point
+_ground = _Newtype <<< prop (SProxy :: SProxy "ground")
+
+_inclined :: Lens' RoofEdited Point
+_inclined = _Newtype <<< prop (SProxy :: SProxy "inclined")
+
+_contours :: Lens' RoofEdited (Array Point)
+_contours = _Newtype <<< prop (SProxy :: SProxy "contours")
+
+_indices :: Lens' RoofEdited (Array Int)
+_indices = _Newtype <<< prop (SProxy :: SProxy "indices")
+
 toRoofEdited :: RoofPlate -> RoofEdited
-toRoofEdited r = { ground: vec2Point gutter,
-                   inclined: vec2Point rafter,
-                   contours: vec2Point <$> r ^. _borderPoints,
-                   indices: 1..(Arr.length $ r ^. _borderPoints)
+toRoofEdited r = RoofEdited {
+                   ground   : vec2Point gutter,
+                   inclined : vec2Point rafter,
+                   contours : vec2Point <$> r ^. _borderPoints,
+                   indices  : 1..(Arr.length $ r ^. _borderPoints)
                  }
     where gutter = gutterVector $ r ^. _normal
           rafter = rafterVector (r ^. _normal) gutter

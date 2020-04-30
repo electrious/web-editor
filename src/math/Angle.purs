@@ -2,12 +2,21 @@ module Math.Angle where
 
 import Prelude
 
+import Data.Newtype (class Newtype)
+import Foreign.Generic (class Decode, class Encode, decode, encode)
 import Math as M
 
 newtype Angle = Angle Number
 
 derive instance eqAngle :: Eq Angle
 derive instance ordAngle :: Ord Angle
+derive instance newtypeAngle :: Newtype Angle _
+
+instance encodeAngle :: Encode Angle where
+    encode (Angle n) = encode n
+
+instance docodeAngle :: Decode Angle where
+    decode = map Angle <<< decode
 
 instance showAngle :: Show Angle where
   show (Angle a) = "Angle(" <> show a <> " deg)"
