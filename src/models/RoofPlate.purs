@@ -1,4 +1,4 @@
-module Models.RoofPlate where
+module Models.Roof.RoofPlate where
 
 import Prelude hiding (degree)
 
