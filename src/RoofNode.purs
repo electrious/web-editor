@@ -6,10 +6,15 @@ import Control.Alt ((<|>))
 import Control.Apply (lift2)
 import Custom.Mesh (TappableMesh, mkTappableMesh)
 import Data.Array (head, init, snoc)
-import Data.Lens ((^.), (.~))
+import Data.Lens (Lens', (.~), (^.))
+import Data.Lens.Iso.Newtype (_Newtype)
+import Data.Lens.Record (prop)
 import Data.Maybe (fromMaybe)
+import Data.Newtype (class Newtype)
+import Data.Symbol (SProxy(..))
 import Data.Traversable (sequence_, traverse, traverse_)
-import Editor.RoofEditor (createRoofEditor)
+import Editor.Disposable (class Disposable, dispose)
+import Editor.RoofEditor (_deleteRoof, _roofVertices, createRoofEditor)
 import Editor.SceneEvent (SceneTapEvent)
 import Effect (Effect)
 import Effect.Timer (setTimeout)
@@ -17,7 +22,8 @@ import Effect.Unsafe (unsafePerformEffect)
 import FRP.Event (Event, create, keepLatest, subscribe, withLast)
 import FRP.Event.Extra (multicast, performEvent)
 import Math.Angle (radianVal)
-import Models.RoofPlate (RoofOperation(..), RoofPlate, _azimuth, _borderPoints, _center, _roofId, _slope)
+import Models.RoofPlate (RoofOperation(..), RoofPlate, _azimuth, _borderPoints, _center, _slope)
+import Models.RoofPlate as RP
 import SimplePolygon (isSimplePolygon)
 import Three.Core.Geometry (mkShape, mkShapeGeometry)
 import Three.Core.Material (Material, mkMeshBasicMaterial, setOpacity, setTransparent)
@@ -26,7 +32,7 @@ import Three.Core.Object3D (Object3D, add, matrix, mkObject3D, remove, rotateX, 
 import Three.Math.Vector (Vector2, Vector3, applyMatrix, mkVec2, mkVec3, vecX, vecY, vecZ)
 import Unsafe.Coerce (unsafeCoerce)
 
-type RoofNode a = {
+newtype RoofNode a = RoofNode {
     roofId     :: String,
     roofUpdate :: Event RoofOperation,
     roofDelete :: Event RoofOperation,
@@ -34,6 +40,26 @@ type RoofNode a = {
     roofObject :: Object3D a,
     disposable :: Effect Unit
 }
+
+derive instance newtypeRoofNode :: Newtype (RoofNode a) _
+
+instance disposableRoofNode :: Disposable (RoofNode a) where
+    dispose (RoofNode { disposable }) = disposable
+
+_roofId :: forall a. Lens' (RoofNode a) String
+_roofId = _Newtype <<< prop (SProxy :: SProxy "roofId")
+
+_roofUpdate :: forall a. Lens' (RoofNode a) (Event RoofOperation)
+_roofUpdate = _Newtype <<< prop (SProxy :: SProxy "roofUpdate")
+
+_roofDelete :: forall a. Lens' (RoofNode a) (Event RoofOperation)
+_roofDelete = _Newtype <<< prop (SProxy :: SProxy "roofDelete")
+
+_tapped :: forall a. Lens' (RoofNode a) (Event SceneTapEvent)
+_tapped = _Newtype <<< prop (SProxy :: SProxy "tapped")
+
+_roofObject :: forall a. Lens' (RoofNode a) (Object3D a)
+_roofObject = _Newtype <<< prop (SProxy :: SProxy "roofObject")
 
 -- | default material for roof plate.
 defMaterial :: forall a. Material a
@@ -110,7 +136,7 @@ createRoofNode roof isActive = do
     -- create the vertex markers editor
     editor <- createRoofEditor obj isActive ps
 
-    let vertices = defVerts <|> editor.roofVertices
+    let vertices = defVerts <|> editor ^. _roofVertices
         meshEvt = performEvent (lift2 createRoofMesh vertices isActive)
     
     -- add/remove mesh to the obj
@@ -126,22 +152,22 @@ createRoofNode roof isActive = do
 
         toParent v = applyMatrix (matrix obj) (mkVec3 (vecX v) (vecY v) 0.0)
         
-        newRoofs = (RoofOpUpdate <<< flip updateRoofPlate roof <<< map toParent) <$> editor.roofVertices
+        newRoofs = (RoofOpUpdate <<< flip updateRoofPlate roof <<< map toParent) <$> editor ^. _roofVertices
     
     -- create a stream for delete event if the current roof is not simple polygon
     { event: delEvt, push: toDel } <- create
-    let delRoofEvt = delEvt <|> (const unit <$> editor.deleteRoof)
+    let delRoofEvt = delEvt <|> (const unit <$> editor ^. _deleteRoof)
 
     -- set default vertices
     setDefVerts ps
 
     when (not $ testSimplePolygon ps) (void $ setTimeout 1000 (toDel unit))
 
-    pure {
-        roofId: roof ^. _roofId,
-        roofDelete: multicast $ const (RoofOpDelete $ roof ^. _roofId) <$> delRoofEvt,
-        roofUpdate: multicast newRoofs,
-        tapped: multicast tapped,
-        roofObject: obj,
-        disposable: sequence_ [d1, d2, editor.disposable]
+    pure $ RoofNode {
+        roofId     : roof ^. RP._roofId,
+        roofDelete : multicast $ const (RoofOpDelete $ roof ^. RP._roofId) <$> delRoofEvt,
+        roofUpdate : multicast newRoofs,
+        tapped     : multicast tapped,
+        roofObject : obj,
+        disposable : sequence_ [d1, d2, dispose editor]
     }

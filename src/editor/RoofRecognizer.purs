@@ -6,9 +6,14 @@ import Algorithm.RoofCheck (couldBeRoof)
 import Control.Apply (lift2)
 import Custom.Mesh (TappableMesh, mkTappableMesh)
 import Data.Compactable (compact)
-import Data.Lens ((^.))
+import Data.Lens (Lens', (^.))
+import Data.Lens.Iso.Newtype (_Newtype)
+import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..))
+import Data.Newtype (class Newtype)
+import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
+import Editor.Disposable (class Disposable)
 import Editor.SceneEvent (SceneMouseMoveEvent, _face, _mousePoint)
 import Effect (Effect)
 import Effect.Unsafe (unsafePerformEffect)
@@ -24,11 +29,24 @@ import Three.Math.Vector (Vector3, addScaled, (<+>))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | RoofRecognizer will be able to let user add new roof
-type RoofRecognizer a = {
+newtype RoofRecognizer a = RoofRecognizer {
     marker       :: Mesh a,
     addedNewRoof :: Event RoofPlate,
     disposable   :: Effect Unit
 }
+
+derive instance newtypeRoofRecognizer :: Newtype (RoofRecognizer a) _
+instance disposeRoofRecognizer :: Disposable (RoofRecognizer a) where
+    dispose r = r ^. _disposable
+
+_marker :: forall a. Lens' (RoofRecognizer a) (Mesh a)
+_marker = _Newtype <<< prop (SProxy :: SProxy "marker")
+
+_addedNewRoof :: forall a. Lens' (RoofRecognizer a) (Event RoofPlate)
+_addedNewRoof = _Newtype <<< prop (SProxy :: SProxy "addedNewRoof")
+
+_disposable :: forall a. Lens' (RoofRecognizer a) (Effect Unit)
+_disposable = _Newtype <<< prop (SProxy :: SProxy "disposable")
 
 -- | Candidate point that will allow user to show the adder marker
 type CandidatePoint = {
@@ -97,8 +115,8 @@ createRoofRecognizer houseWrapper roofs mouseMove canShow = do
     d <- subscribe (lift2 pointCanShow canShow point) (showMarker marker)
 
     let roof = compact $ performEvent $ sampleOn point (traverse <<< mkRoof <$> marker.tapped)
-    pure {
-        marker: marker.mesh,
-        addedNewRoof: multicast roof,
-        disposable: d
+    pure $ RoofRecognizer {
+        marker       : marker.mesh,
+        addedNewRoof : multicast roof,
+        disposable   : d
     }

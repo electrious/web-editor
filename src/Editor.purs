@@ -1,4 +1,4 @@
-module Editor.Editor (WebEditor, createEditor, loadHouse, resize, dispose) where
+module Editor.Editor (WebEditor, createEditor, loadHouse, resize) where
 
 import Prelude hiding (add)
 
@@ -6,10 +6,11 @@ import Data.Array (cons)
 import Data.Foldable (sequence_)
 import Data.Int (toNumber)
 import Data.Lens ((^.))
+import Editor.Disposable (class Disposable, dispose)
 import Editor.House (loadHouseModel)
 import Editor.Input (DragEvent, _deltaX, _deltaY, _shiftDragged, _zoomed, setupInput)
-import Editor.RoofManager (_disposable, _editedRoofs, _roofWrapper, createRoofManager)
-import Editor.SceneEvent (Size(..), _dispose, _dragEvent, _height, _width, setupRaycasting)
+import Editor.RoofManager (_editedRoofs, _roofWrapper, createRoofManager)
+import Editor.SceneEvent (Size(..), _dragEvent, _height, _width, setupRaycasting)
 import Effect (Effect)
 import Effect.Ref (Ref)
 import Effect.Ref as Ref
@@ -34,6 +35,12 @@ newtype WebEditor = WebEditor {
     scene :: EditorScene Unit,
     disposables :: Ref (Array (Effect Unit))
 }
+
+instance disposableEditor :: Disposable WebEditor where
+    dispose (WebEditor { disposables }) = do
+        l <- Ref.read disposables
+        sequence_ l
+        Ref.write [] disposables
 
 -- | internal record that defines all components for threejs related objects
 type EditorScene a = {
@@ -149,7 +156,7 @@ createScene width height elem = do
         render: renderFunc,
         resize: \w h -> updateSize(Size { width: w, height: h }),
         addContent: addContentFunc,
-        dispose: sequence_ [d1, d2, d3, disposeScene scene, rcs ^. _dispose]
+        dispose: sequence_ [d1, d2, d3, disposeScene scene, dispose rcs]
     }
 
 -- | renderLoop is the function to render scene repeatedly
@@ -177,12 +184,6 @@ createEditor width height elem = do
 resize :: Int -> Int -> WebEditor -> Effect Unit
 resize w h (WebEditor { scene }) = scene.resize w h
 
-dispose :: WebEditor -> Effect Unit
-dispose (WebEditor { disposables }) = do
-    l <- Ref.read disposables
-    sequence_ l
-    Ref.write [] disposables
-
 loadHouse :: String -> Int -> Array JSRoofPlate -> WebEditor -> Effect (Event (Array RoofEdited))
 loadHouse url leadId roofs (WebEditor editor)= do
     let addDisposable d = Ref.modify (cons d) editor.disposables
@@ -190,7 +191,7 @@ loadHouse url leadId roofs (WebEditor editor)= do
             editor.scene.addContent hmd.wrapper
             mgr <- createRoofManager hmd (fromJSRoofPlate <$> roofs)
             editor.scene.addContent (mgr ^. _roofWrapper)
-            _ <- addDisposable (mgr ^. _disposable)
+            _ <- addDisposable $ dispose mgr
             pure (mgr ^. _editedRoofs)
     e <- loadHouseModel url leadId
     pure $ keepLatest $ performEvent $ f <$> e

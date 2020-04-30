@@ -15,6 +15,7 @@ import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Time.Duration (Milliseconds(..))
 import Data.Traversable (sequence_, traverse)
+import Editor.Disposable (class Disposable)
 import Editor.Input (DragEvent, DragType(..), InputEvents, MouseMoveEvent, TapEvent, _dragType, _dragX, _dragY, _dragged, _mouseMove, _mouseX, _mouseY, _tapX, _tapY, _tapped)
 import Effect (Effect)
 import FRP.Event (Event, subscribe)
@@ -209,17 +210,17 @@ processDragObjects e objs = traverse doDrag target *> pure (f target)
           f Nothing  = Just e
 
 newtype RaycastSetup = RaycastSetup {
-    dragEvent :: Event DragEvent,
-    dispose   :: Effect Unit
+    dragEvent  :: Event DragEvent,
+    disposable :: Effect Unit
 }
 
 derive instance newtypeRaycastSetup :: Newtype RaycastSetup _
 
+instance disposableRaycastSetup :: Disposable RaycastSetup where
+    dispose (RaycastSetup { disposable }) = disposable
+
 _dragEvent :: Lens' RaycastSetup (Event DragEvent)
 _dragEvent = _Newtype <<< prop (SProxy :: SProxy "dragEvent")
-
-_dispose :: Lens' RaycastSetup (Effect Unit)
-_dispose = _Newtype <<< prop (SProxy :: SProxy "dispose")
 
 -- | setup all raycasting needed to process user inputs and send
 -- them to the corresponding 3D object in the scene
@@ -255,6 +256,6 @@ setupRaycasting camera scene input size = do
     d2 <- subscribe e2 f
 
     pure $ RaycastSetup {
-        dragEvent: multicast unraycastedDrag,
-        dispose: sequence_ [d1, d2]
+        dragEvent  : multicast unraycastedDrag,
+        disposable : sequence_ [d1, d2]
     }

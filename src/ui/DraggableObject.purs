@@ -12,6 +12,7 @@ import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
+import Editor.Disposable (class Disposable)
 import Editor.SceneEvent (isDragEnd, isDragStart)
 import Effect (Effect)
 import Effect.Unsafe (unsafePerformEffect)
@@ -33,6 +34,9 @@ newtype DraggableObject a = DraggableObject {
 
 derive instance newtypeDraggableEvent :: Newtype (DraggableObject a) _
 
+instance disposableDraggableObject :: Disposable (DraggableObject a) where
+    dispose (DraggableObject { disposable }) = disposable
+
 _draggableObject :: forall a. Lens' (DraggableObject a) (Object3D a)
 _draggableObject = _Newtype <<< prop (SProxy :: SProxy "object")
 
@@ -44,9 +48,6 @@ _position = _Newtype <<< prop (SProxy :: SProxy "position")
 
 _isDragging :: forall a. Lens' (DraggableObject a) (Event Boolean)
 _isDragging = _Newtype <<< prop (SProxy :: SProxy "isDragging")
-
-_disposable :: forall a. Lens' (DraggableObject a) (Effect Unit)
-_disposable = _Newtype <<< prop (SProxy :: SProxy "disposable")
 
 -- | create the default material
 defMaterial :: forall a. Material a

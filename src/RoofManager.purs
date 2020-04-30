@@ -18,9 +18,11 @@ import Data.Symbol (SProxy(..))
 import Data.Time.Duration (Milliseconds(..))
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
+import Editor.Disposable (class Disposable, dispose)
 import Editor.House (HouseMeshData)
-import Editor.RoofNode (RoofNode, createRoofNode)
-import Editor.RoofRecognizer (createRoofRecognizer)
+import Editor.RoofNode (RoofNode, _roofDelete, _roofObject, _roofUpdate, _tapped, createRoofNode)
+import Editor.RoofNode as RN
+import Editor.RoofRecognizer (_addedNewRoof, _marker, createRoofRecognizer)
 import Effect (Effect)
 import FRP.Event (Event, create, fold, keepLatest, subscribe, withLast)
 import FRP.Event.Extra (debounce, delay, multicast, performEvent, skip)
@@ -34,6 +36,9 @@ newtype RoofManager a = RoofManager {
 }
 
 derive instance newtypeRoofManager :: Newtype (RoofManager a) _
+
+instance disposableRoofManager :: Disposable (RoofManager a) where
+    dispose r = r ^. _disposable
 
 _roofWrapper :: forall a. Lens' (RoofManager a) (Object3D a)
 _roofWrapper = _Newtype <<< prop (SProxy :: SProxy "roofWrapper")
@@ -78,16 +83,16 @@ doFlatten meshData rd = flattenRoofPlates meshData.geometry meshData.verticeTree
 
 -- | get roofUpdate event from an array of roof nodes
 getRoofUpdate :: forall a. Array (RoofNode a) -> Event RoofOperation
-getRoofUpdate ns = foldl (<|>) empty (_.roofUpdate <$> ns)
+getRoofUpdate ns = foldl (<|>) empty (view _roofUpdate <$> ns)
 
 -- | get roofDelete event from an array of roof nodes
 getRoofDelete :: forall a. Array (RoofNode a) -> Event RoofOperation
-getRoofDelete ns = foldl (<|>) empty (_.roofDelete <$> ns)
+getRoofDelete ns = foldl (<|>) empty (view _roofDelete <$> ns)
 
 -- | get the activated roof id event from an array of roof nodes
 getActivated :: forall a. Array (RoofNode a) -> Event String
 getActivated ns = foldl (<|>) empty (f <$> ns)
-    where f n = const n.roofId <$> n.tapped
+    where f n = const (n ^. RN._roofId) <$> (n ^. _tapped)
 
 -- | create RoofManager for an array of roofs
 createRoofManager :: forall a b. HouseMeshData a -> Array RoofPlate -> Effect (RoofManager b)
@@ -111,8 +116,8 @@ createRoofManager meshData defRoofs = do
 
         -- helper function to deleta and re-add roof nodes
         renderNodes { last, now } = do
-            traverse_ (\o -> remove o.roofObject wrapper) $ fromMaybe [] last
-            traverse_ (\o -> add o.roofObject wrapper) now
+            traverse_ (\o -> remove (o ^. _roofObject) wrapper) $ fromMaybe [] last
+            traverse_ (\o -> add (o ^. _roofObject) wrapper) now
             pure now
         -- create roofnode for each roof
         nodes = performEvent $ (traverse mkNode <$> rsToRenderArr)
@@ -134,9 +139,9 @@ createRoofManager meshData defRoofs = do
                                        meshData.mesh.mouseMove
                                        canShowRecognizer
 
-    add recognizer.marker wrapper
+    add (recognizer ^. _marker) wrapper
 
-    let addedNewRoof = recognizer.addedNewRoof
+    let addedNewRoof = recognizer ^. _addedNewRoof
         addRoofOp = RoofOpCreate <$> addedNewRoof
         ops = addRoofOp <|> deleteRoofOp <|> updateRoofOp
 
@@ -159,5 +164,5 @@ createRoofManager meshData defRoofs = do
     pure $ RoofManager {
         roofWrapper: wrapper,
         editedRoofs: multicast $ skip 1 $ debounce (Milliseconds 1000.0) $ getRoofEdited <$> newRoofs,
-        disposable: sequence_ [d1, d2, d3, d4, d5, recognizer.disposable]
+        disposable: sequence_ [d1, d2, d3, d4, d5, dispose recognizer]
     }

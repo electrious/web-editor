@@ -9,10 +9,15 @@ import Custom.Mesh (TappableMesh, mkTappableMesh)
 import Data.Array (deleteAt, filter, foldl, head, insertAt, length, mapWithIndex, range, snoc, tail, take, takeEnd, zip, zipWith)
 import Data.Compactable (compact)
 import Data.Int (toNumber)
-import Data.Lens (view, (^.))
+import Data.Lens (Lens', view, (^.))
+import Data.Lens.Iso.Newtype (_Newtype)
+import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Newtype (class Newtype)
+import Data.Symbol (SProxy(..))
 import Data.Traversable (sequence, sequence_, sum, traverse, traverse_)
 import Data.Tuple (Tuple(..), fst, snd)
+import Editor.Disposable (class Disposable, dispose)
 import Editor.SceneEvent (SceneTapEvent)
 import Effect (Effect)
 import Effect.Unsafe (unsafePerformEffect)
@@ -22,7 +27,7 @@ import Three.Core.Geometry (Geometry, mkCircleGeometry)
 import Three.Core.Material (Material, mkMeshBasicMaterial)
 import Three.Core.Object3D (Object3D, add, remove, setPosition, setVisible)
 import Three.Math.Vector (Vector2, Vector3, dist, mkVec2, mkVec3, vecX, vecY)
-import UI.DraggableObject (DraggableObject, _disposable, _draggableObject, _isDragging, _position, _tapped, createDraggableObject)
+import UI.DraggableObject (DraggableObject, _draggableObject, _isDragging, _position, _tapped, createDraggableObject)
 import Unsafe.Coerce (unsafeCoerce)
 
 toVec2 :: Vector3 -> Vector2
@@ -57,7 +62,7 @@ getRedMarkerActiveStatus ms = statusForDragging <|> statusForNewMarker
 -- | delete old marker objects and add new ones.
 attachObjs :: forall a b c. Object3D a -> Array (DraggableObject b) -> Array (DraggableObject c) -> Effect (Array (DraggableObject b))
 attachObjs parent newObjs objs = do
-    traverse_ (\o -> remove (o ^. _draggableObject) parent *> (o ^. _disposable)) objs
+    traverse_ (\o -> remove (o ^. _draggableObject) parent *> dispose o) objs
     traverse_ (view _draggableObject >>> flip add parent) newObjs
     pure newObjs
 
@@ -166,12 +171,21 @@ verticesCenter vs = mkVec3 (tx / l) (ty / l) 0.01
           l = toNumber (length vs)
 
 
-type RoofEditor = {
+newtype RoofEditor = RoofEditor {
     roofVertices :: Event (Array Vector2),
     deleteRoof   :: Event SceneTapEvent,
     disposable   :: Effect Unit
 }
 
+derive instance newtypeRoofEditor :: Newtype RoofEditor _
+instance disposableRoofEditor :: Disposable RoofEditor where
+    dispose (RoofEditor { disposable }) = disposable
+
+_roofVertices :: Lens' RoofEditor (Event (Array Vector2))
+_roofVertices = _Newtype <<< prop (SProxy :: SProxy "roofVertices")
+
+_deleteRoof :: Lens' RoofEditor (Event SceneTapEvent)
+_deleteRoof = _Newtype <<< prop (SProxy :: SProxy "deleteRoof")
 
 -- get new positions after dragging
 getPosition :: forall a. Array (DraggableObject a) -> Event (Array Vector2)
@@ -244,8 +258,8 @@ createRoofEditor parent active ps = do
     -- disable roof by default
     setRoofActive false
 
-    pure {
-        roofVertices: newVertices,
-        deleteRoof: roofDel.tapped,
-        disposable: sequence_ [d1, d2, d3, d4, d5]
+    pure $ RoofEditor {
+        roofVertices : newVertices,
+        deleteRoof   : roofDel.tapped,
+        disposable   : sequence_ [d1, d2, d3, d4, d5]
     }
