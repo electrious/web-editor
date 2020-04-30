@@ -16,7 +16,7 @@ import Effect.Ref (Ref)
 import Effect.Ref as Ref
 import FRP.Event (Event, create, keepLatest, sampleOn, subscribe)
 import FRP.Event.Extra (performEvent)
-import Model.Roof.RoofPlate (JSRoofPlate, RoofEdited, fromJSRoofPlate)
+import Model.Roof.RoofPlate (RoofPlate, RoofEdited)
 import Three.Core.Camera (PerspectiveCamera, mkPerspectiveCamera, setAspect, updateProjectionMatrix)
 import Three.Core.Light (mkAmbientLight, mkDirectionalLight)
 import Three.Core.Object3D (Object3D, add, hasParent, lookAt, mkObject3D, parent, position, rotateOnWorldAxis, rotateZ, setName, setPosition, translateX, translateY, worldToLocal)
@@ -184,12 +184,12 @@ createEditor width height elem = do
 resize :: Int -> Int -> WebEditor -> Effect Unit
 resize w h (WebEditor { scene }) = scene.resize w h
 
-loadHouse :: String -> Int -> Array JSRoofPlate -> WebEditor -> Effect (Event (Array RoofEdited))
+loadHouse :: String -> Int -> Array RoofPlate -> WebEditor -> Effect (Event (Array RoofEdited))
 loadHouse url leadId roofs (WebEditor editor)= do
     let addDisposable d = Ref.modify (cons d) editor.disposables
         f hmd = do
             editor.scene.addContent hmd.wrapper
-            mgr <- createRoofManager hmd (fromJSRoofPlate <$> roofs)
+            mgr <- createRoofManager hmd roofs
             editor.scene.addContent (mgr ^. _roofWrapper)
             _ <- addDisposable $ dispose mgr
             pure (mgr ^. _editedRoofs)
