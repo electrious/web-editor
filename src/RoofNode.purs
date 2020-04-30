@@ -22,8 +22,8 @@ import Effect.Unsafe (unsafePerformEffect)
 import FRP.Event (Event, create, keepLatest, subscribe, withLast)
 import FRP.Event.Extra (multicast, performEvent)
 import Math.Angle (radianVal)
-import Models.Roof.RoofPlate (RoofOperation(..), RoofPlate, _azimuth, _borderPoints, _center, _slope)
-import Models.Roof.RoofPlate as RP
+import Model.Roof.RoofPlate (RoofOperation(..), RoofPlate, _azimuth, _borderPoints, _center, _slope)
+import Model.Roof.RoofPlate as RP
 import SimplePolygon (isSimplePolygon)
 import Three.Core.Geometry (mkShape, mkShapeGeometry)
 import Three.Core.Material (Material, mkMeshBasicMaterial, setOpacity, setTransparent)

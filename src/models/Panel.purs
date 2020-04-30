@@ -1,4 +1,4 @@
-module Models.Roof.Panel where
+module Model.Roof.Panel where
 
 import Prelude
 

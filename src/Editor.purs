@@ -16,7 +16,7 @@ import Effect.Ref (Ref)
 import Effect.Ref as Ref
 import FRP.Event (Event, create, keepLatest, sampleOn, subscribe)
 import FRP.Event.Extra (performEvent)
-import Models.Roof.RoofPlate (JSRoofPlate, RoofEdited, fromJSRoofPlate)
+import Model.Roof.RoofPlate (JSRoofPlate, RoofEdited, fromJSRoofPlate)
 import Three.Core.Camera (PerspectiveCamera, mkPerspectiveCamera, setAspect, updateProjectionMatrix)
 import Three.Core.Light (mkAmbientLight, mkDirectionalLight)
 import Three.Core.Object3D (Object3D, add, hasParent, lookAt, mkObject3D, parent, position, rotateOnWorldAxis, rotateZ, setName, setPosition, translateX, translateY, worldToLocal)

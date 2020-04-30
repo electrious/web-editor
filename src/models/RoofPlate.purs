@@ -1,4 +1,4 @@
-module Models.Roof.RoofPlate where
+module Model.Roof.RoofPlate where
 
 import Prelude hiding (degree)
 
@@ -19,7 +19,7 @@ import Effect (Effect)
 import Foreign.Generic (class Decode, class Encode, decode, defaultOptions, encode, genericDecode, genericEncode)
 import Math as Math
 import Math.Angle (Angle, acos, atan2, degree, degreeVal)
-import Models.Roof.Panel (Alignment(..), Orientation(..))
+import Model.Roof.Panel (Alignment(..), Orientation(..))
 import Three.Math.Vector (class Vector, Vector2, Vector3, addScaled, cross, length, mkVec2, mkVec3, vecX, vecY, vecZ, (<.>))
 
 -- | define the core RoofPlate type as a record
