@@ -19,3 +19,12 @@ instance decodeMeter :: Decode Meter where
 
 meter :: Number -> Meter
 meter = Meter
+
+meterVal :: Meter -> Number
+meterVal (Meter m) = m
+
+inch :: Number -> Meter
+inch i = meter $ i * 0.0254
+
+feetInch :: Number -> Number -> Meter
+feetInch f i = meter $ f * 0.3048 + i * 0.0254
