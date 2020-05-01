@@ -16,6 +16,11 @@ type BufferGeometry a = Geometry (JSBufferGeometry a)
 clone :: forall a. Geometry a -> Effect (Geometry a)
 clone = ffi ["geo", ""] "geo.clone()"
 
+foreign import data JSBoxGeometry :: Type -> Type
+type BoxGeometry a = Geometry (JSBoxGeometry a)
+
+foreign import mkBoxGeometry :: forall a. Number -> Number -> Number -> Effect (BoxGeometry a)
+
 foreign import data JSCircleGeometry :: Type -> Type
 type CircleGeometry a = Geometry (JSCircleGeometry a)
 

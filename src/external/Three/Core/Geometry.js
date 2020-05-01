@@ -1,23 +1,19 @@
 const three = require('three')
 
-exports.mkCircleGeometry = radius => {
-    return segs => {
-        return _ => {
-            return new three.CircleGeometry(radius, segs)
-        }
-    }
+exports.mkBoxGeometry = width => height => depth => _ => {
+    return new three.BoxGeometry(width, height, depth)
 }
 
-exports.mkShape = ps => {
-    return _ => {
-        return new three.Shape(ps)
-    }
+exports.mkCircleGeometry = radius => segs => _ => {
+    return new three.CircleGeometry(radius, segs)
 }
 
-exports.mkShapeGeometry = shp => {
-    return _ => {
-        return new three.ShapeGeometry(shp)
-    }
+exports.mkShape = ps => _ => {
+    return new three.Shape(ps)
+}
+
+exports.mkShapeGeometry = shp => _ => {
+    return new three.ShapeGeometry(shp)
 }
 
 exports.isBufferGeometry = geo => {
