@@ -2,6 +2,12 @@ module Editor.PanelNode where
 
 import Prelude
 
+import Data.Default (class Default)
+import Data.Enum (class BoundedEnum, class Enum, cardinality, fromEnum, toEnum)
+import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Bounded (genericBottom, genericTop)
+import Data.Generic.Rep.Enum (genericCardinality, genericFromEnum, genericPred, genericSucc, genericToEnum)
+import Data.Generic.Rep.Show (genericShow)
 import Data.Hardware.Size (_height)
 import Data.Lens (Lens', (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
@@ -13,9 +19,10 @@ import Data.Symbol (SProxy(..))
 import Effect (Effect)
 import Math (pi)
 import Math.Angle (radianVal, sin)
-import Model.Roof.ArrayConfig (ArrayConfig(..), _panelLowestZ)
-import Model.Roof.Panel (Orientation(..), Panel(..), _orientation, _panelX, _panelY, panelLong, panelShort, panelSize, validatedSlope)
-import Model.Roof.Panel as P
+import Model.Hardware.PanelType (PanelType(..))
+import Model.Racking.RackingType (RackingType(..))
+import Model.Roof.ArrayConfig (ArrayConfig, _panelLowestZ)
+import Model.Roof.Panel (Orientation(..), Panel, _orientation, _panelX, _panelY, panelLong, panelShort, panelSize, validatedSlope)
 import Three.Core.Geometry (mkBoxGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterialWithTexture)
 import Three.Core.Mesh (Mesh, mkMesh)
@@ -23,6 +30,57 @@ import Three.Core.Object3D (Object3D, mkObject3D, rotateWithEuler, setName, setP
 import Three.Loader.TextureLoader (loadTexture, mkTextureLoader)
 import Three.Math.Euler (mkEuler)
 import Three.Math.Vector (mkVec3)
+
+-- texture info needed to render panels
+newtype PanelTextureInfo = PanelTextureInfo {
+    standard   :: Maybe String,
+    premium    :: Maybe String,
+    standard72 :: Maybe String
+}
+
+derive instance newtypePanelTextureInfo :: Newtype PanelTextureInfo _
+instance defaultPanelTextureInfo :: Default PanelTextureInfo where
+    def = PanelTextureInfo { standard   : Nothing,
+                             premium    : Nothing,
+                             standard72 : Nothing
+                           }
+
+_standard :: Lens' PanelTextureInfo (Maybe String)
+_standard = _Newtype <<< prop (SProxy :: SProxy "standard")
+
+_premium :: Lens' PanelTextureInfo (Maybe String)
+_premium = _Newtype <<< prop (SProxy :: SProxy "premium")
+
+_standard72 :: Lens' PanelTextureInfo (Maybe String)
+_standard72 = _Newtype <<< prop (SProxy :: SProxy "standard72")
+
+
+-- texture type used for panels
+data PanelTextureType = PremiumTexture
+                      | StandardTexture
+                      | Standard72Texture
+
+derive instance genericPanelTextureType :: Generic PanelTextureType _
+derive instance eqPanelTextureType :: Eq PanelTextureType
+derive instance ordPanelTextureType :: Ord PanelTextureType
+instance showPanelTextureType :: Show PanelTextureType where
+    show = genericShow
+instance boundPanelTextureType :: Bounded PanelTextureType where
+    top = genericTop
+    bottom = genericBottom
+instance enumPanelTextureType :: Enum PanelTextureType where
+    succ = genericSucc
+    pred = genericPred
+instance boundEnumPanelTextureType :: BoundedEnum PanelTextureType where
+    cardinality = genericCardinality
+    toEnum = genericToEnum
+    fromEnum = genericFromEnum
+
+-- get panel texture type based on the racking system and panel type
+panelType :: RackingType -> PanelType -> PanelTextureType
+panelType BX _       = Standard72Texture
+panelType _ Premium  = PremiumTexture
+panelType _ Standard = StandardTexture
 
 newtype PanelNode a = PanelNode {
     panelId     :: Int,
@@ -69,9 +127,9 @@ updateRotation :: forall a. Panel -> Mesh a -> Effect Unit
 updateRotation p m = rotateWithEuler euler m
     where euler = case validatedSlope p of
                      Nothing -> rotateForNormal $ p ^. _orientation
-                     Just slope -> rotateForFlat (p ^> _orientation) slope
-          rotateForNormal Landscape = mkEuler 0.0 0.0 (pi / 2)
+                     Just slope -> rotateForFlat (p ^. _orientation) slope
+          rotateForNormal Landscape = mkEuler 0.0 0.0 (pi / 2.0)
           rotateForNormal Portrait  = mkEuler 0.0 0.0 0.0
 
-          rotateForFlat Landscape slope = mkEuler 0.0 (- radianVal slope) (pi / 2)
+          rotateForFlat Landscape slope = mkEuler 0.0 (- radianVal slope) (pi / 2.0)
           rotateForFlat Portrait  slope = mkEuler (radianVal slope) 0.0 0.0
