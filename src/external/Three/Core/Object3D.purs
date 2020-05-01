@@ -3,6 +3,7 @@ module Three.Core.Object3D where
 import Prelude
 
 import Effect (Effect)
+import Three.Math.Euler (Euler)
 import Three.Math.Matrix (Matrix4)
 import Three.Math.Vector (Vector3)
 import Util (ffi, fpi)
@@ -57,6 +58,9 @@ rotateZ = fpi ["r", "o", ""] "o.rotateZ(r)"
 
 rotateOnWorldAxis :: forall a. Vector3 -> Number -> Object3D a -> Effect Unit
 rotateOnWorldAxis = fpi ["v", "d", "o", ""] "o.rotateOnWorldAxis(v, d)"
+
+rotateWithEuler :: forall a. Euler -> Object3D a -> Effect Unit
+rotateWithEuler = fpi ["e", "o", ""] "o.setRotationFromEuler(e)"
 
 translateX :: forall a. Number -> Object3D a -> Effect Unit
 translateX = fpi ["x", "o", ""] "o.translateX(x)"
