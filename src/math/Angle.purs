@@ -30,6 +30,8 @@ instance semiringAngle :: Semiring Angle where
 instance ringAngle :: Ring Angle where
   sub (Angle a) (Angle b) = Angle (a - b)
 
+instance commutativeRingAngle :: CommutativeRing Angle
+
 degree :: Number -> Angle
 degree d = Angle d
 

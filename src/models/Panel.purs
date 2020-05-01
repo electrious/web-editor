@@ -9,16 +9,17 @@ import Data.Generic.Rep.Bounded (genericBottom, genericTop)
 import Data.Generic.Rep.Enum (genericCardinality, genericFromEnum, genericPred, genericSucc, genericToEnum)
 import Data.Generic.Rep.Ord (genericCompare)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Lens (Lens')
+import Data.Hardware.Size (Size(..))
+import Data.Lens (Lens', (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List.NonEmpty (singleton)
 import Data.Maybe (Maybe(..))
-import Data.Meter (Meter)
+import Data.Meter (Meter, meter)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Foreign.Generic (class Decode, class Encode, ForeignError(..), decode, defaultOptions, encode, genericDecode, genericEncode)
-import Math.Angle (Angle)
+import Math.Angle (Angle, degree)
 
 data Orientation = Landscape
                  | Portrait
@@ -133,3 +134,21 @@ _orientation = _Newtype <<< prop (SProxy :: SProxy "orientation")
 
 _alignment :: Lens' Panel Alignment
 _alignment = _Newtype <<< prop (SProxy :: SProxy "alignment")
+
+
+-- | panel default width and height
+panelLong :: Meter
+panelLong = meter 1.6
+
+panelShort :: Meter
+panelShort = meter 1.0
+
+panelSize :: Panel -> Size
+panelSize p = case p ^. _orientation of
+    Landscape -> Size { width: panelLong, height: panelShort }
+    Portrait  -> Size { width: panelShort, height: panelLong }
+
+-- only slope angles larger than 5 degrees are considered valid slope
+validatedSlope :: Panel -> Maybe Angle
+validatedSlope p | p ^. _slope < degree 5.0 = Nothing
+                 | otherwise                = Just $ p ^. _slope

@@ -10,6 +10,14 @@ newtype Meter = Meter Number
 derive instance newtypeMeter :: Newtype Meter _
 derive instance eqMeter :: Eq Meter
 derive instance ordMeter :: Ord Meter
+instance semiringMeter :: Semiring Meter where
+    add (Meter m1) (Meter m2) = Meter $ m1 + m2
+    zero = Meter 0.0
+    mul (Meter m1) (Meter m2) = Meter $ m1 * m2
+    one = Meter 1.0
+instance ringMeter :: Ring Meter where
+    sub (Meter m1) (Meter m2) = Meter $ m1 - m2
+
 instance showMeter :: Show Meter where
     show (Meter m) = "Meter(" <> show m <> ")"
 instance encodeMeter :: Encode Meter where
