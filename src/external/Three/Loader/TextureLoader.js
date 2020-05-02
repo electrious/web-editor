@@ -7,3 +7,7 @@ exports.mkTextureLoader = _ => {
 exports.loadTexture = url => loader => _ => {
     return loader.load(url)
 }
+
+exports.dispose = t => _ => {
+    t.dispose()
+}

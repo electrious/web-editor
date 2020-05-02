@@ -13,6 +13,7 @@ You can edit this file as you like.
   , "generics-rep"
   , "js-timers"
   , "math"
+  , "memoize"
   , "newtype"
   , "profunctor-lenses"
   , "psci-support"

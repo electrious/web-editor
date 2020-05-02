@@ -4,6 +4,7 @@ import Prelude
 
 import Control.Monad.Error.Class (throwError)
 import Data.Enum (class BoundedEnum, class Enum, fromEnum, toEnum)
+import Data.Function.Memoize (class Tabulate, genericTabulate)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Bounded (genericBottom, genericTop)
 import Data.Generic.Rep.Enum (genericCardinality, genericPred, genericSucc)
@@ -42,3 +43,5 @@ instance decodePanelType :: Decode PanelType where
                     case toEnum i of
                         Just v -> pure v
                         Nothing -> throwError $ singleton $ ForeignError ("Can't decode PanelType from: " <> show i)
+instance tabulatePanelType :: Tabulate PanelType where
+    tabulate = genericTabulate
