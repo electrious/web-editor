@@ -34,6 +34,9 @@ newtype Size = Size {
 
 derive instance newtypeSize :: Newtype Size _
 
+size :: Int -> Int -> Size
+size w h = Size { width: w, height: h }
+
 _width :: Lens' Size Int
 _width = _Newtype <<< prop (SProxy :: SProxy "width")
 

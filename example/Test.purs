@@ -3,9 +3,11 @@ module Test where
 import Prelude
 
 import Control.Monad.Except (runExcept)
+import Data.Default (def)
 import Data.Either (Either(..))
-import Data.Maybe (Maybe(..))
-import Editor.Editor (createEditor, loadHouse)
+import Data.Lens ((.~))
+import Data.Tuple (fst)
+import Editor.Editor (_dataServer, _elem, _leadId, _roofPlates, createEditor, runWebEditor)
 import Effect (Effect)
 import Effect.Class.Console (logShow)
 import FRP.Event (subscribe)
@@ -27,11 +29,13 @@ doTest roofDat = do
 
     case runExcept $ decode roofDat of
         Left e -> logShow e
-        Right roofs -> case elem of
-            Nothing -> pure unit
-            Just e -> do
-                editor <- createEditor 800 600 e
-                res <- loadHouse serverUrl 296285 roofs editor
+        Right roofs -> do
+                let cfg = def # _elem       .~ elem
+                              # _leadId     .~ 296285
+                              # _roofPlates .~ roofs
+                              # _dataServer .~ serverUrl
+
+                res <- runWebEditor cfg createEditor
                 
-                _ <- subscribe res logShow
+                _ <- subscribe (fst res) logShow
                 pure unit
