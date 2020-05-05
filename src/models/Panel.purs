@@ -18,6 +18,7 @@ import Data.Maybe (Maybe(..))
 import Data.Meter (Meter, meter)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
+import Editor.Common.Lenses (_orientation, _slope)
 import Foreign.Generic (class Decode, class Encode, ForeignError(..), decode, defaultOptions, encode, genericDecode, genericEncode)
 import Math.Angle (Angle, degree)
 
@@ -99,9 +100,6 @@ instance encodePanel :: Encode Panel where
 instance decodePanel :: Decode Panel where
     decode = genericDecode (defaultOptions { unwrapSingleConstructors = true })
 
-_panelId :: Lens' Panel Int
-_panelId = _Newtype <<< prop (SProxy :: SProxy "id")
-
 _uuid :: Lens' Panel String
 _uuid = _Newtype <<< prop (SProxy :: SProxy "uuid")
 
@@ -119,21 +117,6 @@ _rowNumber = _Newtype <<< prop (SProxy :: SProxy "row_number")
 
 _arrNumber :: Lens' Panel Int
 _arrNumber = _Newtype <<< prop (SProxy :: SProxy "array_number")
-
-_panelX :: Lens' Panel Meter
-_panelX = _Newtype <<< prop (SProxy :: SProxy "x")
-
-_panelY :: Lens' Panel Meter
-_panelY = _Newtype <<< prop (SProxy :: SProxy "y")
-
-_slope :: Lens' Panel Angle
-_slope = _Newtype <<< prop (SProxy :: SProxy "slope")
-
-_orientation :: Lens' Panel Orientation
-_orientation = _Newtype <<< prop (SProxy :: SProxy "orientation")
-
-_alignment :: Lens' Panel Alignment
-_alignment = _Newtype <<< prop (SProxy :: SProxy "alignment")
 
 
 -- | panel default width and height

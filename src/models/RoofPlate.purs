@@ -15,6 +15,7 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.UUID (genUUID, toString)
+import Editor.Common.Lenses (_alignment, _center, _id, _leadId, _normal, _orientation, _slope)
 import Effect (Effect)
 import Foreign.Generic (class Decode, class Encode, decode, defaultOptions, encode, genericDecode, genericEncode)
 import Math as Math
@@ -50,14 +51,8 @@ instance encodeRoofPlate :: Encode RoofPlate where
 instance decodeRoofPlate :: Decode RoofPlate where
     decode = map fromJSRoofPlate <<< decode
 
-_roofId :: Lens' RoofPlate String
-_roofId = _Newtype <<< prop (SProxy :: SProxy "id")
-
 _roofIntId :: Lens' RoofPlate Int
 _roofIntId = _Newtype <<< prop (SProxy :: SProxy "intId")
-
-_leadId :: Lens' RoofPlate Int
-_leadId = _Newtype <<< prop (SProxy :: SProxy "leadId")
 
 _borderPoints :: Lens' RoofPlate (Array Vector3)
 _borderPoints = _Newtype <<< prop (SProxy :: SProxy "borderPoints")
@@ -67,21 +62,6 @@ _unifiedPoints = _Newtype <<< prop (SProxy :: SProxy "unifiedPoints")
 
 _coefs :: Lens' RoofPlate (Array Number)
 _coefs = _Newtype <<< prop (SProxy :: SProxy "coefs")
-
-_center :: Lens' RoofPlate Vector3
-_center = _Newtype <<< prop (SProxy :: SProxy "center")
-
-_normal :: Lens' RoofPlate Vector3
-_normal = _Newtype <<< prop (SProxy :: SProxy "normal")
-
-_orientation :: Lens' RoofPlate Orientation
-_orientation = _Newtype <<< prop (SProxy :: SProxy "orientation")
-
-_alignment :: Lens' RoofPlate Alignment
-_alignment = _Newtype <<< prop (SProxy :: SProxy "alignment")
-
-_slope :: Lens' RoofPlate Angle
-_slope = _Newtype <<< prop (SProxy :: SProxy "slope")
 
 _azimuth :: Lens' RoofPlate Angle
 _azimuth = _Newtype <<< prop (SProxy :: SProxy "azimuth")
@@ -184,7 +164,7 @@ fromJSRoofPlate (JSRoofPlate r) = RoofPlate {
 toJSRoofPlate :: RoofPlate -> JSRoofPlate
 toJSRoofPlate r = JSRoofPlate {
     id                : r ^. _roofIntId,
-    uuid              : r ^. _roofId,
+    uuid              : r ^. _id,
     lead_id           : r ^. _leadId,
     border_points     : vec2Point <$> r ^. _borderPoints,
     unified_points    : r ^. _unifiedPoints,

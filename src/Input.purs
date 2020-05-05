@@ -210,9 +210,6 @@ newtype InputEvents = InputEvents {
 
 derive instance newtypeInputEvents :: Newtype InputEvents _
 
-_tapped :: Lens' InputEvents (Event TapEvent)
-_tapped = _Newtype <<< prop (SProxy :: SProxy "tapped")
-
 _zoomed :: Lens' InputEvents (Event WE.WheelEvent)
 _zoomed = _Newtype <<< prop (SProxy :: SProxy "zoomed")
 

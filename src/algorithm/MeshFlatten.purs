@@ -13,9 +13,10 @@ import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
 import Data.Tuple (fst, snd)
+import Editor.Common.Lenses (_center, _normal, _polygon)
 import Effect (Effect)
 import Math.Angle (degreeVal)
-import Model.Roof.RoofPlate (Polygon, RoofPlate, _center, _normal, angleBetween, getRoofPolygon)
+import Model.Roof.RoofPlate (Polygon, RoofPlate, angleBetween, getRoofPolygon)
 import RBush.RBush (BBox, RBush, load, mkRBush, search)
 import Three.Core.Geometry (BufferGeometry, clone, getAttribute, isBufferAttribute, setNeedsUpdate, setXYZ)
 import Three.Core.Mesh (Mesh, setBufferGeometry)
@@ -65,36 +66,27 @@ polygonBoundingBox polygon = { minX: minX, minY: minY, maxX: maxX, maxY: maxY}
           maxY = fromMaybe 0.0 (maximum ys)
 
 newtype RoofFlattener = RoofFlattener {
-    roofNormal :: Vector3,
-    roofCenter :: Vector3,
-    roofPolygon :: Polygon
+    normal  :: Vector3,
+    center  :: Vector3,
+    polygon :: Polygon
 }
 
 derive instance newtypeRoofFlattener :: Newtype RoofFlattener _
 
-_roofNormal :: Lens' RoofFlattener Vector3
-_roofNormal = _Newtype <<< prop (SProxy :: SProxy "roofNormal")
-
-_roofCenter :: Lens' RoofFlattener Vector3
-_roofCenter = _Newtype <<< prop (SProxy :: SProxy "roofCenter")
-
-_roofPolygon :: Lens' RoofFlattener Polygon
-_roofPolygon = _Newtype <<< prop (SProxy :: SProxy "roofPolygon")
-
 -- | flatten a vertex, returns a new position for that vertex
 flatten :: RoofFlattener -> Vector3 -> Vector3
-flatten flattener v = addScaled v (flattener ^. _roofNormal) scale
-    where nv = flattener ^. _roofCenter <-> v
-          scale = flattener ^. _roofNormal <.> nv
+flatten flattener v = addScaled v (flattener ^. _normal) scale
+    where nv = flattener ^. _center <-> v
+          scale = flattener ^. _normal <.> nv
 
 -- | calculate distance from the param position to the roof
 distToRoof :: RoofFlattener -> Vector3 -> Number
-distToRoof flattener v = flattener ^. _roofNormal <.> nv
-    where nv = v <-> flattener ^. _roofCenter
+distToRoof flattener v = flattener ^. _normal <.> nv
+    where nv = v <-> flattener ^. _center
 
 -- | get the RoofFlattener for a roof
 roofFlattener :: RoofPlate -> RoofFlattener
-roofFlattener r = RoofFlattener { roofNormal: r ^. _normal, roofCenter: r ^. _center, roofPolygon: getRoofPolygon r}
+roofFlattener r = RoofFlattener { normal: r ^. _normal, center: r ^. _center, polygon: getRoofPolygon r}
 
 -- | flattened vertex info
 newtype FlattenedVertex = FlattenedVertex {
@@ -129,7 +121,7 @@ applyFlattenedVertex geo fvs = do
 flattenRoofplate :: RBush VertexItem -> RoofPlate -> Effect (Array FlattenedVertex)
 flattenRoofplate tree roof = do
     let flattener = roofFlattener roof
-        poly = flattener ^. _roofPolygon
+        poly = flattener ^. _polygon
     
     candidates <- search (polygonBoundingBox poly) tree
 
@@ -140,7 +132,7 @@ flattenRoofplate tree roof = do
         
         -- check the distance to the roof and angle between its normal
         -- vector with the roof normal vector.
-        checkDistAndAngle c = let angle = angleBetween (flattener ^. _roofNormal) c.normal
+        checkDistAndAngle c = let angle = angleBetween (flattener ^. _normal) c.normal
                                   dist = distToRoof flattener c.vertex
                               in (dist < 0.5 && dist >= 0.0) || (dist < 0.0 && dist > -1.0 && degreeVal angle < 20.0)
     

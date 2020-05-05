@@ -18,6 +18,7 @@ import Data.Meter (meterVal)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Editor.ArrayBuilder (ArrayBuilder, PanelTextureInfo, _premium, _standard, _standard72, getArrayConfig, getPanelType, getTextureInfo)
+import Editor.Common.Lenses (_orientation, _x, _y)
 import Editor.Rendering.DefMaterials (loadMaterial)
 import Effect (Effect)
 import Effect.Class (liftEffect)
@@ -29,7 +30,7 @@ import Math.Angle (radianVal, sin)
 import Model.Hardware.PanelType (PanelType(..))
 import Model.Racking.RackingType (RackingType(..))
 import Model.Roof.ArrayConfig (ArrayConfig, _panelLowestZ, _rackingType)
-import Model.Roof.Panel (Orientation(..), Panel, _orientation, _panelX, _panelY, panelLong, panelShort, panelSize, validatedSlope)
+import Model.Roof.Panel (Orientation(..), Panel, panelLong, panelShort, panelSize, validatedSlope)
 import Three.Core.Geometry (BoxGeometry, Geometry, mkBoxGeometry)
 import Three.Core.Material (MeshBasicMaterial, Material, mkMeshBasicMaterialWithTexture)
 import Three.Core.Mesh (Mesh, mkMesh)
@@ -172,8 +173,8 @@ mkPanelMesh p = do
 -- update panel mesh position based on array config and the corresponding panel model
 updatePosition :: forall a. ArrayConfig -> Panel -> Object3D a -> Effect (Object3D a)
 updatePosition arrCfg p m = setPosition pv m *> pure m
-    where px = meterVal $ p ^. _panelX
-          py = meterVal $ p ^. _panelY
+    where px = meterVal $ p ^. _x
+          py = meterVal $ p ^. _y
           z = meterVal $ arrCfg ^. _panelLowestZ
           pv = case validatedSlope p of
                   Nothing -> mkVec3 px py z

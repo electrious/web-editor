@@ -8,7 +8,7 @@ import Control.Plus (empty)
 import Data.Array (cons)
 import Data.Default (class Default, def)
 import Data.Foldable (sequence_)
-import Data.Lens (Lens', (%~))
+import Data.Lens (Lens', (%~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..))
@@ -16,6 +16,7 @@ import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple, fst)
 import Editor.ArrayBuilder (PanelTextureInfo)
+import Editor.Common.Lenses (_disposable)
 import Editor.Disposable (class Disposable)
 import Editor.EditorMode (EditorMode(..))
 import Editor.SceneEvent (Size, size)
@@ -69,9 +70,6 @@ _defMode = _Newtype <<< prop (SProxy :: SProxy "defMode")
 _modeEvt :: Lens' EditorConfig (Event EditorMode)
 _modeEvt = _Newtype <<< prop (SProxy :: SProxy "modeEvt")
 
-_leadId :: Lens' EditorConfig Int
-_leadId = _Newtype <<< prop (SProxy :: SProxy "leadId")
-
 _roofPlates :: Lens' EditorConfig (Array RoofPlate)
 _roofPlates = _Newtype <<< prop (SProxy :: SProxy "roofPlates")
 
@@ -86,19 +84,16 @@ _textures = _Newtype <<< prop (SProxy :: SProxy "textures")
 
 -- | Public interface for the main WebEditor
 newtype WebEditorState = WebEditorState {
-    disposables :: Array (Effect Unit)
+    disposable :: Array (Effect Unit)
 }
 
 derive instance newtypeWebEditorState :: Newtype WebEditorState _
 instance defaultWebEditorState :: Default WebEditorState where
     def = WebEditorState {
-        disposables : []
+        disposable : []
     }
 instance disposableEditorState :: Disposable WebEditorState where
-    dispose (WebEditorState { disposables }) = sequence_ disposables
-
-_disposables :: Lens' WebEditorState (Array (Effect Unit))
-_disposables = _Newtype <<< prop (SProxy :: SProxy "disposables")
+    dispose s = sequence_ $ s ^. _disposable
 
 newtype WebEditor a = WebEditor (ReaderT EditorConfig (StateT WebEditorState Effect) a)
 
@@ -130,4 +125,4 @@ performEditorEvent e = do
 
 
 addDisposable :: Effect Unit -> WebEditor Unit
-addDisposable d = modify_ (\s -> s # _disposables %~ (cons d))
+addDisposable d = modify_ (\s -> s # _disposable %~ (cons d))

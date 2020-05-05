@@ -13,6 +13,7 @@ import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
+import Editor.Common.Lenses (_disposable)
 import Editor.Disposable (class Disposable)
 import Editor.SceneEvent (SceneMouseMoveEvent, _face, _mousePoint)
 import Effect (Effect)
@@ -44,9 +45,6 @@ _marker = _Newtype <<< prop (SProxy :: SProxy "marker")
 
 _addedNewRoof :: forall a. Lens' (RoofRecognizer a) (Event RoofPlate)
 _addedNewRoof = _Newtype <<< prop (SProxy :: SProxy "addedNewRoof")
-
-_disposable :: forall a. Lens' (RoofRecognizer a) (Effect Unit)
-_disposable = _Newtype <<< prop (SProxy :: SProxy "disposable")
 
 -- | Candidate point that will allow user to show the adder marker
 type CandidatePoint = {

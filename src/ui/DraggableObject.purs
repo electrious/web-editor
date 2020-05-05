@@ -6,12 +6,13 @@ import Control.Alt ((<|>))
 import Custom.Mesh (DraggableMesh, TapDragMesh, calcDragDelta, mkDraggableMesh, mkTapDragMesh, validateDrag)
 import Data.Filterable (filter)
 import Data.Foldable (sequence_)
-import Data.Lens (Lens')
+import Data.Lens (Lens', (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
+import Editor.Common.Lenses (_disposable)
 import Editor.Disposable (class Disposable)
 import Editor.SceneEvent (isDragEnd, isDragStart)
 import Effect (Effect)
@@ -35,13 +36,10 @@ newtype DraggableObject a = DraggableObject {
 derive instance newtypeDraggableEvent :: Newtype (DraggableObject a) _
 
 instance disposableDraggableObject :: Disposable (DraggableObject a) where
-    dispose (DraggableObject { disposable }) = disposable
+    dispose d = d ^. _disposable
 
 _draggableObject :: forall a. Lens' (DraggableObject a) (Object3D a)
 _draggableObject = _Newtype <<< prop (SProxy :: SProxy "object")
-
-_tapped :: forall a. Lens' (DraggableObject a) (Event Int)
-_tapped = _Newtype <<< prop (SProxy :: SProxy "tapped")
 
 _position :: forall a. Lens' (DraggableObject a) (Event Vector3)
 _position = _Newtype <<< prop (SProxy :: SProxy "position")

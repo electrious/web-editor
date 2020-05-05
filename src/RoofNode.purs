@@ -13,6 +13,7 @@ import Data.Maybe (fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (sequence_, traverse, traverse_)
+import Editor.Common.Lenses (_center, _id, _slope)
 import Editor.Disposable (class Disposable, dispose)
 import Editor.RoofEditor (_deleteRoof, _roofVertices, createRoofEditor)
 import Editor.SceneEvent (SceneTapEvent)
@@ -22,8 +23,7 @@ import Effect.Unsafe (unsafePerformEffect)
 import FRP.Event (Event, create, keepLatest, subscribe, withLast)
 import FRP.Event.Extra (multicast, performEvent)
 import Math.Angle (radianVal)
-import Model.Roof.RoofPlate (RoofOperation(..), RoofPlate, _azimuth, _borderPoints, _center, _slope)
-import Model.Roof.RoofPlate as RP
+import Model.Roof.RoofPlate (RoofOperation(..), RoofPlate, _azimuth, _borderPoints)
 import SimplePolygon (isSimplePolygon)
 import Three.Core.Geometry (mkShape, mkShapeGeometry)
 import Three.Core.Material (Material, mkMeshBasicMaterial, setOpacity, setTransparent)
@@ -46,17 +46,11 @@ derive instance newtypeRoofNode :: Newtype (RoofNode a) _
 instance disposableRoofNode :: Disposable (RoofNode a) where
     dispose (RoofNode { disposable }) = disposable
 
-_roofId :: forall a. Lens' (RoofNode a) String
-_roofId = _Newtype <<< prop (SProxy :: SProxy "roofId")
-
 _roofUpdate :: forall a. Lens' (RoofNode a) (Event RoofOperation)
 _roofUpdate = _Newtype <<< prop (SProxy :: SProxy "roofUpdate")
 
 _roofDelete :: forall a. Lens' (RoofNode a) (Event RoofOperation)
 _roofDelete = _Newtype <<< prop (SProxy :: SProxy "roofDelete")
-
-_tapped :: forall a. Lens' (RoofNode a) (Event SceneTapEvent)
-_tapped = _Newtype <<< prop (SProxy :: SProxy "tapped")
 
 _roofObject :: forall a. Lens' (RoofNode a) (Object3D a)
 _roofObject = _Newtype <<< prop (SProxy :: SProxy "roofObject")
@@ -164,8 +158,8 @@ createRoofNode roof isActive = do
     when (not $ testSimplePolygon ps) (void $ setTimeout 1000 (toDel unit))
 
     pure $ RoofNode {
-        roofId     : roof ^. RP._roofId,
-        roofDelete : multicast $ const (RoofOpDelete $ roof ^. RP._roofId) <$> delRoofEvt,
+        roofId     : roof ^. _id,
+        roofDelete : multicast $ const (RoofOpDelete $ roof ^. _id) <$> delRoofEvt,
         roofUpdate : multicast newRoofs,
         tapped     : multicast tapped,
         roofObject : obj,

@@ -18,15 +18,15 @@ import Data.Symbol (SProxy(..))
 import Data.Time.Duration (Milliseconds(..))
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
+import Editor.Common.Lenses (_disposable, _id, _roofId, _roofs, _tapped)
 import Editor.Disposable (class Disposable, dispose)
 import Editor.House (HouseMeshData)
-import Editor.RoofNode (RoofNode, _roofDelete, _roofObject, _roofUpdate, _tapped, createRoofNode)
-import Editor.RoofNode as RN
+import Editor.RoofNode (RoofNode, _roofDelete, _roofObject, _roofUpdate, createRoofNode)
 import Editor.RoofRecognizer (_addedNewRoof, _marker, createRoofRecognizer)
 import Effect (Effect)
 import FRP.Event (Event, create, fold, keepLatest, subscribe, withLast)
 import FRP.Event.Extra (debounce, delay, multicast, performEvent, skip)
-import Model.Roof.RoofPlate (RoofEdited, RoofOperation(..), RoofPlate, _roofId, toRoofEdited)
+import Model.Roof.RoofPlate (RoofEdited, RoofOperation(..), RoofPlate, toRoofEdited)
 import Three.Core.Object3D (Object3D, add, mkObject3D, remove, setName)
 
 newtype RoofManager a = RoofManager {
@@ -46,14 +46,11 @@ _roofWrapper = _Newtype <<< prop (SProxy :: SProxy "roofWrapper")
 _editedRoofs :: forall a. Lens' (RoofManager a) (Event (Array RoofEdited))
 _editedRoofs = _Newtype <<< prop (SProxy :: SProxy "editedRoofs")
 
-_disposable :: forall a. Lens' (RoofManager a) (Effect Unit)
-_disposable = _Newtype <<< prop (SProxy :: SProxy "disposable")
-
 type RoofDict = Map String RoofPlate
 
 roofDict :: Array RoofPlate -> RoofDict
 roofDict = fromFoldable <<< map f
-    where f r = Tuple (r ^. _roofId) r
+    where f r = Tuple (r ^. _id) r
 
 -- internal data structure used to manage roofs
 newtype RoofDictData = RoofDictData {
@@ -63,19 +60,16 @@ newtype RoofDictData = RoofDictData {
 
 derive instance newtypeRoofDictData :: Newtype RoofDictData _
 
-_roofs :: Lens' RoofDictData RoofDict
-_roofs = _Newtype <<< prop (SProxy :: SProxy "roofs")
-
 _roofsToRender :: Lens' RoofDictData (Maybe RoofDict)
 _roofsToRender = _Newtype <<< prop (SProxy :: SProxy "roofsToRender")
 
 -- | update the managed roof dict with new operation
 updateRoofDict :: RoofOperation -> RoofDictData -> RoofDictData
-updateRoofDict (RoofOpCreate roof) rd = let roofs = insert (roof ^. _roofId) roof (rd ^. _roofs)
+updateRoofDict (RoofOpCreate roof) rd = let roofs = insert (roof ^. _id) roof (rd ^. _roofs)
                                       in RoofDictData { roofs: roofs, roofsToRender: Just roofs }
 updateRoofDict (RoofOpDelete rid) rd = let roofs = delete rid $ rd ^. _roofs
                                         in RoofDictData { roofs: roofs, roofsToRender: Just roofs }
-updateRoofDict (RoofOpUpdate roof) rd = let roofs = insert (roof ^. _roofId) roof (rd ^. _roofs)
+updateRoofDict (RoofOpUpdate roof) rd = let roofs = insert (roof ^. _id) roof (rd ^. _roofs)
                                         in RoofDictData { roofs: roofs, roofsToRender: Nothing }
 
 doFlatten :: forall a. HouseMeshData a -> RoofDict -> Effect Unit
@@ -92,7 +86,7 @@ getRoofDelete ns = foldl (<|>) empty (view _roofDelete <$> ns)
 -- | get the activated roof id event from an array of roof nodes
 getActivated :: forall a. Array (RoofNode a) -> Event String
 getActivated ns = foldl (<|>) empty (f <$> ns)
-    where f n = const (n ^. RN._roofId) <$> (n ^. _tapped)
+    where f n = const (n ^. _roofId) <$> (n ^. _tapped)
 
 -- | create RoofManager for an array of roofs
 createRoofManager :: forall a b. HouseMeshData a -> Array RoofPlate -> Effect (RoofManager b)
@@ -107,7 +101,7 @@ createRoofManager meshData defRoofs = do
     d1 <- subscribe (const Nothing <$> meshData.mesh.tapped) updateActive
 
     { event: roofsData, push: updateRoofsData } <- create
-    let mkNode roof = createRoofNode roof (multicast $ ((==) (Just $ roof ^. _roofId)) <$> activeRoof)
+    let mkNode roof = createRoofNode roof (multicast $ ((==) (Just $ roof ^. _id)) <$> activeRoof)
         defRoofDict = roofDict defRoofs
 
         -- get roofs to be rerendered
@@ -147,7 +141,7 @@ createRoofManager meshData defRoofs = do
 
     d2 <- subscribe (Just <$> (keepLatest $ getActivated <$> renderedNodes)) updateActive
     d3 <- subscribe (delay 1 $ const Nothing <$> deleteRoofOp) updateActive
-    d4 <- subscribe (delay 1 $ (\o -> Just $ o ^. _roofId) <$> addedNewRoof) updateActive
+    d4 <- subscribe (delay 1 $ (\o -> Just $ o ^. _id) <$> addedNewRoof) updateActive
 
     -- manage all roofs and update it with user operations.
     let defRoofData = RoofDictData { roofs: defRoofDict, roofsToRender: Just defRoofDict }
