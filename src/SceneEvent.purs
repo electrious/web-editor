@@ -184,7 +184,7 @@ _dragEvent = _Newtype <<< prop (SProxy :: SProxy "dragEvent")
 -- | setup all raycasting needed to process user inputs and send
 -- them to the corresponding 3D object in the scene
 setupRaycasting :: forall a b. Camera a -> Object3D b -> InputEvents -> Event Size -> Effect RaycastSetup
-setupRaycasting camera scene input size = do
+setupRaycasting camera scene input sizeEvt = do
     raycaster <- mkRaycaster
     
     let doRaycast tp = do
@@ -205,9 +205,9 @@ setupRaycasting camera scene input size = do
             res <- doRaycast (calcPosition sz e)
             processDragObjects e res
     
-    let e1 = performEvent $ lift2 raycastTap size (input ^. _tapped)
-        e2 = performEvent $ lift2 raycastMouse size (input ^. _mouseMove)
-        unraycastedDrag = compact $ performEvent $ lift2 raycastDrag size (input ^. _dragged)
+    let e1 = performEvent $ lift2 raycastTap sizeEvt (input ^. _tapped)
+        e2 = performEvent $ lift2 raycastMouse sizeEvt (input ^. _mouseMove)
+        unraycastedDrag = compact $ performEvent $ lift2 raycastDrag sizeEvt (input ^. _dragged)
 
         f _ = pure unit
     

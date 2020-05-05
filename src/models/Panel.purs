@@ -1,6 +1,6 @@
 module Model.Roof.Panel where
 
-import Prelude
+import Prelude hiding (degree)
 
 import Control.Monad.Error.Class (throwError)
 import Data.Enum (class BoundedEnum, class Enum, fromEnum, toEnum)
