@@ -9,8 +9,8 @@ import Data.Maybe (Maybe(..))
 import Editor.Common.Lenses (_leadId, _wrapper)
 import Editor.Disposable (dispose)
 import Editor.House (loadHouseModel)
-import Editor.RoofManager (_editedRoofs, _roofWrapper, createRoofManager)
-import Editor.WebEditor (WebEditor, _dataServer, _defSize, _elem, _roofPlates, _sizeEvt, addDisposable, performEditorEvent)
+import Editor.RoofManager (_editedRoofs, createRoofManager)
+import Editor.WebEditor (WebEditor, _dataServer, _defSize, _elem, _sizeEvt, addDisposable, performEditorEvent)
 import Editor.WebEditorScene (EditorScene(..), createScene, renderLoop)
 import Effect.Class (liftEffect)
 import Effect.Class.Console (errorShow)
@@ -35,8 +35,8 @@ createEditor = do
 
             let f hmd = do
                     liftEffect $ es.addContent $ hmd ^. _wrapper
-                    mgr <- liftEffect $ createRoofManager hmd (cfg ^. _roofPlates)
-                    liftEffect $ es.addContent (mgr ^. _roofWrapper)
+                    mgr <- createRoofManager hmd
+                    liftEffect $ es.addContent (mgr ^. _wrapper)
                     addDisposable $ dispose mgr
                     pure (mgr ^. _editedRoofs)
 

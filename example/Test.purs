@@ -9,7 +9,8 @@ import Data.Lens ((.~))
 import Data.Tuple (fst)
 import Editor.Common.Lenses (_leadId)
 import Editor.Editor (createEditor)
-import Editor.WebEditor (_dataServer, _elem, _roofPlates, runWebEditor)
+import Editor.EditorMode (EditorMode(..))
+import Editor.WebEditor (_dataServer, _defMode, _elem, _roofPlates, runWebEditor)
 import Effect (Effect)
 import Effect.Class.Console (logShow)
 import FRP.Event (subscribe)
@@ -36,6 +37,7 @@ doTest roofDat = do
                               # _leadId     .~ 296285
                               # _roofPlates .~ roofs
                               # _dataServer .~ serverUrl
+                              # _defMode    .~ Showing
 
                 res <- runWebEditor cfg createEditor
                 
