@@ -13,9 +13,9 @@ import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
-import Editor.Common.Lenses (_disposable)
+import Editor.Common.Lenses (_disposable, _face, _mesh, _point, _tapped)
 import Editor.Disposable (class Disposable)
-import Editor.SceneEvent (SceneMouseMoveEvent, _face, _mousePoint)
+import Editor.SceneEvent (SceneMouseMoveEvent)
 import Effect (Effect)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Event (Event, gate, sampleOn, subscribe)
@@ -61,25 +61,25 @@ adderMarkerGeo = unsafeCoerce $ unsafePerformEffect (mkCircleGeometry 1.0 32)
 createAdderMarker :: forall a. Effect (TappableMesh a)
 createAdderMarker = do
     marker <- mkTappableMesh adderMarkerGeo adderMarkerMat
-    setName "add-roof-marker" marker.mesh
+    setName "add-roof-marker" $ marker ^. _mesh
     pure marker
 
 
 showMarker :: forall a. TappableMesh a -> Maybe CandidatePoint -> Effect Unit
-showMarker marker Nothing = setVisible false marker.mesh
-showMarker marker (Just p) | not (hasParent marker.mesh) = setVisible false marker.mesh
+showMarker marker Nothing = setVisible false $ marker ^. _mesh
+showMarker marker (Just p) | not (hasParent $ marker ^. _mesh) = setVisible false $ marker ^. _mesh
                            | otherwise = do
-                                 setVisible true marker.mesh
+                                 setVisible true $ marker ^. _mesh
                                  -- get the local position of the candidate point
                                  -- and move it along the normal vector a bit.
                                  -- then used as the new position of the marker
                                  let np = addScaled p.position p.faceNormal 0.03
-                                 setPosition np marker.mesh
+                                 setPosition np $ marker ^. _mesh
 
                                  -- set the target direction of the marker
                                  let target = p.position <+> p.faceNormal
-                                 targetW <- localToWorld target (parent marker.mesh)
-                                 lookAt targetW marker.mesh
+                                 targetW <- localToWorld target (parent $ marker ^. _mesh)
+                                 lookAt targetW $ marker ^. _mesh
 
 
 -- | create a roof recognizer
@@ -92,13 +92,13 @@ createRoofRecognizer houseWrapper roofs mouseMove canShow = do
     marker <- createAdderMarker
 
     -- hide the marker by default
-    setVisible false marker.mesh
+    setVisible false $ marker ^. _mesh
 
     let getCandidatePoint evt rs = do
             isRoof <- couldBeRoof houseWrapper rs evt
             if isRoof
             then do
-                np <- worldToLocal (evt ^. _mousePoint) houseWrapper
+                np <- worldToLocal (evt ^. _point) houseWrapper
                 pure $ Just { position: np, faceNormal: normal (evt ^. _face) }
             else pure Nothing
 
@@ -112,9 +112,9 @@ createRoofRecognizer houseWrapper roofs mouseMove canShow = do
 
     d <- subscribe (lift2 pointCanShow canShow point) (showMarker marker)
 
-    let roof = compact $ performEvent $ sampleOn point (traverse <<< mkRoof <$> marker.tapped)
+    let roof = compact $ performEvent $ sampleOn point (traverse <<< mkRoof <$> marker ^. _tapped)
     pure $ RoofRecognizer {
-        marker       : marker.mesh,
+        marker       : marker ^. _mesh,
         addedNewRoof : multicast roof,
         disposable   : d
     }

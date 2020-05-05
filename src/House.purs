@@ -6,8 +6,11 @@ import Algorithm.MeshFlatten (VertexItem, buildRTree)
 import Data.Array (range)
 import Data.Compactable (compact)
 import Data.Foldable (find, traverse_)
+import Data.Lens ((^.))
 import Data.Maybe (Maybe)
+import Data.Newtype (class Newtype)
 import Data.Traversable (traverse)
+import Editor.Common.Lenses (_mesh)
 import Editor.SceneEvent (SceneMouseMoveEvent, SceneTapEvent, makeMouseMove, makeTappable, stopMouseMove, stopTappable)
 import Effect (Effect)
 import FRP.Event (Event, makeEvent)
@@ -23,11 +26,13 @@ import Three.Math.Vector (Vector3, mkVec3)
 meshPath :: String -> Int -> String
 meshPath serverUrl leadId = serverUrl <> "/leads/" <> show leadId <> "/mesh/"
 
-type HouseMesh = {
+newtype HouseMesh = HouseMesh {
     mesh      :: Mesh Unit,
     tapped    :: Event SceneTapEvent,
     mouseMove :: Event SceneMouseMoveEvent
 }
+
+derive instance newtypeHouseMesh :: Newtype HouseMesh _
 
 -- | create new HouseMesh, which is a mesh composed with the tap and mouse
 -- events from the mesh.
@@ -43,7 +48,7 @@ mkHouseMesh geo mat = do
             makeMouseMove mesh k
             pure (stopMouseMove mesh)
     
-    pure {
+    pure $ HouseMesh {
         mesh      : mesh,
         tapped    : tapEvt,
         mouseMove : mouseEvt
@@ -61,7 +66,7 @@ applyMaterialCreator matCreator obj = do
         upd old = do
             remove old obj
             newMesh <- mkHouseMesh (geometry old) mat
-            add newMesh.mesh obj
+            add (newMesh ^. _mesh) obj
             pure newMesh
     traverse upd oldMesh
 
@@ -94,12 +99,14 @@ loadHouseModel serverUrl leadId = do
 
 -- | house mesh data, including the mesh, the original geometry, and the
 -- vertices tree built from all vertices
-type HouseMeshData geo = {
+newtype HouseMeshData geo = HouseMeshData {
     wrapper     :: Object3D Unit,
     mesh        :: HouseMesh,
     geometry    :: BufferGeometry geo,
     verticeTree :: RBush VertexItem
 }
+
+derive instance newtypeHouseMeshData :: Newtype (HouseMeshData geo) _
 
 type GeometryInfo geo = {
     geometry :: BufferGeometry geo,
@@ -120,12 +127,12 @@ getGeometryInfo mesh = let g = bufferGeometry mesh
 
 getHouseMeshData :: forall geo. Object3D Unit -> HouseMesh -> Effect (HouseMeshData geo)
 getHouseMeshData obj houseMesh = do
-    let d = getGeometryInfo houseMesh.mesh
+    let d = getGeometryInfo $ houseMesh ^. _mesh
     tree <- buildRTree d.vertices d.normals
 
-    pure { wrapper: obj,
-           mesh: houseMesh,
-           geometry: d.geometry,
-           verticeTree: tree
-          }
-          
+    pure $ HouseMeshData {
+            wrapper     : obj,
+            mesh        : houseMesh,
+            geometry    : d.geometry,
+            verticeTree : tree
+        }

@@ -6,14 +6,14 @@ import Control.Alt ((<|>))
 import Control.Apply (lift2)
 import Custom.Mesh (TappableMesh, mkTappableMesh)
 import Data.Array (head, init, snoc)
-import Data.Lens (Lens', (.~), (^.))
+import Data.Lens (Lens', view, (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (sequence_, traverse, traverse_)
-import Editor.Common.Lenses (_center, _id, _slope)
+import Editor.Common.Lenses (_center, _id, _mesh, _slope, _tapped)
 import Editor.Disposable (class Disposable, dispose)
 import Editor.RoofEditor (_deleteRoof, _roofVertices, createRoofEditor)
 import Editor.SceneEvent (SceneTapEvent)
@@ -81,7 +81,7 @@ createRoofMesh ps active = do
     shp <- mkShape ps
     geo <- mkShapeGeometry shp
     m <- mkTappableMesh geo (getMaterial active)
-    setName "roof-mesh" m.mesh
+    setName "roof-mesh" $ m ^. _mesh
     pure m
 
 updateRoofPlate :: Array Vector3 -> RoofPlate -> RoofPlate
@@ -135,14 +135,14 @@ createRoofNode roof isActive = do
     
     -- add/remove mesh to the obj
     d1 <- subscribe (withLast meshEvt) \{last, now} -> do
-              traverse_ (\o -> remove o.mesh obj) last
-              add now.mesh obj
+              traverse_ (\o -> remove (o ^. _mesh) obj) last
+              add (now ^. _mesh) obj
     
     -- set mesh material based on activity state
-    let e = performEvent $ lift2 (\m a -> setMaterial (getMaterial a) m.mesh) meshEvt isActive
-    d2 <- subscribe e (\_ -> pure init)
+    let e = performEvent $ lift2 (\m a -> setMaterial (getMaterial a) (m ^. _mesh)) meshEvt isActive
+    d2 <- subscribe e (const $ pure init)
 
-    let tapped = keepLatest $ _.tapped <$> meshEvt
+    let tapped = keepLatest $ view _tapped <$> meshEvt
 
         toParent v = applyMatrix (matrix obj) (mkVec3 (vecX v) (vecY v) 0.0)
         

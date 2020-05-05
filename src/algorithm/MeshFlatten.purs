@@ -5,15 +5,12 @@ import Prelude
 import Algorithm.PointInPolygon (pointInPolygon)
 import Data.Array (concat, filter, length, range, zip, zipWith)
 import Data.Foldable (maximum, minimum, sequence_)
-import Data.Lens (Lens', (^.))
-import Data.Lens.Iso.Newtype (_Newtype)
-import Data.Lens.Record (prop)
+import Data.Lens ((^.))
 import Data.Maybe (fromMaybe)
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
 import Data.Tuple (fst, snd)
-import Editor.Common.Lenses (_center, _normal, _polygon)
+import Editor.Common.Lenses (_center, _index, _normal, _polygon, _position)
 import Effect (Effect)
 import Math.Angle (degreeVal)
 import Model.Roof.RoofPlate (Polygon, RoofPlate, angleBetween, getRoofPolygon)
@@ -47,10 +44,10 @@ vertexItem point normal index =
 -- | build an RTree from a list of vertices
 buildRTree :: Array Vector3 -> Array Vector3 -> Effect (RBush VertexItem)
 buildRTree vertices normals = do
-    let vns = zip vertices normals
-        nums = range 0 (length vns - 1)
+    let vns     = zip vertices normals
+        nums    = range 0 (length vns - 1)
         f t idx = vertexItem (fst t) (snd t) idx
-        items = zipWith f vns nums
+        items   = zipWith f vns nums
     tree <- mkRBush
     load items tree
     pure tree
@@ -90,17 +87,11 @@ roofFlattener r = RoofFlattener { normal: r ^. _normal, center: r ^. _center, po
 
 -- | flattened vertex info
 newtype FlattenedVertex = FlattenedVertex {
-    index  :: Int,
-    newPos :: Vector3
+    index    :: Int,
+    position :: Vector3
 }
 
 derive instance newtypeFlattendVertex :: Newtype FlattenedVertex _
-
-_index :: Lens' FlattenedVertex Int
-_index = _Newtype <<< prop (SProxy :: SProxy "index")
-
-_newPos :: Lens' FlattenedVertex Vector3
-_newPos = _Newtype <<< prop (SProxy :: SProxy "newPos")
 
 -- | apply the flattened vertices to the BufferGeometry and return a new one
 applyFlattenedVertex :: forall geo. BufferGeometry geo -> Array FlattenedVertex -> Effect (BufferGeometry geo)
@@ -110,7 +101,7 @@ applyFlattenedVertex geo fvs = do
     if isBufferAttribute attr
     then do
         let apply fv = do
-                let p = fv ^. _newPos
+                let p = fv ^. _position
                 setXYZ (fv ^. _index) (vecX p) (vecY p) (vecZ p) attr
         sequence_ (apply <$> fvs)
         setNeedsUpdate true attr
@@ -138,7 +129,7 @@ flattenRoofplate tree roof = do
     
         -- filter function
         f c = pointInRoof c && checkDistAndAngle c
-        flattenF c = FlattenedVertex { index: c.index, newPos: flatten flattener c.vertex }
+        flattenF c = FlattenedVertex { index: c.index, position: flatten flattener c.vertex }
     
     pure $ flattenF <$> filter f candidates
 

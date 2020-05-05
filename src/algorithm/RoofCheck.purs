@@ -5,7 +5,8 @@ import Prelude
 import Algorithm.PointInPolygon (pointInPolygon)
 import Data.Foldable (any)
 import Data.Lens ((^.))
-import Editor.SceneEvent (SceneMouseMoveEvent, _face, _mousePoint)
+import Editor.Common.Lenses (_face, _point)
+import Editor.SceneEvent (SceneMouseMoveEvent)
 import Effect (Effect)
 import Math.Angle (acos, degreeVal)
 import Model.Roof.RoofPlate (RoofPlate, getRoofPolygon)
@@ -19,7 +20,7 @@ couldBeRoof house roofs e = do
     let roofPoly = getRoofPolygon <$> roofs
     
     -- get the local coordinate of the intersection point in the house mesh
-    localPoint <- worldToLocal (e ^. _mousePoint) house
+    localPoint <- worldToLocal (e ^. _point) house
 
     let -- 2D projection of the intersection point
         flatP = mkVec2 (vecX localPoint) (vecY localPoint)

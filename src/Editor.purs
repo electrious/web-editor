@@ -6,7 +6,7 @@ import Control.Monad.Reader (ask)
 import Control.Plus (empty)
 import Data.Lens ((^.))
 import Data.Maybe (Maybe(..))
-import Editor.Common.Lenses (_leadId)
+import Editor.Common.Lenses (_leadId, _wrapper)
 import Editor.Disposable (dispose)
 import Editor.House (loadHouseModel)
 import Editor.RoofManager (_editedRoofs, _roofWrapper, createRoofManager)
@@ -34,7 +34,7 @@ createEditor = do
             liftEffect $ window >>= renderLoop es.render
 
             let f hmd = do
-                    liftEffect $ es.addContent hmd.wrapper
+                    liftEffect $ es.addContent $ hmd ^. _wrapper
                     mgr <- liftEffect $ createRoofManager hmd (cfg ^. _roofPlates)
                     liftEffect $ es.addContent (mgr ^. _roofWrapper)
                     addDisposable $ dispose mgr

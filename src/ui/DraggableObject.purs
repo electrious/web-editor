@@ -12,7 +12,7 @@ import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Editor.Common.Lenses (_disposable)
+import Editor.Common.Lenses (_disposable, _dragged, _mesh, _tapped)
 import Editor.Disposable (class Disposable)
 import Editor.SceneEvent (isDragEnd, isDragStart)
 import Effect (Effect)
@@ -90,28 +90,28 @@ createDraggableObject active index position customGeo customMat = do
     mesh <- createVisibleObject customGeo customMat
 
     let defPosition = mkVec3 (vecX position) (vecY position) 0.1
-    setPosition defPosition mesh.mesh
-    setVisible false mesh.mesh  -- invisible by default
+    setPosition defPosition $ mesh ^. _mesh
+    setVisible false $ mesh ^. _mesh  -- invisible by default
     
-    add mesh.mesh dragObj
+    add (mesh ^. _mesh) dragObj
 
     -- create the invisible circle
     invCircle <- createInvisibleCircle
-    setPosition defPosition invCircle.mesh
-    setVisible false invCircle.mesh
-    setRenderOrder 10 invCircle.mesh
-    add invCircle.mesh dragObj
+    setPosition defPosition $ invCircle ^. _mesh
+    setVisible false $ invCircle ^. _mesh
+    setRenderOrder 10 $ invCircle ^. _mesh
+    add (invCircle ^. _mesh) dragObj
 
-    disp1 <- subscribe active (flip setVisible mesh.mesh)
+    disp1 <- subscribe active (flip setVisible (mesh ^. _mesh))
 
-    let dragEvts = multicast $ mesh.dragged <|> invCircle.dragged
+    let dragEvts = multicast $ mesh ^. _dragged <|> invCircle ^. _dragged
         evts = multicast $ validateDrag dragEvts
         startEvt = filter isDragStart evts
         endEvt = filter isDragEnd evts
 
         dragging = (const true <$> startEvt) <|> (const false <$> endEvt)
     
-    disp2 <- subscribe dragging (flip setVisible invCircle.mesh)
+    disp2 <- subscribe dragging (flip setVisible (invCircle ^. _mesh))
 
     let toLocal v = if hasParent dragObj
                     then Just <$> worldToLocal v (parent dragObj)
@@ -125,13 +125,13 @@ createDraggableObject active index position customGeo customMat = do
         newPos = multicast $ foldWithDef updatePos delta defPosition
     
     disp3 <- subscribe newPos \p -> do
-                setPosition p mesh.mesh
-                setPosition p invCircle.mesh
+                setPosition p $ mesh ^. _mesh
+                setPosition p $ invCircle ^. _mesh
 
     pure $ DraggableObject {
-        object: dragObj,
-        tapped: const index <$> mesh.tapped,
-        position: newPos,
-        isDragging: multicast dragging,
-        disposable: sequence_ [disp1, disp2, disp3]
+        object     : dragObj,
+        tapped     : const index <$> mesh ^. _tapped,
+        position   : newPos,
+        isDragging : multicast dragging,
+        disposable : sequence_ [disp1, disp2, disp3]
     }

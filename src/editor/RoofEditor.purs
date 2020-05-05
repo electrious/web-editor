@@ -17,7 +17,7 @@ import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (sequence, sequence_, sum, traverse, traverse_)
 import Data.Tuple (Tuple(..), fst, snd)
-import Editor.Common.Lenses (_tapped)
+import Editor.Common.Lenses (_disposable, _index, _mesh, _point, _position, _tapped)
 import Editor.Disposable (class Disposable, dispose)
 import Editor.SceneEvent (SceneTapEvent)
 import Effect (Effect)
@@ -26,9 +26,10 @@ import FRP.Event (Event, create, keepLatest, sampleOn, subscribe)
 import FRP.Event.Extra (foldEffect, mergeArray, multicast, performEvent)
 import Three.Core.Geometry (Geometry, mkCircleGeometry)
 import Three.Core.Material (Material, mkMeshBasicMaterial)
+import Three.Core.Mesh (Mesh)
 import Three.Core.Object3D (Object3D, add, remove, setPosition, setVisible)
 import Three.Math.Vector (Vector2, Vector3, dist, mkVec2, mkVec3, vecX, vecY)
-import UI.DraggableObject (DraggableObject, _draggableObject, _isDragging, _position, createDraggableObject)
+import UI.DraggableObject (DraggableObject, _draggableObject, _isDragging, createDraggableObject)
 import Unsafe.Coerce (unsafeCoerce)
 
 toVec2 :: Vector3 -> Vector2
@@ -79,15 +80,22 @@ createRoofDeleteMarker = mkTappableMesh roofDeleteGeometry roofDeleteMaterial
 
 
 -- | internal object for green marker point data
-type GreenMarkerPoint = {
-    position  :: Vector2,
-    vertIndex :: Int
+newtype GreenMarkerPoint = GreenMarkerPoint {
+    position :: Vector2,
+    index    :: Int
 }
 
-type GreenMarker a = {
+derive instance newtypeGreenMarkerPoint :: Newtype GreenMarkerPoint _
+
+newtype GreenMarker a = GreenMarker {
     mesh  :: TappableMesh a,
     point :: GreenMarkerPoint
 }
+
+derive instance newtypeGreenMarker :: Newtype (GreenMarker a) _
+
+_greenMesh :: forall a. Lens' (GreenMarker a) (Mesh a)
+_greenMesh = _mesh <<< _mesh
 
 -- | create material and geometry for the green marker.
 greenMaterial :: forall a. Material a
@@ -99,13 +107,13 @@ greenGeometry = unsafeCoerce $ unsafePerformEffect (mkCircleGeometry 0.3 32)
 mkGreenMarkerMesh :: forall a. Vector2 -> Effect (TappableMesh a)
 mkGreenMarkerMesh p = do
     m <- mkTappableMesh greenGeometry greenMaterial
-    setPosition (mkVec3 (vecX p) (vecY p) 0.01) m.mesh
+    setPosition (mkVec3 (vecX p) (vecY p) 0.01) $ m ^. _mesh
     pure m
 
 mkGreenMarker :: forall a. GreenMarkerPoint -> Effect (GreenMarker a)
 mkGreenMarker p = do
-    m <- mkGreenMarkerMesh p.position
-    pure { mesh: m, point: p }
+    m <- mkGreenMarkerMesh $ p ^. _position
+    pure $ GreenMarker { mesh: m, point: p }
 
 -- | given a list of vertices position, calculate all middle points
 greenMarkerPositions :: Array Vector2 -> Array GreenMarkerPoint
@@ -120,8 +128,9 @@ greenMarkerPositions vertices = h <$> filter g d
           f :: Tuple Int Vector2 -> Vector2 -> { dist :: Number, point :: GreenMarkerPoint }
           f v v2 = let idx = fst v
                        v1 = snd v
-                       point = { position: mkVec2 ((vecX v1 + vecX v2) / 2.0) ((vecY v1 + vecY v2) / 2.0),
-                                 vertIndex: idx + 1
+                       point = GreenMarkerPoint {
+                                 position : mkVec2 ((vecX v1 + vecX v2) / 2.0) ((vecY v1 + vecY v2) / 2.0),
+                                 index    : idx + 1
                                }
                     in { dist: dist v1 v2, point: point }
 
@@ -130,12 +139,13 @@ greenMarkerPositions vertices = h <$> filter g d
           h r = r.point
 
 setActive :: forall a. Array (GreenMarker a) -> Boolean -> Effect Unit
-setActive ms active = traverse_ (\m -> setVisible active m.mesh.mesh) ms
+setActive ms active = traverse_ (\m -> setVisible active (m ^. _greenMesh)) ms
 
 updatePos :: forall c. GreenMarker c -> GreenMarkerPoint -> Effect (GreenMarker c)
 updatePos o p = do
-    setPosition (mkVec3 (vecX p.position) (vecY p.position) 0.01) o.mesh.mesh
-    pure { mesh: o.mesh, point: p }
+    let pos = p ^. _position
+    setPosition (mkVec3 (vecX pos) (vecY pos) 0.01) (o ^. _greenMesh)
+    pure $ GreenMarker { mesh: o ^. _mesh, point: p }
 
 -- function to create/delete/update green marker objects based on new
 -- list of GreenMarkerPoint
@@ -144,12 +154,12 @@ updateMarkers parent ps oldObjs | length ps == length oldObjs = sequence (zipWit
                                 | length ps > length oldObjs = do
                                         updObjs <- sequence (zipWith updatePos oldObjs (take (length oldObjs) ps))
                                         newObjs <- sequence (mkGreenMarker <$> takeEnd (length ps - length oldObjs) ps)
-                                        traverse_ (\o -> add o.mesh.mesh parent) newObjs
+                                        traverse_ (\o -> add (o ^. _greenMesh) parent) newObjs
                                         pure (updObjs <> newObjs)
                                 | length ps < length oldObjs = do
                                         updObjs <- sequence (zipWith updatePos (take (length ps) oldObjs) ps)
                                         let delObjs = takeEnd (length oldObjs - length ps) oldObjs
-                                        traverse_ (\o -> remove o.mesh.mesh parent) delObjs
+                                        traverse_ (\o -> remove (o ^. _greenMesh) parent) delObjs
                                         pure updObjs
                                 | otherwise = pure oldObjs
 
@@ -159,7 +169,7 @@ mkGreenMarkers parent active vertices = keepLatest $ getTapForAll <$> markers
           markers = multicast $ foldEffect (updateMarkers parent) mPosList []
           res = performEvent $ lift2 setActive markers active
 
-          getTap m = const m.point <$> m.mesh.tapped
+          getTap m = const (m ^. _point) <$> (m ^. _mesh ^. _tapped)
           getTapForAll ms = foldl (<|>) empty (getTap <$> ms)
 
 
@@ -180,7 +190,7 @@ newtype RoofEditor = RoofEditor {
 
 derive instance newtypeRoofEditor :: Newtype RoofEditor _
 instance disposableRoofEditor :: Disposable RoofEditor where
-    dispose (RoofEditor { disposable }) = disposable
+    dispose e = e ^. _disposable
 
 _roofVertices :: Lens' RoofEditor (Event (Array Vector2))
 _roofVertices = _Newtype <<< prop (SProxy :: SProxy "roofVertices")
@@ -231,7 +241,7 @@ createRoofEditor parent active ps = do
         greenActive = multicast $ lift2 (\ra am -> ra && am == Nothing) roofActive activeMarker
         -- create green markers for adding new vertices
         toAddEvt = mkGreenMarkers parent greenActive newVertices
-        addVert p pns = insertAt p.vertIndex p.position pns
+        addVert p pns = insertAt (p ^. _index) (p ^. _position) pns
         vertsAfterAdd = compact (sampleOn newVertices $ addVert <$> toAddEvt)
 
         -- get delete event of tapping on a marker
@@ -246,13 +256,13 @@ createRoofEditor parent active ps = do
     
     -- create the roof delete button
     roofDel <- createRoofDeleteMarker
-    add roofDel.mesh parent
+    add (roofDel ^. _mesh) parent
 
     -- update roof delete button position
-    d4 <- subscribe (verticesCenter <$> newVertices) (flip setPosition roofDel.mesh)
+    d4 <- subscribe (verticesCenter <$> newVertices) (flip setPosition (roofDel ^. _mesh))
 
     -- Show the roof delete button when roof's active
-    d5 <- subscribe roofActive (flip setVisible roofDel.mesh)
+    d5 <- subscribe roofActive (flip setVisible (roofDel ^. _mesh))
 
     -- set the default vertices
     updateVertList ps
@@ -261,6 +271,6 @@ createRoofEditor parent active ps = do
 
     pure $ RoofEditor {
         roofVertices : newVertices,
-        deleteRoof   : roofDel.tapped,
+        deleteRoof   : roofDel ^. _tapped,
         disposable   : sequence_ [d1, d2, d3, d4, d5]
     }

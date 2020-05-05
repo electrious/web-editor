@@ -18,7 +18,7 @@ import Data.Symbol (SProxy(..))
 import Data.Time.Duration (Milliseconds(..))
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import Editor.Common.Lenses (_disposable, _id, _roofId, _roofs, _tapped)
+import Editor.Common.Lenses (_disposable, _geometry, _id, _mesh, _mouseMove, _roofId, _roofs, _tapped, _verticeTree, _wrapper)
 import Editor.Disposable (class Disposable, dispose)
 import Editor.House (HouseMeshData)
 import Editor.RoofNode (RoofNode, _roofDelete, _roofObject, _roofUpdate, createRoofNode)
@@ -73,7 +73,10 @@ updateRoofDict (RoofOpUpdate roof) rd = let roofs = insert (roof ^. _id) roof (r
                                         in RoofDictData { roofs: roofs, roofsToRender: Nothing }
 
 doFlatten :: forall a. HouseMeshData a -> RoofDict -> Effect Unit
-doFlatten meshData rd = flattenRoofPlates meshData.geometry meshData.verticeTree meshData.mesh.mesh (toUnfoldable $ values rd)
+doFlatten meshData rd = flattenRoofPlates (meshData ^. _geometry) 
+                                          (meshData ^. _verticeTree)
+                                          (meshData ^. (_mesh <<< _mesh))
+                                          (toUnfoldable $ values rd)
 
 -- | get roofUpdate event from an array of roof nodes
 getRoofUpdate :: forall a. Array (RoofNode a) -> Event RoofOperation
@@ -98,7 +101,7 @@ createRoofManager meshData defRoofs = do
     { event: activeRoof, push: updateActive } <- create
 
     -- if house mesh is tapped, to deactivate all roofs
-    d1 <- subscribe (const Nothing <$> meshData.mesh.tapped) updateActive
+    d1 <- subscribe (const Nothing <$> meshData ^. (_mesh <<< _tapped)) updateActive
 
     { event: roofsData, push: updateRoofsData } <- create
     let mkNode roof = createRoofNode roof (multicast $ ((==) (Just $ roof ^. _id)) <$> activeRoof)
@@ -128,9 +131,9 @@ createRoofManager meshData defRoofs = do
         -- create the roof recognizer and add it to the roof wrapper object
         canShowRecognizer = isNothing <$> activeRoof
 
-    recognizer <- createRoofRecognizer meshData.wrapper
+    recognizer <- createRoofRecognizer (meshData ^. _wrapper)
                                        ((toUnfoldable <<< values) <$> newRoofs)
-                                       meshData.mesh.mouseMove
+                                       (meshData ^. (_mesh <<< _mouseMove))
                                        canShowRecognizer
 
     add (recognizer ^. _marker) wrapper

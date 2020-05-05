@@ -11,12 +11,6 @@ import Data.Symbol (SProxy(..))
 _leadId :: forall t a r. Newtype t { leadId :: a | r } => Lens' t a
 _leadId = _Newtype <<< prop (SProxy :: SProxy "leadId")
 
-_disposable :: forall t a r. Newtype t { disposable :: a | r } => Lens' t a
-_disposable = _Newtype <<< prop (SProxy :: SProxy "disposable")
-
-_tapped :: forall t a r. Newtype t { tapped :: a | r } => Lens' t a
-_tapped = _Newtype <<< prop (SProxy :: SProxy "tapped")
-
 _id :: forall t a r. Newtype t { id :: a | r } => Lens' t a
 _id = _Newtype <<< prop (SProxy :: SProxy "id")
 
@@ -52,3 +46,81 @@ _y = _Newtype <<< prop (SProxy :: SProxy "y")
 
 _z :: forall t a r. Newtype t { z :: a | r } => Lens' t a
 _z = _Newtype <<< prop (SProxy :: SProxy "z")
+
+_deltaX :: forall t a r. Newtype t { deltaX :: a | r } => Lens' t a
+_deltaX = _Newtype <<< prop (SProxy :: SProxy "deltaX")
+
+_deltaY :: forall t a r. Newtype t { deltaY :: a | r } => Lens' t a
+_deltaY = _Newtype <<< prop (SProxy :: SProxy "deltaY")
+
+_width :: forall t a r. Newtype t { width :: a | r } => Lens' t a
+_width = _Newtype <<< prop (SProxy :: SProxy "width")
+
+_height :: forall t a r. Newtype t { height :: a | r } => Lens' t a
+_height = _Newtype <<< prop (SProxy :: SProxy "height")
+
+_disposable :: forall t a r. Newtype t { disposable :: a | r } => Lens' t a
+_disposable = _Newtype <<< prop (SProxy :: SProxy "disposable")
+
+_mesh :: forall t a r. Newtype t { mesh :: a | r } => Lens' t a
+_mesh = _Newtype <<< prop (SProxy :: SProxy "mesh")
+
+_tapped :: forall t a r. Newtype t { tapped :: a | r } => Lens' t a
+_tapped = _Newtype <<< prop (SProxy :: SProxy "tapped")
+
+_dragged :: forall t a r. Newtype t { dragged :: a | r } => Lens' t a
+_dragged = _Newtype <<< prop (SProxy :: SProxy "dragged")
+
+_dragType :: forall t a r. Newtype t { dragType :: a | r } => Lens' t a
+_dragType = _Newtype <<< prop (SProxy :: SProxy "dragType")
+
+_dragDelta :: forall t a r. Newtype t { dragDelta :: a | r } => Lens' t a
+_dragDelta = _Newtype <<< prop (SProxy :: SProxy "dragDelta")
+
+_position :: forall t a r. Newtype t { position :: a | r } => Lens' t a
+_position = _Newtype <<< prop (SProxy :: SProxy "position")
+
+_point :: forall t a r. Newtype t { point :: a | r } => Lens' t a
+_point = _Newtype <<< prop (SProxy :: SProxy "point")
+
+_canDrag :: forall t a r. Newtype t { canDrag :: a | r } => Lens' t a
+_canDrag = _Newtype <<< prop (SProxy :: SProxy "canDrag")
+
+_isDragging :: forall t a r. Newtype t { isDragging :: a | r } => Lens' t a
+_isDragging = _Newtype <<< prop (SProxy :: SProxy "isDragging")
+
+_lastDragEvt :: forall t a r. Newtype t { lastDragEvt :: a | r } => Lens' t a
+_lastDragEvt = _Newtype <<< prop (SProxy :: SProxy "lastDragEvt")
+
+_curDragEvt :: forall t a r. Newtype t { curDragEvt :: a | r } => Lens' t a
+_curDragEvt = _Newtype <<< prop (SProxy :: SProxy "curDragEvt")
+
+_zoomed :: forall t a r. Newtype t { zoomed :: a | r } => Lens' t a 
+_zoomed = _Newtype <<< prop (SProxy :: SProxy "zoomed")
+
+_shiftDragged :: forall t a r. Newtype t { shiftDragged :: a | r } => Lens' t a
+_shiftDragged = _Newtype <<< prop (SProxy :: SProxy "shiftDragged")
+
+_mouseMove :: forall t a r. Newtype t { mouseMove :: a | r } => Lens' t a
+_mouseMove = _Newtype <<< prop (SProxy :: SProxy "mouseMove")
+
+_domPosition :: forall t a r. Newtype t { domPosition :: a | r } => Lens' t a
+_domPosition = _Newtype <<< prop (SProxy :: SProxy "domPosition")
+
+_distance :: forall t a r. Newtype t { distance :: a | r } => Lens' t a
+_distance = _Newtype <<< prop (SProxy :: SProxy "distance")
+
+_face :: forall t a r. Newtype t { face :: a | r } => Lens' t a 
+_face = _Newtype <<< prop (SProxy :: SProxy "face")
+
+_index :: forall t a r. Newtype t { index :: a | r } => Lens' t a
+_index = _Newtype <<< prop (SProxy :: SProxy "index")
+
+_wrapper :: forall t a r. Newtype t { wrapper :: a | r } => Lens' t a
+_wrapper = _Newtype <<< prop (SProxy :: SProxy "wrapper")
+
+_geometry :: forall t a r. Newtype t { geometry :: a | r } => Lens' t a
+_geometry = _Newtype <<< prop (SProxy :: SProxy "geometry")
+
+_verticeTree :: forall t a r. Newtype t { verticeTree :: a | r } => Lens' t a
+_verticeTree = _Newtype <<< prop (SProxy :: SProxy "verticeTree")

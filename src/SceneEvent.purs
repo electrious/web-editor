@@ -6,6 +6,7 @@ import Control.Alt ((<|>))
 import Control.Apply (lift2)
 import Data.Array (filter, head)
 import Data.Compactable (compact)
+import Data.Default (class Default)
 import Data.Int (toNumber)
 import Data.Lens (Lens', (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
@@ -15,9 +16,9 @@ import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Time.Duration (Milliseconds(..))
 import Data.Traversable (sequence_, traverse)
-import Editor.Common.Lenses (_tapped)
+import Editor.Common.Lenses (_dragType, _dragged, _height, _mouseMove, _tapped, _width, _x, _y)
 import Editor.Disposable (class Disposable)
-import Editor.Input (DragEvent, DragType(..), InputEvents, MouseMoveEvent, TapEvent, _dragType, _dragX, _dragY, _dragged, _mouseMove, _mouseX, _mouseY, _tapX, _tapY)
+import Editor.Input (DragEvent, DragType(..), InputEvents)
 import Effect (Effect)
 import FRP.Event (Event, subscribe)
 import FRP.Event.Extra (debounce, multicast, performEvent)
@@ -25,7 +26,7 @@ import Three.Core.Camera (Camera)
 import Three.Core.Face3 (Face3)
 import Three.Core.Object3D (Object3D)
 import Three.Core.Raycaster (Intersection, distance, face, intersectObject, mkRaycaster, object, point, setFromCamera)
-import Three.Math.Vector (Vector2, Vector3, mkVec2, vecX, vecY)
+import Three.Math.Vector (Vector2, Vector3, mkVec2, mkVec3)
 import Util (ffi, fpi)
 
 newtype Size = Size {
@@ -38,12 +39,6 @@ derive instance newtypeSize :: Newtype Size _
 size :: Int -> Int -> Size
 size w h = Size { width: w, height: h }
 
-_width :: Lens' Size Int
-_width = _Newtype <<< prop (SProxy :: SProxy "width")
-
-_height :: Lens' Size Int
-_height = _Newtype <<< prop (SProxy :: SProxy "height")
-
 -- | tap events sent to 3D objects
 newtype SceneTapEvent = SceneTapEvent {
     distance    :: Number,
@@ -52,15 +47,6 @@ newtype SceneTapEvent = SceneTapEvent {
 }
 
 derive instance newtypeSceneTapEvent :: Newtype SceneTapEvent _
-
-_tapDistance :: Lens' SceneTapEvent Number
-_tapDistance = _Newtype <<< prop (SProxy :: SProxy "distance")
-
-_tapPoint :: Lens' SceneTapEvent Vector3
-_tapPoint = _Newtype <<< prop (SProxy :: SProxy "point")
-
-_tapDomPosition :: Lens' SceneTapEvent Vector2
-_tapDomPosition = _Newtype <<< prop (SProxy :: SProxy "domPosition")
 
 -- | mousemove events sent to 3D object
 newtype SceneMouseMoveEvent = SceneMouseMoveEvent {
@@ -72,52 +58,33 @@ newtype SceneMouseMoveEvent = SceneMouseMoveEvent {
 
 derive instance newtypeSceneMouseMoveEvent :: Newtype SceneMouseMoveEvent _
 
-_mouseDistance :: Lens' SceneMouseMoveEvent Number
-_mouseDistance = _Newtype <<< prop (SProxy :: SProxy "distance")
-
-_mousePoint :: Lens' SceneMouseMoveEvent Vector3
-_mousePoint = _Newtype <<< prop (SProxy :: SProxy "point")
-
-_mouseDomPosition :: Lens' SceneMouseMoveEvent Vector2
-_mouseDomPosition = _Newtype <<< prop (SProxy :: SProxy "domPosition")
-
-_face :: Lens' SceneMouseMoveEvent Face3
-_face = _Newtype <<< prop (SProxy :: SProxy "face")
-
 -- | drag events sent to 3D objects
 newtype SceneDragEvent = SceneDragEvent {
-    type     :: DragType,
+    dragType :: DragType,
     distance :: Number,
     point    :: Vector3
 }
 
 derive instance newtypeSceneDragEvent :: Newtype SceneDragEvent _
-
-_type :: Lens' SceneDragEvent DragType
-_type = _Newtype <<< prop (SProxy :: SProxy "type")
-
-_dragDistance :: Lens' SceneDragEvent Number
-_dragDistance = _Newtype <<< prop (SProxy :: SProxy "distance")
-
-_dragPoint :: Lens' SceneDragEvent Vector3
-_dragPoint = _Newtype <<< prop (SProxy :: SProxy "point")
+instance defaultSceneDragEvent :: Default SceneDragEvent where
+    def = SceneDragEvent { dragType: DragStart, distance: 0.0, point: mkVec3 0.0 0.0 0.0 }
 
 isDragStart :: SceneDragEvent -> Boolean
-isDragStart e = e ^. _type == DragStart
+isDragStart e = e ^. _dragType == DragStart
 
 isDrag :: SceneDragEvent -> Boolean
-isDrag e = e ^. _type == Drag
+isDrag e = e ^. _dragType == Drag
 
 isDragEnd :: SceneDragEvent -> Boolean
-isDragEnd e = e ^. _type == DragEnd
+isDragEnd e = e ^. _dragType == DragEnd
 
 -- | add end event to SceneDragEvent stream if there's no input for a while
 -- and no end event.
 mkDragEndable :: Event SceneDragEvent -> Event SceneDragEvent
 mkDragEndable evt = evt <|> compact (f <$> e)
     where e = debounce (Milliseconds 2000.0) evt
-          f d = if d ^. _type /= DragEnd
-                then Just $ d # _type .~ DragEnd
+          f d = if d ^. _dragType /= DragEnd
+                then Just $ d # _dragType .~ DragEnd
                 else Nothing
 
 -- | Convert an Object3D to be tappable by attaching a callback
@@ -164,22 +131,10 @@ sendDragEvent :: forall a. Object3D a -> SceneDragEvent -> Effect Unit
 sendDragEvent = fpi ["obj", "evt", ""] "obj.dragged(evt)()"
 
 -- | convert mouse/touch position to values between -1 and 1
-calcPosition :: Size -> Vector2 -> Vector2
+calcPosition :: forall t r. Newtype t { x :: Number, y :: Number | r} => Size -> t -> Vector2
 calcPosition s pos = mkVec2 x y
-    where x = (vecX pos / toNumber (s ^. _width)) * 2.0 - 1.0
-          y = - (vecY pos / toNumber (s ^. _height)) * 2.0 + 1.0
-
--- | convert a TapEvent to position used for raycasting
-tapPosition :: Size -> TapEvent -> Vector2
-tapPosition s e = calcPosition s $ mkVec2 (e ^. _tapX) (e ^. _tapY)
-
--- | convert a MouseMoveEvent to position used for raycasting
-mousePosition :: Size -> MouseMoveEvent -> Vector2
-mousePosition s e = calcPosition s $ mkVec2 (e ^. _mouseX) (e ^. _mouseY)
-
--- | convert a DragEvent to position used for raycasting
-dragPosition :: Size -> DragEvent -> Vector2
-dragPosition s e = calcPosition s $ mkVec2 (e ^. _dragX) (e ^. _dragY)
+    where x = (pos ^. _x / toNumber (s ^. _width)) * 2.0 - 1.0
+          y = - (pos ^. _y / toNumber (s ^. _height)) * 2.0 + 1.0
 
 -- | Find first object in the intersections array that is Tappable and
 -- send the event to it.
@@ -206,9 +161,9 @@ processDragObjects :: DragEvent -> Array Intersection -> Effect (Maybe DragEvent
 processDragObjects e objs = traverse doDrag target *> pure (f target)
     where target = head $ filter (isDraggable <<< object) objs
           doDrag o = sendDragEvent (object o) $ SceneDragEvent {
-              type: e ^. _dragType,
-              distance: distance o,
-              point: point o
+              dragType : e ^. _dragType,
+              distance : distance o,
+              point    : point o
             }
           f (Just _) = Nothing
           f Nothing  = Just e
@@ -237,17 +192,17 @@ setupRaycasting camera scene input size = do
             intersectObject raycaster scene true
         
         raycastTap sz e = do
-            let domPos = mkVec2 (e ^. _tapX) (e ^. _tapY)
-            res <- doRaycast (tapPosition sz e)
+            let domPos = mkVec2 (e ^. _x) (e ^. _y)
+            res <- doRaycast (calcPosition sz e)
             processTapObjects domPos res
 
         raycastMouse sz e = do
-            let domPos = mkVec2 (e ^. _mouseX) (e ^. _mouseY)
-            res <- doRaycast (mousePosition sz e)
+            let domPos = mkVec2 (e ^. _x) (e ^. _y)
+            res <- doRaycast (calcPosition sz e)
             processMouseOverObjects domPos res
         
         raycastDrag sz e = do
-            res <- doRaycast (dragPosition sz e)
+            res <- doRaycast (calcPosition sz e)
             processDragObjects e res
     
     let e1 = performEvent $ lift2 raycastTap size (input ^. _tapped)
