@@ -18,8 +18,8 @@ import Data.Tuple (Tuple, fst)
 import Editor.ArrayBuilder (PanelTextureInfo)
 import Editor.Common.Lenses (_disposable)
 import Editor.Disposable (class Disposable)
-import Editor.EditorMode (EditorMode(..))
-import Editor.SceneEvent (Size, size)
+import Editor.EditorMode (EditorMode)
+import Editor.SceneEvent (Size)
 import Effect (Effect)
 import Effect.Class (class MonadEffect)
 import FRP.Event (Event, makeEvent, subscribe)
@@ -29,9 +29,7 @@ import Web.DOM (Element)
 
 newtype EditorConfig = EditorConfig {
     elem       :: Maybe Element,
-    defSize    :: Size,
     sizeEvt    :: Event Size,
-    defMode    :: EditorMode,
     modeEvt    :: Event EditorMode,
     leadId     :: Int,
     roofPlates :: Array RoofPlate,
@@ -44,9 +42,7 @@ derive instance newtypeEditorConfig :: Newtype EditorConfig _
 instance defaultEditorConfig :: Default EditorConfig where
     def = EditorConfig {
         elem       : Nothing,
-        defSize    : size 800 600,
         sizeEvt    : empty,
-        defMode    : Showing,
         modeEvt    : empty,
         leadId     : 0,
         roofPlates : [],
@@ -58,14 +54,8 @@ instance defaultEditorConfig :: Default EditorConfig where
 _elem :: Lens' EditorConfig (Maybe Element)
 _elem = _Newtype <<< prop (SProxy :: SProxy "elem")
 
-_defSize :: Lens' EditorConfig Size
-_defSize = _Newtype <<< prop (SProxy :: SProxy "defSize")
-
 _sizeEvt :: Lens' EditorConfig (Event Size)
 _sizeEvt = _Newtype <<< prop (SProxy :: SProxy "sizeEvt")
-
-_defMode :: Lens' EditorConfig EditorMode
-_defMode = _Newtype <<< prop (SProxy :: SProxy "defMode")
 
 _modeEvt :: Lens' EditorConfig (Event EditorMode)
 _modeEvt = _Newtype <<< prop (SProxy :: SProxy "modeEvt")

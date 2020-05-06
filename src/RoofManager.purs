@@ -25,11 +25,11 @@ import Editor.EditorMode (EditorMode(..))
 import Editor.House (HouseMeshData)
 import Editor.RoofNode (RoofNode, _roofDelete, _roofObject, _roofUpdate, createRoofNode)
 import Editor.RoofRecognizer (RoofRecognizer, _addedNewRoof, _marker, createRoofRecognizer)
-import Editor.WebEditor (WebEditor, _defMode, _modeEvt, _roofPlates, performEditorEvent)
+import Editor.WebEditor (WebEditor, _modeEvt, _roofPlates, performEditorEvent)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import FRP.Event (Event, create, fold, keepLatest, subscribe, withLast)
-import FRP.Event.Extra (after, debounce, delay, multicast, performEvent, skip)
+import FRP.Event.Extra (debounce, delay, multicast, performEvent, skip)
 import Model.Roof.RoofPlate (RoofEdited, RoofOperation(..), RoofPlate, toRoofEdited)
 import Three.Core.Object3D (Object3D, add, mkObject3D, remove, setName)
 
@@ -131,12 +131,7 @@ renderRoofs wrapper activeRoof roofsData = do
     pure $ multicast $ performEvent $ renderNodes wrapper <$> withLast nodes
 
 isRoofEditing :: WebEditor (Event Boolean)
-isRoofEditing = do
-    defMode <- view _defMode <$> ask
-    modeEvt <- view _modeEvt <$> ask
-
-    let realModeEvt = modeEvt <|> (const defMode <$> after 10)
-    pure $ (==) RoofEditing <$> realModeEvt
+isRoofEditing = map ((==) RoofEditing) <<< view _modeEvt <$> ask
 
 -- | function to add the roof recognizer and recognize new roofs
 recognizeNewRoofs :: forall a b c. HouseMeshData a -> Object3D b -> Event RoofDict -> Event (Maybe String) -> Event Boolean -> Effect (RoofRecognizer c)

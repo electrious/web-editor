@@ -10,7 +10,7 @@ import Editor.Common.Lenses (_leadId, _wrapper)
 import Editor.Disposable (dispose)
 import Editor.House (loadHouseModel)
 import Editor.RoofManager (_editedRoofs, createRoofManager)
-import Editor.WebEditor (WebEditor, _dataServer, _defSize, _elem, _sizeEvt, addDisposable, performEditorEvent)
+import Editor.WebEditor (WebEditor, _dataServer, _elem, _sizeEvt, addDisposable, performEditorEvent)
 import Editor.WebEditorScene (EditorScene(..), createScene, renderLoop)
 import Effect.Class (liftEffect)
 import Effect.Class.Console (errorShow)
@@ -26,8 +26,7 @@ createEditor = do
     case cfg ^. _elem of
         Nothing -> errorShow "elem is not set in EditorConfig" *> pure empty
         Just elem -> do
-            (EditorScene es) <- liftEffect $ createScene (cfg ^. _defSize)
-                                                         (cfg ^. _sizeEvt)
+            (EditorScene es) <- liftEffect $ createScene (cfg ^. _sizeEvt)
                                                          elem
 
             -- start the rednerring

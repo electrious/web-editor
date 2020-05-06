@@ -2,7 +2,6 @@ module Editor.WebEditorScene where
 
 import Prelude hiding (add)
 
-import Control.Alt ((<|>))
 import Data.Foldable (sequence_)
 import Data.Int (toNumber)
 import Data.Lens ((^.))
@@ -13,7 +12,7 @@ import Editor.Input (DragEvent, setupInput)
 import Editor.SceneEvent (Size, _dragEvent, setupRaycasting)
 import Effect (Effect)
 import FRP.Event (Event, sampleOn, subscribe)
-import FRP.Event.Extra (after, performEvent)
+import FRP.Event.Extra (performEvent)
 import Three.Core.Camera (PerspectiveCamera, mkPerspectiveCamera, setAspect, updateProjectionMatrix)
 import Three.Core.Light (mkAmbientLight, mkDirectionalLight)
 import Three.Core.Object3D (Object3D, add, hasParent, lookAt, mkObject3D, parent, position, rotateOnWorldAxis, rotateZ, setName, setPosition, translateX, translateY, worldToLocal)
@@ -68,10 +67,10 @@ moveWithShiftDrag obj drag scale | not (hasParent obj) = pure unit
                                     translateY (vecY lVec * scale / 10.0) obj
 
 -- | internal function to create the threejs scene, camera, light and renderer
-createScene :: forall a. Size -> Event Size -> Element -> Effect (EditorScene a)
-createScene defSize newSizeEvt elem = do
+createScene :: forall a. Event Size -> Element -> Effect (EditorScene a)
+createScene sizeEvt elem = do
     scene <- mkScene
-    camera <- mkPerspectiveCamera 45.0 (toNumber (defSize ^. _width) / toNumber (defSize ^. _height)) 0.1 1000.0
+    camera <- mkPerspectiveCamera 45.0 (800.0 / 600.0) 0.1 1000.0
     renderer <- mkWebGLRenderer
 
     -- function to update camera and renderer when resized
@@ -80,7 +79,6 @@ createScene defSize newSizeEvt elem = do
             updateProjectionMatrix camera
             setSize (s ^. _width) (s ^. _height) renderer
     
-    let sizeEvt = newSizeEvt <|> (const defSize <$> after 10)
     d1 <- subscribe sizeEvt resized
 
     -- attach the webgl canvas to parent DOM element

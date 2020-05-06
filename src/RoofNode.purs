@@ -19,13 +19,13 @@ import Editor.Disposable (class Disposable, dispose)
 import Editor.EditorMode (EditorMode(..))
 import Editor.RoofEditor (_deleteRoof, _roofVertices, createRoofEditor)
 import Editor.SceneEvent (SceneTapEvent)
-import Editor.WebEditor (WebEditor, _defMode, _modeEvt)
+import Editor.WebEditor (WebEditor, _modeEvt)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import Effect.Timer (setTimeout)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Event (Event, create, keepLatest, subscribe, withLast)
-import FRP.Event.Extra (after, multicast, performEvent)
+import FRP.Event.Extra (multicast, performEvent)
 import Math.Angle (radianVal)
 import Model.Roof.RoofPlate (RoofOperation(..), RoofPlate, _azimuth, _borderPoints)
 import SimplePolygon (isSimplePolygon)
@@ -106,11 +106,9 @@ createRoofNode roof isActive = do
     obj <- liftEffect mkObject3D
     liftEffect $ setName "roofplate" obj
 
-    defMode <- view _defMode <$> ask
     modeEvt <- view _modeEvt <$> ask
 
-    let realModeEvt = modeEvt <|> const defMode <$> after 10
-        canEditRoofEvt = (==) RoofEditing <$> realModeEvt
+    let canEditRoofEvt = (==) RoofEditing <$> modeEvt
     -- set the roof node position
     let c = roof ^. _center
     liftEffect do
