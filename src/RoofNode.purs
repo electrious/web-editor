@@ -13,9 +13,11 @@ import Data.Maybe (Maybe, fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (sequence_, traverse, traverse_)
-import Editor.Common.Lenses (_center, _id, _mesh, _slope, _tapped)
+import Editor.ArrayBuilder (runArrayBuilder)
+import Editor.Common.Lenses (_center, _id, _mesh, _slope, _tapped, _wrapper)
 import Editor.Disposable (class Disposable, dispose)
 import Editor.EditorMode (EditorMode(..))
+import Editor.PanelLayer (createPanelLayer)
 import Editor.RoofEditor (_deleteRoof, _roofVertices, createRoofEditor)
 import Editor.SceneEvent (SceneTapEvent)
 import Editor.WebEditor (WebEditor, _modeEvt)
@@ -26,6 +28,7 @@ import Effect.Unsafe (unsafePerformEffect)
 import FRP.Event (Event, create, keepLatest, subscribe, withLast)
 import FRP.Event.Extra (after, multicast, performEvent)
 import Math.Angle (radianVal)
+import Model.Roof.Panel (Panel)
 import Model.Roof.RoofPlate (RoofOperation(..), RoofPlate, _azimuth, _borderPoints)
 import SimplePolygon (isSimplePolygon)
 import Three.Core.Geometry (mkShape, mkShapeGeometry)
@@ -149,12 +152,16 @@ getNewRoof obj roof newVertices = do
     pure $ (RoofOpUpdate <<< flip updateRoofPlate roof <<< map toParent) <$> newVertices
 
 -- | Create RoofNode for a RoofPlate
-createRoofNode :: forall a. RoofPlate -> Event Boolean -> WebEditor (RoofNode a)
-createRoofNode roof isActive = do
+createRoofNode :: forall a. RoofPlate -> Array Panel -> Event Boolean -> WebEditor (RoofNode a)
+createRoofNode roof panels isActive = do
     obj <- liftEffect mkNode
 
     modeEvt <- view _modeEvt <$> ask
 
+    -- render panels
+    panelLayer <- runArrayBuilder $ createPanelLayer panels
+    liftEffect $ add (panelLayer ^. _wrapper) obj
+        
     let canEditRoofEvt = (==) RoofEditing <$> modeEvt
     -- set the roof node position
     liftEffect do

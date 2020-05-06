@@ -6,13 +6,16 @@ import Algorithm.MeshFlatten (flattenRoofPlates)
 import Control.Alt ((<|>))
 import Control.Monad.Reader (ask)
 import Control.Plus (empty)
+import Data.Array (cons)
 import Data.Compactable (compact)
 import Data.Foldable (foldl, sequence_, traverse_)
 import Data.Lens (Lens', view, (^.), (%~), (.~))
+import Data.Lens.Index (ix)
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (toUnfoldable)
-import Data.Map (Map, delete, fromFoldable, insert, values)
+import Data.Map (Map, delete, fromFoldable, insert, lookup, member, update, values)
+import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe, isNothing)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
@@ -25,11 +28,13 @@ import Editor.EditorMode (EditorMode(..))
 import Editor.House (HouseMeshData)
 import Editor.RoofNode (RoofNode, _roofDelete, _roofObject, _roofUpdate, createRoofNode)
 import Editor.RoofRecognizer (RoofRecognizer, _addedNewRoof, _marker, createRoofRecognizer)
-import Editor.WebEditor (WebEditor, _modeEvt, _roofPlates, performEditorEvent)
+import Editor.WebEditor (WebEditor, _modeEvt, _panels, _roofPlates, performEditorEvent)
 import Effect (Effect)
 import Effect.Class (liftEffect)
+import Effect.Class.Console (logShow)
 import FRP.Event (Event, create, fold, keepLatest, subscribe, withLast)
 import FRP.Event.Extra (debounce, delay, multicast, performEvent, skip)
+import Model.Roof.Panel (Panel(..), _roofUUID)
 import Model.Roof.RoofPlate (RoofEdited, RoofOperation(..), RoofPlate, toRoofEdited)
 import Three.Core.Object3D (Object3D, add, mkObject3D, remove, setName)
 
@@ -55,6 +60,14 @@ roofDict = fromFoldable <<< map f
 
 dictToArr :: RoofDict -> Array RoofPlate
 dictToArr = toUnfoldable <<< values
+
+type PanelsDict = Map String (Array Panel)
+
+panelDict :: Array Panel -> PanelsDict
+panelDict = foldl f Map.empty
+    where f d p = if member (p ^. _roofUUID) d
+                  then update (Just <<< cons p) (p ^. _roofUUID) d
+                  else insert (p ^. _roofUUID) [p] d
 
 -- internal data structure used to manage roofs
 newtype RoofDictData = RoofDictData {
@@ -104,8 +117,9 @@ createWrapper = do
     pure wrapper
 
 -- | function to create roof node
-mkNode :: forall a. Event (Maybe String) -> RoofPlate -> WebEditor (RoofNode a)
-mkNode activeRoof roof = createRoofNode roof (multicast $ (==) (Just (roof ^. _id)) <$> activeRoof)
+mkNode :: forall a. Event (Maybe String) -> PanelsDict -> RoofPlate -> WebEditor (RoofNode a)
+mkNode activeRoof panelsDict roof = createRoofNode roof ps (multicast $ (==) (Just (roof ^. _id)) <$> activeRoof)
+    where ps = fromMaybe [] $ lookup (roof ^. _id) panelsDict
 
 -- helper function to delete and dispose an old roof node
 delOldNode :: forall a b. Object3D a -> RoofNode b -> Effect Unit
@@ -121,13 +135,13 @@ renderNodes wrapper { last, now } = do
     pure now
 
 -- | render dynamic roofs
-renderRoofs :: forall a b. Object3D a -> Event (Maybe String) -> Event RoofDictData -> WebEditor (Event (Array (RoofNode b)))
-renderRoofs wrapper activeRoof roofsData = do
+renderRoofs :: forall a b. Object3D a -> Event (Maybe String) -> Event RoofDictData -> PanelsDict -> WebEditor (Event (Array (RoofNode b)))
+renderRoofs wrapper activeRoof roofsData panelsDict = do
     let rsToRender = compact $ view _roofsToRender <$> roofsData
         rsToRenderArr = dictToArr <$> rsToRender
         
     -- create roofnode for each roof and render them
-    nodes <- performEditorEvent $ traverse (mkNode activeRoof) <$> rsToRenderArr
+    nodes <- performEditorEvent $ traverse (mkNode activeRoof panelsDict) <$> rsToRenderArr
     pure $ multicast $ performEvent $ renderNodes wrapper <$> withLast nodes
 
 isRoofEditing :: WebEditor (Event Boolean)
@@ -163,10 +177,11 @@ createRoofManager meshData = do
 
     -- get the default roof plates as a dict
     defRoofDict    <- roofDict <<< view _roofPlates <$> ask
+    panelsDict     <- panelDict <<< view _panels <$> ask
     canEditRoofEvt <- isRoofEditing
 
     -- render roofs dynamically
-    renderedNodes <- renderRoofs wrapper activeRoof roofsData
+    renderedNodes <- renderRoofs wrapper activeRoof roofsData panelsDict
 
     let deleteRoofOp  = multicast $ keepLatest $ getRoofDelete <$> renderedNodes
         updateRoofOp  = keepLatest $ getRoofUpdate             <$> renderedNodes

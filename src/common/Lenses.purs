@@ -124,3 +124,9 @@ _geometry = _Newtype <<< prop (SProxy :: SProxy "geometry")
 
 _verticeTree :: forall t a r. Newtype t { verticeTree :: a | r } => Lens' t a
 _verticeTree = _Newtype <<< prop (SProxy :: SProxy "verticeTree")
+
+_textureInfo :: forall t a r. Newtype t { textureInfo :: a | r } => Lens' t a
+_textureInfo = _Newtype <<< prop (SProxy :: SProxy "textureInfo")
+
+_panelType :: forall t a r. Newtype t { panelType :: a | r } => Lens' t a
+_panelType = _Newtype <<< prop (SProxy :: SProxy "panelType")

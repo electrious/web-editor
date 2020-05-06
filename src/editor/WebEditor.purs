@@ -15,7 +15,6 @@ import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple, fst)
-import Editor.ArrayBuilder (PanelTextureInfo)
 import Editor.Common.Lenses (_disposable)
 import Editor.Disposable (class Disposable)
 import Editor.EditorMode (EditorMode)
@@ -23,32 +22,36 @@ import Editor.SceneEvent (Size)
 import Effect (Effect)
 import Effect.Class (class MonadEffect)
 import FRP.Event (Event, makeEvent, subscribe)
+import Model.Hardware.PanelTextureInfo (PanelTextureInfo(..))
+import Model.Hardware.PanelType (PanelType)
 import Model.Roof.Panel (Panel)
 import Model.Roof.RoofPlate (RoofPlate)
 import Web.DOM (Element)
 
 newtype EditorConfig = EditorConfig {
-    elem       :: Maybe Element,
-    sizeEvt    :: Event Size,
-    modeEvt    :: Event EditorMode,
-    leadId     :: Int,
-    roofPlates :: Array RoofPlate,
-    panels     :: Array Panel,
-    dataServer :: String,
-    textures   :: PanelTextureInfo
+    elem        :: Maybe Element,
+    sizeEvt     :: Event Size,
+    modeEvt     :: Event EditorMode,
+    leadId      :: Int,
+    roofPlates  :: Array RoofPlate,
+    panels      :: Array Panel,
+    dataServer  :: String,
+    textureInfo :: PanelTextureInfo,
+    panelType   :: Event PanelType
 }
 
 derive instance newtypeEditorConfig :: Newtype EditorConfig _
 instance defaultEditorConfig :: Default EditorConfig where
     def = EditorConfig {
-        elem       : Nothing,
-        sizeEvt    : empty,
-        modeEvt    : empty,
-        leadId     : 0,
-        roofPlates : [],
-        panels     : [],
-        dataServer : "",
-        textures   : def
+        elem        : Nothing,
+        sizeEvt     : empty,
+        modeEvt     : empty,
+        leadId      : 0,
+        roofPlates  : [],
+        panels      : [],
+        dataServer  : "",
+        textureInfo : def,
+        panelType   : empty
     }
 
 _elem :: Lens' EditorConfig (Maybe Element)
@@ -68,9 +71,6 @@ _panels = _Newtype <<< prop (SProxy :: SProxy "panels")
 
 _dataServer :: Lens' EditorConfig String
 _dataServer = _Newtype <<< prop (SProxy :: SProxy "dataServer")
-
-_textures :: Lens' EditorConfig PanelTextureInfo
-_textures = _Newtype <<< prop (SProxy :: SProxy "textures")
 
 -- | Public interface for the main WebEditor
 newtype WebEditorState = WebEditorState {
