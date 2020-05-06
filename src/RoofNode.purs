@@ -4,6 +4,7 @@ import Prelude hiding (add)
 
 import Control.Alt ((<|>))
 import Control.Apply (lift2)
+import Control.Monad.Reader (ask)
 import Custom.Mesh (TappableMesh, mkTappableMesh)
 import Data.Array (head, init, snoc)
 import Data.Lens (Lens', view, (.~), (^.))
@@ -15,13 +16,16 @@ import Data.Symbol (SProxy(..))
 import Data.Traversable (sequence_, traverse, traverse_)
 import Editor.Common.Lenses (_center, _id, _mesh, _slope, _tapped)
 import Editor.Disposable (class Disposable, dispose)
+import Editor.EditorMode (EditorMode(..))
 import Editor.RoofEditor (_deleteRoof, _roofVertices, createRoofEditor)
 import Editor.SceneEvent (SceneTapEvent)
+import Editor.WebEditor (WebEditor, _defMode, _modeEvt)
 import Effect (Effect)
+import Effect.Class (liftEffect)
 import Effect.Timer (setTimeout)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Event (Event, create, keepLatest, subscribe, withLast)
-import FRP.Event.Extra (multicast, performEvent)
+import FRP.Event.Extra (after, multicast, performEvent)
 import Math.Angle (radianVal)
 import Model.Roof.RoofPlate (RoofOperation(..), RoofPlate, _azimuth, _borderPoints)
 import SimplePolygon (isSimplePolygon)
@@ -97,71 +101,78 @@ testSimplePolygon ps = isSimplePolygon (f <$> ps)
 
 
 -- | Create RoofNode for a RoofPlate
-createRoofNode :: forall a. RoofPlate -> Event Boolean -> Effect (RoofNode a)
+createRoofNode :: forall a. RoofPlate -> Event Boolean -> WebEditor (RoofNode a)
 createRoofNode roof isActive = do
-    obj <- mkObject3D
-    setName "roofplate" obj
+    obj <- liftEffect mkObject3D
+    liftEffect $ setName "roofplate" obj
 
+    defMode <- view _defMode <$> ask
+    modeEvt <- view _modeEvt <$> ask
+
+    let realModeEvt = modeEvt <|> const defMode <$> after 10
+        canEditRoofEvt = (==) RoofEditing <$> realModeEvt
     -- set the roof node position
     let c = roof ^. _center
-    setPosition (mkVec3 (vecX c) (vecY c) (vecZ c + 0.05)) obj
+    liftEffect do
+        setPosition (mkVec3 (vecX c) (vecY c) (vecZ c + 0.05)) obj
 
-    -- rotate the roof node to the right azimuth and slope angles
-    rotateZ (- radianVal (roof ^. _azimuth)) obj
-    rotateX (- radianVal (roof ^. _slope)) obj
+        -- rotate the roof node to the right azimuth and slope angles
+        rotateZ (- radianVal (roof ^. _azimuth)) obj
+        rotateX (- radianVal (roof ^. _slope)) obj
 
-    -- make sure the matrix and matrixWorld are updated immediately after
-    -- position and rotation changed, so that worldToLocal can use them to
-    -- convert coordinates correctly
-    updateMatrix obj
-    updateMatrixWorld obj
+        -- make sure the matrix and matrixWorld are updated immediately after
+        -- position and rotation changed, so that worldToLocal can use them to
+        -- convert coordinates correctly
+        updateMatrix obj
+        updateMatrixWorld obj
 
-    -- convert all roof border points to local coordinate and get
-    -- only the x, y coordinates
-    -- NOTE: the last point will be dropped here because it's the same with the
-    -- first one
-    let toLocal p = do
-            np <- worldToLocal p obj
-            pure $ mkVec2 (vecX np) (vecY np)
-    ps <- traverse toLocal $ fromMaybe [] (init $ roof ^. _borderPoints)
+        -- convert all roof border points to local coordinate and get
+        -- only the x, y coordinates
+        -- NOTE: the last point will be dropped here because it's the same with the
+        -- first one
+        let toLocal p = do
+                np <- worldToLocal p obj
+                pure $ mkVec2 (vecX np) (vecY np)
+        ps <- traverse toLocal $ fromMaybe [] (init $ roof ^. _borderPoints)
 
-    { event: defVerts, push: setDefVerts } <- create
+        { event: defVerts, push: setDefVerts } <- create
 
-    -- create the vertex markers editor
-    editor <- createRoofEditor obj isActive ps
+        -- create the vertex markers editor
+        let canEdit = (&&) <$> isActive <*> canEditRoofEvt
+        editor <- createRoofEditor obj canEdit ps
 
-    let vertices = defVerts <|> editor ^. _roofVertices
-        meshEvt = performEvent (lift2 createRoofMesh vertices isActive)
-    
-    -- add/remove mesh to the obj
-    d1 <- subscribe (withLast meshEvt) \{last, now} -> do
-              traverse_ (\o -> remove (o ^. _mesh) obj) last
-              add (now ^. _mesh) obj
-    
-    -- set mesh material based on activity state
-    let e = performEvent $ lift2 (\m a -> setMaterial (getMaterial a) (m ^. _mesh)) meshEvt isActive
-    d2 <- subscribe e (const $ pure init)
-
-    let tapped = keepLatest $ view _tapped <$> meshEvt
-
-        toParent v = applyMatrix (matrix obj) (mkVec3 (vecX v) (vecY v) 0.0)
+        let vertices = defVerts <|> editor ^. _roofVertices
+            meshEvt = performEvent (lift2 createRoofMesh vertices isActive)
         
-        newRoofs = (RoofOpUpdate <<< flip updateRoofPlate roof <<< map toParent) <$> editor ^. _roofVertices
-    
-    -- create a stream for delete event if the current roof is not simple polygon
-    { event: delEvt, push: toDel } <- create
-    let delRoofEvt = delEvt <|> (const unit <$> editor ^. _deleteRoof)
+        -- add/remove mesh to the obj
+        d1 <- subscribe (withLast meshEvt) \{last, now} -> do
+                traverse_ (flip remove obj <<< view _mesh) last
+                add (now ^. _mesh) obj
+        
+        -- set mesh material based on activity state
+        let e = performEvent $ lift2 (\m a -> setMaterial (getMaterial a) (m ^. _mesh)) meshEvt isActive
+        d2 <- subscribe e (const $ pure init)
 
-    -- set default vertices
-    setDefVerts ps
+        let tapped = keepLatest $ view _tapped <$> meshEvt
 
-    when (not $ testSimplePolygon ps) (void $ setTimeout 1000 (toDel unit))
+            toParent v = applyMatrix (matrix obj) (mkVec3 (vecX v) (vecY v) 0.0)
+            
+            newRoofs = (RoofOpUpdate <<< flip updateRoofPlate roof <<< map toParent) <$> editor ^. _roofVertices
+        
+        -- create a stream for delete event if the current roof is not simple polygon
+        { event: delEvt, push: toDel } <- create
+        let delRoofEvt = delEvt <|> (const unit <$> editor ^. _deleteRoof)
 
-    pure $ RoofNode {
-        roofId     : roof ^. _id,
-        roofDelete : multicast $ const (RoofOpDelete $ roof ^. _id) <$> delRoofEvt,
-        roofUpdate : multicast newRoofs,
-        tapped     : multicast tapped,
-        roofObject : obj,
-        disposable : sequence_ [d1, d2, dispose editor]
-    }
+        -- set default vertices
+        setDefVerts ps
+
+        when (not $ testSimplePolygon ps) (void $ setTimeout 1000 (toDel unit))
+
+        pure $ RoofNode {
+            roofId     : roof ^. _id,
+            roofDelete : multicast $ const (RoofOpDelete $ roof ^. _id) <$> delRoofEvt,
+            roofUpdate : multicast newRoofs,
+            tapped     : multicast tapped,
+            roofObject : obj,
+            disposable : sequence_ [d1, d2, dispose editor]
+        }

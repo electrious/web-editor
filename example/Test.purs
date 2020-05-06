@@ -37,7 +37,7 @@ doTest roofDat = do
                               # _leadId     .~ 296285
                               # _roofPlates .~ roofs
                               # _dataServer .~ serverUrl
-                              # _defMode    .~ Showing
+                              # _defMode    .~ RoofEditing
 
                 res <- runWebEditor cfg createEditor
                 
