@@ -3,7 +3,6 @@ module Editor.RoofNode where
 import Prelude hiding (add)
 
 import Control.Alt ((<|>))
-import Control.Apply (lift2)
 import Control.Monad.Reader (ask)
 import Custom.Mesh (TappableMesh, mkTappableMesh)
 import Data.Array (head, init, snoc)
@@ -31,7 +30,6 @@ import Model.Roof.RoofPlate (RoofOperation(..), RoofPlate, _azimuth, _borderPoin
 import SimplePolygon (isSimplePolygon)
 import Three.Core.Geometry (mkShape, mkShapeGeometry)
 import Three.Core.Material (Material, mkMeshBasicMaterial, setOpacity, setTransparent)
-import Three.Core.Mesh (setMaterial)
 import Three.Core.Object3D (Object3D, add, matrix, mkObject3D, remove, rotateX, rotateZ, setName, setPosition, updateMatrix, updateMatrixWorld, worldToLocal)
 import Three.Math.Vector (Vector2, Vector3, applyMatrix, mkVec2, mkVec3, vecX, vecY, vecZ)
 import Unsafe.Coerce (unsafeCoerce)
@@ -75,16 +73,25 @@ activeMaterial = unsafeCoerce $ unsafePerformEffect do
     setOpacity 0.9 mat
     pure mat
 
-getMaterial :: forall a. Boolean -> Material a
-getMaterial true = activeMaterial
-getMaterial false = defMaterial
+-- | material for transparent roof plate
+transparentMaterial :: forall a. Material a
+transparentMaterial = unsafeCoerce $ unsafePerformEffect do
+    mat <- mkMeshBasicMaterial 0xffffff
+    setTransparent true mat
+    setOpacity 0.01 mat
+    pure mat
+
+getMaterial :: forall a. Boolean -> Boolean -> Material a
+getMaterial true  true  = activeMaterial
+getMaterial false true  = defMaterial
+getMaterial _     false = transparentMaterial
 
 -- | create roof mesh
-createRoofMesh :: forall a. Array Vector2 -> Boolean -> Effect (TappableMesh a)
-createRoofMesh ps active = do
+createRoofMesh :: forall a. Array Vector2 -> Boolean -> Boolean -> Effect (TappableMesh a)
+createRoofMesh ps active canEditRoof = do
     shp <- mkShape ps
     geo <- mkShapeGeometry shp
-    m <- mkTappableMesh geo (getMaterial active)
+    m <- mkTappableMesh geo (getMaterial active canEditRoof)
     setName "roof-mesh" $ m ^. _mesh
     pure m
 
@@ -159,14 +166,10 @@ createRoofNode roof isActive = do
         editor <- createRoofEditor obj canEdit ps
 
         let vertices = (const ps <$> after 2) <|> editor ^. _roofVertices
-            meshEvt = performEvent (lift2 createRoofMesh vertices isActive)
+            meshEvt = performEvent (createRoofMesh <$> vertices <*> isActive <*> canEditRoofEvt)
         
         -- add/remove mesh to the obj
         d1 <- subscribe (withLast meshEvt) (renderMesh obj)
-        
-        -- set mesh material based on activity state
-        let e = performEvent $ lift2 (\m a -> setMaterial (getMaterial a) (m ^. _mesh)) meshEvt isActive
-        d2 <- subscribe e (const $ pure init)
         
         newRoof <- getNewRoof obj roof (editor ^. _roofVertices)
 
@@ -182,5 +185,5 @@ createRoofNode roof isActive = do
             roofUpdate : multicast newRoof,
             tapped     : multicast $ keepLatest $ view _tapped <$> meshEvt,
             roofObject : obj,
-            disposable : sequence_ [d1, d2, dispose editor]
+            disposable : sequence_ [d1, dispose editor]
         }
