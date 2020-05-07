@@ -69,6 +69,8 @@ _azimuth = _Newtype <<< prop (SProxy :: SProxy "azimuth")
 _rotation :: Lens' RoofPlate Angle
 _rotation = _Newtype <<< prop (SProxy :: SProxy "rotation")
 
+isFlat :: RoofPlate -> Boolean
+isFlat r = degreeVal (r ^. _slope) < 4.0
 
 -- | Point defines a 3D point used in external values
 newtype Point = Point {

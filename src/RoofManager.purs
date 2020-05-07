@@ -22,7 +22,7 @@ import Data.Symbol (SProxy(..))
 import Data.Time.Duration (Milliseconds(..))
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import Editor.Common.Lenses (_disposable, _geometry, _id, _mesh, _mouseMove, _roofId, _roofs, _tapped, _verticeTree, _wrapper)
+import Editor.Common.Lenses (_disposable, _geometry, _id, _mesh, _mouseMove, _roofId, _roofs, _slope, _tapped, _verticeTree, _wrapper)
 import Editor.Disposable (class Disposable, dispose)
 import Editor.EditorMode (EditorMode(..))
 import Editor.House (HouseMeshData)
@@ -34,8 +34,9 @@ import Effect.Class (liftEffect)
 import Effect.Class.Console (logShow)
 import FRP.Event (Event, create, fold, keepLatest, subscribe, withLast)
 import FRP.Event.Extra (debounce, delay, multicast, performEvent, skip)
+import Math.Angle (degree)
 import Model.Roof.Panel (Panel(..), _roofUUID)
-import Model.Roof.RoofPlate (RoofEdited, RoofOperation(..), RoofPlate, toRoofEdited)
+import Model.Roof.RoofPlate (RoofEdited, RoofOperation(..), RoofPlate, isFlat, toRoofEdited)
 import Three.Core.Object3D (Object3D, add, mkObject3D, remove, setName)
 
 newtype RoofManager a = RoofManager {
@@ -119,7 +120,11 @@ createWrapper = do
 -- | function to create roof node
 mkNode :: forall a. Event (Maybe String) -> PanelsDict -> RoofPlate -> WebEditor (RoofNode a)
 mkNode activeRoof panelsDict roof = createRoofNode roof ps (multicast $ (==) (Just (roof ^. _id)) <$> activeRoof)
-    where ps = fromMaybe [] $ lookup (roof ^. _id) panelsDict
+    where ps = zeroSlope <$> fromMaybe [] (lookup (roof ^. _id) panelsDict)
+          -- make sure slope value in panels on non-flat roof is set to zero
+          zeroSlope p = if isFlat roof
+                        then p
+                        else p # _slope .~ degree 0.0
 
 -- helper function to delete and dispose an old roof node
 delOldNode :: forall a b. Object3D a -> RoofNode b -> Effect Unit

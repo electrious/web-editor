@@ -135,11 +135,10 @@ setupRoofNode obj roof = do
 -- NOTE: the last point will be dropped here because it's the same with the
 -- first one
 getBorderPoints :: forall a. Object3D a -> RoofPlate -> Effect (Array Vector2)
-getBorderPoints obj roof = do 
-    let toLocal p = do
-            np <- worldToLocal p obj
-            pure $ mkVec2 (vecX np) (vecY np)
-    traverse toLocal $ fromMaybe [] (init $ roof ^. _borderPoints)
+getBorderPoints obj roof = traverse toLocal $ fromMaybe [] (init $ roof ^. _borderPoints)
+    where toLocal p = do
+              np <- worldToLocal p obj
+              pure $ mkVec2 (vecX np) (vecY np)
 
 renderMesh :: forall a b. Object3D a -> { last :: Maybe (TappableMesh b), now :: TappableMesh b } -> Effect Unit
 renderMesh obj {last, now} = do
