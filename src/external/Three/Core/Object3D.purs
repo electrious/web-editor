@@ -13,6 +13,8 @@ type Object3D = JSObject3D
 
 foreign import mkObject3D :: forall a. Effect (Object3D a)
 
+foreign import setDefaultUp :: Vector3 -> Effect Unit
+
 -- | Whether the object gets rendered into shadow map, default False
 castShadow :: forall a. Object3D a -> Boolean
 castShadow = ffi ["o"] "o.castShadow"

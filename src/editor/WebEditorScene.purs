@@ -1,6 +1,6 @@
 module Editor.WebEditorScene where
 
-import Prelude hiding (add)
+import Prelude hiding (add,degree)
 
 import Data.Foldable (sequence_)
 import Data.Int (toNumber)
@@ -8,14 +8,18 @@ import Data.Lens ((^.))
 import Data.Newtype (class Newtype)
 import Editor.Common.Lenses (_deltaX, _deltaY, _height, _shiftDragged, _width, _zoomed)
 import Editor.Disposable (class Disposable, dispose)
+import Editor.EditorMode (EditorMode(..))
 import Editor.Input (DragEvent, setupInput)
 import Editor.SceneEvent (Size, _dragEvent, setupRaycasting)
 import Effect (Effect)
-import FRP.Event (Event, sampleOn, subscribe)
+import FRP.Event (Event, gate, sampleOn, subscribe)
 import FRP.Event.Extra (performEvent)
+import Math.Angle (degree, radianVal)
+import Three.Controls.OrbitControls (OrbitControls, enableDamping, enableZoom, isEnabled, mkOrbitControls, setAutoRotate, setAutoRotateSpeed, setEnabled, setMaxDistance, setMaxPolarAngle, setMinDistance, setMinPolarAngle, setTarget, update)
+import Three.Controls.OrbitControls as OrbitControls
 import Three.Core.Camera (PerspectiveCamera, mkPerspectiveCamera, setAspect, updateProjectionMatrix)
 import Three.Core.Light (mkAmbientLight, mkDirectionalLight)
-import Three.Core.Object3D (Object3D, add, hasParent, lookAt, mkObject3D, parent, position, rotateOnWorldAxis, rotateZ, setName, setPosition, translateX, translateY, worldToLocal)
+import Three.Core.Object3D (Object3D, add, hasParent, lookAt, mkObject3D, parent, position, rotateOnWorldAxis, rotateZ, setDefaultUp, setName, setPosition, translateX, translateY, worldToLocal)
 import Three.Core.Scene (disposeScene, mkScene)
 import Three.Core.WebGLRenderer (domElement, mkWebGLRenderer, render, setSize)
 import Three.Math.Vector (length, mkVec3, multiplyScalar, normal, vecX, vecY)
@@ -66,11 +70,26 @@ moveWithShiftDrag obj drag scale | not (hasParent obj) = pure unit
                                     translateX (vecX lVec * scale / 10.0) obj
                                     translateY (vecY lVec * scale / 10.0) obj
 
+setupOrbitControls :: OrbitControls -> Effect Unit
+setupOrbitControls c = do
+    setAutoRotate true c
+    setAutoRotateSpeed 0.5 c
+    enableDamping true c
+    enableZoom true c
+    setMinPolarAngle (radianVal $ degree 30.0) c
+    setMaxPolarAngle (radianVal $ degree 60.0) c
+    setMinDistance 30.0 c
+    setMaxDistance 60.0 c
+    setTarget (mkVec3 0.0 0.0 0.0) c
+
 -- | internal function to create the threejs scene, camera, light and renderer
-createScene :: forall a. Event Size -> Element -> Effect (EditorScene a)
-createScene sizeEvt elem = do
-    scene <- mkScene
-    camera <- mkPerspectiveCamera 45.0 (800.0 / 600.0) 0.1 1000.0
+createScene :: forall a. Event Size -> Event EditorMode -> Element -> Effect (EditorScene a)
+createScene sizeEvt modeEvt elem = do
+    -- set the default Up direction as z axis in the scene
+    setDefaultUp (mkVec3 0.0 0.0 1.0)
+
+    scene    <- mkScene
+    camera   <- mkPerspectiveCamera 45.0 (800.0 / 600.0) 0.1 1000.0
     renderer <- mkWebGLRenderer
 
     -- function to update camera and renderer when resized
@@ -85,10 +104,19 @@ createScene sizeEvt elem = do
     _ <- appendChild (toNode $ domElement renderer) (toNode elem)
 
     -- set the camera position and orient it toward the center
-    setPosition (mkVec3 0.0 (-50.0) 50.0) camera
+    setPosition (mkVec3 0.0 (-40.0) 20.0) camera
     lookAt (mkVec3 0.0 0.0 0.0) camera
 
     let cameraDefDist = length (position camera)
+
+    -- setup the orbit controls
+    orbitCtrl <- mkOrbitControls camera (domElement renderer)
+    setupOrbitControls orbitCtrl
+
+    let isShowing = (==) Showing <$> modeEvt
+        canEdit = not <$> isShowing
+
+    d4 <- subscribe isShowing (flip setEnabled orbitCtrl)
 
     -- add ambient light
     ambientLight <- mkAmbientLight 0xffffff
@@ -112,26 +140,28 @@ createScene sizeEvt elem = do
     add content rotWrapper
 
     -- function to update renderring of the webgl scene
-    let renderFunc = render scene camera renderer
+    let renderFunc = do
+            render scene camera renderer
+            when (isEnabled orbitCtrl) $ update orbitCtrl
 
         addContentFunc c = add c content
     
         inputEvts = setupInput elem
     
-        newDistEvt = performEvent $ (zoomCamera camera <<< deltaY) <$> inputEvts ^. _zoomed
+        newDistEvt = performEvent $ (zoomCamera camera <<< deltaY) <$> (gate canEdit $ inputEvts ^. _zoomed)
         scaleEvt = (\d -> d / cameraDefDist) <$> newDistEvt
     
     rcs <- setupRaycasting camera scene inputEvts sizeEvt
 
-    d2 <- subscribe (rcs ^. _dragEvent) (rotateContentWithDrag rotWrapper)
+    d2 <- subscribe (gate canEdit $ rcs ^. _dragEvent) (rotateContentWithDrag rotWrapper)
 
-    let shiftDragEvt = performEvent $ sampleOn scaleEvt (moveWithShiftDrag content <$> inputEvts ^. _shiftDragged) 
+    let shiftDragEvt = performEvent $ sampleOn scaleEvt $ moveWithShiftDrag content <$> gate canEdit (inputEvts ^. _shiftDragged) 
     d3 <- subscribe shiftDragEvt (const $ pure unit)
 
     pure $ EditorScene {
         render     : renderFunc,
         addContent : addContentFunc,
-        disposable : sequence_ [d1, d2, d3, disposeScene scene, dispose rcs]
+        disposable : sequence_ [d1, d2, d3, disposeScene scene, dispose rcs, OrbitControls.dispose orbitCtrl]
     }
 
 -- | renderLoop is the function to render scene repeatedly

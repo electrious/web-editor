@@ -1,6 +1,8 @@
 module Test where
 
 import Prelude
+
+import Control.Alt ((<|>))
 import Control.Monad.Except (runExcept)
 import Data.Default (def)
 import Data.Either (Either(..))
@@ -44,7 +46,7 @@ doTest roofDat panelDat = do
         Right roofs -> case runExcept $ decode panelDat of
             Left e -> logShow e
             Right panels -> do
-                let modeEvt = const Showing <$> after 10
+                let modeEvt = const Showing <$> after 10 <|> const RoofEditing <$> after 10000
                     sizeEvt = const (size 800 600) <$> after 2
                     panelType = const Standard <$> after 10
 

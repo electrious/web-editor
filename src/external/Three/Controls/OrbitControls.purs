@@ -5,7 +5,7 @@ import Prelude
 import Effect (Effect)
 import Three.Core.Camera (Camera)
 import Three.Math.Vector (Vector3)
-import Util (fpi)
+import Util (ffi, fpi)
 import Web.DOM (Element)
 
 foreign import data OrbitControls :: Type
@@ -22,6 +22,9 @@ setAutoRotate = fpi ["r", "o", ""] "o.autoRotate = r"
 
 setAutoRotateSpeed :: Number -> OrbitControls -> Effect Unit
 setAutoRotateSpeed = fpi ["s", "o", ""] "o.autoRotateSpeed = s"
+
+isEnabled :: OrbitControls -> Boolean
+isEnabled = ffi ["o"] "o.enabled"
 
 setEnabled :: Boolean -> OrbitControls -> Effect Unit
 setEnabled = fpi ["e", "o", ""] "o.enabled = e"
