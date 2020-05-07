@@ -27,13 +27,15 @@ import Effect.Timer (setTimeout)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Event (Event, create, keepLatest, subscribe, withLast)
 import FRP.Event.Extra (after, multicast, performEvent)
-import Math.Angle (radianVal)
+import Math (pi)
+import Math.Angle (degreeVal, radianVal)
 import Model.Roof.Panel (Panel)
-import Model.Roof.RoofPlate (RoofOperation(..), RoofPlate, _azimuth, _borderPoints)
+import Model.Roof.RoofPlate (RoofOperation(..), RoofPlate, _azimuth, _borderPoints, _rotation)
 import SimplePolygon (isSimplePolygon)
 import Three.Core.Geometry (mkShape, mkShapeGeometry)
 import Three.Core.Material (Material, mkMeshBasicMaterial, setOpacity, setTransparent)
 import Three.Core.Object3D (Object3D, add, matrix, mkObject3D, remove, rotateX, rotateZ, setName, setPosition, updateMatrix, updateMatrixWorld, worldToLocal)
+import Three.Helper.AxesHelper (mkAxesHelper)
 import Three.Math.Vector (Vector2, Vector3, applyMatrix, mkVec2, mkVec3, vecX, vecY, vecZ)
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -109,20 +111,26 @@ testSimplePolygon :: Array Vector2 -> Boolean
 testSimplePolygon ps = isSimplePolygon (f <$> ps)
     where f p = [vecX p, vecY p]
 
-mkNode :: forall a. Effect (Object3D a)
-mkNode = do
+mkNode :: forall a. String -> Effect (Object3D a)
+mkNode name  = do
     obj <- mkObject3D
-    setName "roofplate" obj
+    setName name obj
     pure obj
 
-setupRoofNode :: forall a. Object3D a -> RoofPlate -> Effect Unit
-setupRoofNode obj roof = do
+setupRoofNode :: forall a b. Object3D a -> Object3D b -> RoofPlate -> Effect Unit
+setupRoofNode obj content roof = do
     let c = roof ^. _center
     setPosition (mkVec3 (vecX c) (vecY c) (vecZ c + 0.05)) obj
 
     -- rotate the roof node to the right azimuth and slope angles
     rotateZ (- radianVal (roof ^. _azimuth)) obj
     rotateX (- radianVal (roof ^. _slope)) obj
+    rotateZ pi obj
+
+    -- rotate the content node if rotateOverride is not 0
+    if degreeVal (roof ^. _rotation) /= 0.0
+    then rotateZ (radianVal $ roof ^. _rotation) content
+    else pure unit
 
     -- make sure the matrix and matrixWorld are updated immediately after
     -- position and rotation changed, so that worldToLocal can use them to
@@ -153,18 +161,20 @@ getNewRoof obj roof newVertices = do
 -- | Create RoofNode for a RoofPlate
 createRoofNode :: forall a. RoofPlate -> Array Panel -> Event Boolean -> WebEditor (RoofNode a)
 createRoofNode roof panels isActive = do
-    obj <- liftEffect mkNode
+    obj <- liftEffect $ mkNode "roofplate"
+    content <- liftEffect $ mkNode "roof-content"
+    liftEffect $ add content obj
 
     modeEvt <- view _modeEvt <$> ask
 
     -- render panels
     panelLayer <- runArrayBuilder $ createPanelLayer panels
-    liftEffect $ add (panelLayer ^. _wrapper) obj
-        
+    liftEffect $ add (panelLayer ^. _wrapper) content
+    
     let canEditRoofEvt = (==) RoofEditing <$> modeEvt
     -- set the roof node position
     liftEffect do
-        setupRoofNode obj roof
+        setupRoofNode obj content roof
         ps <- getBorderPoints obj roof
 
         -- create the vertex markers editor

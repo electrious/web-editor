@@ -173,8 +173,8 @@ mkPanelMesh p = do
 -- update panel mesh position based on array config and the corresponding panel model
 updatePosition :: forall a. ArrayConfig -> Panel -> Object3D a -> Effect (Object3D a)
 updatePosition arrCfg p m = setPosition pv m *> pure m
-    where px = - (meterVal $ p ^. _x)
-          py = - (meterVal $ p ^. _y)
+    where px = meterVal $ p ^. _x
+          py = meterVal $ p ^. _y
           z = meterVal $ arrCfg ^. _panelLowestZ
           pv = case validatedSlope p of
                   Nothing -> mkVec3 px py z
