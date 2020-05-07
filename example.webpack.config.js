@@ -15,6 +15,10 @@ module.exports = {
                 loader: 'html-loader'
             },
             {
+                test: /\.(jpg|png)$/,
+                use: ['file-loader']
+            },
+            {
                 test: /\.purs$/,
                 exclude: /node_modules/,
                 loader: 'purs-loader',
@@ -27,7 +31,7 @@ module.exports = {
         ]
     },
     resolve: {
-        extensions: ['.js', '.html', '.purs']
+        extensions: ['.js', '.html', '.purs', '.jpg', 'png']
     },
     stats: {
         colors: true
