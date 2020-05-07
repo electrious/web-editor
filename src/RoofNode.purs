@@ -35,7 +35,6 @@ import SimplePolygon (isSimplePolygon)
 import Three.Core.Geometry (mkShape, mkShapeGeometry)
 import Three.Core.Material (Material, mkMeshBasicMaterial, setOpacity, setTransparent)
 import Three.Core.Object3D (Object3D, add, matrix, mkObject3D, remove, rotateX, rotateZ, setName, setPosition, updateMatrix, updateMatrixWorld, worldToLocal)
-import Three.Helper.AxesHelper (mkAxesHelper)
 import Three.Math.Vector (Vector2, Vector3, applyMatrix, mkVec2, mkVec3, vecX, vecY, vecZ)
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -128,9 +127,8 @@ setupRoofNode obj content roof = do
     rotateZ pi obj
 
     -- rotate the content node if rotateOverride is not 0
-    if degreeVal (roof ^. _rotation) /= 0.0
-    then rotateZ (radianVal $ roof ^. _rotation) content
-    else pure unit
+    let rot = roof ^. _rotation
+    when (degreeVal rot /= 0.0) (rotateZ (radianVal rot) content)
 
     -- make sure the matrix and matrixWorld are updated immediately after
     -- position and rotation changed, so that worldToLocal can use them to
