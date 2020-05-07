@@ -9,7 +9,7 @@ import Data.Array (head, init, snoc)
 import Data.Lens (Lens', view, (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.Maybe (Maybe, fromMaybe)
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (sequence_, traverse, traverse_)
@@ -20,7 +20,7 @@ import Editor.EditorMode (EditorMode(..))
 import Editor.PanelLayer (createPanelLayer)
 import Editor.RoofEditor (_deleteRoof, _roofVertices, createRoofEditor)
 import Editor.SceneEvent (SceneTapEvent)
-import Editor.WebEditor (WebEditor, _modeEvt)
+import Editor.WebEditor (WebEditor, _modeEvt, performEditorEvent)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import Effect.Timer (setTimeout)
@@ -156,6 +156,18 @@ getNewRoof obj roof newVertices = do
     let toParent v = applyMatrix (matrix obj) (mkVec3 (vecX v) (vecY v) 0.0)
     pure $ (RoofOpUpdate <<< flip updateRoofPlate roof <<< map toParent) <$> newVertices
 
+renderPanels :: forall a. Object3D a -> Array Panel -> Event EditorMode -> WebEditor (Effect Unit)
+renderPanels content panels modeEvt = do
+    -- don't build the panel layer when it's roof editing mode
+    let builder RoofEditing = pure Nothing
+        builder _ = Just <$> runArrayBuilder (createPanelLayer panels)
+
+        render { last, now } = do
+            traverse_ (flip remove content <<< view _wrapper) $ join last
+            traverse_ (flip add content <<< view _wrapper) now
+    panelLayerEvt <- performEditorEvent $ builder <$> modeEvt
+    liftEffect $ subscribe (withLast panelLayerEvt) render
+
 -- | Create RoofNode for a RoofPlate
 createRoofNode :: forall a. RoofPlate -> Array Panel -> Event Boolean -> WebEditor (RoofNode a)
 createRoofNode roof panels isActive = do
@@ -166,8 +178,7 @@ createRoofNode roof panels isActive = do
     modeEvt <- view _modeEvt <$> ask
 
     -- render panels
-    panelLayer <- runArrayBuilder $ createPanelLayer panels
-    liftEffect $ add (panelLayer ^. _wrapper) content
+    d <- renderPanels content panels modeEvt
     
     let canEditRoofEvt = (==) RoofEditing <$> modeEvt
     -- set the roof node position
@@ -199,5 +210,5 @@ createRoofNode roof panels isActive = do
             roofUpdate : multicast newRoof,
             tapped     : multicast $ keepLatest $ view _tapped <$> meshEvt,
             roofObject : obj,
-            disposable : sequence_ [d1, dispose editor]
+            disposable : sequence_ [d, d1, dispose editor]
         }

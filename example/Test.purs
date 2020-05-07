@@ -1,7 +1,6 @@
 module Test where
 
 import Prelude
-
 import Control.Monad.Except (runExcept)
 import Data.Default (def)
 import Data.Either (Either(..))
