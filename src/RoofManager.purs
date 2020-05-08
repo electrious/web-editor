@@ -1,6 +1,6 @@
 module Editor.RoofManager where
 
-import Prelude hiding (add)
+import Prelude hiding (add, degree)
 
 import Algorithm.MeshFlatten (flattenRoofPlates)
 import Control.Alt ((<|>))
@@ -10,7 +10,6 @@ import Data.Array (cons)
 import Data.Compactable (compact)
 import Data.Foldable (foldl, sequence_, traverse_)
 import Data.Lens (Lens', view, (^.), (%~), (.~))
-import Data.Lens.Index (ix)
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (toUnfoldable)
@@ -31,11 +30,10 @@ import Editor.RoofRecognizer (RoofRecognizer, _addedNewRoof, _marker, createRoof
 import Editor.WebEditor (WebEditor, _modeEvt, _panels, _roofPlates, performEditorEvent)
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import Effect.Class.Console (logShow)
 import FRP.Event (Event, create, fold, keepLatest, subscribe, withLast)
 import FRP.Event.Extra (debounce, delay, multicast, performEvent, skip)
 import Math.Angle (degree)
-import Model.Roof.Panel (Panel(..), _roofUUID)
+import Model.Roof.Panel (Panel, _roofUUID)
 import Model.Roof.RoofPlate (RoofEdited, RoofOperation(..), RoofPlate, isFlat, toRoofEdited)
 import Three.Core.Object3D (Object3D, add, mkObject3D, remove, setName)
 
