@@ -11,6 +11,7 @@ import Data.Lens.Record (prop)
 import Data.Meter (Meter, inch, meter)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
+import Editor.Common.Lenses (_rackingType)
 import Math.Angle (Angle, degree)
 import Model.Racking.RackingType (RackingType(..))
 
@@ -34,9 +35,6 @@ instance defaultArrayConfig :: Default ArrayConfig where
                 gapX         : inch 0.5,
                 gapY         : inch 0.75
             }
-
-_rackingType :: Lens' ArrayConfig RackingType
-_rackingType = _Newtype <<< prop (SProxy :: SProxy "rackingType")
 
 _panelSlope :: Lens' ArrayConfig Angle
 _panelSlope = _Newtype <<< prop (SProxy :: SProxy "panelSlope")

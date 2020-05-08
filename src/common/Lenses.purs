@@ -130,3 +130,6 @@ _textureInfo = _Newtype <<< prop (SProxy :: SProxy "textureInfo")
 
 _panelType :: forall t a r. Newtype t { panelType :: a | r } => Lens' t a
 _panelType = _Newtype <<< prop (SProxy :: SProxy "panelType")
+
+_rackingType :: forall t a r. Newtype t { rackingType :: a | r } => Lens' t a
+_rackingType = _Newtype <<< prop (SProxy :: SProxy "rackingType")

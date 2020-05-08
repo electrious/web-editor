@@ -22,8 +22,9 @@ import Editor.SceneEvent (Size)
 import Effect (Effect)
 import Effect.Class (class MonadEffect)
 import FRP.Event (Event, makeEvent, subscribe)
-import Model.Hardware.PanelTextureInfo (PanelTextureInfo(..))
+import Model.Hardware.PanelTextureInfo (PanelTextureInfo)
 import Model.Hardware.PanelType (PanelType)
+import Model.Racking.RackingType (RackingType)
 import Model.Roof.Panel (Panel)
 import Model.Roof.RoofPlate (RoofPlate)
 import Web.DOM (Element)
@@ -37,7 +38,8 @@ newtype EditorConfig = EditorConfig {
     panels      :: Array Panel,
     dataServer  :: String,
     textureInfo :: PanelTextureInfo,
-    panelType   :: Event PanelType
+    panelType   :: Event PanelType,
+    rackingType :: Event RackingType
 }
 
 derive instance newtypeEditorConfig :: Newtype EditorConfig _
@@ -51,7 +53,8 @@ instance defaultEditorConfig :: Default EditorConfig where
         panels      : [],
         dataServer  : "",
         textureInfo : def,
-        panelType   : empty
+        panelType   : empty,
+        rackingType : empty
     }
 
 _elem :: Lens' EditorConfig (Maybe Element)

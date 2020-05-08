@@ -8,25 +8,25 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Editor.Common.Lenses (_panelType, _textureInfo)
+import Editor.Common.Lenses (_panelType, _rackingType, _textureInfo)
 import Editor.WebEditor (WebEditor)
 import Effect (Effect)
 import Effect.Class (class MonadEffect, liftEffect)
 import FRP.Event (Event)
 import Model.Hardware.PanelTextureInfo (PanelTextureInfo)
 import Model.Hardware.PanelType (PanelType)
-import Model.Roof.ArrayConfig (ArrayConfig, xr10ArrayConfig)
+import Model.Roof.ArrayConfig (ArrayConfig, arrayConfigForRack)
 
 -- data used to provide env info for ArrayBuilder monad
 newtype ArrayBuilderEnv = ArrayBuilderEnv {
-    arrayConfig :: ArrayConfig,
+    arrayConfig :: Event ArrayConfig,
     textureInfo :: PanelTextureInfo,
     panelType   :: Event PanelType
 }
 
 derive instance newtypeArrayBuilderEnv :: Newtype ArrayBuilderEnv _
 
-_arrayConfig :: Lens' ArrayBuilderEnv ArrayConfig
+_arrayConfig :: Lens' ArrayBuilderEnv (Event ArrayConfig)
 _arrayConfig = _Newtype <<< prop (SProxy :: SProxy "arrayConfig")
 
 -- | ArrayBuilder is the monad to build arrays in
@@ -45,13 +45,14 @@ runArrayBuilder :: forall a. ArrayBuilder a -> WebEditor a
 runArrayBuilder (ArrayBuilder b) = do
     texture <- view _textureInfo <$> ask
     pt <- view _panelType <$> ask
+    rt <- view _rackingType <$> ask
     liftEffect $ runReaderT b $ ArrayBuilderEnv {
-        arrayConfig : xr10ArrayConfig,
+        arrayConfig : arrayConfigForRack <$> rt,
         textureInfo : texture,
         panelType   : pt
     }
 
-getArrayConfig :: ArrayBuilder ArrayConfig
+getArrayConfig :: ArrayBuilder (Event ArrayConfig)
 getArrayConfig = view _arrayConfig <$> ask
 
 getTextureInfo :: ArrayBuilder PanelTextureInfo

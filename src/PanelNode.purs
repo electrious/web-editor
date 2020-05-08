@@ -9,7 +9,7 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Bounded (genericBottom, genericTop)
 import Data.Generic.Rep.Enum (genericCardinality, genericFromEnum, genericPred, genericSucc, genericToEnum)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Lens (Lens', (^.))
+import Data.Lens (Lens', view, (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..), fromMaybe)
@@ -17,7 +17,7 @@ import Data.Meter (meterVal)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Editor.ArrayBuilder (ArrayBuilder, getArrayConfig, getPanelType, getTextureInfo)
-import Editor.Common.Lenses (_height, _orientation, _x, _y)
+import Editor.Common.Lenses (_height, _orientation, _rackingType, _x, _y)
 import Editor.Rendering.DefMaterials (loadMaterial)
 import Effect (Effect)
 import Effect.Class (liftEffect)
@@ -29,7 +29,7 @@ import Math.Angle (radianVal, sin)
 import Model.Hardware.PanelTextureInfo (PanelTextureInfo, _premium, _standard, _standard72)
 import Model.Hardware.PanelType (PanelType(..))
 import Model.Racking.RackingType (RackingType(..))
-import Model.Roof.ArrayConfig (ArrayConfig, _panelLowestZ, _rackingType)
+import Model.Roof.ArrayConfig (ArrayConfig, _panelLowestZ)
 import Model.Roof.Panel (Orientation(..), Panel, panelLong, panelShort, panelSize, validatedSlope)
 import Three.Core.Geometry (BoxGeometry, Geometry, mkBoxGeometry)
 import Three.Core.Material (MeshBasicMaterial, Material, mkMeshBasicMaterialWithTexture)
@@ -63,10 +63,10 @@ instance tabulatePanelTextureType :: Tabulate PanelTextureType where
     tabulate = genericTabulate
 
 -- get panel texture type based on the racking system and panel type
-panelType :: RackingType -> PanelType -> PanelTextureType
-panelType BX _       = Standard72Texture
-panelType _ Premium  = PremiumTexture
-panelType _ Standard = StandardTexture
+panelTextureType :: RackingType -> PanelType -> PanelTextureType
+panelTextureType BX _       = Standard72Texture
+panelTextureType _ Premium  = PremiumTexture
+panelTextureType _ Standard = StandardTexture
 
 -- create material for panel node with the provided image url
 mkPanelMaterial :: forall a. String -> Effect (MeshBasicMaterial a)
@@ -139,7 +139,7 @@ mkRightFrame geo mat = do
 -- | make a default panel mesh node
 mkPanelMesh :: forall a. Panel -> ArrayBuilder (Event (Mesh a))
 mkPanelMesh p = do
-    arrCfg       <- getArrayConfig
+    arrCfgEvt    <- getArrayConfig
     info         <- getTextureInfo
     panelTypeEvt <- getPanelType
 
@@ -150,8 +150,8 @@ mkPanelMesh p = do
         -- always use black material for frame around panel
         blackMat = loadMaterial Premium
 
-        bodyMat = getPanelMaterial info <<< panelType (arrCfg ^. _rackingType)
-        bodyMatEvt = bodyMat <$> panelTypeEvt
+        rackingTypeEvt = view _rackingType <$> arrCfgEvt
+        bodyMatEvt = getPanelMaterial info <$> (panelTextureType <$> rackingTypeEvt <*> panelTypeEvt)
 
         mkBody geo mat = do
             n <- mkMesh geo mat
@@ -168,11 +168,12 @@ mkPanelMesh p = do
     -- add frame meshes to panel mesh
     let addFrame n = traverse_ (flip add n) [top, bot, left, right] *> pure n
         
-    pure $ performEvent $ (addFrame >=> updatePosition arrCfg p >=> updateRotation p) <$> nodeEvt
+        newNodeEvt = performEvent $ (addFrame >=> updateRotation p) <$> nodeEvt
+    pure $ performEvent $ updatePosition p <$> arrCfgEvt <*> newNodeEvt
 
 -- update panel mesh position based on array config and the corresponding panel model
-updatePosition :: forall a. ArrayConfig -> Panel -> Object3D a -> Effect (Object3D a)
-updatePosition arrCfg p m = setPosition pv m *> pure m
+updatePosition :: forall a. Panel -> ArrayConfig -> Object3D a -> Effect (Object3D a)
+updatePosition p arrCfg m = setPosition pv m *> pure m
     where px = meterVal $ p ^. _x
           py = meterVal $ p ^. _y
           z = meterVal $ arrCfg ^. _panelLowestZ
