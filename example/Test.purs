@@ -46,7 +46,7 @@ doTest roofDat panelDat = do
         Right roofs -> case runExcept $ decode panelDat of
             Left e -> logShow e
             Right panels -> do
-                let modeEvt = const Showing <$> after 10 <|> const RoofEditing <$> after 10000
+                let modeEvt = const Showing <$> after 10
                     sizeEvt = const (size 800 600) <$> after 2
                     panelType = const Standard <$> after 10
 

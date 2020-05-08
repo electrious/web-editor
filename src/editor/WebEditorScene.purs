@@ -15,7 +15,7 @@ import Effect (Effect)
 import FRP.Event (Event, gate, sampleOn, subscribe)
 import FRP.Event.Extra (performEvent)
 import Math.Angle (degree, radianVal)
-import Three.Controls.OrbitControls (OrbitControls, enableDamping, enableZoom, isEnabled, mkOrbitControls, setAutoRotate, setAutoRotateSpeed, setEnabled, setMaxDistance, setMaxPolarAngle, setMinDistance, setMinPolarAngle, setTarget, update)
+import Three.Controls.OrbitControls (OrbitControls, enableDamping, enableZoom, isEnabled, mkOrbitControls, setAutoRotate, setAutoRotateSpeed, setDampingFactor, setEnabled, setMaxDistance, setMaxPolarAngle, setMinDistance, setMinPolarAngle, setTarget, update)
 import Three.Controls.OrbitControls as OrbitControls
 import Three.Core.Camera (PerspectiveCamera, mkPerspectiveCamera, setAspect, updateProjectionMatrix)
 import Three.Core.Light (mkAmbientLight, mkDirectionalLight)
@@ -75,12 +75,13 @@ setupOrbitControls c = do
     setAutoRotate true c
     setAutoRotateSpeed 0.5 c
     enableDamping true c
+    setDampingFactor 0.1 c
     enableZoom true c
-    setMinPolarAngle (radianVal $ degree 30.0) c
-    setMaxPolarAngle (radianVal $ degree 60.0) c
-    setMinDistance 30.0 c
-    setMaxDistance 60.0 c
-    setTarget (mkVec3 0.0 0.0 0.0) c
+    setMinPolarAngle (radianVal $ degree 10.0) c
+    setMaxPolarAngle (radianVal $ degree 50.0) c
+    setMinDistance 15.0 c
+    setMaxDistance 35.0 c
+    setTarget (mkVec3 0.0 0.0 (-5.0)) c
 
 -- | internal function to create the threejs scene, camera, light and renderer
 createScene :: forall a. Event Size -> Event EditorMode -> Element -> Effect (EditorScene a)
