@@ -17,54 +17,55 @@ import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple, fst)
 import Editor.Common.Lenses (_disposable)
 import Editor.Disposable (class Disposable)
-import Editor.EditorMode (EditorMode)
-import Editor.SceneEvent (Size)
+import Editor.EditorMode (EditorMode(..))
+import Editor.SceneEvent (Size, calcPosition, size)
 import Effect (Effect)
-import Effect.Class (class MonadEffect)
+import Effect.Class (class MonadEffect, liftEffect)
+import FRP.Dynamic (Dynamic, current, dynEvent, step)
 import FRP.Event (Event, makeEvent, subscribe)
 import Model.Hardware.PanelTextureInfo (PanelTextureInfo)
-import Model.Hardware.PanelType (PanelType)
-import Model.Racking.RackingType (RackingType)
+import Model.Hardware.PanelType (PanelType(..))
+import Model.Racking.RackingType (RackingType(..))
 import Model.Roof.Panel (Panel)
 import Model.Roof.RoofPlate (RoofPlate)
 import Web.DOM (Element)
 
 newtype EditorConfig = EditorConfig {
     elem        :: Maybe Element,
-    sizeEvt     :: Event Size,
-    modeEvt     :: Event EditorMode,
+    sizeDyn     :: Dynamic Size,
+    modeDyn     :: Dynamic EditorMode,
     leadId      :: Int,
     roofPlates  :: Array RoofPlate,
     panels      :: Array Panel,
     dataServer  :: String,
     textureInfo :: PanelTextureInfo,
-    panelType   :: Event PanelType,
-    rackingType :: Event RackingType
+    panelType   :: Dynamic PanelType,
+    rackingType :: Dynamic RackingType
 }
 
 derive instance newtypeEditorConfig :: Newtype EditorConfig _
 instance defaultEditorConfig :: Default EditorConfig where
     def = EditorConfig {
         elem        : Nothing,
-        sizeEvt     : empty,
-        modeEvt     : empty,
+        sizeDyn     : step (size 800 600) empty,
+        modeDyn     : step Showing empty,
         leadId      : 0,
         roofPlates  : [],
         panels      : [],
         dataServer  : "",
         textureInfo : def,
-        panelType   : empty,
-        rackingType : empty
+        panelType   : step Standard empty,
+        rackingType : step XR10 empty
     }
 
 _elem :: Lens' EditorConfig (Maybe Element)
 _elem = _Newtype <<< prop (SProxy :: SProxy "elem")
 
-_sizeEvt :: Lens' EditorConfig (Event Size)
-_sizeEvt = _Newtype <<< prop (SProxy :: SProxy "sizeEvt")
+_sizeDyn :: Lens' EditorConfig (Dynamic Size)
+_sizeDyn = _Newtype <<< prop (SProxy :: SProxy "sizeDyn")
 
-_modeEvt :: Lens' EditorConfig (Event EditorMode)
-_modeEvt = _Newtype <<< prop (SProxy :: SProxy "modeEvt")
+_modeDyn :: Lens' EditorConfig (Dynamic EditorMode)
+_modeDyn = _Newtype <<< prop (SProxy :: SProxy "modeDyn")
 
 _roofPlates :: Lens' EditorConfig (Array RoofPlate)
 _roofPlates = _Newtype <<< prop (SProxy :: SProxy "roofPlates")
@@ -116,6 +117,15 @@ performEditorEvent e = do
 
     pure $ makeEvent \k -> subscribe e (\v -> evalWebEditor' cfg st v >>= k)
 
+performEditorDyn :: forall a. Dynamic (WebEditor a) -> WebEditor (Dynamic a)
+performEditorDyn d = do
+    cfg <- ask
+    st  <- get
+
+    curV <- liftEffect $ current d
+    def <- liftEffect $ evalWebEditor' cfg st curV
+    let evt = makeEvent \k -> subscribe (dynEvent d) \v -> evalWebEditor' cfg st v >>= k
+    pure $ step def evt
 
 addDisposable :: Effect Unit -> WebEditor Unit
 addDisposable d = modify_ (\s -> s # _disposable %~ (cons d))

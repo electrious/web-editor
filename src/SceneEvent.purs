@@ -3,7 +3,6 @@ module Editor.SceneEvent where
 import Prelude
 
 import Control.Alt ((<|>))
-import Control.Apply (lift2)
 import Data.Array (filter, head)
 import Data.Compactable (compact)
 import Data.Default (class Default)
@@ -20,6 +19,7 @@ import Editor.Common.Lenses (_dragType, _dragged, _height, _mouseMove, _tapped, 
 import Editor.Disposable (class Disposable)
 import Editor.Input (DragEvent, DragType(..), InputEvents)
 import Effect (Effect)
+import FRP.Dynamic (Dynamic, sampleDyn)
 import FRP.Event (Event, subscribe)
 import FRP.Event.Extra (debounce, multicast, performEvent)
 import Three.Core.Camera (Camera)
@@ -183,8 +183,8 @@ _dragEvent = _Newtype <<< prop (SProxy :: SProxy "dragEvent")
 
 -- | setup all raycasting needed to process user inputs and send
 -- them to the corresponding 3D object in the scene
-setupRaycasting :: forall a b. Camera a -> Object3D b -> InputEvents -> Event Size -> Effect RaycastSetup
-setupRaycasting camera scene input sizeEvt = do
+setupRaycasting :: forall a b. Camera a -> Object3D b -> InputEvents -> Dynamic Size -> Effect RaycastSetup
+setupRaycasting camera scene input sizeDyn = do
     raycaster <- mkRaycaster
     
     let doRaycast tp = do
@@ -205,9 +205,9 @@ setupRaycasting camera scene input sizeEvt = do
             res <- doRaycast (calcPosition sz e)
             processDragObjects e res
     
-    let e1 = performEvent $ lift2 raycastTap sizeEvt (input ^. _tapped)
-        e2 = performEvent $ lift2 raycastMouse sizeEvt (input ^. _mouseMove)
-        unraycastedDrag = compact $ performEvent $ lift2 raycastDrag sizeEvt (input ^. _dragged)
+    let e1 = performEvent $ sampleDyn sizeDyn (flip raycastTap <$> input ^. _tapped)
+        e2 = performEvent $ sampleDyn sizeDyn (flip raycastMouse <$> input ^. _mouseMove)
+        unraycastedDrag = compact $ performEvent $ sampleDyn sizeDyn (flip raycastDrag <$> input ^. _dragged)
 
         f _ = pure unit
     

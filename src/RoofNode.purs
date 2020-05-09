@@ -20,13 +20,15 @@ import Editor.EditorMode (EditorMode(..))
 import Editor.PanelLayer (createPanelLayer)
 import Editor.RoofEditor (_deleteRoof, _roofVertices, createRoofEditor)
 import Editor.SceneEvent (SceneTapEvent)
-import Editor.WebEditor (WebEditor, _modeEvt, performEditorEvent)
+import Editor.WebEditor (WebEditor, _modeDyn, performEditorDyn)
 import Effect (Effect)
 import Effect.Class (liftEffect)
+import Effect.Class.Console (logShow)
 import Effect.Timer (setTimeout)
 import Effect.Unsafe (unsafePerformEffect)
-import FRP.Event (Event, create, keepLatest, subscribe, withLast)
-import FRP.Event.Extra (after, multicast, performEvent)
+import FRP.Dynamic (Dynamic, debugDyn, debugDynWith, dynEvent, performDynamic, step, subscribeDyn, withLast)
+import FRP.Event (Event, create, keepLatest)
+import FRP.Event.Extra (multicast)
 import Math (pi)
 import Math.Angle (degreeVal, radianVal)
 import Model.Roof.Panel (Panel)
@@ -156,8 +158,8 @@ getNewRoof obj roof newVertices = do
     let toParent v = applyMatrix (matrix obj) (mkVec3 (vecX v) (vecY v) 0.0)
     pure $ (RoofOpUpdate <<< flip updateRoofPlate roof <<< map toParent) <$> newVertices
 
-renderPanels :: forall a. Object3D a -> Array Panel -> Event EditorMode -> WebEditor (Effect Unit)
-renderPanels content panels modeEvt = do
+renderPanels :: forall a. Object3D a -> Array Panel -> Dynamic EditorMode -> WebEditor (Effect Unit)
+renderPanels content panels modeDyn = do
     -- don't build the panel layer when it's roof editing mode
     let builder RoofEditing = pure Nothing
         builder _ = Just <$> runArrayBuilder (createPanelLayer panels)
@@ -165,36 +167,36 @@ renderPanels content panels modeEvt = do
         render { last, now } = do
             traverse_ (flip remove content <<< view _wrapper) $ join last
             traverse_ (flip add content <<< view _wrapper) now
-    panelLayerEvt <- performEditorEvent $ builder <$> modeEvt
-    liftEffect $ subscribe (withLast panelLayerEvt) render
+    panelLayerDyn <- performEditorDyn $ builder <$> modeDyn
+    liftEffect $ subscribeDyn (withLast panelLayerDyn) render
 
 -- | Create RoofNode for a RoofPlate
-createRoofNode :: forall a. RoofPlate -> Array Panel -> Event Boolean -> WebEditor (RoofNode a)
+createRoofNode :: forall a. RoofPlate -> Array Panel -> Dynamic Boolean -> WebEditor (RoofNode a)
 createRoofNode roof panels isActive = do
     obj <- liftEffect $ mkNode "roofplate"
     content <- liftEffect $ mkNode "roof-content"
     liftEffect $ add content obj
 
-    modeEvt <- view _modeEvt <$> ask
+    modeDyn <- view _modeDyn <$> ask
 
     -- render panels
-    d <- renderPanels content panels modeEvt
+    d <- renderPanels content panels modeDyn
     
-    let canEditRoofEvt = (==) RoofEditing <$> modeEvt
+    let canEditRoofDyn = (==) RoofEditing <$> modeDyn
     -- set the roof node position
     liftEffect do
         setupRoofNode obj content roof
         ps <- getBorderPoints obj roof
 
         -- create the vertex markers editor
-        let canEdit = (&&) <$> isActive <*> canEditRoofEvt
+        let canEdit = (&&) <$> isActive <*> canEditRoofDyn
         editor <- createRoofEditor obj canEdit ps
 
-        let vertices = (const ps <$> after 2) <|> editor ^. _roofVertices
-            meshEvt = performEvent (createRoofMesh <$> vertices <*> isActive <*> canEditRoofEvt)
+        let vertices = step ps (editor ^. _roofVertices)
+            meshDyn = performDynamic (createRoofMesh <$> vertices <*> isActive <*> canEditRoofDyn)
         
         -- add/remove mesh to the obj
-        d1 <- subscribe (withLast meshEvt) (renderMesh obj)
+        d1 <- subscribeDyn (withLast meshDyn) (renderMesh obj)
         
         newRoof <- getNewRoof obj roof (editor ^. _roofVertices)
 
@@ -208,7 +210,7 @@ createRoofNode roof panels isActive = do
             roofId     : roof ^. _id,
             roofDelete : multicast $ const (RoofOpDelete $ roof ^. _id) <$> delRoofEvt,
             roofUpdate : multicast newRoof,
-            tapped     : multicast $ keepLatest $ view _tapped <$> meshEvt,
+            tapped     : multicast $ keepLatest $ view _tapped <$> (dynEvent meshDyn),
             roofObject : obj,
             disposable : sequence_ [d, d1, dispose editor]
         }

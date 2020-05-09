@@ -22,8 +22,7 @@ import Editor.Rendering.DefMaterials (loadMaterial)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
-import FRP.Event (Event)
-import FRP.Event.Extra (performEvent)
+import FRP.Dynamic (Dynamic, performDynamic)
 import Math (pi)
 import Math.Angle (radianVal, sin)
 import Model.Hardware.PanelTextureInfo (PanelTextureInfo, _premium, _standard, _standard72)
@@ -137,11 +136,11 @@ mkRightFrame geo mat = do
     pure right
 
 -- | make a default panel mesh node
-mkPanelMesh :: forall a. Panel -> ArrayBuilder (Event (Mesh a))
+mkPanelMesh :: forall a. Panel -> ArrayBuilder (Dynamic (Mesh a))
 mkPanelMesh p = do
-    arrCfgEvt    <- getArrayConfig
+    arrCfgDyn    <- getArrayConfig
     info         <- getTextureInfo
-    panelTypeEvt <- getPanelType
+    panelTypeDyn <- getPanelType
 
     -- create the panel body first
     let bodyGeo = panelGeometry unit
@@ -150,15 +149,14 @@ mkPanelMesh p = do
         -- always use black material for frame around panel
         blackMat = loadMaterial Premium
 
-        rackingTypeEvt = view _rackingType <$> arrCfgEvt
-        bodyMatEvt = getPanelMaterial info <$> (panelTextureType <$> rackingTypeEvt <*> panelTypeEvt)
+        rackingTypeDyn = view _rackingType <$> arrCfgDyn
+        bodyMatDyn = getPanelMaterial info <$> (panelTextureType <$> rackingTypeDyn <*> panelTypeDyn)
 
         mkBody geo mat = do
             n <- mkMesh geo mat
             setName "panel-body" n
             pure n
-        nodeEvt = performEvent $ mkBody bodyGeo <$> bodyMatEvt
-    
+        nodeDyn = performDynamic $ mkBody bodyGeo <$> bodyMatDyn    
     -- create frames
     top   <- liftEffect $ mkTopFrame horiGeo blackMat
     bot   <- liftEffect $ mkBotFrame horiGeo blackMat
@@ -168,8 +166,8 @@ mkPanelMesh p = do
     -- add frame meshes to panel mesh
     let addFrame n = traverse_ (flip add n) [top, bot, left, right] *> pure n
         
-        newNodeEvt = performEvent $ (addFrame >=> updateRotation p) <$> nodeEvt
-    pure $ performEvent $ updatePosition p <$> arrCfgEvt <*> newNodeEvt
+        newNodeDyn = performDynamic $ (addFrame >=> updateRotation p) <$> nodeDyn
+    pure $ performDynamic $ updatePosition p <$> arrCfgDyn <*> newNodeDyn
 
 -- update panel mesh position based on array config and the corresponding panel model
 updatePosition :: forall a. Panel -> ArrayConfig -> Object3D a -> Effect (Object3D a)

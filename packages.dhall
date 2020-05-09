@@ -119,21 +119,21 @@ let additions =
 
 
 let upstream =
-      https://github.com/purescript/package-sets/releases/download/psc-0.13.6-20200226/packages.dhall sha256:3a52562e05b31a7b51d12d5b228ccbe567c527781a88e9028ab42374ab55c0f1
+      https://github.com/purescript/package-sets/releases/download/psc-0.13.6-20200507/packages.dhall sha256:9c1e8951e721b79de1de551f31ecb5a339e82bbd43300eb5ccfb1bf8cf7bbd62
 
 let overrides = {=}
 
-let additions = {
-    easy-ffi = {
-        dependencies = ["prelude"],
-        repo = "https://github.com/pelotom/purescript-easy-ffi.git",
-        version = "master"
-    },
-    event-extra = {
-        dependencies = ["event"],
-        repo = "https://github.com/manyoo/event-extra.git",
-        version = "master"
-    }
-}
+let additions =
+      { easy-ffi =
+        { dependencies = [ "prelude" ]
+        , repo = "https://github.com/pelotom/purescript-easy-ffi.git"
+        , version = "master"
+        }
+      , event-extra =
+        { dependencies = [ "event" ]
+        , repo = "https://github.com/manyoo/event-extra.git"
+        , version = "v0.1.3"
+        }
+      }
 
 in  upstream // overrides // additions

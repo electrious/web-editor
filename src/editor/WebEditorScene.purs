@@ -12,8 +12,10 @@ import Editor.EditorMode (EditorMode(..))
 import Editor.Input (DragEvent, setupInput)
 import Editor.SceneEvent (Size, _dragEvent, setupRaycasting)
 import Effect (Effect)
-import FRP.Event (Event, gate, sampleOn, subscribe)
-import FRP.Event.Extra (performEvent)
+import Effect.Class.Console (logShow)
+import FRP.Dynamic (Dynamic, current, debugDyn, gateDyn, subscribeDyn)
+import FRP.Event (Event, makeEvent, sampleOn, subscribe)
+import FRP.Event.Extra (debugWith, performEvent)
 import Math.Angle (degree, radianVal)
 import Three.Controls.OrbitControls (OrbitControls, enableDamping, enableZoom, isEnabled, mkOrbitControls, setAutoRotate, setAutoRotateSpeed, setDampingFactor, setEnabled, setMaxDistance, setMaxPolarAngle, setMinDistance, setMinPolarAngle, setTarget, update)
 import Three.Controls.OrbitControls as OrbitControls
@@ -84,8 +86,8 @@ setupOrbitControls c = do
     setTarget (mkVec3 0.0 0.0 (-5.0)) c
 
 -- | internal function to create the threejs scene, camera, light and renderer
-createScene :: forall a. Event Size -> Event EditorMode -> Element -> Effect (EditorScene a)
-createScene sizeEvt modeEvt elem = do
+createScene :: forall a. Dynamic Size -> Dynamic EditorMode -> Element -> Effect (EditorScene a)
+createScene sizeDyn modeDyn elem = do
     -- set the default Up direction as z axis in the scene
     setDefaultUp (mkVec3 0.0 0.0 1.0)
 
@@ -99,7 +101,7 @@ createScene sizeEvt modeEvt elem = do
             updateProjectionMatrix camera
             setSize (s ^. _width) (s ^. _height) renderer
     
-    d1 <- subscribe sizeEvt resized
+    d1 <- subscribeDyn sizeDyn resized
 
     -- attach the webgl canvas to parent DOM element
     _ <- appendChild (toNode $ domElement renderer) (toNode elem)
@@ -114,10 +116,10 @@ createScene sizeEvt modeEvt elem = do
     orbitCtrl <- mkOrbitControls camera (domElement renderer)
     setupOrbitControls orbitCtrl
 
-    let isShowing = (==) Showing <$> modeEvt
+    let isShowing = (==) Showing <$> modeDyn
         canEdit = not <$> isShowing
 
-    d4 <- subscribe isShowing (flip setEnabled orbitCtrl)
+    d4 <- subscribeDyn isShowing (flip setEnabled orbitCtrl)
 
     -- add ambient light
     ambientLight <- mkAmbientLight 0xffffff
@@ -149,20 +151,22 @@ createScene sizeEvt modeEvt elem = do
     
         inputEvts = setupInput elem
     
-        newDistEvt = performEvent $ (zoomCamera camera <<< deltaY) <$> (gate canEdit $ inputEvts ^. _zoomed)
+        newDistEvt = performEvent $ (zoomCamera camera <<< deltaY) <$> (gateDyn canEdit $ inputEvts ^. _zoomed)
         scaleEvt = (\d -> d / cameraDefDist) <$> newDistEvt
     
-    rcs <- setupRaycasting camera scene inputEvts sizeEvt
+    rcs <- setupRaycasting camera scene inputEvts sizeDyn
 
-    d2 <- subscribe (gate canEdit $ rcs ^. _dragEvent) (rotateContentWithDrag rotWrapper)
+    d2 <- subscribe (gateDyn canEdit $ rcs ^. _dragEvent) (rotateContentWithDrag rotWrapper)
 
-    let shiftDragEvt = performEvent $ sampleOn scaleEvt $ moveWithShiftDrag content <$> gate canEdit (inputEvts ^. _shiftDragged) 
+    let shiftDragEvt = performEvent $ sampleOn scaleEvt $ moveWithShiftDrag content <$> gateDyn canEdit (inputEvts ^. _shiftDragged) 
     d3 <- subscribe shiftDragEvt (const $ pure unit)
+
+    d5 <- subscribeDyn canEdit (const $ pure unit)
 
     pure $ EditorScene {
         render     : renderFunc,
         addContent : addContentFunc,
-        disposable : sequence_ [d1, d2, d3, disposeScene scene, dispose rcs, OrbitControls.dispose orbitCtrl]
+        disposable : sequence_ [d1, d2, d3, d4, d5, disposeScene scene, dispose rcs, OrbitControls.dispose orbitCtrl]
     }
 
 -- | renderLoop is the function to render scene repeatedly

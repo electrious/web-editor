@@ -12,21 +12,21 @@ import Editor.Common.Lenses (_panelType, _rackingType, _textureInfo)
 import Editor.WebEditor (WebEditor)
 import Effect (Effect)
 import Effect.Class (class MonadEffect, liftEffect)
-import FRP.Event (Event)
+import FRP.Dynamic (Dynamic)
 import Model.Hardware.PanelTextureInfo (PanelTextureInfo)
 import Model.Hardware.PanelType (PanelType)
 import Model.Roof.ArrayConfig (ArrayConfig, arrayConfigForRack)
 
 -- data used to provide env info for ArrayBuilder monad
 newtype ArrayBuilderEnv = ArrayBuilderEnv {
-    arrayConfig :: Event ArrayConfig,
+    arrayConfig :: Dynamic ArrayConfig,
     textureInfo :: PanelTextureInfo,
-    panelType   :: Event PanelType
+    panelType   :: Dynamic PanelType
 }
 
 derive instance newtypeArrayBuilderEnv :: Newtype ArrayBuilderEnv _
 
-_arrayConfig :: Lens' ArrayBuilderEnv (Event ArrayConfig)
+_arrayConfig :: Lens' ArrayBuilderEnv (Dynamic ArrayConfig)
 _arrayConfig = _Newtype <<< prop (SProxy :: SProxy "arrayConfig")
 
 -- | ArrayBuilder is the monad to build arrays in
@@ -52,11 +52,11 @@ runArrayBuilder (ArrayBuilder b) = do
         panelType   : pt
     }
 
-getArrayConfig :: ArrayBuilder (Event ArrayConfig)
+getArrayConfig :: ArrayBuilder (Dynamic ArrayConfig)
 getArrayConfig = view _arrayConfig <$> ask
 
 getTextureInfo :: ArrayBuilder PanelTextureInfo
 getTextureInfo = view _textureInfo <$> ask
 
-getPanelType :: ArrayBuilder (Event PanelType)
+getPanelType :: ArrayBuilder (Dynamic PanelType)
 getPanelType = view _panelType <$> ask

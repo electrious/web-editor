@@ -3,7 +3,6 @@ module Editor.RoofRecognizer where
 import Prelude
 
 import Algorithm.RoofCheck (couldBeRoof)
-import Control.Apply (lift2)
 import Custom.Mesh (TappableMesh, mkTappableMesh)
 import Data.Compactable (compact)
 import Data.Lens (Lens', (^.))
@@ -18,7 +17,8 @@ import Editor.Disposable (class Disposable)
 import Editor.SceneEvent (SceneMouseMoveEvent)
 import Effect (Effect)
 import Effect.Unsafe (unsafePerformEffect)
-import FRP.Event (Event, gate, sampleOn, subscribe)
+import FRP.Dynamic (Dynamic, gateDyn, sampleDyn, step, subscribeDyn)
+import FRP.Event (Event, sampleOn)
 import FRP.Event.Extra (multicast, performEvent)
 import Model.Roof.RoofPlate (RoofPlate, newRoofPlate)
 import Three.Core.Face3 (normal)
@@ -86,7 +86,7 @@ showMarker marker (Just p) | not (hasParent $ marker ^. _mesh) = setVisible fals
 createRoofRecognizer :: forall a b. Object3D a
                                -> Event (Array RoofPlate)
                                -> Event SceneMouseMoveEvent
-                               -> Event Boolean
+                               -> Dynamic Boolean
                                -> Effect (RoofRecognizer b)
 createRoofRecognizer houseWrapper roofs mouseMove canShow = do
     marker <- createAdderMarker
@@ -102,7 +102,7 @@ createRoofRecognizer houseWrapper roofs mouseMove canShow = do
                 pure $ Just { position: np, faceNormal: normal (evt ^. _face) }
             else pure Nothing
 
-        point = performEvent $ sampleOn roofs (getCandidatePoint <$> gate canShow mouseMove)
+        point = step Nothing $ performEvent $ sampleOn roofs (getCandidatePoint <$> gateDyn canShow mouseMove)
     
         mkRoof _ p = newRoofPlate p.position p.faceNormal
 
@@ -110,9 +110,9 @@ createRoofRecognizer houseWrapper roofs mouseMove canShow = do
         pointCanShow true p = p
         pointCanShow false _ = Nothing
 
-    d <- subscribe (lift2 pointCanShow canShow point) (showMarker marker)
+    d <- subscribeDyn (pointCanShow <$> canShow <*> point) (showMarker marker)
 
-    let roof = compact $ performEvent $ sampleOn point (traverse <<< mkRoof <$> marker ^. _tapped)
+    let roof = compact $ performEvent $ sampleDyn point (traverse <<< mkRoof <$> marker ^. _tapped)
     pure $ RoofRecognizer {
         marker       : marker ^. _mesh,
         addedNewRoof : multicast roof,

@@ -9,8 +9,7 @@ import Editor.ArrayBuilder (ArrayBuilder)
 import Editor.PanelNode (mkPanelMesh)
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import FRP.Event (subscribe, withLast)
-import FRP.Event.Extra (mergeArray)
+import FRP.Dynamic (mergeDynArray, subscribeDyn, withLast)
 import Model.Roof.Panel (Panel)
 import Three.Core.Object3D (Object3D, add, mkObject3D, remove, setName)
 
@@ -27,13 +26,13 @@ createPanelLayer ps = do
     liftEffect $ setName "panel-layer" layer
 
     -- render all panels
-    panelNodeEvts <- mergeArray <$> traverse mkPanelMesh ps
+    panelNodeDyns <- mergeDynArray <$> traverse mkPanelMesh ps
     
     let doRender { last, now } = do
             traverse_ (flip remove layer) $ fromMaybe [] last
             traverse_ (flip add layer) now
 
-    d <- liftEffect $ subscribe (withLast panelNodeEvts) doRender
+    d <- liftEffect $ subscribeDyn (withLast panelNodeDyns) doRender
 
     pure $ PanelLayer {
         wrapper    : layer,

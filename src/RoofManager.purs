@@ -1,6 +1,6 @@
 module Editor.RoofManager where
 
-import Prelude hiding (add, degree)
+import Prelude hiding (add,degree)
 
 import Algorithm.MeshFlatten (flattenRoofPlates)
 import Control.Alt ((<|>))
@@ -27,9 +27,10 @@ import Editor.EditorMode (EditorMode(..))
 import Editor.House (HouseMeshData)
 import Editor.RoofNode (RoofNode, _roofDelete, _roofObject, _roofUpdate, createRoofNode)
 import Editor.RoofRecognizer (RoofRecognizer, _addedNewRoof, _marker, createRoofRecognizer)
-import Editor.WebEditor (WebEditor, _modeEvt, _panels, _roofPlates, performEditorEvent)
+import Editor.WebEditor (WebEditor, _modeDyn, _panels, _roofPlates, performEditorEvent)
 import Effect (Effect)
 import Effect.Class (liftEffect)
+import FRP.Dynamic (Dynamic, step)
 import FRP.Event (Event, create, fold, keepLatest, subscribe, withLast)
 import FRP.Event.Extra (debounce, delay, multicast, performEvent, skip)
 import Math.Angle (degree)
@@ -117,7 +118,7 @@ createWrapper = do
 
 -- | function to create roof node
 mkNode :: forall a. Event (Maybe String) -> PanelsDict -> RoofPlate -> WebEditor (RoofNode a)
-mkNode activeRoof panelsDict roof = createRoofNode roof ps (multicast $ (==) (Just (roof ^. _id)) <$> activeRoof)
+mkNode activeRoof panelsDict roof = createRoofNode roof ps (step false $ multicast $ (==) (Just (roof ^. _id)) <$> activeRoof)
     where ps = zeroSlope <$> fromMaybe [] (lookup (roof ^. _id) panelsDict)
           -- make sure slope value in panels on non-flat roof is set to zero
           zeroSlope p = if isFlat roof
@@ -147,13 +148,13 @@ renderRoofs wrapper activeRoof roofsData panelsDict = do
     nodes <- performEditorEvent $ traverse (mkNode activeRoof panelsDict) <$> rsToRenderArr
     pure $ multicast $ performEvent $ renderNodes wrapper <$> withLast nodes
 
-isRoofEditing :: WebEditor (Event Boolean)
-isRoofEditing = map ((==) RoofEditing) <<< view _modeEvt <$> ask
+isRoofEditing :: WebEditor (Dynamic Boolean)
+isRoofEditing = map ((==) RoofEditing) <<< view _modeDyn <$> ask
 
 -- | function to add the roof recognizer and recognize new roofs
-recognizeNewRoofs :: forall a b c. HouseMeshData a -> Object3D b -> Event RoofDict -> Event (Maybe String) -> Event Boolean -> Effect (RoofRecognizer c)
-recognizeNewRoofs meshData wrapper newRoofs activeRoof canEditRoofEvt = do
-    let canShowRecognizer = (&&) <$> (isNothing <$> activeRoof) <*> canEditRoofEvt
+recognizeNewRoofs :: forall a b c. HouseMeshData a -> Object3D b -> Event RoofDict -> Dynamic (Maybe String) -> Dynamic Boolean -> Effect (RoofRecognizer c)
+recognizeNewRoofs meshData wrapper newRoofs activeRoof canEditRoofDyn = do
+    let canShowRecognizer = (&&) <$> (isNothing <$> activeRoof) <*> canEditRoofDyn
     -- create the roof recognizer and add it to the roof wrapper object
     recognizer <- createRoofRecognizer (meshData ^. _wrapper)
                                        (dictToArr <$> newRoofs)
@@ -178,10 +179,12 @@ createRoofManager meshData = do
     { event : activeRoof, push : updateActive }    <- liftEffect create
     { event : roofsData,  push : updateRoofsData } <- liftEffect create
 
+    let activeRoofDyn = step Nothing activeRoof
+
     -- get the default roof plates as a dict
     defRoofDict    <- roofDict <<< view _roofPlates <$> ask
     panelsDict     <- panelDict <<< view _panels <$> ask
-    canEditRoofEvt <- isRoofEditing
+    canEditRoofDyn <- isRoofEditing
 
     -- render roofs dynamically
     renderedNodes <- renderRoofs wrapper activeRoof roofsData panelsDict
@@ -196,7 +199,7 @@ createRoofManager meshData = do
         flattened = performEvent $ doFlatten meshData <$>  newRoofs
 
     -- recognize new roofs
-    recognizer <- liftEffect $ recognizeNewRoofs meshData wrapper newRoofs activeRoof canEditRoofEvt
+    recognizer <- liftEffect $ recognizeNewRoofs meshData wrapper newRoofs activeRoofDyn canEditRoofDyn
     let addedNewRoof = recognizer ^. _addedNewRoof
         addRoofOp    = RoofOpCreate <$> addedNewRoof
         ops          = addRoofOp <|> deleteRoofOp <|> updateRoofOp

@@ -2,8 +2,8 @@ module Test where
 
 import Prelude
 
-import Control.Alt ((<|>))
 import Control.Monad.Except (runExcept)
+import Control.Plus (empty)
 import Data.Default (def)
 import Data.Either (Either(..))
 import Data.Lens ((.~))
@@ -13,11 +13,12 @@ import Editor.Common.Lenses (_leadId, _panelType, _rackingType, _textureInfo)
 import Editor.Editor (createEditor)
 import Editor.EditorMode (EditorMode(..))
 import Editor.SceneEvent (size)
-import Editor.WebEditor (_dataServer, _elem, _modeEvt, _panels, _roofPlates, _sizeEvt, runWebEditor)
+import Editor.WebEditor (_dataServer, _elem, _modeDyn, _panels, _roofPlates, _sizeDyn, runWebEditor)
 import Effect (Effect)
 import Effect.Class.Console (logShow)
+import FRP.Dynamic (step)
 import FRP.Event (subscribe)
-import FRP.Event.Extra (after, debug, multicast)
+import FRP.Event.Extra (after)
 import Foreign (Foreign)
 import Foreign.Generic (decode)
 import Model.Hardware.PanelTextureInfo (_premium, _standard, _standard72)
@@ -47,10 +48,10 @@ doTest roofDat panelDat = do
         Right roofs -> case runExcept $ decode panelDat of
             Left e -> logShow e
             Right panels -> do
-                let modeEvt = const Showing <$> after 300 <|> const RoofEditing <$> after 10000
-                    sizeEvt = const (size 800 600) <$> after 2
-                    panelType = const Standard <$> after 500
-                    rackingType = const XR10 <$> after 500
+                let modeDyn = step Showing (const RoofEditing <$> after 10000)
+                    sizeDyn = step (size 800 600) empty
+                    panelType = step Standard empty
+                    rackingType = step XR10 empty
 
                     textures = def # _standard   .~ Just solarModuleJPG
                                    # _premium    .~ Just qCellSolarPanelJPG
@@ -61,10 +62,10 @@ doTest roofDat panelDat = do
                               # _roofPlates .~ roofs
                               # _panels     .~ panels
                               # _dataServer .~ serverUrl
-                              # _modeEvt    .~ multicast modeEvt
-                              # _sizeEvt    .~ multicast sizeEvt
-                              # _panelType  .~ multicast panelType
-                              # _rackingType .~ multicast rackingType
+                              # _modeDyn    .~ modeDyn
+                              # _sizeDyn    .~ sizeDyn
+                              # _panelType  .~ panelType
+                              # _rackingType .~ rackingType
                               # _textureInfo .~ textures
                 res <- runWebEditor cfg createEditor
                 

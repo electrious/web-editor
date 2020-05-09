@@ -22,6 +22,7 @@ import Editor.Disposable (class Disposable, dispose)
 import Editor.SceneEvent (SceneTapEvent)
 import Effect (Effect)
 import Effect.Unsafe (unsafePerformEffect)
+import FRP.Dynamic (Dynamic, subscribeDyn)
 import FRP.Event (Event, create, keepLatest, sampleOn, subscribe)
 import FRP.Event.Extra (foldEffect, mergeArray, multicast, performEvent)
 import Three.Core.Geometry (Geometry, mkCircleGeometry)
@@ -212,12 +213,12 @@ delMarker :: Int -> Array Vector2 -> Array Vector2
 delMarker idx ps = fromMaybe [] (deleteAt idx ps)
 
 -- | create roof editor
-createRoofEditor :: forall a. Object3D a -> Event Boolean -> Array Vector2 -> Effect RoofEditor
+createRoofEditor :: forall a. Object3D a -> Dynamic Boolean -> Array Vector2 -> Effect RoofEditor
 createRoofEditor parent active ps = do
     -- internal event for maintaining the roof active status
     { event: roofActive, push: setRoofActive } <- create
     -- pipe the 'active' param event into internal roofActive event
-    d1 <- subscribe active setRoofActive
+    d1 <- subscribeDyn active setRoofActive
 
     -- event for new list of vertices
     { event: vertices, push: updateVertList } <- create
