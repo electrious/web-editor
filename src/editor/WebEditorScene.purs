@@ -13,9 +13,8 @@ import Editor.EditorMode (EditorMode(..))
 import Editor.Input (DragEvent, setupInput)
 import Editor.SceneEvent (Size, _dragEvent, setupRaycasting)
 import Effect (Effect)
-import Effect.Class.Console (logShow)
-import FRP.Dynamic (Dynamic, gateDyn, sampleDyn, subscribeDyn)
-import FRP.Event (sampleOn, subscribe)
+import FRP.Dynamic (Dynamic, gateDyn, sampleDyn, step, subscribeDyn)
+import FRP.Event (subscribe)
 import FRP.Event.Extra (performEvent)
 import Math.Angle (degree, radianVal)
 import Three.Controls.OrbitControls (OrbitControls, enableDamping, enableZoom, isEnabled, mkOrbitControls, setAutoRotate, setAutoRotateSpeed, setDampingFactor, setEnabled, setMaxDistance, setMaxPolarAngle, setMinDistance, setMinPolarAngle, setTarget, update)
@@ -159,17 +158,17 @@ createScene sizeDyn modeDyn elem = do
 
         addContentFunc c = add c content
     
-        inputEvts = setupInput elem
+        inputEvts = setupInput (domElement renderer)
     
         newDistEvt = performEvent $ (zoomCamera camera <<< deltaY) <$> (gateDyn canEdit $ inputEvts ^. _zoomed)
         scaleEvt = (\d -> d / cameraDefDist) <$> newDistEvt
-    
+        scaleDyn = step 1.0 scaleEvt
     rcs <- setupRaycasting camera scene inputEvts sizeDyn
 
     let dragEvtWithSize = sampleDyn sizeDyn $ Tuple <$> gateDyn canEdit (rcs ^. _dragEvent)
     d2 <- subscribe dragEvtWithSize (rotateContentWithDrag rotWrapper)
 
-    let shiftDragEvt = performEvent $ sampleOn scaleEvt $ moveWithShiftDrag content <$> gateDyn canEdit (inputEvts ^. _shiftDragged) 
+    let shiftDragEvt = performEvent $ sampleDyn scaleDyn $ moveWithShiftDrag content <$> gateDyn canEdit (inputEvts ^. _shiftDragged) 
     d3 <- subscribe shiftDragEvt (const $ pure unit)
 
     pure $ EditorScene {
