@@ -18,11 +18,12 @@ import FRP.Event.Extra (performEvent)
 import Math.Angle (degree, radianVal)
 import Three.Controls.OrbitControls (OrbitControls, enableDamping, enableZoom, isEnabled, mkOrbitControls, setAutoRotate, setAutoRotateSpeed, setDampingFactor, setEnabled, setMaxDistance, setMaxPolarAngle, setMinDistance, setMinPolarAngle, setTarget, update)
 import Three.Controls.OrbitControls as OrbitControls
-import Three.Core.Camera (PerspectiveCamera, mkPerspectiveCamera, setAspect, updateProjectionMatrix)
+import Three.Core.Camera (PerspectiveCamera, Camera, mkPerspectiveCamera, setAspect, updateProjectionMatrix)
 import Three.Core.Light (mkAmbientLight, mkDirectionalLight)
 import Three.Core.Object3D (Object3D, add, hasParent, lookAt, mkObject3D, parent, position, rotateOnWorldAxis, rotateZ, setDefaultUp, setName, setPosition, translateX, translateY, worldToLocal)
 import Three.Core.Scene (disposeScene, mkScene)
 import Three.Core.WebGLRenderer (domElement, mkWebGLRenderer, render, setSize)
+import Three.Helper.AxesHelper (mkAxesHelper)
 import Three.Math.Vector (length, mkVec3, multiplyScalar, normal, vecX, vecY)
 import Web.DOM (Element)
 import Web.DOM.Element (toNode)
@@ -46,6 +47,11 @@ capVal :: Number -> Number -> Number -> Number
 capVal bot top v | v < bot = bot
                  | v > top = top
                  | otherwise = v
+
+setupCameraPos :: forall a. Camera a -> Effect Unit
+setupCameraPos camera = do
+    setPosition (mkVec3 0.0 (-40.0) 20.0) camera
+    lookAt (mkVec3 0.0 0.0 0.0) camera
 
 zoomCamera :: forall a. PerspectiveCamera a -> Number -> Effect Number
 zoomCamera camera zoom = do
@@ -106,8 +112,7 @@ createScene sizeDyn modeDyn elem = do
     _ <- appendChild (toNode $ domElement renderer) (toNode elem)
 
     -- set the camera position and orient it toward the center
-    setPosition (mkVec3 0.0 (-40.0) 20.0) camera
-    lookAt (mkVec3 0.0 0.0 0.0) camera
+    setupCameraPos camera
 
     let cameraDefDist = length (position camera)
 
@@ -118,7 +123,9 @@ createScene sizeDyn modeDyn elem = do
     let isShowing = (==) Showing <$> modeDyn
         canEdit = not <$> isShowing
 
-    d4 <- subscribeDyn isShowing (flip setEnabled orbitCtrl)
+    d4 <- subscribeDyn isShowing $ \s -> do
+             when (not s) $ setupCameraPos camera
+             setEnabled s orbitCtrl
 
     -- add ambient light
     ambientLight <- mkAmbientLight 0xffffff
