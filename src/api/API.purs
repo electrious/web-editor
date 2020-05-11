@@ -6,6 +6,7 @@ import Axios (Header(..), Method, baseUrl, genericAxios, headers, method)
 import Control.Monad.Except (runExcept, throwError)
 import Control.Monad.Reader (class MonadAsk, ReaderT, ask, runReaderT)
 import Data.Array as Array
+import Data.Default (class Default)
 import Data.Either (Either(..), fromRight, isRight)
 import Data.Filterable (filter)
 import Data.Generic.Rep (class Generic)
@@ -13,7 +14,7 @@ import Data.Lens (Lens', (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List.NonEmpty (singleton)
-import Data.Maybe (Maybe, fromMaybe)
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Effect (Effect)
@@ -48,6 +49,12 @@ derive instance genericAPIConfig :: Generic APIConfig _
 instance decodeAPIConfig :: Decode APIConfig where
     decode = genericDecode (defaultOptions { unwrapSingleConstructors = true })
 
+instance defaultAPIConfig :: Default APIConfig where
+    def = APIConfig {
+        auth    : "",
+        xUserId : Nothing,
+        baseUrl : ""
+    }
 _auth :: Lens' APIConfig String
 _auth = _Newtype <<< prop (SProxy :: SProxy "auth")
 

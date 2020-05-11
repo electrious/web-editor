@@ -2,13 +2,14 @@ module Editor.WebEditor where
 
 import Prelude
 
+import API (API, APIConfig, runAPI)
 import Control.Monad.Reader (class MonadAsk, class MonadReader, ReaderT, ask, runReaderT)
 import Control.Monad.State (class MonadState, StateT, get, modify_, runStateT)
 import Control.Plus (empty)
 import Data.Array (cons)
 import Data.Default (class Default, def)
 import Data.Foldable (sequence_)
-import Data.Lens (Lens', (%~), (^.))
+import Data.Lens (Lens', view, (%~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..))
@@ -18,7 +19,7 @@ import Data.Tuple (Tuple, fst)
 import Editor.Common.Lenses (_disposable)
 import Editor.Disposable (class Disposable)
 import Editor.EditorMode (EditorMode(..))
-import Editor.SceneEvent (Size, calcPosition, size)
+import Editor.SceneEvent (Size, size)
 import Effect (Effect)
 import Effect.Class (class MonadEffect, liftEffect)
 import FRP.Dynamic (Dynamic, current, dynEvent, step)
@@ -40,7 +41,8 @@ newtype EditorConfig = EditorConfig {
     dataServer  :: String,
     textureInfo :: PanelTextureInfo,
     panelType   :: Dynamic PanelType,
-    rackingType :: Dynamic RackingType
+    rackingType :: Dynamic RackingType,
+    apiConfig   :: APIConfig
 }
 
 derive instance newtypeEditorConfig :: Newtype EditorConfig _
@@ -55,7 +57,8 @@ instance defaultEditorConfig :: Default EditorConfig where
         dataServer  : "",
         textureInfo : def,
         panelType   : step Standard empty,
-        rackingType : step XR10 empty
+        rackingType : step XR10 empty,
+        apiConfig   : def
     }
 
 _elem :: Lens' EditorConfig (Maybe Element)
@@ -75,6 +78,9 @@ _panels = _Newtype <<< prop (SProxy :: SProxy "panels")
 
 _dataServer :: Lens' EditorConfig String
 _dataServer = _Newtype <<< prop (SProxy :: SProxy "dataServer")
+
+_apiConfig :: Lens' EditorConfig APIConfig
+_apiConfig = _Newtype <<< prop (SProxy :: SProxy "apiConfig")
 
 -- | Public interface for the main WebEditor
 newtype WebEditorState = WebEditorState {
@@ -129,3 +135,6 @@ performEditorDyn d = do
 
 addDisposable :: Effect Unit -> WebEditor Unit
 addDisposable d = modify_ (\s -> s # _disposable %~ (cons d))
+
+runAPIInEditor :: forall a. API a -> WebEditor a
+runAPIInEditor api = ask >>= view _apiConfig >>> runAPI api >>> liftEffect
