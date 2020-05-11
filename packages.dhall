@@ -132,7 +132,7 @@ let additions =
       , event-extra =
         { dependencies = [ "event" ]
         , repo = "https://github.com/manyoo/event-extra.git"
-        , version = "v0.1.3"
+        , version = "v0.1.5"
         }
       }
 

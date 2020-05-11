@@ -12,10 +12,9 @@ import Editor.EditorMode (EditorMode(..))
 import Editor.Input (DragEvent, setupInput)
 import Editor.SceneEvent (Size, _dragEvent, setupRaycasting)
 import Effect (Effect)
-import Effect.Class.Console (logShow)
-import FRP.Dynamic (Dynamic, current, debugDyn, gateDyn, subscribeDyn)
-import FRP.Event (Event, makeEvent, sampleOn, subscribe)
-import FRP.Event.Extra (debugWith, performEvent)
+import FRP.Dynamic (Dynamic, gateDyn, subscribeDyn)
+import FRP.Event (sampleOn, subscribe)
+import FRP.Event.Extra (performEvent)
 import Math.Angle (degree, radianVal)
 import Three.Controls.OrbitControls (OrbitControls, enableDamping, enableZoom, isEnabled, mkOrbitControls, setAutoRotate, setAutoRotateSpeed, setDampingFactor, setEnabled, setMaxDistance, setMaxPolarAngle, setMinDistance, setMinPolarAngle, setTarget, update)
 import Three.Controls.OrbitControls as OrbitControls
@@ -161,12 +160,10 @@ createScene sizeDyn modeDyn elem = do
     let shiftDragEvt = performEvent $ sampleOn scaleEvt $ moveWithShiftDrag content <$> gateDyn canEdit (inputEvts ^. _shiftDragged) 
     d3 <- subscribe shiftDragEvt (const $ pure unit)
 
-    d5 <- subscribeDyn canEdit (const $ pure unit)
-
     pure $ EditorScene {
         render     : renderFunc,
         addContent : addContentFunc,
-        disposable : sequence_ [d1, d2, d3, d4, d5, disposeScene scene, dispose rcs, OrbitControls.dispose orbitCtrl]
+        disposable : sequence_ [d1, d2, d3, d4, disposeScene scene, dispose rcs, OrbitControls.dispose orbitCtrl]
     }
 
 -- | renderLoop is the function to render scene repeatedly
