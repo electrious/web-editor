@@ -134,6 +134,11 @@ let additions =
         , repo = "https://github.com/manyoo/event-extra.git"
         , version = "v0.1.5"
         }
+      , axios =
+        { dependencies = [ "prelude", "effect", "aff", "foreign-generic" ]
+        , repo = "https://github.com/iarthstar/purescript-axios.git"
+        , version = "v1.1.2"
+        }
       }
 
 in  upstream // overrides // additions
