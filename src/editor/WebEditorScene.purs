@@ -6,13 +6,15 @@ import Data.Foldable (sequence_)
 import Data.Int (toNumber)
 import Data.Lens ((^.))
 import Data.Newtype (class Newtype)
-import Editor.Common.Lenses (_deltaX, _deltaY, _height, _shiftDragged, _width, _zoomed)
+import Data.Tuple (Tuple(..))
+import Editor.Common.Lenses (_deltaX, _deltaY, _height, _shiftDragged, _width, _y, _zoomed)
 import Editor.Disposable (class Disposable, dispose)
 import Editor.EditorMode (EditorMode(..))
 import Editor.Input (DragEvent, setupInput)
 import Editor.SceneEvent (Size, _dragEvent, setupRaycasting)
 import Effect (Effect)
-import FRP.Dynamic (Dynamic, gateDyn, subscribeDyn)
+import Effect.Class.Console (logShow)
+import FRP.Dynamic (Dynamic, gateDyn, sampleDyn, subscribeDyn)
 import FRP.Event (sampleOn, subscribe)
 import FRP.Event.Extra (performEvent)
 import Math.Angle (degree, radianVal)
@@ -23,7 +25,6 @@ import Three.Core.Light (mkAmbientLight, mkDirectionalLight)
 import Three.Core.Object3D (Object3D, add, hasParent, lookAt, mkObject3D, parent, position, rotateOnWorldAxis, rotateZ, setDefaultUp, setName, setPosition, translateX, translateY, worldToLocal)
 import Three.Core.Scene (disposeScene, mkScene)
 import Three.Core.WebGLRenderer (domElement, mkWebGLRenderer, render, setSize)
-import Three.Helper.AxesHelper (mkAxesHelper)
 import Three.Math.Vector (length, mkVec3, multiplyScalar, normal, vecX, vecY)
 import Web.DOM (Element)
 import Web.DOM.Element (toNode)
@@ -63,9 +64,12 @@ zoomCamera camera zoom = do
     pure newDist
 
 
-rotateContentWithDrag :: forall a. Object3D a -> DragEvent -> Effect Unit
-rotateContentWithDrag obj drag = do
-    rotateZ ((drag ^. _deltaX) / 360.0) obj
+rotateContentWithDrag :: forall a. Object3D a -> Tuple DragEvent Size -> Effect Unit
+rotateContentWithDrag obj (Tuple drag size) = do
+    let dx = if drag ^. _y < (toNumber $ size ^. _height) / 2.0
+             then - (drag ^. _deltaX) / 360.0
+             else (drag ^. _deltaX) / 360.0
+    rotateZ dx obj
     rotateOnWorldAxis (mkVec3 1.0 0.0 0.0) ((drag ^. _deltaY) / 360.0) obj
 
 moveWithShiftDrag :: forall a. Object3D a -> DragEvent -> Number -> Effect Unit
@@ -162,7 +166,8 @@ createScene sizeDyn modeDyn elem = do
     
     rcs <- setupRaycasting camera scene inputEvts sizeDyn
 
-    d2 <- subscribe (gateDyn canEdit $ rcs ^. _dragEvent) (rotateContentWithDrag rotWrapper)
+    let dragEvtWithSize = sampleDyn sizeDyn $ Tuple <$> gateDyn canEdit (rcs ^. _dragEvent)
+    d2 <- subscribe dragEvtWithSize (rotateContentWithDrag rotWrapper)
 
     let shiftDragEvt = performEvent $ sampleOn scaleEvt $ moveWithShiftDrag content <$> gateDyn canEdit (inputEvts ^. _shiftDragged) 
     d3 <- subscribe shiftDragEvt (const $ pure unit)
