@@ -72,8 +72,8 @@ doTest roofDat panelDat = do
                                    # _panelType   .~ panelType
                                    # _textureInfo .~ textures
                                    # _apiConfig   .~ apiCfg
-                editor <- runEditorM cfg createEditor
-                res <- traverse (runHouseEditor houseCfg <<< loadHouse) editor
+                editor <- runEditorM createEditor cfg
+                res <- traverse (flip runHouseEditor houseCfg <<< loadHouse) editor
 
                 case res of
                     Just evt -> void $ subscribe evt logShow

@@ -49,5 +49,5 @@ derive newtype instance monadEffectEditorM :: MonadEffect EditorM
 derive newtype instance monadAskEditorM    :: MonadAsk EditorConfig EditorM
 derive newtype instance monadReaderEditorM :: MonadReader EditorConfig EditorM
 
-runEditorM :: forall a. EditorConfig -> EditorM a -> Effect a
-runEditorM cfg (EditorM editor) = runReaderT editor cfg
+runEditorM :: forall a. EditorM a -> EditorConfig -> Effect a
+runEditorM (EditorM editor) = runReaderT editor

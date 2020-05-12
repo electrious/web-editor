@@ -71,21 +71,21 @@ derive newtype instance monadEffectHouseEditor :: MonadEffect HouseEditor
 derive newtype instance monadAskHouseEditor    :: MonadAsk HouseConfig HouseEditor
 derive newtype instance monadReaderHouseEditor :: MonadReader HouseConfig HouseEditor
 
-runHouseEditor :: forall a. HouseConfig -> HouseEditor a -> Effect a
-runHouseEditor cfg (HouseEditor e) = runReaderT e cfg
+runHouseEditor :: forall a. HouseEditor a -> HouseConfig -> Effect a
+runHouseEditor (HouseEditor e) = runReaderT e
 
 performEditorEvent :: forall a. Event (HouseEditor a) -> HouseEditor (Event a)
 performEditorEvent e = do
     cfg <- ask
-    pure $ makeEvent \k -> subscribe e (\v -> runHouseEditor cfg v >>= k)
+    pure $ makeEvent \k -> subscribe e (\v -> runHouseEditor v cfg >>= k)
 
 performEditorDyn :: forall a. Dynamic (HouseEditor a) -> HouseEditor (Dynamic a)
 performEditorDyn d = do
     cfg <- ask
 
     curV <- liftEffect $ current d
-    def <- liftEffect $ runHouseEditor cfg curV
-    let evt = makeEvent \k -> subscribe (dynEvent d) \v -> runHouseEditor cfg v >>= k
+    def <- liftEffect $ runHouseEditor curV cfg
+    let evt = makeEvent \k -> subscribe (dynEvent d) \v -> runHouseEditor v cfg >>= k
     pure $ step def evt
 
 runAPIInEditor :: forall a. API a -> HouseEditor a
