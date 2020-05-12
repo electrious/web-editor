@@ -9,12 +9,13 @@ import Data.Default (def)
 import Data.Either (Either(..))
 import Data.Lens ((.~))
 import Data.Maybe (Maybe(..))
-import Data.Tuple (fst)
-import Editor.Common.Lenses (_leadId, _houseId, _panelType, _textureInfo)
-import Editor.Editor (createEditor)
+import Data.Traversable (traverse)
+import Editor.Common.Lenses (_houseId, _leadId, _modeDyn, _panelType, _textureInfo)
+import Editor.Editor (createEditor, loadHouse)
+import Editor.EditorM (_elem, _sizeDyn, runEditorM)
 import Editor.EditorMode (EditorMode(..))
+import Editor.HouseEditor (_apiConfig, _dataServer, _panels, _roofPlates, runHouseEditor)
 import Editor.SceneEvent (size)
-import Editor.WebEditor (_apiConfig, _dataServer, _elem, _modeDyn, _panels, _roofPlates, _sizeDyn, runWebEditor)
 import Effect (Effect)
 import Effect.Class.Console (logShow)
 import FRP.Dynamic (step)
@@ -59,18 +60,23 @@ doTest roofDat panelDat = do
                                  # _baseUrl .~ "https://api.electrious.com/v1"
 
                     cfg = def # _elem       .~ elem
-                              # _houseId    .~ 4
-                              # _leadId     .~ 296285
-                              # _roofPlates .~ roofs
-                              # _panels     .~ panels
-                              # _dataServer .~ serverUrl
                               # _modeDyn    .~ modeDyn
                               # _sizeDyn    .~ sizeDyn
-                              # _panelType  .~ panelType
-                              # _textureInfo .~ textures
-                              # _apiConfig  .~ apiCfg
-                res <- runWebEditor cfg createEditor
-                
-                _ <- subscribe (fst res) logShow
+                    
+                    houseCfg = def # _modeDyn     .~ modeDyn
+                                   # _houseId     .~ 4
+                                   # _leadId      .~ 296285
+                                   # _roofPlates  .~ roofs
+                                   # _panels      .~ panels
+                                   # _dataServer  .~ serverUrl
+                                   # _panelType   .~ panelType
+                                   # _textureInfo .~ textures
+                                   # _apiConfig   .~ apiCfg
+                editor <- runEditorM cfg createEditor
+                res <- traverse (runHouseEditor houseCfg <<< loadHouse) editor
+
+                case res of
+                    Just evt -> void $ subscribe evt logShow
+                    Nothing -> pure unit
 
                 pure unit

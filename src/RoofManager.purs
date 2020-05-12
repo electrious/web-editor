@@ -21,13 +21,13 @@ import Data.Symbol (SProxy(..))
 import Data.Time.Duration (Milliseconds(..))
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import Editor.Common.Lenses (_disposable, _geometry, _id, _mesh, _mouseMove, _roofId, _roofs, _slope, _tapped, _verticeTree, _wrapper)
+import Editor.Common.Lenses (_disposable, _geometry, _id, _mesh, _modeDyn, _mouseMove, _roofId, _roofs, _slope, _tapped, _verticeTree, _wrapper)
 import Editor.Disposable (class Disposable, dispose)
 import Editor.EditorMode (EditorMode(..))
 import Editor.House (HouseMeshData)
+import Editor.HouseEditor (HouseEditor, _panels, _roofPlates, performEditorEvent)
 import Editor.RoofNode (RoofNode, _roofDelete, _roofObject, _roofUpdate, createRoofNode)
 import Editor.RoofRecognizer (RoofRecognizer, _addedNewRoof, _marker, createRoofRecognizer)
-import Editor.WebEditor (WebEditor, _modeDyn, _panels, _roofPlates, performEditorEvent)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic, step)
@@ -119,7 +119,7 @@ createWrapper = do
     pure wrapper
 
 -- | function to create roof node
-mkNode :: forall a. Event (Maybe String) -> PanelsDict -> Map Int OldRoofRackingData -> RoofPlate -> WebEditor (RoofNode a)
+mkNode :: forall a. Event (Maybe String) -> PanelsDict -> Map Int OldRoofRackingData -> RoofPlate -> HouseEditor (RoofNode a)
 mkNode activeRoof panelsDict racks roof = createRoofNode roof rackType ps (step false $ multicast $ (==) (Just (roof ^. _id)) <$> activeRoof)
     where ps = zeroSlope <$> fromMaybe [] (lookup (roof ^. _id) panelsDict)
           -- make sure slope value in panels on non-flat roof is set to zero
@@ -142,7 +142,7 @@ renderNodes wrapper { last, now } = do
     pure now
 
 -- | render dynamic roofs
-renderRoofs :: forall a b. Object3D a -> Event (Maybe String) -> Event RoofDictData -> PanelsDict -> Map Int OldRoofRackingData -> WebEditor (Event (Array (RoofNode b)))
+renderRoofs :: forall a b. Object3D a -> Event (Maybe String) -> Event RoofDictData -> PanelsDict -> Map Int OldRoofRackingData -> HouseEditor (Event (Array (RoofNode b)))
 renderRoofs wrapper activeRoof roofsData panelsDict racks = do
     let rsToRender = compact $ view _roofsToRender <$> roofsData
         rsToRenderArr = dictToArr <$> rsToRender
@@ -151,7 +151,7 @@ renderRoofs wrapper activeRoof roofsData panelsDict racks = do
     nodes <- performEditorEvent $ traverse (mkNode activeRoof panelsDict racks) <$> rsToRenderArr
     pure $ multicast $ performEvent $ renderNodes wrapper <$> withLast nodes
 
-isRoofEditing :: WebEditor (Dynamic Boolean)
+isRoofEditing :: HouseEditor (Dynamic Boolean)
 isRoofEditing = map ((==) RoofEditing) <<< view _modeDyn <$> ask
 
 -- | function to add the roof recognizer and recognize new roofs
@@ -174,7 +174,7 @@ getActiveRoof meshData activated deleteRoofOp addedNewRoof =
                 (delay 1 $ Just <<< view _id <$> addedNewRoof)
 
 -- | create RoofManager for an array of roofs
-createRoofManager :: forall a b. HouseMeshData a -> Map Int OldRoofRackingData -> WebEditor (RoofManager b)
+createRoofManager :: forall a b. HouseMeshData a -> Map Int OldRoofRackingData -> HouseEditor (RoofManager b)
 createRoofManager meshData racks = do
     wrapper <- liftEffect createWrapper
 

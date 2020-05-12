@@ -10,7 +10,7 @@ import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Editor.Common.Lenses (_panelType, _textureInfo)
-import Editor.WebEditor (WebEditor)
+import Editor.HouseEditor (HouseEditor)
 import Effect (Effect)
 import Effect.Class (class MonadEffect, liftEffect)
 import FRP.Dynamic (Dynamic, step)
@@ -43,7 +43,7 @@ derive newtype instance monadAskArrayBuilder :: MonadAsk ArrayBuilderEnv ArrayBu
 derive newtype instance monadReaderArrayBuilder :: MonadReader ArrayBuilderEnv ArrayBuilder
 derive newtype instance monadEffectArrayBuilder :: MonadEffect ArrayBuilder
 
-runArrayBuilder :: forall a. RackingType -> ArrayBuilder a -> WebEditor a
+runArrayBuilder :: forall a. RackingType -> ArrayBuilder a -> HouseEditor a
 runArrayBuilder rt (ArrayBuilder b) = do
     texture <- view _textureInfo <$> ask
     pt <- view _panelType <$> ask

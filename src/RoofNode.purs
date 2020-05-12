@@ -14,13 +14,13 @@ import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (sequence_, traverse, traverse_)
 import Editor.ArrayBuilder (runArrayBuilder)
-import Editor.Common.Lenses (_center, _id, _mesh, _slope, _tapped, _wrapper)
+import Editor.Common.Lenses (_center, _id, _mesh, _modeDyn, _slope, _tapped, _wrapper)
 import Editor.Disposable (class Disposable, dispose)
 import Editor.EditorMode (EditorMode(..))
+import Editor.HouseEditor (HouseEditor, performEditorDyn)
 import Editor.PanelLayer (createPanelLayer)
 import Editor.RoofEditor (_deleteRoof, _roofVertices, createRoofEditor)
 import Editor.SceneEvent (SceneTapEvent)
-import Editor.WebEditor (WebEditor, _modeDyn, performEditorDyn)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import Effect.Timer (setTimeout)
@@ -158,7 +158,7 @@ getNewRoof obj roof newVertices = do
     let toParent v = applyMatrix (matrix obj) (mkVec3 (vecX v) (vecY v) 0.0)
     pure $ (RoofOpUpdate <<< flip updateRoofPlate roof <<< map toParent) <$> newVertices
 
-renderPanels :: forall a. Object3D a -> RackingType -> Array Panel -> Dynamic EditorMode -> WebEditor (Effect Unit)
+renderPanels :: forall a. Object3D a -> RackingType -> Array Panel -> Dynamic EditorMode -> HouseEditor (Effect Unit)
 renderPanels content rackType panels modeDyn = do
     -- don't build the panel layer when it's roof editing mode
     let builder RoofEditing = pure Nothing
@@ -171,7 +171,7 @@ renderPanels content rackType panels modeDyn = do
     liftEffect $ subscribeDyn (withLast panelLayerDyn) render
 
 -- | Create RoofNode for a RoofPlate
-createRoofNode :: forall a. RoofPlate -> RackingType -> Array Panel -> Dynamic Boolean -> WebEditor (RoofNode a)
+createRoofNode :: forall a. RoofPlate -> RackingType -> Array Panel -> Dynamic Boolean -> HouseEditor (RoofNode a)
 createRoofNode roof rackType panels isActive = do
     obj <- liftEffect $ mkNode "roofplate"
     content <- liftEffect $ mkNode "roof-content"

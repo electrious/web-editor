@@ -145,3 +145,6 @@ _rafterSpacing = _Newtype <<< prop (SProxy :: SProxy "rafterSpacing")
 
 _roofRackings :: forall t a r. Newtype t { roofRackings :: a | r } => Lens' t a
 _roofRackings = _Newtype <<< prop (SProxy :: SProxy "roofRackings")
+
+_modeDyn :: forall t a r. Newtype t { modeDyn :: a | r } => Lens' t a
+_modeDyn = _Newtype <<< prop (SProxy :: SProxy "modeDyn")

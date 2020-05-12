@@ -1,139 +1,196 @@
 module Editor.WebEditor where
 
-import Prelude
+import Prelude hiding (add,degree)
 
-import API (API, APIConfig, runAPI)
-import Control.Monad.Reader (class MonadAsk, class MonadReader, ReaderT, ask, runReaderT)
-import Control.Monad.State (class MonadState, StateT, get, modify_, runStateT)
-import Control.Plus (empty)
 import Data.Array (cons)
-import Data.Default (class Default, def)
 import Data.Foldable (sequence_)
-import Data.Lens (Lens', view, (%~), (^.))
-import Data.Lens.Iso.Newtype (_Newtype)
-import Data.Lens.Record (prop)
-import Data.Maybe (Maybe(..))
+import Data.Int (toNumber)
+import Data.Lens ((^.))
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
-import Data.Tuple (Tuple, fst)
-import Editor.Common.Lenses (_disposable)
-import Editor.Disposable (class Disposable)
+import Data.Tuple (Tuple(..))
+import Editor.Common.Lenses (_deltaX, _deltaY, _height, _shiftDragged, _width, _y, _zoomed)
+import Editor.Disposable (class Disposable, dispose)
 import Editor.EditorMode (EditorMode(..))
-import Editor.SceneEvent (Size, size)
+import Editor.Input (DragEvent, setupInput)
+import Editor.SceneEvent (Size, _dragEvent, setupRaycasting)
 import Effect (Effect)
-import Effect.Class (class MonadEffect, liftEffect)
-import FRP.Dynamic (Dynamic, current, dynEvent, step)
-import FRP.Event (Event, makeEvent, subscribe)
-import Model.Hardware.PanelTextureInfo (PanelTextureInfo)
-import Model.Hardware.PanelType (PanelType(..))
-import Model.Roof.Panel (Panel)
-import Model.Roof.RoofPlate (RoofPlate)
+import Effect.Ref (Ref, modify, new, read)
+import FRP.Dynamic (Dynamic, gateDyn, sampleDyn, step, subscribeDyn)
+import FRP.Event (subscribe)
+import FRP.Event.Extra (performEvent)
+import Math.Angle (degree, radianVal)
+import Three.Controls.OrbitControls (OrbitControls, enableDamping, enableZoom, isEnabled, mkOrbitControls, setAutoRotate, setAutoRotateSpeed, setDampingFactor, setEnabled, setMaxDistance, setMaxPolarAngle, setMinDistance, setMinPolarAngle, setTarget, update)
+import Three.Controls.OrbitControls as OrbitControls
+import Three.Core.Camera (PerspectiveCamera, Camera, mkPerspectiveCamera, setAspect, updateProjectionMatrix)
+import Three.Core.Light (mkAmbientLight, mkDirectionalLight)
+import Three.Core.Object3D (Object3D, add, hasParent, lookAt, mkObject3D, parent, position, rotateOnWorldAxis, rotateZ, setDefaultUp, setName, setPosition, translateX, translateY, worldToLocal)
+import Three.Core.Scene (disposeScene, mkScene)
+import Three.Core.WebGLRenderer (domElement, mkWebGLRenderer, render, setSize)
+import Three.Math.Vector (length, mkVec3, multiplyScalar, normal, vecX, vecY)
 import Web.DOM (Element)
+import Web.DOM.Element (toNode)
+import Web.DOM.Node (appendChild)
+import Web.HTML (Window)
+import Web.HTML.Window (requestAnimationFrame)
+import Web.UIEvent.WheelEvent (deltaY)
 
-newtype EditorConfig = EditorConfig {
-    elem        :: Maybe Element,
-    sizeDyn     :: Dynamic Size,
-    modeDyn     :: Dynamic EditorMode,
-    leadId      :: Int,
-    houseId     :: Int,
-    roofPlates  :: Array RoofPlate,
-    panels      :: Array Panel,
-    dataServer  :: String,
-    textureInfo :: PanelTextureInfo,
-    panelType   :: Dynamic PanelType,
-    apiConfig   :: APIConfig
+-- | internal record that defines all components for threejs related objects
+newtype WebEditor a = WebEditor {
+    render     :: Effect Unit,
+    addContent :: Object3D a -> Effect Unit,
+    disposable :: Ref (Array (Effect Unit))
 }
 
-derive instance newtypeEditorConfig :: Newtype EditorConfig _
-instance defaultEditorConfig :: Default EditorConfig where
-    def = EditorConfig {
-        elem        : Nothing,
-        sizeDyn     : step (size 800 600) empty,
-        modeDyn     : step Showing empty,
-        leadId      : 0,
-        houseId     : 0,
-        roofPlates  : [],
-        panels      : [],
-        dataServer  : "",
-        textureInfo : def,
-        panelType   : step Standard empty,
-        apiConfig   : def
+derive instance newtypeEditorScene :: Newtype (WebEditor a) _
+instance disposableEditorScene :: Disposable (WebEditor a) where
+    dispose (WebEditor { disposable }) = read disposable >>= sequence_
+
+addToScene :: forall a. Object3D a -> WebEditor a -> Effect Unit
+addToScene obj (WebEditor s) = s.addContent obj
+
+renderScene :: forall a. WebEditor a -> Effect Unit
+renderScene (WebEditor s) = s.render
+
+addDisposable :: forall a. Effect Unit -> WebEditor a -> Effect Unit
+addDisposable d (WebEditor e) = void $ modify (cons d) e.disposable
+
+capVal :: Number -> Number -> Number -> Number
+capVal bot top v | v < bot = bot
+                 | v > top = top
+                 | otherwise = v
+
+setupCameraPos :: forall a. Camera a -> Effect Unit
+setupCameraPos camera = do
+    setPosition (mkVec3 0.0 (-40.0) 20.0) camera
+    lookAt (mkVec3 0.0 0.0 0.0) camera
+
+zoomCamera :: forall a. PerspectiveCamera a -> Number -> Effect Number
+zoomCamera camera zoom = do
+    let pos = position camera
+        curDist = length pos
+        newDist = capVal 5.0 500.0 (curDist + zoom)
+        newPos = multiplyScalar (normal pos) newDist
+    setPosition newPos camera
+    pure newDist
+
+
+rotateContentWithDrag :: forall a. Object3D a -> Tuple DragEvent Size -> Effect Unit
+rotateContentWithDrag obj (Tuple drag size) = do
+    let dx = if drag ^. _y < (toNumber $ size ^. _height) / 2.0
+             then - (drag ^. _deltaX) / 360.0
+             else (drag ^. _deltaX) / 360.0
+    rotateZ dx obj
+    rotateOnWorldAxis (mkVec3 1.0 0.0 0.0) ((drag ^. _deltaY) / 360.0) obj
+
+moveWithShiftDrag :: forall a. Object3D a -> DragEvent -> Number -> Effect Unit
+moveWithShiftDrag obj drag scale | not (hasParent obj) = pure unit
+                                 | otherwise = do
+                                    let p = parent obj
+                                        vec = mkVec3 (drag ^. _deltaX) (- (drag ^. _deltaY)) 0.0
+                                    lVec <- worldToLocal vec p
+                                    translateX (vecX lVec * scale / 10.0) obj
+                                    translateY (vecY lVec * scale / 10.0) obj
+
+setupOrbitControls :: OrbitControls -> Effect Unit
+setupOrbitControls c = do
+    setAutoRotate true c
+    setAutoRotateSpeed 0.5 c
+    enableDamping true c
+    setDampingFactor 0.1 c
+    enableZoom true c
+    setMinPolarAngle (radianVal $ degree 10.0) c
+    setMaxPolarAngle (radianVal $ degree 50.0) c
+    setMinDistance 15.0 c
+    setMaxDistance 35.0 c
+    setTarget (mkVec3 0.0 0.0 (-5.0)) c
+
+-- | internal function to create the threejs scene, camera, light and renderer
+createScene :: forall a. Dynamic Size -> Dynamic EditorMode -> Element -> Effect (WebEditor a)
+createScene sizeDyn modeDyn elem = do
+    -- set the default Up direction as z axis in the scene
+    setDefaultUp (mkVec3 0.0 0.0 1.0)
+
+    scene    <- mkScene
+    camera   <- mkPerspectiveCamera 45.0 (800.0 / 600.0) 0.1 1000.0
+    renderer <- mkWebGLRenderer
+
+    -- function to update camera and renderer when resized
+    let resized s = do
+            setAspect (toNumber (s ^. _width) / toNumber (s ^. _height)) camera
+            updateProjectionMatrix camera
+            setSize (s ^. _width) (s ^. _height) renderer
+    
+    d1 <- subscribeDyn sizeDyn resized
+
+    -- attach the webgl canvas to parent DOM element
+    _ <- appendChild (toNode $ domElement renderer) (toNode elem)
+
+    -- set the camera position and orient it toward the center
+    setupCameraPos camera
+
+    let cameraDefDist = length (position camera)
+
+    -- setup the orbit controls
+    orbitCtrl <- mkOrbitControls camera (domElement renderer)
+    setupOrbitControls orbitCtrl
+
+    let isShowing = (==) Showing <$> modeDyn
+        canEdit = not <$> isShowing
+
+    d4 <- subscribeDyn isShowing $ \s -> do
+             when (not s) $ setupCameraPos camera
+             setEnabled s orbitCtrl
+
+    -- add ambient light
+    ambientLight <- mkAmbientLight 0xffffff
+    setName "ambient-light" ambientLight
+    add ambientLight scene
+
+    -- add a directional light
+    dirLight <- mkDirectionalLight 0xeeeeee 0.5
+    setName "directional-light" dirLight
+    setPosition (mkVec3 100.0 0.0 100.0) dirLight
+    add dirLight scene
+
+    -- add a wrapper object that's used only to rotate the scene around
+    rotWrapper <- mkObject3D
+    setName "rotate-wrapper" rotWrapper
+    add rotWrapper scene
+
+    -- add a wrapper object to be parent of all user contents
+    content <- mkObject3D
+    setName "scene-content" content
+    add content rotWrapper
+
+    -- function to update renderring of the webgl scene
+    let renderFunc = do
+            render scene camera renderer
+            when (isEnabled orbitCtrl) $ update orbitCtrl
+
+        addContentFunc c = add c content
+    
+        inputEvts = setupInput (domElement renderer)
+    
+        newDistEvt = performEvent $ (zoomCamera camera <<< deltaY) <$> (gateDyn canEdit $ inputEvts ^. _zoomed)
+        scaleEvt = (\d -> d / cameraDefDist) <$> newDistEvt
+        scaleDyn = step 1.0 scaleEvt
+    rcs <- setupRaycasting camera scene inputEvts sizeDyn
+
+    let dragEvtWithSize = sampleDyn sizeDyn $ Tuple <$> gateDyn canEdit (rcs ^. _dragEvent)
+    d2 <- subscribe dragEvtWithSize (rotateContentWithDrag rotWrapper)
+
+    let shiftDragEvt = performEvent $ sampleDyn scaleDyn $ moveWithShiftDrag content <$> gateDyn canEdit (inputEvts ^. _shiftDragged) 
+    d3 <- subscribe shiftDragEvt (const $ pure unit)
+
+    disposable <- new [d1, d2, d3, d4, disposeScene scene, dispose rcs, OrbitControls.dispose orbitCtrl]
+    pure $ WebEditor {
+        render     : renderFunc,
+        addContent : addContentFunc,
+        disposable : disposable
     }
 
-_elem :: Lens' EditorConfig (Maybe Element)
-_elem = _Newtype <<< prop (SProxy :: SProxy "elem")
-
-_sizeDyn :: Lens' EditorConfig (Dynamic Size)
-_sizeDyn = _Newtype <<< prop (SProxy :: SProxy "sizeDyn")
-
-_modeDyn :: Lens' EditorConfig (Dynamic EditorMode)
-_modeDyn = _Newtype <<< prop (SProxy :: SProxy "modeDyn")
-
-_roofPlates :: Lens' EditorConfig (Array RoofPlate)
-_roofPlates = _Newtype <<< prop (SProxy :: SProxy "roofPlates")
-
-_panels :: Lens' EditorConfig (Array Panel)
-_panels = _Newtype <<< prop (SProxy :: SProxy "panels")
-
-_dataServer :: Lens' EditorConfig String
-_dataServer = _Newtype <<< prop (SProxy :: SProxy "dataServer")
-
-_apiConfig :: Lens' EditorConfig APIConfig
-_apiConfig = _Newtype <<< prop (SProxy :: SProxy "apiConfig")
-
--- | Public interface for the main WebEditor
-newtype WebEditorState = WebEditorState {
-    disposable :: Array (Effect Unit)
-}
-
-derive instance newtypeWebEditorState :: Newtype WebEditorState _
-instance defaultWebEditorState :: Default WebEditorState where
-    def = WebEditorState {
-        disposable : []
-    }
-instance disposableEditorState :: Disposable WebEditorState where
-    dispose s = sequence_ $ s ^. _disposable
-
-newtype WebEditor a = WebEditor (ReaderT EditorConfig (StateT WebEditorState Effect) a)
-
-derive newtype instance functorWebEditor     :: Functor WebEditor
-derive newtype instance applyWebEditor       :: Apply WebEditor
-derive newtype instance applicativeWebEditor :: Applicative WebEditor
-derive newtype instance bindWebEditor        :: Bind WebEditor
-derive newtype instance monadWebEditor       :: Monad WebEditor
-derive newtype instance monadEffectWebEditor :: MonadEffect WebEditor
-derive newtype instance monadAskWebEditor    :: MonadAsk EditorConfig WebEditor
-derive newtype instance monadReaderWebEditor :: MonadReader EditorConfig WebEditor
-derive newtype instance monadStateWebEditor  :: MonadState WebEditorState WebEditor
-
-runWebEditor :: forall a. EditorConfig -> WebEditor a -> Effect (Tuple a WebEditorState)
-runWebEditor cfg editor = runWebEditor' cfg def editor
-
-runWebEditor' :: forall a. EditorConfig -> WebEditorState -> WebEditor a -> Effect (Tuple a WebEditorState)
-runWebEditor' cfg st (WebEditor editor) = runStateT (runReaderT editor cfg) st
-
-evalWebEditor' :: forall a. EditorConfig -> WebEditorState -> WebEditor a -> Effect a
-evalWebEditor' cfg st editor = fst <$> runWebEditor' cfg st editor
-
-performEditorEvent :: forall a. Event (WebEditor a) -> WebEditor (Event a)
-performEditorEvent e = do
-    cfg <- ask
-    st  <- get
-
-    pure $ makeEvent \k -> subscribe e (\v -> evalWebEditor' cfg st v >>= k)
-
-performEditorDyn :: forall a. Dynamic (WebEditor a) -> WebEditor (Dynamic a)
-performEditorDyn d = do
-    cfg <- ask
-    st  <- get
-
-    curV <- liftEffect $ current d
-    def <- liftEffect $ evalWebEditor' cfg st curV
-    let evt = makeEvent \k -> subscribe (dynEvent d) \v -> evalWebEditor' cfg st v >>= k
-    pure $ step def evt
-
-addDisposable :: Effect Unit -> WebEditor Unit
-addDisposable d = modify_ (\s -> s # _disposable %~ (cons d))
-
-runAPIInEditor :: forall a. API a -> WebEditor a
-runAPIInEditor api = ask >>= view _apiConfig >>> runAPI api >>> liftEffect
+-- | renderLoop is the function to render scene repeatedly
+renderLoop :: forall a. WebEditor a -> Window -> Effect Unit
+renderLoop scene w = do
+    _ <- requestAnimationFrame (renderLoop scene w) w
+    renderScene scene
