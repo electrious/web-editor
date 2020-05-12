@@ -34,8 +34,10 @@ import FRP.Dynamic (Dynamic, step)
 import FRP.Event (Event, create, fold, keepLatest, subscribe, withLast)
 import FRP.Event.Extra (debounce, delay, multicast, performEvent, skip)
 import Math.Angle (degree)
+import Model.Racking.OldRackingSystem (OldRoofRackingData, guessRackingType)
+import Model.Racking.RackingType (RackingType(..))
 import Model.Roof.Panel (Panel, _roofUUID)
-import Model.Roof.RoofPlate (RoofEdited, RoofOperation(..), RoofPlate, isFlat, toRoofEdited)
+import Model.Roof.RoofPlate (RoofEdited, RoofOperation(..), RoofPlate, _roofIntId, isFlat, toRoofEdited)
 import Three.Core.Object3D (Object3D, add, mkObject3D, remove, setName)
 
 newtype RoofManager a = RoofManager {
@@ -117,13 +119,14 @@ createWrapper = do
     pure wrapper
 
 -- | function to create roof node
-mkNode :: forall a. Event (Maybe String) -> PanelsDict -> RoofPlate -> WebEditor (RoofNode a)
-mkNode activeRoof panelsDict roof = createRoofNode roof ps (step false $ multicast $ (==) (Just (roof ^. _id)) <$> activeRoof)
+mkNode :: forall a. Event (Maybe String) -> PanelsDict -> Map Int OldRoofRackingData -> RoofPlate -> WebEditor (RoofNode a)
+mkNode activeRoof panelsDict racks roof = createRoofNode roof rackType ps (step false $ multicast $ (==) (Just (roof ^. _id)) <$> activeRoof)
     where ps = zeroSlope <$> fromMaybe [] (lookup (roof ^. _id) panelsDict)
           -- make sure slope value in panels on non-flat roof is set to zero
           zeroSlope p = if isFlat roof
                         then p
                         else p # _slope .~ degree 0.0
+          rackType = fromMaybe XR10 $ guessRackingType <$> lookup (roof ^. _roofIntId) racks
 
 -- helper function to delete and dispose an old roof node
 delOldNode :: forall a b. Object3D a -> RoofNode b -> Effect Unit
@@ -139,13 +142,13 @@ renderNodes wrapper { last, now } = do
     pure now
 
 -- | render dynamic roofs
-renderRoofs :: forall a b. Object3D a -> Event (Maybe String) -> Event RoofDictData -> PanelsDict -> WebEditor (Event (Array (RoofNode b)))
-renderRoofs wrapper activeRoof roofsData panelsDict = do
+renderRoofs :: forall a b. Object3D a -> Event (Maybe String) -> Event RoofDictData -> PanelsDict -> Map Int OldRoofRackingData -> WebEditor (Event (Array (RoofNode b)))
+renderRoofs wrapper activeRoof roofsData panelsDict racks = do
     let rsToRender = compact $ view _roofsToRender <$> roofsData
         rsToRenderArr = dictToArr <$> rsToRender
         
     -- create roofnode for each roof and render them
-    nodes <- performEditorEvent $ traverse (mkNode activeRoof panelsDict) <$> rsToRenderArr
+    nodes <- performEditorEvent $ traverse (mkNode activeRoof panelsDict racks) <$> rsToRenderArr
     pure $ multicast $ performEvent $ renderNodes wrapper <$> withLast nodes
 
 isRoofEditing :: WebEditor (Dynamic Boolean)
@@ -171,8 +174,8 @@ getActiveRoof meshData activated deleteRoofOp addedNewRoof =
                 (delay 1 $ Just <<< view _id <$> addedNewRoof)
 
 -- | create RoofManager for an array of roofs
-createRoofManager :: forall a b. HouseMeshData a -> WebEditor (RoofManager b)
-createRoofManager meshData = do
+createRoofManager :: forall a b. HouseMeshData a -> Map Int OldRoofRackingData -> WebEditor (RoofManager b)
+createRoofManager meshData racks = do
     wrapper <- liftEffect createWrapper
 
     -- create an event stream for the current active id
@@ -187,7 +190,7 @@ createRoofManager meshData = do
     canEditRoofDyn <- isRoofEditing
 
     -- render roofs dynamically
-    renderedNodes <- renderRoofs wrapper activeRoof roofsData panelsDict
+    renderedNodes <- renderRoofs wrapper activeRoof roofsData panelsDict racks
 
     let deleteRoofOp  = multicast $ keepLatest $ getRoofDelete <$> renderedNodes
         updateRoofOp  = keepLatest $ getRoofUpdate             <$> renderedNodes

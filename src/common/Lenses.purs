@@ -11,6 +11,9 @@ import Data.Symbol (SProxy(..))
 _leadId :: forall t a r. Newtype t { leadId :: a | r } => Lens' t a
 _leadId = _Newtype <<< prop (SProxy :: SProxy "leadId")
 
+_houseId :: forall t a r. Newtype t { houseId :: a | r } => Lens' t a
+_houseId = _Newtype <<< prop (SProxy :: SProxy "houseId")
+
 _id :: forall t a r. Newtype t { id :: a | r } => Lens' t a
 _id = _Newtype <<< prop (SProxy :: SProxy "id")
 
@@ -133,3 +136,12 @@ _panelType = _Newtype <<< prop (SProxy :: SProxy "panelType")
 
 _rackingType :: forall t a r. Newtype t { rackingType :: a | r } => Lens' t a
 _rackingType = _Newtype <<< prop (SProxy :: SProxy "rackingType")
+
+_mountSpacing :: forall t a r. Newtype t { mountSpacing :: a | r } => Lens' t a
+_mountSpacing = _Newtype <<< prop (SProxy :: SProxy "mountSpacing")
+
+_rafterSpacing :: forall t a r. Newtype t { rafterSpacing :: a | r } => Lens' t a
+_rafterSpacing = _Newtype <<< prop (SProxy :: SProxy "rafterSpacing")
+
+_roofRackings :: forall t a r. Newtype t { roofRackings :: a | r } => Lens' t a
+_roofRackings = _Newtype <<< prop (SProxy :: SProxy "roofRackings")

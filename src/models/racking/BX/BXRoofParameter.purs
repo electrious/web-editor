@@ -22,5 +22,5 @@ instance encodeBXRoofParameter :: Encode BXRoofParameter where
                                            })
 instance decodeBXRoofParameter :: Decode BXRoofParameter where
     decode = genericDecode (defaultOptions { unwrapSingleConstructors = true,
-                                              fieldTransform = const "chassisType"
+                                              fieldTransform = const "chassis_type"
                                             })

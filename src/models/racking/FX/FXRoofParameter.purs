@@ -19,10 +19,6 @@ toJSFieldName "mountSpacing"  = "mount_space"
 toJSFieldName "rafterSpacing" = "rafter_space"
 toJSFieldName _               = "mount_space"
 
-fromJSFieldName :: String -> String
-fromJSFieldName "mount_space"  = "mountSpacing"
-fromJSFieldName "rafter_space" = "rafterSpacing"
-fromJSFieldName _              = "mountSpacing"
 
 derive instance newtypeFXRoofParameter :: Newtype FXRoofParameter _
 derive instance genericFXRoofParameter :: Generic FXRoofParameter _
@@ -34,5 +30,5 @@ instance encodeFXRoofParameter :: Encode FXRoofParameter where
                                             })
 instance decodeFXRoofParameter :: Decode FXRoofParameter where
     decode = genericDecode (defaultOptions { unwrapSingleConstructors = true,
-                                             fieldTransform = fromJSFieldName
+                                             fieldTransform = toJSFieldName
                                             })

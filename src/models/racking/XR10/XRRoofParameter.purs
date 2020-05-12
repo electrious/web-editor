@@ -19,11 +19,6 @@ toJSFieldName "mountSpacing"  = "mount_space"
 toJSFieldName "rafterSpacing" = "rafter_space"
 toJSFieldName _               = "mount_space"
 
-fromJSFieldName :: String -> String
-fromJSFieldName "mount_space"  = "mountSpacing"
-fromJSFieldName "rafter_space" = "rafterSpacing"
-fromJSFieldName _              = "mountSpacing"
-
 derive instance newtypeXRRoofParameter :: Newtype XRRoofParameter _
 derive instance genericXRRoofParameter :: Generic XRRoofParameter _
 instance showXRRoofParameter :: Show XRRoofParameter where
@@ -34,5 +29,5 @@ instance encodeXRRoofParameter :: Encode XRRoofParameter where
                                             })
 instance decodeXRRoofParameter :: Decode XRRoofParameter where
     decode = genericDecode (defaultOptions { unwrapSingleConstructors = true,
-                                             fieldTransform = fromJSFieldName
+                                             fieldTransform = toJSFieldName
                                             })

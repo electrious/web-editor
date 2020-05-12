@@ -30,6 +30,7 @@
     "webpack-dev-server": "^3.8.2"
   },
   "dependencies": {
+    "axios": "^0.19.2",
     "rbush": "^3.0.1",
     "shamos-hoey": "^1.0.1",
     "three": "^0.110.0",

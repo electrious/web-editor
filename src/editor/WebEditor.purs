@@ -26,7 +26,6 @@ import FRP.Dynamic (Dynamic, current, dynEvent, step)
 import FRP.Event (Event, makeEvent, subscribe)
 import Model.Hardware.PanelTextureInfo (PanelTextureInfo)
 import Model.Hardware.PanelType (PanelType(..))
-import Model.Racking.RackingType (RackingType(..))
 import Model.Roof.Panel (Panel)
 import Model.Roof.RoofPlate (RoofPlate)
 import Web.DOM (Element)
@@ -36,12 +35,12 @@ newtype EditorConfig = EditorConfig {
     sizeDyn     :: Dynamic Size,
     modeDyn     :: Dynamic EditorMode,
     leadId      :: Int,
+    houseId     :: Int,
     roofPlates  :: Array RoofPlate,
     panels      :: Array Panel,
     dataServer  :: String,
     textureInfo :: PanelTextureInfo,
     panelType   :: Dynamic PanelType,
-    rackingType :: Dynamic RackingType,
     apiConfig   :: APIConfig
 }
 
@@ -52,12 +51,12 @@ instance defaultEditorConfig :: Default EditorConfig where
         sizeDyn     : step (size 800 600) empty,
         modeDyn     : step Showing empty,
         leadId      : 0,
+        houseId     : 0,
         roofPlates  : [],
         panels      : [],
         dataServer  : "",
         textureInfo : def,
         panelType   : step Standard empty,
-        rackingType : step XR10 empty,
         apiConfig   : def
     }
 

@@ -3,18 +3,20 @@ module Editor.ArrayBuilder where
 import Prelude
 
 import Control.Monad.Reader (class MonadAsk, class MonadReader, ReaderT, ask, runReaderT)
+import Control.Plus (empty)
 import Data.Lens (Lens', view)
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Editor.Common.Lenses (_panelType, _rackingType, _textureInfo)
+import Editor.Common.Lenses (_panelType, _textureInfo)
 import Editor.WebEditor (WebEditor)
 import Effect (Effect)
 import Effect.Class (class MonadEffect, liftEffect)
-import FRP.Dynamic (Dynamic)
+import FRP.Dynamic (Dynamic, step)
 import Model.Hardware.PanelTextureInfo (PanelTextureInfo)
 import Model.Hardware.PanelType (PanelType)
+import Model.Racking.RackingType (RackingType)
 import Model.Roof.ArrayConfig (ArrayConfig, arrayConfigForRack)
 
 -- data used to provide env info for ArrayBuilder monad
@@ -41,13 +43,12 @@ derive newtype instance monadAskArrayBuilder :: MonadAsk ArrayBuilderEnv ArrayBu
 derive newtype instance monadReaderArrayBuilder :: MonadReader ArrayBuilderEnv ArrayBuilder
 derive newtype instance monadEffectArrayBuilder :: MonadEffect ArrayBuilder
 
-runArrayBuilder :: forall a. ArrayBuilder a -> WebEditor a
-runArrayBuilder (ArrayBuilder b) = do
+runArrayBuilder :: forall a. RackingType -> ArrayBuilder a -> WebEditor a
+runArrayBuilder rt (ArrayBuilder b) = do
     texture <- view _textureInfo <$> ask
     pt <- view _panelType <$> ask
-    rt <- view _rackingType <$> ask
     liftEffect $ runReaderT b $ ArrayBuilderEnv {
-        arrayConfig : arrayConfigForRack <$> rt,
+        arrayConfig : step (arrayConfigForRack rt) empty,
         textureInfo : texture,
         panelType   : pt
     }

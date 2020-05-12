@@ -2,6 +2,7 @@ module Test where
 
 import Prelude
 
+import API (_auth, _baseUrl)
 import Control.Monad.Except (runExcept)
 import Control.Plus (empty)
 import Data.Default (def)
@@ -9,11 +10,11 @@ import Data.Either (Either(..))
 import Data.Lens ((.~))
 import Data.Maybe (Maybe(..))
 import Data.Tuple (fst)
-import Editor.Common.Lenses (_leadId, _panelType, _rackingType, _textureInfo)
+import Editor.Common.Lenses (_leadId, _houseId, _panelType, _textureInfo)
 import Editor.Editor (createEditor)
 import Editor.EditorMode (EditorMode(..))
 import Editor.SceneEvent (size)
-import Editor.WebEditor (_dataServer, _elem, _modeDyn, _panels, _roofPlates, _sizeDyn, runWebEditor)
+import Editor.WebEditor (_apiConfig, _dataServer, _elem, _modeDyn, _panels, _roofPlates, _sizeDyn, runWebEditor)
 import Effect (Effect)
 import Effect.Class.Console (logShow)
 import FRP.Dynamic (step)
@@ -23,7 +24,6 @@ import Foreign (Foreign)
 import Foreign.Generic (decode)
 import Model.Hardware.PanelTextureInfo (_premium, _standard, _standard72)
 import Model.Hardware.PanelType (PanelType(..))
-import Model.Racking.RackingType (RackingType(..))
 import Web.DOM.NonElementParentNode (getElementById)
 import Web.HTML (window)
 import Web.HTML.HTMLDocument (toNonElementParentNode)
@@ -51,13 +51,15 @@ doTest roofDat panelDat = do
                 let modeDyn = step Showing (const RoofEditing <$> after 10000)
                     sizeDyn = step (size 800 600) empty
                     panelType = step Standard empty
-                    rackingType = step XR10 empty
 
                     textures = def # _standard   .~ Just solarModuleJPG
                                    # _premium    .~ Just qCellSolarPanelJPG
                                    # _standard72 .~ Just qCellSolarPanel72PNG
+                    apiCfg = def # _auth .~ "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJJZCI6IiIsImN0YyI6NCwianRpIjoiNCJ9.d6pG95A4EoAPGhhnN4BsL7QtarpBRCEcta0Uu72SoVU"
+                                 # _baseUrl .~ "https://api.electrious.com/v1"
 
                     cfg = def # _elem       .~ elem
+                              # _houseId    .~ 4
                               # _leadId     .~ 296285
                               # _roofPlates .~ roofs
                               # _panels     .~ panels
@@ -65,8 +67,8 @@ doTest roofDat panelDat = do
                               # _modeDyn    .~ modeDyn
                               # _sizeDyn    .~ sizeDyn
                               # _panelType  .~ panelType
-                              # _rackingType .~ rackingType
                               # _textureInfo .~ textures
+                              # _apiConfig  .~ apiCfg
                 res <- runWebEditor cfg createEditor
                 
                 _ <- subscribe (fst res) logShow

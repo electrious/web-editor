@@ -37,9 +37,9 @@ instance decodeRoofParameter :: Decode RoofParameter where
                                                         })
 
 toParamTag :: String -> String
-toParamTag "xr"  = "XRParameter"
-toParamTag "fx"  = "FXParameter"
-toParamTag "fl"  = "XRFlatParameter"
-toParamTag "bx"  = "BXParameter"
-toParamTag "gaf" = "GAFParameter"
-toParamTag _     = "GAFParameter"
+toParamTag "XRParameter"     = "xr"
+toParamTag "FXParameter"     = "fx"
+toParamTag "XRFlatParameter" = "fl"
+toParamTag "BXParameter"     = "bx"
+toParamTag "GAFParameter"    = "gaf"
+toParamTag _                 = "xr"

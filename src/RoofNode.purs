@@ -23,14 +23,14 @@ import Editor.SceneEvent (SceneTapEvent)
 import Editor.WebEditor (WebEditor, _modeDyn, performEditorDyn)
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import Effect.Class.Console (logShow)
 import Effect.Timer (setTimeout)
 import Effect.Unsafe (unsafePerformEffect)
-import FRP.Dynamic (Dynamic, debugDyn, debugDynWith, dynEvent, performDynamic, step, subscribeDyn, withLast)
+import FRP.Dynamic (Dynamic, dynEvent, performDynamic, step, subscribeDyn, withLast)
 import FRP.Event (Event, create, keepLatest)
 import FRP.Event.Extra (multicast)
 import Math (pi)
 import Math.Angle (degreeVal, radianVal)
+import Model.Racking.RackingType (RackingType)
 import Model.Roof.Panel (Panel)
 import Model.Roof.RoofPlate (RoofOperation(..), RoofPlate, _azimuth, _borderPoints, _rotation)
 import SimplePolygon (isSimplePolygon)
@@ -158,11 +158,11 @@ getNewRoof obj roof newVertices = do
     let toParent v = applyMatrix (matrix obj) (mkVec3 (vecX v) (vecY v) 0.0)
     pure $ (RoofOpUpdate <<< flip updateRoofPlate roof <<< map toParent) <$> newVertices
 
-renderPanels :: forall a. Object3D a -> Array Panel -> Dynamic EditorMode -> WebEditor (Effect Unit)
-renderPanels content panels modeDyn = do
+renderPanels :: forall a. Object3D a -> RackingType -> Array Panel -> Dynamic EditorMode -> WebEditor (Effect Unit)
+renderPanels content rackType panels modeDyn = do
     -- don't build the panel layer when it's roof editing mode
     let builder RoofEditing = pure Nothing
-        builder _ = Just <$> runArrayBuilder (createPanelLayer panels)
+        builder _ = Just <$> runArrayBuilder rackType (createPanelLayer panels)
 
         render { last, now } = do
             traverse_ (flip remove content <<< view _wrapper) $ join last
@@ -171,8 +171,8 @@ renderPanels content panels modeDyn = do
     liftEffect $ subscribeDyn (withLast panelLayerDyn) render
 
 -- | Create RoofNode for a RoofPlate
-createRoofNode :: forall a. RoofPlate -> Array Panel -> Dynamic Boolean -> WebEditor (RoofNode a)
-createRoofNode roof panels isActive = do
+createRoofNode :: forall a. RoofPlate -> RackingType -> Array Panel -> Dynamic Boolean -> WebEditor (RoofNode a)
+createRoofNode roof rackType panels isActive = do
     obj <- liftEffect $ mkNode "roofplate"
     content <- liftEffect $ mkNode "roof-content"
     liftEffect $ add content obj
@@ -180,7 +180,7 @@ createRoofNode roof panels isActive = do
     modeDyn <- view _modeDyn <$> ask
 
     -- render panels
-    d <- renderPanels content panels modeDyn
+    d <- renderPanels content rackType panels modeDyn
     
     let canEditRoofDyn = (==) RoofEditing <$> modeDyn
     -- set the roof node position
