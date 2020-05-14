@@ -2,6 +2,7 @@ module Test where
 
 import Prelude
 
+import Control.Alt ((<|>))
 import API (_auth, _baseUrl)
 import Control.Monad.Except (runExcept)
 import Control.Plus (empty)
@@ -49,7 +50,7 @@ doTest roofDat panelDat = do
         Right roofs -> case runExcept $ decode panelDat of
             Left e -> logShow e
             Right panels -> do
-                let modeDyn = step Showing (const RoofEditing <$> after 10000)
+                let modeDyn = step Showing (const RoofEditing <$> after 10000 <|> const Showing <$> after 20000)
                     sizeDyn = step (size 800 600) empty
                     panelType = step Standard empty
 

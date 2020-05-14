@@ -23,9 +23,10 @@ import Three.Controls.OrbitControls (OrbitControls, enableDamping, enableZoom, i
 import Three.Controls.OrbitControls as OrbitControls
 import Three.Core.Camera (PerspectiveCamera, Camera, mkPerspectiveCamera, setAspect, updateProjectionMatrix)
 import Three.Core.Light (mkAmbientLight, mkDirectionalLight)
-import Three.Core.Object3D (Object3D, add, hasParent, lookAt, mkObject3D, parent, position, rotateOnWorldAxis, rotateZ, setDefaultUp, setName, setPosition, translateX, translateY, worldToLocal)
+import Three.Core.Object3D (Object3D, add, hasParent, lookAt, mkObject3D, parent, position, rotateOnWorldAxis, rotateZ, setDefaultUp, setName, setPosition, setRotation, translateX, translateY, worldToLocal)
 import Three.Core.Scene (disposeScene, mkScene)
 import Three.Core.WebGLRenderer (domElement, mkWebGLRenderer, render, setSize)
+import Three.Math.Euler (mkEuler)
 import Three.Math.Vector (length, mkVec3, multiplyScalar, normal, vecX, vecY)
 import Web.DOM (Element)
 import Web.DOM.Element (toNode)
@@ -63,6 +64,12 @@ setupCameraPos :: forall a. Camera a -> Effect Unit
 setupCameraPos camera = do
     setPosition (mkVec3 0.0 (-40.0) 20.0) camera
     lookAt (mkVec3 0.0 0.0 0.0) camera
+
+resetContentPos :: forall a. Object3D a -> Effect Unit
+resetContentPos = setPosition (mkVec3 0.0 0.0 0.0)
+
+resetContentRot :: forall a. Object3D a -> Effect Unit
+resetContentRot = setRotation (mkEuler 0.0 0.0 0.0)
 
 zoomCamera :: forall a. PerspectiveCamera a -> Number -> Effect Number
 zoomCamera camera zoom = do
@@ -137,10 +144,6 @@ createScene sizeDyn modeDyn elem = do
     let isShowing = (==) Showing <$> modeDyn
         canEdit = not <$> isShowing
 
-    d4 <- subscribeDyn isShowing $ \s -> do
-             when (not s) $ setupCameraPos camera
-             setEnabled s orbitCtrl
-
     -- add ambient light
     ambientLight <- mkAmbientLight 0xffffff
     setName "ambient-light" ambientLight
@@ -161,6 +164,12 @@ createScene sizeDyn modeDyn elem = do
     content <- mkObject3D
     setName "scene-content" content
     add content rotWrapper
+
+    d4 <- subscribeDyn isShowing $ \s -> do
+             if s
+                then resetContentPos content *> resetContentRot rotWrapper
+                else setupCameraPos camera
+             setEnabled s orbitCtrl
 
     -- function to update renderring of the webgl scene
     let renderFunc = do

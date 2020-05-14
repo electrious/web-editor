@@ -49,6 +49,9 @@ position = ffi ["o"] "o.position"
 setPosition :: forall a. Vector3 -> Object3D a -> Effect Unit
 setPosition = fpi ["v", "o", ""] "o.position.copy(v)"
 
+setRotation :: forall a. Euler -> Object3D a ->Effect Unit
+setRotation = fpi ["e", "o", ""] "o.rotation.copy(e)"
+
 rotateX :: forall a. Number -> Object3D a -> Effect Unit
 rotateX = fpi ["r", "o", ""] "o.rotateX(r)"
 
