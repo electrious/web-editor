@@ -3,8 +3,11 @@ module Editor.Editor (createEditor, loadHouse) where
 import Prelude hiding (add)
 
 import API.Racking (loadRacking)
+import Control.Monad.Except (runExcept)
 import Control.Monad.Reader (ask)
+import Data.Either (Either(..))
 import Data.Lens ((^.))
+import Data.Map (empty)
 import Data.Maybe (Maybe)
 import Data.Traversable (traverse)
 import Editor.Common.Lenses (_houseId, _leadId, _modeDyn, _roofRackings, _wrapper)
@@ -39,14 +42,17 @@ loadHouse :: forall a. WebEditor a -> HouseEditor (Event (Array RoofEdited))
 loadHouse editor = do
     cfg <- ask
 
-    let f hmd rackSys = do
+    let f hmd roofRackData = do
             liftEffect $ addToScene (unsafeCoerce $ hmd ^. _wrapper) editor
-            mgr <- createRoofManager hmd (rackSys ^. _roofRackings)
+            mgr <- createRoofManager hmd roofRackData
             liftEffect $ addToScene (mgr ^. _wrapper) editor
             liftEffect $ addDisposable (dispose mgr) editor
             pure (mgr ^. _editedRoofs)
 
     e <- liftEffect $ loadHouseModel (cfg ^. _dataServer) (cfg ^. _leadId)
     racksEvt <- runAPIInEditor $ loadRacking (cfg ^. _houseId)
-
-    keepLatest <$> performEditorEvent (f <$> e <*> racksEvt)
+    let roofRackDatEvt = g <$> racksEvt
+        g res = case runExcept res of
+                Left _ -> empty
+                Right v -> v ^. _roofRackings
+    keepLatest <$> performEditorEvent (f <$> e <*> roofRackDatEvt)
