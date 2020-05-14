@@ -6,6 +6,8 @@ import Control.Alt ((<|>))
 import Data.Array (filter, head)
 import Data.Compactable (compact)
 import Data.Default (class Default)
+import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Show (genericShow)
 import Data.Int (toNumber)
 import Data.Lens (Lens', (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
@@ -35,6 +37,9 @@ newtype Size = Size {
 }
 
 derive instance newtypeSize :: Newtype Size _
+derive instance genericSize :: Generic Size _
+instance showSize :: Show Size where
+    show = genericShow
 
 size :: Int -> Int -> Size
 size w h = Size { width: w, height: h }
