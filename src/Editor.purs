@@ -1,4 +1,4 @@
-module Editor.Editor (createEditor, loadHouse) where
+module Editor.Editor (createEditor, loadHouse, House, _loaded, _roofUpdate) where
 
 import Prelude hiding (add)
 
@@ -6,9 +6,13 @@ import API.Racking (loadRacking)
 import Control.Monad.Except (runExcept)
 import Control.Monad.Reader (ask)
 import Data.Either (Either(..))
-import Data.Lens ((^.))
+import Data.Lens (Lens', (^.))
+import Data.Lens.Iso.Newtype (_Newtype)
+import Data.Lens.Record (prop)
 import Data.Map (empty)
 import Data.Maybe (Maybe)
+import Data.Newtype (class Newtype)
+import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
 import Editor.Common.Lenses (_houseId, _leadId, _modeDyn, _roofRackings, _wrapper)
 import Editor.Disposable (dispose)
@@ -18,7 +22,7 @@ import Editor.HouseEditor (HouseEditor, _dataServer, performEditorEvent, runAPII
 import Editor.RoofManager (_editedRoofs, createRoofManager)
 import Editor.WebEditor (WebEditor, addDisposable, addToScene, createScene, renderLoop)
 import Effect.Class (liftEffect)
-import FRP.Event (Event, keepLatest)
+import FRP.Event (Event, create, keepLatest)
 import Model.Roof.RoofPlate (RoofEdited)
 import Unsafe.Coerce (unsafeCoerce)
 import Web.HTML (window)
@@ -38,15 +42,32 @@ createEditor = do
     traverse mkEditor (cfg ^. _elem)
 
 
-loadHouse :: forall a. WebEditor a -> HouseEditor (Event (Array RoofEdited))
+newtype House = House {
+    loaded     :: Event Unit,
+    roofUpdate :: Event (Array RoofEdited)
+}
+
+derive instance newtypeHouse :: Newtype House _
+
+_loaded :: Lens' House (Event Unit)
+_loaded = _Newtype <<< prop (SProxy :: SProxy "loaded")
+
+_roofUpdate :: Lens' House (Event (Array RoofEdited))
+_roofUpdate = _Newtype <<< prop (SProxy :: SProxy "roofUpdate")
+
+loadHouse :: forall a. WebEditor a -> HouseEditor House
 loadHouse editor = do
     cfg <- ask
+
+    { event: loadedEvt, push: loadedFunc } <- liftEffect create
 
     let f hmd roofRackData = do
             liftEffect $ addToScene (unsafeCoerce $ hmd ^. _wrapper) editor
             mgr <- createRoofManager hmd roofRackData
             liftEffect $ addToScene (mgr ^. _wrapper) editor
             liftEffect $ addDisposable (dispose mgr) editor
+            
+            liftEffect $ loadedFunc unit
             pure (mgr ^. _editedRoofs)
 
     e <- liftEffect $ loadHouseModel (cfg ^. _dataServer) (cfg ^. _leadId)
@@ -55,4 +76,9 @@ loadHouse editor = do
         g res = case runExcept res of
                 Left _ -> empty
                 Right v -> v ^. _roofRackings
-    keepLatest <$> performEditorEvent (f <$> e <*> roofRackDatEvt)
+    roofUpdEvt <- keepLatest <$> performEditorEvent (f <$> e <*> roofRackDatEvt)
+
+    pure $ House {
+        loaded     : loadedEvt,
+        roofUpdate : roofUpdEvt
+    }

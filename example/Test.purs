@@ -7,11 +7,11 @@ import Control.Monad.Except (runExcept)
 import Control.Plus (empty)
 import Data.Default (def)
 import Data.Either (Either(..))
-import Data.Lens ((.~))
+import Data.Lens ((.~), (^.))
 import Data.Maybe (Maybe(..))
 import Data.Traversable (traverse)
 import Editor.Common.Lenses (_houseId, _leadId, _modeDyn, _panelType, _textureInfo)
-import Editor.Editor (createEditor, loadHouse)
+import Editor.Editor (_roofUpdate, createEditor, loadHouse)
 import Editor.EditorM (_elem, _sizeDyn, runEditorM)
 import Editor.EditorMode (EditorMode(..))
 import Editor.HouseEditor (_apiConfig, _dataServer, _panels, _roofPlates, runHouseEditor)
@@ -76,7 +76,7 @@ doTest roofDat panelDat = do
                 res <- traverse (flip runHouseEditor houseCfg <<< loadHouse) editor
 
                 case res of
-                    Just evt -> void $ subscribe evt logShow
+                    Just house -> void $ subscribe (house ^. _roofUpdate) logShow
                     Nothing -> pure unit
 
                 pure unit
