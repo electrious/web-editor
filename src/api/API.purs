@@ -39,7 +39,7 @@ onlyRight :: forall a e. Event (Either e a) -> Event a
 onlyRight = map (unsafePartial fromRight) <<< filter isRight
 
 newtype APIConfig = APIConfig {
-    auth    :: String,
+    auth    :: Maybe String,
     xUserId :: Maybe Int,
     baseUrl :: String
 }
@@ -51,11 +51,11 @@ instance decodeAPIConfig :: Decode APIConfig where
 
 instance defaultAPIConfig :: Default APIConfig where
     def = APIConfig {
-        auth    : "",
+        auth    : Nothing,
         xUserId : Nothing,
         baseUrl : ""
     }
-_auth :: Lens' APIConfig String
+_auth :: Lens' APIConfig (Maybe String)
 _auth = _Newtype <<< prop (SProxy :: SProxy "auth")
 
 _xUserId :: Lens' APIConfig (Maybe Int)
@@ -83,12 +83,12 @@ runAPI (API a) = runReaderT a
 callAPI :: forall req res. Encode req => Decode res => Method -> String -> req -> API (Event (F res))
 callAPI m url req = do
     cfg <- ask
-    let defHeaders = [Header "Content-Type" "application/json",
-                      Header "Authorization" $ cfg ^. _auth]
+    let defHeaders = [Header "Content-Type" "application/json"]
+        authHeader = Array.singleton <<< Header "Authorization" <$> cfg ^. _auth
         userHeader = Array.singleton <<< Header "x-user-id" <<< show <$> cfg ^. _xUserId
         
         aff = genericAxios url [method m
-                              , headers (defHeaders <> fromMaybe [] userHeader)
+                              , headers (defHeaders <> fromMaybe [] authHeader <> fromMaybe [] userHeader)
                               , baseUrl $ cfg ^. _baseUrl] req
         toF (Left e) = throwError $ singleton $ ForeignError $ getErrorMessage e
         toF (Right v) = pure v

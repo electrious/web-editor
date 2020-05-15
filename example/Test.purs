@@ -57,7 +57,7 @@ doTest roofDat panelDat = do
                     textures = def # _standard   .~ Just solarModuleJPG
                                    # _premium    .~ Just qCellSolarPanelJPG
                                    # _standard72 .~ Just qCellSolarPanel72PNG
-                    apiCfg = def # _auth .~ "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJJZCI6IiIsImN0YyI6NCwianRpIjoiNCJ9.d6pG95A4EoAPGhhnN4BsL7QtarpBRCEcta0Uu72SoVU"
+                    apiCfg = def # _auth .~ Just "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJJZCI6IiIsImN0YyI6NCwianRpIjoiNCJ9.d6pG95A4EoAPGhhnN4BsL7QtarpBRCEcta0Uu72SoVU"
                                  # _baseUrl .~ "https://api.electrious.com/v1"
 
                     cfg = def # _elem       .~ elem
