@@ -12,8 +12,9 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Time.Duration (Milliseconds(..))
 import Editor.Common.Lenses (_canDrag, _curDragEvt, _deltaX, _deltaY, _dragType, _isDragging, _lastDragEvt, _x, _y)
+import Effect (Effect)
 import FRP.Event (Event, fold, gate, makeEvent)
-import FRP.Event.Extra (debounce, delay, multicast)
+import FRP.Event.Extra (debounce, delay, multicast, performEvent)
 import Math (sqrt)
 import Util (ffi)
 import Web.DOM (Element)
@@ -24,7 +25,7 @@ import Web.Event.Internal.Types (EventTarget)
 import Web.HTML.HTMLElement (DOMRect)
 import Web.TouchEvent.EventTypes (touchend, touchmove, touchstart)
 import Web.TouchEvent.Touch (clientY, pageX)
-import Web.TouchEvent.TouchEvent (TouchEvent, touches)
+import Web.TouchEvent.TouchEvent (TouchEvent, toEvent, touches)
 import Web.TouchEvent.TouchEvent as TE
 import Web.TouchEvent.TouchList (item)
 import Web.UIEvent.MouseEvent (MouseEvent, shiftKey)
@@ -205,6 +206,9 @@ touchTap elem e = tapT <$> item 0 (touches e)
 
 foreign import getBoundingClientRect :: Element -> DOMRect
 
+stopTouchScroll :: TouchEvent -> Effect TouchEvent
+stopTouchScroll e = preventDefault (toEvent e) *> pure e
+
 -- | setup the input system for an element.
 setupInput :: Element -> InputEvents
 setupInput elem =
@@ -219,7 +223,7 @@ setupInput elem =
         mouseEnd   = mouseTap <$> mu
 
         touchStart = compact $ touchTap elem <$> multicast (touchEvent touchstart target)
-        touchMove  = compact $ touchTap elem <$> multicast (touchEvent touchmove target)
+        touchMove  = compact $ touchTap elem <$> multicast (performEvent $ stopTouchScroll <$> touchEvent touchmove target)
         touchEnd   = compact $ touchTap elem <$> multicast (touchEvent touchend target)
 
         wheelEvt = multicast $ wheelEvent target
