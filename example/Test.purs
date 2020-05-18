@@ -37,7 +37,7 @@ foreign import qCellSolarPanelJPG :: String
 foreign import qCellSolarPanel72PNG :: String
 
 serverUrl :: String
-serverUrl = "https://s3.eu-west-1.amazonaws.com/data.electrious.com"
+serverUrl = "http://data.electrious.com"
 
 doTest :: Foreign -> Foreign -> Effect Unit
 doTest roofDat panelDat = do
