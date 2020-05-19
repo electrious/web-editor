@@ -5,12 +5,12 @@ import Prelude
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Newtype (class Newtype)
-import MOdel.Racking.XR10.Rail (Rail)
+import Model.Racking.XR10.Rail (Rail)
 import Model.Racking.Flash (Flash)
 import Model.Racking.XR10.Clamp (Clamp)
 import Model.Racking.XR10.LFoot (LFoot)
 import Model.Racking.XR10.Splice (Splice)
-import Model.Racking.XR10.Stepper (Stepper)
+import Model.Racking.XR10.Stopper (Stopper)
 
 newtype XRRackingComponent = XRRackingComponent {
     arrayNumber :: Int,
@@ -20,7 +20,7 @@ newtype XRRackingComponent = XRRackingComponent {
     splices     :: Array Splice,
     lfeet       :: Array LFoot,
     clamps      :: Array Clamp,
-    steppers    :: Array Stepper
+    stoppers    :: Array Stopper
 }
 
 derive instance newtypeXRRackingComponent :: Newtype XRRackingComponent _
@@ -35,7 +35,7 @@ newtype XRRackingNumbers = XRRackingNumbers {
     splices  :: Int,
     lfeet    :: Int,
     clamps   :: Int,
-    steppers :: Int
+    stoppers :: Int
 }
 
 derive instance newtypeXRRackingNumbers :: Newtype XRRackingNumbers _

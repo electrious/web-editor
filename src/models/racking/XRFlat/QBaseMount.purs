@@ -1,4 +1,4 @@
-module Model.Racking.XR10.Stepper where
+module Model.Racking.XRFlat.QBaseMount where
 
 import Prelude
 
@@ -7,18 +7,17 @@ import Data.Generic.Rep.Show (genericShow)
 import Data.Meter (Meter)
 import Data.Newtype (class Newtype)
 import Data.UUID (UUID)
-import Model.Racking.Common (RackPos)
 
-newtype Stepper = Stepper {
+newtype QBaseMount = QBaseMount {
     id          :: UUID,
     x           :: Meter,
     y           :: Meter,
     z           :: Meter,
     arrayNumber :: Int,
-    type        :: RackPos
+    height      :: Meter
 }
 
-derive instance newtypeStepper :: Newtype Stepper _
-derive instance genericStepper :: Generic Stepper _
-instance showStepper :: Show Stepper where
+derive instance newtypeQBaseMount :: Newtype QBaseMount _
+derive instance genericQBaseMount :: Generic QBaseMount _
+instance showQBaseMount :: Show QBaseMount where
     show = genericShow
