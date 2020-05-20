@@ -10,6 +10,9 @@ import Data.Generic.Rep.Enum (genericCardinality, genericFromEnum, genericPred, 
 import Data.Generic.Rep.Show (genericShow)
 import Data.List.NonEmpty (singleton)
 import Data.Maybe (Maybe(..))
+import Data.Meter (Meter)
+import Data.Newtype (class Newtype)
+import Data.UUID (UUID)
 import Foreign.Generic (class Decode, class Encode, ForeignError(..), decode, encode)
 
 data ChassisType = ChassisTilt5
@@ -37,3 +40,18 @@ instance decodeChassisType :: Decode ChassisType where
                     case toEnum i of
                         Just v -> pure v
                         Nothing -> throwError $ singleton $ ForeignError $ "Can't decode ChassisType from: " <> show i
+
+
+newtype Chassis = Chassis {
+    id          :: UUID,
+    x           :: Meter,
+    y           :: Meter,
+    z           :: Meter,
+    arrayNumber :: Int,
+    type        :: ChassisType
+}
+
+derive instance newtypeChassis :: Newtype Chassis _
+derive instance genericChassis :: Generic Chassis _
+instance showChassis :: Show Chassis where
+    show = genericShow
