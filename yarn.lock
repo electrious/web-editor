@@ -2324,10 +2324,20 @@ globby@^6.1.0:
     pify "^2.0.0"
     pinkie-promise "^2.0.0"
 
+google-protobuf@^3.12.2:
+  version "3.12.2"
+  resolved "https://registry.yarnpkg.com/google-protobuf/-/google-protobuf-3.12.2.tgz#50ce9f9b6281235724eb243d6a83e969a2176e53"
+  integrity sha512-4CZhpuRr1d6HjlyrxoXoocoGFnRYgKULgMtikMddA9ztRyYR59Aondv2FioyxWVamRo0rF2XpYawkTCBEQOSkA==
+
 graceful-fs@^4.1.11, graceful-fs@^4.1.15, graceful-fs@^4.1.2:
   version "4.2.3"
   resolved "https://registry.yarnpkg.com/graceful-fs/-/graceful-fs-4.2.3.tgz#4a12ff1b60376ef09862c2093edd908328be8423"
   integrity sha512-a30VEBm4PEdx1dRB7MFK7BejejvCvBronbLjht+sHuGYj8PHs7M/5Z+rt5lw551vZ7yfTCj4Vuyy3mSJytDWRQ==
+
+grpc-web@^1.1.0-rc.1:
+  version "1.1.0"
+  resolved "https://registry.yarnpkg.com/grpc-web/-/grpc-web-1.1.0.tgz#18f73583a0a8c0b6c44a5cba62e66376d0ad019e"
+  integrity sha512-oPoS4/E/EO0TA2ZOSf3AxV2AbWDeabwfbAo+8oXNenOw87RmKz4hME8Sy4KDu2dUnqK8cuGfzdQlJPAEQEygNQ==
 
 handle-thing@^2.0.0:
   version "2.0.1"
@@ -5448,6 +5458,18 @@ webpack@^4.41.1:
     terser-webpack-plugin "^1.4.3"
     watchpack "^1.6.0"
     webpack-sources "^1.4.1"
+
+webpb@^0.0.7:
+  version "0.0.7"
+  resolved "https://registry.yarnpkg.com/webpb/-/webpb-0.0.7.tgz#1fef49fa0c0a85b893194fd00ad2b38080cf6575"
+  integrity sha512-LI9ElaFgx48wyIXjFJ6dn/Omsh5/2899dcNJBxMJnwyjlC0G/CcUHfnzzbuUcM/K/yRVpCjX4sMRCdlmyrNKzg==
+
+"webpb@https://github.com/electrious/webpb":
+  version "1.0.0"
+  resolved "https://github.com/electrious/webpb#f2aeadcc6a9bfb9c4e1076108b8e5c53163427ef"
+  dependencies:
+    google-protobuf "^3.12.2"
+    grpc-web "^1.1.0-rc.1"
 
 websocket-driver@>=0.5.1:
   version "0.7.3"
