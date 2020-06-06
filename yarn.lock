@@ -5459,11 +5459,6 @@ webpack@^4.41.1:
     watchpack "^1.6.0"
     webpack-sources "^1.4.1"
 
-webpb@^0.0.7:
-  version "0.0.7"
-  resolved "https://registry.yarnpkg.com/webpb/-/webpb-0.0.7.tgz#1fef49fa0c0a85b893194fd00ad2b38080cf6575"
-  integrity sha512-LI9ElaFgx48wyIXjFJ6dn/Omsh5/2899dcNJBxMJnwyjlC0G/CcUHfnzzbuUcM/K/yRVpCjX4sMRCdlmyrNKzg==
-
 "webpb@https://github.com/electrious/webpb":
   version "1.0.0"
   resolved "https://github.com/electrious/webpb#f2aeadcc6a9bfb9c4e1076108b8e5c53163427ef"
