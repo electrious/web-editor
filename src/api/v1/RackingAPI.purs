@@ -1,11 +1,13 @@
-module API.V1.RackingAPI where
+module API.V1.RackingAPI (updateRacking, RackingAPIClient, mkRackingAPIClient) where
 
 import Prelude
 
 import API.Error (ErrorPB)
-import API.V1.Racking.Request (RackRequestPB)
+import API.V1.Racking.Request (RackRequest, RackRequestPB)
+import Editor.Common.ProtoCodable (fromProto, toProto)
 import Effect (Effect)
-import Model.Racking.RackingSystem (RackingSystemPB)
+import FRP.Event (Event, makeEvent)
+import Model.Racking.RackingSystem (RackingSystem, RackingSystemPB)
 import Util (ffi, fpi)
 
 foreign import data DoRackRequestPB :: Type
@@ -31,3 +33,13 @@ foreign import data RackingAPIClient :: Type
 foreign import mkRackingAPIClient :: String -> Effect RackingAPIClient
 
 foreign import doRack :: DoRackRequestPB -> (ErrorPB -> DoRackResponsePB -> Effect Unit) -> RackingAPIClient -> Effect Unit
+
+-- | Call GRPC API to update racking data
+updateRacking :: RackRequest -> RackingAPIClient -> Effect (Event RackingSystem)
+updateRacking req client = do
+    reqPb <- toProto req
+    dReq <- mkDoRackRequestPB
+    setRequest reqPb dReq
+    pure $ makeEvent \k -> do
+        doRack dReq (\err resp -> k (fromProto $ getRacking resp)) client
+        pure (pure unit)
