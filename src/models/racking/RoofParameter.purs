@@ -4,12 +4,60 @@ import Prelude
 
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
+import Editor.Common.ProtoCodable (class ProtoDecodable, class ProtoEncodable, fromProto, toProto)
+import Effect (Effect)
 import Foreign.Generic (class Decode, class Encode, Foreign, SumEncoding(..), defaultOptions, encode, genericDecode)
-import Model.Racking.BX.BXRoofParameter (BXRoofParameter)
-import Model.Racking.FX.FXRoofParameter (FXRoofParameter)
-import Model.Racking.GAF.GAFRoofParameter (GAFRoofParameter)
-import Model.Racking.XR.XRRoofParameter (XRRoofParameter)
-import Model.Racking.XRFlat.XRFlatRoofParameter (XRFlatRoofParameter)
+import Model.Racking.BX.BXRoofParameter (BXParameterPB, BXRoofParameter)
+import Model.Racking.FX.FXRoofParameter (FXParameterPB, FXRoofParameter)
+import Model.Racking.GAF.GAFRoofParameter (GAFParameterPB, GAFRoofParameter)
+import Model.Racking.XR.XRRoofParameter (XRParameterPB, XRRoofParameter)
+import Model.Racking.XRFlat.XRFlatRoofParameter (XRFlatParameterPB, XRFlatRoofParameter)
+import Util (ffi, fpi)
+
+foreign import data RoofParameterPB :: Type
+foreign import mkRoofParameterPB :: Effect RoofParameterPB
+
+newtype ParamTypeCasePB = ParamTypeCasePB Int
+derive newtype instance eqParamTypeCasePB :: Eq ParamTypeCasePB
+foreign import paramTypeNotSet :: ParamTypeCasePB
+foreign import paramTypeXR     :: ParamTypeCasePB
+foreign import paramTypeFX     :: ParamTypeCasePB
+foreign import paramTypeXRFlat :: ParamTypeCasePB
+foreign import paramTypeBX     :: ParamTypeCasePB
+foreign import paramTypeGAF    :: ParamTypeCasePB
+
+getParamTypeCase :: RoofParameterPB -> ParamTypeCasePB
+getParamTypeCase = ffi ["r"] "r.getParamTypeCase()"
+
+getXRParameter :: RoofParameterPB -> XRParameterPB
+getXRParameter = ffi ["r"] "r.getXrParam()"
+
+setXRParameter :: XRParameterPB -> RoofParameterPB -> Effect Unit
+setXRParameter = fpi ["x", "r", ""] "r.setXrParam(x)"
+
+getFXParameter :: RoofParameterPB -> FXParameterPB
+getFXParameter = ffi ["r"] "r.getFxParam()"
+
+setFXParameter :: FXParameterPB -> RoofParameterPB -> Effect Unit
+setFXParameter = fpi ["x", "r", ""] "r.setFxParam(x)"
+
+getXRFlatParameter :: RoofParameterPB -> XRFlatParameterPB
+getXRFlatParameter = ffi ["r"] "r.getXrFlatParam()"
+
+setXRFlatParameter :: XRFlatParameterPB -> RoofParameterPB -> Effect Unit
+setXRFlatParameter = fpi ["x", "r", ""] "r.setXrFlatParam(x)"
+
+getBXParameter :: RoofParameterPB -> BXParameterPB
+getBXParameter = ffi ["r"] "r.getBxParam()"
+
+setBXParameter :: BXParameterPB -> RoofParameterPB -> Effect Unit
+setBXParameter = fpi ["x", "r", ""] "r.setBxParam(x)"
+
+getGAFParameter :: RoofParameterPB -> GAFParameterPB
+getGAFParameter = ffi ["r"] "r.getGafParam()"
+
+setGAFParameter :: GAFParameterPB -> RoofParameterPB -> Effect Unit
+setGAFParameter = fpi ["x", "r", ""] "r.setGafParam(x)"
 
 foreign import toTagged :: Foreign -> Foreign
 
@@ -35,7 +83,34 @@ instance decodeRoofParameter :: Decode RoofParameter where
                                                                             constructorTagTransform: toParamTag
                                                                         }
                                                         })
-
+instance protoEncodableRoofParameter :: ProtoEncodable RoofParameter RoofParameterPB where
+    toProto p = do
+        rp <- mkRoofParameterPB
+        case p of
+            XRParameter xr -> do
+                xrp <- toProto xr
+                setXRParameter xrp rp
+            FXParameter fx -> do
+                fxp <- toProto fx
+                setFXParameter fxp rp
+            XRFlatParameter xf -> do
+                xfp <- toProto xf
+                setXRFlatParameter xfp rp
+            BXParameter bx -> do
+                bxp <- toProto bx
+                setBXParameter bxp rp
+            GAFParameter gaf -> do
+                gafp <- toProto gaf
+                setGAFParameter gafp rp
+        pure rp
+instance protoDecodableRoofParameter :: ProtoDecodable RoofParameter RoofParameterPB where
+    fromProto r = f $ getParamTypeCase r
+        where f v | v == paramTypeXR     = XRParameter $ fromProto $ getXRParameter r
+                  | v == paramTypeFX     = FXParameter $ fromProto $ getFXParameter r
+                  | v == paramTypeXRFlat = XRFlatParameter $ fromProto $ getXRFlatParameter r
+                  | v == paramTypeBX     = BXParameter $ fromProto $ getBXParameter r
+                  | v == paramTypeGAF    = GAFParameter $ fromProto $ getGAFParameter r
+                  | otherwise            = XRParameter $ fromProto $ getXRParameter r
 toParamTag :: String -> String
 toParamTag "XRParameter"     = "xr"
 toParamTag "FXParameter"     = "fx"
