@@ -14,25 +14,25 @@ import Editor.SceneEvent (SceneDragEvent, SceneTapEvent, makeDraggable, makeTapp
 import Effect (Effect)
 import FRP.Event (Event, makeEvent, mapAccum)
 import FRP.Event.Extra (multicast, performEvent)
-import Three.Core.Geometry (Geometry)
-import Three.Core.Material (Material)
+import Three.Core.Geometry (class IsGeometry)
+import Three.Core.Material (class IsMaterial)
 import Three.Core.Mesh (Mesh, mkMesh)
-import Three.Core.Object3D (Object3D, hasParent, parent, worldToLocal)
+import Three.Core.Object3D (class IsObject3D, Object3D, hasParent, parent, worldToLocal)
 import Three.Math.Vector (Vector3, mkVec3, (<->))
 
-newtype TappableMesh a = TappableMesh {
-    mesh   :: Mesh a,
+newtype TappableMesh = TappableMesh {
+    mesh   :: Mesh,
     tapped :: Event SceneTapEvent
 }
 
-derive instance newtypeTappableMesh :: Newtype (TappableMesh a) _
+derive instance newtypeTappableMesh :: Newtype TappableMesh _
 
-tapEvtOn :: forall a. Mesh a -> Event SceneTapEvent
+tapEvtOn :: Mesh -> Event SceneTapEvent
 tapEvtOn m = makeEvent \k -> do
                 makeTappable m k
                 pure (stopTappable m)
 
-mkTappableMesh :: forall a geo mat. Geometry geo -> Material mat -> Effect (TappableMesh a)
+mkTappableMesh :: forall geo mat. IsGeometry geo => IsMaterial mat => geo -> mat -> Effect TappableMesh
 mkTappableMesh geo mat = do
     mesh <- mkMesh geo mat
     pure $ TappableMesh {
@@ -67,26 +67,26 @@ calcDragDelta toLocalF evt = mapAccum calcDelta e def
                             | otherwise                    = Tuple ne (ne ^. _point <-> oldE ^. _point)
 
 
-newtype DraggableMesh a = DraggableMesh {
-    mesh      :: Mesh a,
+newtype DraggableMesh = DraggableMesh {
+    mesh      :: Mesh,
     dragged   :: Event SceneDragEvent,
     dragDelta :: Event Vector3
 }
 
-derive instance newtypeDraggableMesh :: Newtype (DraggableMesh a) _
+derive instance newtypeDraggableMesh :: Newtype DraggableMesh _
 
-dragEvtOn :: forall a. Mesh a -> Event SceneDragEvent
+dragEvtOn :: Mesh -> Event SceneDragEvent
 dragEvtOn m = makeEvent \k -> do
                   makeDraggable m k
                   pure (stopDraggable m)
 
 -- helper function to convert a world Vector3 to the mesh's local coord
-toLocal :: forall a. Object3D a -> Vector3 -> Effect (Maybe Vector3)
+toLocal :: forall a. IsObject3D a => a -> Vector3 -> Effect (Maybe Vector3)
 toLocal mesh v = if hasParent mesh
-                 then Just <$> worldToLocal v (parent mesh)
+                 then Just <$> worldToLocal v (parent mesh :: Object3D)
                  else pure Nothing
 
-mkDraggableMesh :: forall a geo mat. Geometry geo -> Material mat -> Effect (DraggableMesh a)
+mkDraggableMesh :: forall geo mat. IsGeometry geo => IsMaterial mat => geo -> mat -> Effect DraggableMesh
 mkDraggableMesh geo mat = do
     mesh <- mkMesh geo mat
 
@@ -99,16 +99,16 @@ mkDraggableMesh geo mat = do
         dragDelta : dragDelta
     }
 
-newtype TapDragMesh a = TapDragMesh {
-    mesh      :: Mesh a,
+newtype TapDragMesh = TapDragMesh {
+    mesh      :: Mesh,
     tapped    :: Event SceneTapEvent,
     dragged   :: Event SceneDragEvent,
     dragDelta :: Event Vector3
 }
 
-derive instance newtypeTapDragMesh :: Newtype (TapDragMesh a) _
+derive instance newtypeTapDragMesh :: Newtype TapDragMesh _
 
-mkTapDragMesh :: forall a geo mat. Geometry geo -> Material mat -> Effect (TapDragMesh a)
+mkTapDragMesh :: forall geo mat. IsGeometry geo => IsMaterial mat => geo -> mat -> Effect TapDragMesh
 mkTapDragMesh geo mat = do
     m <- mkDraggableMesh geo mat
     pure $ TapDragMesh {

@@ -8,6 +8,10 @@ exports.mkCircleGeometry = radius => segs => _ => {
     return new three.CircleGeometry(radius, segs)
 }
 
+exports.mkCylinderGeometry = radius => height => _ => {
+    return new three.CylinderGeometry(radius, radius, height)
+}
+
 exports.mkShape = ps => _ => {
     return new three.Shape(ps)
 }

@@ -15,10 +15,10 @@ import Editor.SceneEvent (SceneMouseMoveEvent, SceneTapEvent, makeMouseMove, mak
 import Effect (Effect)
 import FRP.Event (Event, makeEvent)
 import RBush.RBush (RBush)
-import Three.Core.Geometry (BufferGeometry, Geometry, count, getAttribute, getX, getY, getZ)
-import Three.Core.Material (Material, MaterialCreator, getMaterial, preload, setTransparent)
+import Three.Core.Geometry (class IsGeometry, BufferGeometry, Geometry, count, getAttribute, getX, getY, getZ)
+import Three.Core.Material (class IsMaterial, MaterialCreator, MeshBasicMaterial, getMaterial, preload, setTransparent)
 import Three.Core.Mesh (Mesh, bufferGeometry, geometry, isMesh, mkMesh)
-import Three.Core.Object3D (Object3D, add, children, remove, setCastShadow, setName, setReceiveShadow)
+import Three.Core.Object3D (class IsObject3D, Object3D, add, children, remove, setCastShadow, setName, setReceiveShadow)
 import Three.Loader.ObjLoader (loadMTL, loadOBJ, makeMTLLoader, makeOBJLoader2, setPath)
 import Three.Math.Vector (Vector3, mkVec3)
 
@@ -27,7 +27,7 @@ meshPath :: String -> Int -> String
 meshPath serverUrl leadId = serverUrl <> "/leads/" <> show leadId <> "/mesh/"
 
 newtype HouseMesh = HouseMesh {
-    mesh      :: Mesh Unit,
+    mesh      :: Mesh,
     tapped    :: Event SceneTapEvent,
     mouseMove :: Event SceneMouseMoveEvent
 }
@@ -36,7 +36,7 @@ derive instance newtypeHouseMesh :: Newtype HouseMesh _
 
 -- | create new HouseMesh, which is a mesh composed with the tap and mouse
 -- events from the mesh.
-mkHouseMesh :: forall a geo. Geometry geo -> Material a -> Effect HouseMesh
+mkHouseMesh :: forall geo mat. IsGeometry geo => IsMaterial mat => geo -> mat -> Effect HouseMesh
 mkHouseMesh geo mat = do
     mesh <- mkMesh geo mat
     setName "house-mesh" mesh
@@ -57,29 +57,33 @@ mkHouseMesh geo mat = do
 
 -- | apply the material creator's material to the mesh, which is a child of
 -- the loaded Object3D
-applyMaterialCreator :: forall a. MaterialCreator -> Object3D a -> Effect (Maybe HouseMesh)
+applyMaterialCreator :: forall a. IsObject3D a => MaterialCreator -> a -> Effect (Maybe HouseMesh)
 applyMaterialCreator matCreator obj = do
-    let mat = getMaterial "scene" matCreator
+    let mat :: MeshBasicMaterial
+        mat = getMaterial "scene" matCreator
     setTransparent false mat
 
     let oldMesh = find isMesh (children obj)
         upd old = do
             remove old obj
-            newMesh <- mkHouseMesh (geometry old) mat
+            let geo :: Geometry
+                geo = geometry old
+            newMesh <- mkHouseMesh geo mat
             add (newMesh ^. _mesh) obj
             pure newMesh
     traverse upd oldMesh
 
 
 -- | load the house mesh of the specified lead
-loadHouseModel :: forall geo. String -> Int -> Effect (Event (HouseMeshData geo))
+loadHouseModel :: String -> Int -> Effect (Event HouseMeshData)
 loadHouseModel serverUrl leadId = do
     objLoader <- makeOBJLoader2
     mtlLoader <- makeMTLLoader
 
     let path = meshPath serverUrl leadId
 
-    let setupShadow o = do
+    let setupShadow :: Object3D -> Effect Unit
+        setupShadow o = do
             setCastShadow true o
             setReceiveShadow true o
 
@@ -99,23 +103,23 @@ loadHouseModel serverUrl leadId = do
 
 -- | house mesh data, including the mesh, the original geometry, and the
 -- vertices tree built from all vertices
-newtype HouseMeshData geo = HouseMeshData {
-    wrapper     :: Object3D Unit,
+newtype HouseMeshData = HouseMeshData {
+    wrapper     :: Object3D,
     mesh        :: HouseMesh,
-    geometry    :: BufferGeometry geo,
+    geometry    :: BufferGeometry,
     verticeTree :: RBush VertexItem
 }
 
-derive instance newtypeHouseMeshData :: Newtype (HouseMeshData geo) _
+derive instance newtypeHouseMeshData :: Newtype HouseMeshData _
 
-type GeometryInfo geo = {
-    geometry :: BufferGeometry geo,
+type GeometryInfo = {
+    geometry :: BufferGeometry,
     vertices :: Array Vector3,
     normals  :: Array Vector3
 }
 
 -- | get the vertex position and normal vector arrays of a BufferGeometry
-getGeometryInfo :: forall a geo. Mesh a -> GeometryInfo geo
+getGeometryInfo :: Mesh -> GeometryInfo
 getGeometryInfo mesh = let g = bufferGeometry mesh
                            posAttr = getAttribute "position" g
                            normAttr = getAttribute "normal" g
@@ -125,7 +129,7 @@ getGeometryInfo mesh = let g = bufferGeometry mesh
                            normVecs = vecAt normAttr <$> range 0 (count normAttr - 1)
                            in { geometry: g, vertices: posVecs, normals: normVecs }
 
-getHouseMeshData :: forall geo. Object3D Unit -> HouseMesh -> Effect (HouseMeshData geo)
+getHouseMeshData :: Object3D -> HouseMesh -> Effect HouseMeshData
 getHouseMeshData obj houseMesh = do
     let d = getGeometryInfo $ houseMesh ^. _mesh
     tree <- buildRTree d.vertices d.normals

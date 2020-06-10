@@ -24,11 +24,10 @@ import Editor.WebEditor (WebEditor, addDisposable, addToScene, createScene, rend
 import Effect.Class (liftEffect)
 import FRP.Event (Event, create, keepLatest)
 import Model.Roof.RoofPlate (RoofEdited)
-import Unsafe.Coerce (unsafeCoerce)
 import Web.HTML (window)
 
 -- | createEditor will create the Web Editor instance
-createEditor :: forall a. EditorM (Maybe (WebEditor a))
+createEditor :: EditorM (Maybe WebEditor)
 createEditor = do
     cfg <- ask
 
@@ -55,14 +54,14 @@ _loaded = _Newtype <<< prop (SProxy :: SProxy "loaded")
 _roofUpdate :: Lens' House (Event (Array RoofEdited))
 _roofUpdate = _Newtype <<< prop (SProxy :: SProxy "roofUpdate")
 
-loadHouse :: forall a. WebEditor a -> HouseEditor House
+loadHouse :: WebEditor -> HouseEditor House
 loadHouse editor = do
     cfg <- ask
 
     { event: loadedEvt, push: loadedFunc } <- liftEffect create
 
     let f hmd roofRackData = do
-            liftEffect $ addToScene (unsafeCoerce $ hmd ^. _wrapper) editor
+            liftEffect $ addToScene (hmd ^. _wrapper) editor
             mgr <- createRoofManager hmd roofRackData
             liftEffect $ addToScene (mgr ^. _wrapper) editor
             liftEffect $ addDisposable (dispose mgr) editor

@@ -19,40 +19,40 @@ import Effect (Effect)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Event (Event, subscribe)
 import FRP.Event.Extra (foldWithDef, multicast)
-import Three.Core.Geometry (Geometry, mkCircleGeometry)
-import Three.Core.Material (Material, mkMeshBasicMaterial, setOpacity, setTransparent)
+import Three.Core.Geometry (class IsGeometry, mkCircleGeometry)
+import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial, setOpacity, setTransparent)
 import Three.Core.Object3D (Object3D, add, hasParent, mkObject3D, parent, setName, setPosition, setRenderOrder, setVisible, worldToLocal)
 import Three.Math.Vector (Vector2, Vector3, mkVec3, vecX, vecY, (<+>))
 import Unsafe.Coerce (unsafeCoerce)
 
-newtype DraggableObject a = DraggableObject {
-    object     :: Object3D a,
+newtype DraggableObject = DraggableObject {
+    object     :: Object3D,
     tapped     :: Event Int,
     position   :: Event Vector3,
     isDragging :: Event Boolean,
     disposable :: Effect Unit
 }
 
-derive instance newtypeDraggableEvent :: Newtype (DraggableObject a) _
+derive instance newtypeDraggableEvent :: Newtype DraggableObject _
 
-instance disposableDraggableObject :: Disposable (DraggableObject a) where
+instance disposableDraggableObject :: Disposable DraggableObject where
     dispose d = d ^. _disposable
 
-_draggableObject :: forall a. Lens' (DraggableObject a) (Object3D a)
+_draggableObject :: Lens' DraggableObject Object3D
 _draggableObject = _Newtype <<< prop (SProxy :: SProxy "object")
 
-_position :: forall a. Lens' (DraggableObject a) (Event Vector3)
+_position :: Lens' DraggableObject (Event Vector3)
 _position = _Newtype <<< prop (SProxy :: SProxy "position")
 
-_isDragging :: forall a. Lens' (DraggableObject a) (Event Boolean)
+_isDragging :: Lens' DraggableObject (Event Boolean)
 _isDragging = _Newtype <<< prop (SProxy :: SProxy "isDragging")
 
 -- | create the default material
-defMaterial :: forall a. Material a
+defMaterial :: MeshBasicMaterial
 defMaterial = unsafeCoerce $ unsafePerformEffect (mkMeshBasicMaterial 0xff2222)
 
 -- | invisible material for big circle under marker to easae dragging
-invisibleMaterial :: forall a. Material a
+invisibleMaterial :: MeshBasicMaterial
 invisibleMaterial = unsafeCoerce $ unsafePerformEffect do
     mat <- mkMeshBasicMaterial 0
     setTransparent true mat
@@ -61,7 +61,7 @@ invisibleMaterial = unsafeCoerce $ unsafePerformEffect do
 
 -- | create visible part of the object, user can specify custom geometry
 -- and material
-createVisibleObject :: forall a geo mat. Maybe (Geometry geo) -> Maybe (Material mat) -> Effect (TapDragMesh a)
+createVisibleObject :: forall geo. IsGeometry geo => Maybe geo -> Maybe MeshBasicMaterial -> Effect TapDragMesh
 createVisibleObject geo mat = do
     cm <- mkCircleGeometry 0.5 32
     let g = fromMaybe (unsafeCoerce cm) geo
@@ -69,19 +69,20 @@ createVisibleObject geo mat = do
     mkTapDragMesh g m
 
 
-createInvisibleCircle :: forall a. Effect (DraggableMesh a)
+createInvisibleCircle :: Effect DraggableMesh
 createInvisibleCircle = do
     geo <- mkCircleGeometry 10.0 32
     mkDraggableMesh geo invisibleMaterial
 
 
 -- | create a draggable object
-createDraggableObject :: forall a geo mat. Event Boolean
+createDraggableObject :: forall geo. IsGeometry geo =>
+                                        Event Boolean
                                         -> Int
                                         -> Vector2
-                                        -> Maybe (Geometry geo)
-                                        -> Maybe (Material mat)
-                                        -> Effect (DraggableObject a)
+                                        -> Maybe geo
+                                        -> Maybe MeshBasicMaterial
+                                        -> Effect DraggableObject
 createDraggableObject active index position customGeo customMat = do
     dragObj <- mkObject3D
     setName "drag-object" dragObj
@@ -114,7 +115,7 @@ createDraggableObject active index position customGeo customMat = do
     disp2 <- subscribe dragging (flip setVisible (invCircle ^. _mesh))
 
     let toLocal v = if hasParent dragObj
-                    then Just <$> worldToLocal v (parent dragObj)
+                    then Just <$> worldToLocal v (parent dragObj :: Object3D)
                     else pure Nothing
         delta = calcDragDelta toLocal evts
 

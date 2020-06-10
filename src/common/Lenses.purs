@@ -50,6 +50,9 @@ _y = _Newtype <<< prop (SProxy :: SProxy "y")
 _z :: forall t a r. Newtype t { z :: a | r } => Lens' t a
 _z = _Newtype <<< prop (SProxy :: SProxy "z")
 
+_length :: forall t a r. Newtype t { length :: a | r } => Lens' t a
+_length = _Newtype <<< prop (SProxy :: SProxy "length")
+
 _deltaX :: forall t a r. Newtype t { deltaX :: a | r } => Lens' t a
 _deltaX = _Newtype <<< prop (SProxy :: SProxy "deltaX")
 

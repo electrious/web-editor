@@ -30,10 +30,10 @@ import Model.Hardware.PanelType (PanelType(..))
 import Model.Racking.RackingType (RackingType(..))
 import Model.Roof.ArrayConfig (ArrayConfig, _panelLowestZ)
 import Model.Roof.Panel (Orientation(..), Panel, panelLong, panelShort, panelSize, validatedSlope)
-import Three.Core.Geometry (BoxGeometry, Geometry, mkBoxGeometry)
-import Three.Core.Material (MeshBasicMaterial, Material, mkMeshBasicMaterialWithTexture)
+import Three.Core.Geometry (class IsGeometry, BoxGeometry, mkBoxGeometry)
+import Three.Core.Material (class IsMaterial, MeshBasicMaterial, mkMeshBasicMaterialWithTexture)
 import Three.Core.Mesh (Mesh, mkMesh)
-import Three.Core.Object3D (Object3D, add, rotateWithEuler, setName, setPosition, setRenderOrder)
+import Three.Core.Object3D (class IsObject3D, Object3D, add, rotateWithEuler, setName, setPosition, setRenderOrder)
 import Three.Loader.TextureLoader (loadTexture, mkTextureLoader)
 import Three.Math.Euler (mkEuler)
 import Three.Math.Vector (mkVec3)
@@ -68,42 +68,42 @@ panelTextureType _ Premium  = PremiumTexture
 panelTextureType _ Standard = StandardTexture
 
 -- create material for panel node with the provided image url
-mkPanelMaterial :: forall a. String -> Effect (MeshBasicMaterial a)
+mkPanelMaterial :: String -> Effect MeshBasicMaterial
 mkPanelMaterial imagePath = mkTextureLoader >>= loadTexture imagePath >>= mkMeshBasicMaterialWithTexture
 
 -- | memoized function to get panel material for the corresponding panel texture type
-getPanelMaterial :: forall a. PanelTextureInfo -> PanelTextureType -> MeshBasicMaterial a
+getPanelMaterial :: PanelTextureInfo -> PanelTextureType -> MeshBasicMaterial
 getPanelMaterial info = memoize (unsafePerformEffect <<< mkPanelMaterial <<< imageUrl)
     where imageUrl PremiumTexture    = fromMaybe "" $ info ^. _premium
           imageUrl StandardTexture   = fromMaybe "" $ info ^. _standard
           imageUrl Standard72Texture = fromMaybe "" $ info ^. _standard72
 
 -- | memoized function to create panel body's geometry
-panelGeometry :: forall a. Unit -> BoxGeometry a
+panelGeometry :: Unit -> BoxGeometry
 panelGeometry = memoize (const $ unsafePerformEffect $ mkBoxGeometry (meterVal panelShort) (meterVal panelLong) 0.04)
 
 -- | memoized function to create panel vertical frame
-verticalGeometry :: forall a. Unit -> BoxGeometry a
+verticalGeometry :: Unit -> BoxGeometry
 verticalGeometry = memoize (const $ unsafePerformEffect $ mkBoxGeometry 0.01 (meterVal panelLong) 0.05)
 
 -- | memoized function to create panel horizontal frame
-horizontalGeometry :: forall a. Unit -> BoxGeometry a
+horizontalGeometry :: Unit -> BoxGeometry
 horizontalGeometry = memoize (const $ unsafePerformEffect $ mkBoxGeometry (meterVal panelShort) 0.01 0.05)
 
-newtype PanelNode a = PanelNode {
+newtype PanelNode = PanelNode {
     panelId     :: Int,
-    panelObject :: Object3D a
+    panelObject :: Object3D
 }
 
-derive instance newtypePanelNode :: Newtype (PanelNode a) _
+derive instance newtypePanelNode :: Newtype PanelNode _
 
-_panelId :: forall a. Lens' (PanelNode a) Int
+_panelId :: Lens' PanelNode Int
 _panelId = _Newtype <<< prop (SProxy :: SProxy "panelId")
 
-_panelObject :: forall a. Lens' (PanelNode a) (Object3D a)
+_panelObject :: Lens' PanelNode Object3D
 _panelObject = _Newtype <<< prop (SProxy :: SProxy "panelObject")
 
-mkTopFrame :: forall a geo mat. Geometry geo -> Material mat -> Effect (Mesh a)
+mkTopFrame :: forall geo mat. IsGeometry geo => IsMaterial mat => geo -> mat -> Effect Mesh
 mkTopFrame geo mat = do
     top <- mkMesh geo mat
     setName "top" top
@@ -111,7 +111,7 @@ mkTopFrame geo mat = do
     setRenderOrder 9 top
     pure top
 
-mkBotFrame :: forall a geo mat. Geometry geo -> Material mat -> Effect (Mesh a)
+mkBotFrame :: forall geo mat. IsGeometry geo => IsMaterial mat => geo -> mat -> Effect Mesh
 mkBotFrame geo mat = do
     bot <- mkMesh geo mat
     setName "bottom" bot
@@ -119,7 +119,7 @@ mkBotFrame geo mat = do
     setRenderOrder 9 bot
     pure bot
 
-mkLeftFrame :: forall a geo mat. Geometry geo -> Material mat -> Effect (Mesh a)
+mkLeftFrame :: forall geo mat. IsGeometry geo => IsMaterial mat => geo -> mat -> Effect Mesh
 mkLeftFrame geo mat = do
     left <- mkMesh geo mat
     setName "left" left
@@ -127,7 +127,7 @@ mkLeftFrame geo mat = do
     setRenderOrder 9 left
     pure left
 
-mkRightFrame :: forall a geo mat. Geometry geo -> Material mat -> Effect (Mesh a)
+mkRightFrame :: forall geo mat. IsGeometry geo => IsMaterial mat => geo -> mat -> Effect Mesh
 mkRightFrame geo mat = do
     right <- mkMesh geo mat
     setName "right" right
@@ -136,7 +136,7 @@ mkRightFrame geo mat = do
     pure right
 
 -- | make a default panel mesh node
-mkPanelMesh :: forall a. Panel -> ArrayBuilder (Dynamic (Mesh a))
+mkPanelMesh :: Panel -> ArrayBuilder (Dynamic Mesh)
 mkPanelMesh p = do
     arrCfgDyn    <- getArrayConfig
     info         <- getTextureInfo
@@ -170,7 +170,7 @@ mkPanelMesh p = do
     pure $ performDynamic $ updatePosition p <$> arrCfgDyn <*> newNodeDyn
 
 -- update panel mesh position based on array config and the corresponding panel model
-updatePosition :: forall a. Panel -> ArrayConfig -> Object3D a -> Effect (Object3D a)
+updatePosition :: forall a. IsObject3D a => Panel -> ArrayConfig -> a -> Effect a
 updatePosition p arrCfg m = setPosition pv m *> pure m
     where px = meterVal $ p ^. _x
           py = meterVal $ p ^. _y
@@ -182,7 +182,7 @@ updatePosition p arrCfg m = setPosition pv m *> pure m
                                 in mkVec3 px py (z + h)
 
 -- update the rotation of the panel mesh
-updateRotation :: forall a. Panel -> Object3D a -> Effect (Object3D a)
+updateRotation :: forall a. IsObject3D a => Panel -> a -> Effect a
 updateRotation p m = rotateWithEuler euler m *> pure m
     where euler = case validatedSlope p of
                      Nothing -> rotateForNormal $ p ^. _orientation

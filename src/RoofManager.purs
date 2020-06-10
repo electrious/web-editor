@@ -38,20 +38,20 @@ import Model.Racking.OldRackingSystem (OldRoofRackingData, guessRackingType)
 import Model.Racking.RackingType (RackingType(..))
 import Model.Roof.Panel (Panel, _roofUUID)
 import Model.Roof.RoofPlate (RoofEdited, RoofOperation(..), RoofPlate, _roofIntId, isFlat, toRoofEdited)
-import Three.Core.Object3D (Object3D, add, mkObject3D, remove, setName)
+import Three.Core.Object3D (class IsObject3D, Object3D, add, mkObject3D, remove, setName)
 
-newtype RoofManager a = RoofManager {
-    wrapper     :: Object3D a,
+newtype RoofManager = RoofManager {
+    wrapper     :: Object3D,
     editedRoofs :: Event (Array RoofEdited),
     disposable  :: Effect Unit
 }
 
-derive instance newtypeRoofManager :: Newtype (RoofManager a) _
+derive instance newtypeRoofManager :: Newtype RoofManager _
 
-instance disposableRoofManager :: Disposable (RoofManager a) where
+instance disposableRoofManager :: Disposable RoofManager where
     dispose r = r ^. _disposable
 
-_editedRoofs :: forall a. Lens' (RoofManager a) (Event (Array RoofEdited))
+_editedRoofs :: Lens' RoofManager (Event (Array RoofEdited))
 _editedRoofs = _Newtype <<< prop (SProxy :: SProxy "editedRoofs")
 
 type RoofDict = Map String RoofPlate
@@ -93,33 +93,33 @@ applyRoofOp (RoofOpDelete rid)  rd = renderAll $ rd # _roofs %~ delete rid
 applyRoofOp (RoofOpUpdate roof) rd = rd # _roofs %~ insert (roof ^. _id) roof
                                         # _roofsToRender .~ Nothing
 
-doFlatten :: forall a. HouseMeshData a -> RoofDict -> Effect Unit
+doFlatten :: HouseMeshData -> RoofDict -> Effect Unit
 doFlatten meshData rd = flattenRoofPlates (meshData ^. _geometry) 
                                           (meshData ^. _verticeTree)
                                           (meshData ^. (_mesh <<< _mesh))
                                           (toUnfoldable $ values rd)
 
 -- | get roofUpdate event from an array of roof nodes
-getRoofUpdate :: forall a. Array (RoofNode a) -> Event RoofOperation
+getRoofUpdate :: Array RoofNode -> Event RoofOperation
 getRoofUpdate ns = foldl (<|>) empty (view _roofUpdate <$> ns)
 
 -- | get roofDelete event from an array of roof nodes
-getRoofDelete :: forall a. Array (RoofNode a) -> Event RoofOperation
+getRoofDelete :: Array RoofNode -> Event RoofOperation
 getRoofDelete ns = foldl (<|>) empty (view _roofDelete <$> ns)
 
 -- | get the activated roof id event from an array of roof nodes
-getActivated :: forall a. Array (RoofNode a) -> Event String
+getActivated :: Array RoofNode -> Event String
 getActivated ns = foldl (<|>) empty (f <$> ns)
     where f n = const (n ^. _roofId) <$> (n ^. _tapped)
 
-createWrapper :: forall a. Effect (Object3D a)
+createWrapper :: Effect Object3D
 createWrapper = do
     wrapper <- mkObject3D
     setName "roof wrapper" wrapper
     pure wrapper
 
 -- | function to create roof node
-mkNode :: forall a. Event (Maybe String) -> PanelsDict -> Map Int OldRoofRackingData -> RoofPlate -> HouseEditor (RoofNode a)
+mkNode :: Event (Maybe String) -> PanelsDict -> Map Int OldRoofRackingData -> RoofPlate -> HouseEditor RoofNode
 mkNode activeRoof panelsDict racks roof = createRoofNode roof rackType ps (step false $ multicast $ (==) (Just (roof ^. _id)) <$> activeRoof)
     where ps = zeroSlope <$> fromMaybe [] (lookup (roof ^. _id) panelsDict)
           -- make sure slope value in panels on non-flat roof is set to zero
@@ -129,20 +129,20 @@ mkNode activeRoof panelsDict racks roof = createRoofNode roof rackType ps (step 
           rackType = fromMaybe XR10 $ guessRackingType <$> lookup (roof ^. _roofIntId) racks
 
 -- helper function to delete and dispose an old roof node
-delOldNode :: forall a b. Object3D a -> RoofNode b -> Effect Unit
+delOldNode :: forall a. IsObject3D a => a -> RoofNode -> Effect Unit
 delOldNode wrapper rn = do
     dispose rn
     remove (rn ^. _roofObject) wrapper
 
 -- delete old nodes and add new ones to the wrapper
-renderNodes :: forall a b. Object3D a -> { last :: Maybe (Array (RoofNode b)), now :: Array (RoofNode b)} -> Effect (Array (RoofNode b))
+renderNodes :: forall a. IsObject3D a => a -> { last :: Maybe (Array RoofNode), now :: Array RoofNode } -> Effect (Array RoofNode)
 renderNodes wrapper { last, now } = do
     traverse_ (delOldNode wrapper) $ fromMaybe [] last
     traverse_ (flip add wrapper <<< view _roofObject) now
     pure now
 
 -- | render dynamic roofs
-renderRoofs :: forall a b. Object3D a -> Event (Maybe String) -> Event RoofDictData -> PanelsDict -> Map Int OldRoofRackingData -> HouseEditor (Event (Array (RoofNode b)))
+renderRoofs :: forall a. IsObject3D a => a -> Event (Maybe String) -> Event RoofDictData -> PanelsDict -> Map Int OldRoofRackingData -> HouseEditor (Event (Array RoofNode))
 renderRoofs wrapper activeRoof roofsData panelsDict racks = do
     let rsToRender = compact $ view _roofsToRender <$> roofsData
         rsToRenderArr = dictToArr <$> rsToRender
@@ -155,7 +155,7 @@ isRoofEditing :: HouseEditor (Dynamic Boolean)
 isRoofEditing = map ((==) RoofEditing) <<< view _modeDyn <$> ask
 
 -- | function to add the roof recognizer and recognize new roofs
-recognizeNewRoofs :: forall a b c. HouseMeshData a -> Object3D b -> Event RoofDict -> Dynamic (Maybe String) -> Dynamic Boolean -> Effect (RoofRecognizer c)
+recognizeNewRoofs :: HouseMeshData -> Object3D -> Event RoofDict -> Dynamic (Maybe String) -> Dynamic Boolean -> Effect RoofRecognizer
 recognizeNewRoofs meshData wrapper newRoofs activeRoof canEditRoofDyn = do
     let canShowRecognizer = (&&) <$> (isNothing <$> activeRoof) <*> canEditRoofDyn
     -- create the roof recognizer and add it to the roof wrapper object
@@ -166,7 +166,7 @@ recognizeNewRoofs meshData wrapper newRoofs activeRoof canEditRoofDyn = do
     add (recognizer ^. _marker) wrapper
     pure recognizer
 
-getActiveRoof :: forall a. HouseMeshData a -> Event String -> Event RoofOperation -> Event RoofPlate -> Event (Maybe String)
+getActiveRoof :: HouseMeshData -> Event String -> Event RoofOperation -> Event RoofPlate -> Event (Maybe String)
 getActiveRoof meshData activated deleteRoofOp addedNewRoof =
                 (const Nothing <$> meshData ^. _mesh <<< _tapped) <|>
                 (Just <$> activated) <|>
@@ -174,7 +174,7 @@ getActiveRoof meshData activated deleteRoofOp addedNewRoof =
                 (delay 1 $ Just <<< view _id <$> addedNewRoof)
 
 -- | create RoofManager for an array of roofs
-createRoofManager :: forall a b. HouseMeshData a -> Map Int OldRoofRackingData -> HouseEditor (RoofManager b)
+createRoofManager :: HouseMeshData -> Map Int OldRoofRackingData -> HouseEditor RoofManager
 createRoofManager meshData racks = do
     wrapper <- liftEffect createWrapper
 

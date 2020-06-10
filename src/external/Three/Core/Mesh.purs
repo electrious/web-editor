@@ -3,27 +3,25 @@ module Three.Core.Mesh where
 import Prelude
 
 import Effect (Effect)
-import Three.Core.Geometry (BufferGeometry, Geometry)
-import Three.Core.Material (Material)
-import Three.Core.Object3D (Object3D)
+import Three.Core.Geometry (class IsBufferGeometry, class IsGeometry)
+import Three.Core.Material (class IsMaterial)
+import Three.Core.Object3D (class IsObject3D)
 import Util (ffi, fpi)
 
-foreign import data JSMesh :: Type -> Type
+foreign import data Mesh :: Type
+foreign import mkMesh :: forall geo mat. IsGeometry geo => IsMaterial mat => geo -> mat -> Effect Mesh
+instance isObject3DMesh :: IsObject3D Mesh
 
-type Mesh a = Object3D (JSMesh a)
+foreign import isMesh :: Mesh -> Boolean
 
-foreign import mkMesh :: forall a geo mat. Geometry geo -> Material mat -> Effect (Mesh a)
-
-foreign import isMesh :: forall a. Mesh a -> Boolean
-
-geometry :: forall a geo. Mesh a -> Geometry geo
+geometry :: forall geo. IsGeometry geo => Mesh -> geo
 geometry = ffi ["mesh"] "mesh.geometry"
 
-bufferGeometry :: forall a geo. Mesh a -> BufferGeometry geo
+bufferGeometry :: forall geo. IsBufferGeometry geo => Mesh -> geo
 bufferGeometry = ffi ["mesh"] "mesh.geometry"
 
-setBufferGeometry :: forall a geo. BufferGeometry geo -> Mesh a -> Effect Unit
+setBufferGeometry :: forall geo. IsBufferGeometry geo => geo -> Mesh -> Effect Unit
 setBufferGeometry = fpi ["geo", "mesh", ""] "mesh.geometry = geo"
 
-setMaterial :: forall a mat. Material mat -> Mesh a -> Effect Unit
+setMaterial :: forall mat. IsMaterial mat => mat -> Mesh -> Effect Unit
 setMaterial = fpi ["mat", "mesh", ""] "mesh.material = mat"

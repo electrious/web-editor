@@ -25,9 +25,9 @@ import Effect (Effect)
 import FRP.Dynamic (Dynamic, sampleDyn)
 import FRP.Event (Event, subscribe)
 import FRP.Event.Extra (debounce, multicast, performEvent)
-import Three.Core.Camera (Camera)
+import Three.Core.Camera (class IsCamera)
 import Three.Core.Face3 (Face3)
-import Three.Core.Object3D (Object3D)
+import Three.Core.Object3D (class IsObject3D)
 import Three.Core.Raycaster (Intersection, distance, face, intersectObject, mkRaycaster, object, point, setFromCamera)
 import Three.Math.Vector (Vector2, Vector3, mkVec2, mkVec3)
 import Util (ffi, fpi)
@@ -95,45 +95,45 @@ mkDragEndable evt = evt <|> compact (f <$> e)
 
 -- | Convert an Object3D to be tappable by attaching a callback
 -- function for tap events.
-makeTappable :: forall a. Object3D a -> (SceneTapEvent -> Effect Unit) -> Effect Unit
+makeTappable :: forall a. IsObject3D a => a -> (SceneTapEvent -> Effect Unit) -> Effect Unit
 makeTappable = fpi ["obj", "cb", ""] "obj.tapped = cb"
 
-stopTappable :: forall a. Object3D a -> Effect Unit
+stopTappable :: forall a. IsObject3D a => a -> Effect Unit
 stopTappable = fpi ["obj", ""] "obj.tapped = undefined"
 
-isTappable :: forall a. Object3D a -> Boolean
+isTappable :: forall a. IsObject3D a => a -> Boolean
 isTappable = ffi ["obj"] "obj.tapped !== undefined"
 
-sendTapEvent :: forall a. Object3D a -> SceneTapEvent -> Effect Unit
+sendTapEvent :: forall a. IsObject3D a => a -> SceneTapEvent -> Effect Unit
 sendTapEvent = fpi ["obj", "evt", ""] "obj.tapped(evt)()"
 
 
 -- | Convert an Object3D to be MouseMovable by attaching a callback
 -- function for mouseMove events.
-makeMouseMove :: forall a. Object3D a -> (SceneMouseMoveEvent -> Effect Unit) -> Effect Unit
+makeMouseMove :: forall a. IsObject3D a => a -> (SceneMouseMoveEvent -> Effect Unit) -> Effect Unit
 makeMouseMove = fpi ["obj", "cb", ""] "obj.mouseMove = cb"
 
-stopMouseMove :: forall a. Object3D a -> Effect Unit
+stopMouseMove :: forall a. IsObject3D a => a -> Effect Unit
 stopMouseMove = fpi ["obj", ""] "obj.mouseMove = undefined"
 
-isMouseMove :: forall a. Object3D a -> Boolean
+isMouseMove :: forall a. IsObject3D a => a -> Boolean
 isMouseMove = ffi ["obj"] "obj.mouseMove !== undefined"
 
-sendMouseMoveEvent :: forall a. Object3D a -> SceneMouseMoveEvent -> Effect Unit
+sendMouseMoveEvent :: forall a. IsObject3D a => a -> SceneMouseMoveEvent -> Effect Unit
 sendMouseMoveEvent = fpi ["obj", "evt", ""] "obj.mouseMove(evt)()"
 
 -- | Convert an Object3D to be Draggable by attaching a callback
 -- function for drag events.
-makeDraggable :: forall a. Object3D a -> (SceneDragEvent -> Effect Unit) -> Effect Unit
+makeDraggable :: forall a. IsObject3D a => a -> (SceneDragEvent -> Effect Unit) -> Effect Unit
 makeDraggable = fpi ["obj", "cb", ""] "obj.dragged = cb"
 
-stopDraggable :: forall a. Object3D a -> Effect Unit
+stopDraggable :: forall a. IsObject3D a => a -> Effect Unit
 stopDraggable = fpi ["obj", ""] "obj.dragged = undefined"
 
-isDraggable :: forall a. Object3D a -> Boolean
+isDraggable :: forall a. IsObject3D a => a -> Boolean
 isDraggable = ffi ["obj"] "obj.dragged !== undefined"
 
-sendDragEvent :: forall a. Object3D a -> SceneDragEvent -> Effect Unit
+sendDragEvent :: forall a. IsObject3D a => a -> SceneDragEvent -> Effect Unit
 sendDragEvent = fpi ["obj", "evt", ""] "obj.dragged(evt)()"
 
 -- | convert mouse/touch position to values between -1 and 1
@@ -189,7 +189,7 @@ _dragEvent = _Newtype <<< prop (SProxy :: SProxy "dragEvent")
 
 -- | setup all raycasting needed to process user inputs and send
 -- them to the corresponding 3D object in the scene
-setupRaycasting :: forall a b. Camera a -> Object3D b -> InputEvents -> Dynamic Size -> Effect RaycastSetup
+setupRaycasting :: forall a b. IsCamera a => IsObject3D b => a -> b -> InputEvents -> Dynamic Size -> Effect RaycastSetup
 setupRaycasting camera scene input sizeDyn = do
     raycaster <- mkRaycaster
     

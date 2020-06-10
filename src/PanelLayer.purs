@@ -13,14 +13,14 @@ import FRP.Dynamic (mergeDynArray, subscribeDyn, withLast)
 import Model.Roof.Panel (Panel)
 import Three.Core.Object3D (Object3D, add, mkObject3D, remove, setName)
 
-newtype PanelLayer a = PanelLayer {
-    wrapper    :: Object3D a,
+newtype PanelLayer = PanelLayer {
+    wrapper    :: Object3D,
     disposable :: Effect Unit
 }
 
-derive instance newtypePanelLayer :: Newtype (PanelLayer a) _
+derive instance newtypePanelLayer :: Newtype PanelLayer _
 
-createPanelLayer :: forall a. Array Panel -> ArrayBuilder (PanelLayer a)
+createPanelLayer :: Array Panel -> ArrayBuilder PanelLayer
 createPanelLayer ps = do
     layer <- liftEffect mkObject3D
     liftEffect $ setName "panel-layer" layer

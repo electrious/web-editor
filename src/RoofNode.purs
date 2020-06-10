@@ -35,36 +35,36 @@ import Model.Roof.Panel (Panel)
 import Model.Roof.RoofPlate (RoofOperation(..), RoofPlate, _azimuth, _borderPoints, _rotation)
 import SimplePolygon (isSimplePolygon)
 import Three.Core.Geometry (mkShape, mkShapeGeometry)
-import Three.Core.Material (Material, mkMeshBasicMaterial, setOpacity, setTransparent)
-import Three.Core.Object3D (Object3D, add, matrix, mkObject3D, remove, rotateX, rotateZ, setName, setPosition, updateMatrix, updateMatrixWorld, worldToLocal)
+import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial, setOpacity, setTransparent)
+import Three.Core.Object3D (class IsObject3D, Object3D, add, matrix, mkObject3D, remove, rotateX, rotateZ, setName, setPosition, updateMatrix, updateMatrixWorld, worldToLocal)
 import Three.Math.Vector (Vector2, Vector3, applyMatrix, mkVec2, mkVec3, vecX, vecY, vecZ)
 import Unsafe.Coerce (unsafeCoerce)
 
-newtype RoofNode a = RoofNode {
+newtype RoofNode = RoofNode {
     roofId     :: String,
     roofUpdate :: Event RoofOperation,
     roofDelete :: Event RoofOperation,
     tapped     :: Event SceneTapEvent,
-    roofObject :: Object3D a,
+    roofObject :: Object3D,
     disposable :: Effect Unit
 }
 
-derive instance newtypeRoofNode :: Newtype (RoofNode a) _
+derive instance newtypeRoofNode :: Newtype RoofNode _
 
-instance disposableRoofNode :: Disposable (RoofNode a) where
+instance disposableRoofNode :: Disposable RoofNode where
     dispose (RoofNode { disposable }) = disposable
 
-_roofUpdate :: forall a. Lens' (RoofNode a) (Event RoofOperation)
+_roofUpdate :: Lens' RoofNode (Event RoofOperation)
 _roofUpdate = _Newtype <<< prop (SProxy :: SProxy "roofUpdate")
 
-_roofDelete :: forall a. Lens' (RoofNode a) (Event RoofOperation)
+_roofDelete :: Lens' RoofNode (Event RoofOperation)
 _roofDelete = _Newtype <<< prop (SProxy :: SProxy "roofDelete")
 
-_roofObject :: forall a. Lens' (RoofNode a) (Object3D a)
+_roofObject :: Lens' RoofNode Object3D
 _roofObject = _Newtype <<< prop (SProxy :: SProxy "roofObject")
 
 -- | default material for roof plate.
-defMaterial :: forall a. Material a
+defMaterial :: MeshBasicMaterial
 defMaterial = unsafeCoerce $ unsafePerformEffect do
     mat <- mkMeshBasicMaterial 0xffffbb
     setTransparent true mat
@@ -72,7 +72,7 @@ defMaterial = unsafeCoerce $ unsafePerformEffect do
     pure mat
 
 -- | material for active roof plate
-activeMaterial :: forall a. Material a
+activeMaterial :: MeshBasicMaterial
 activeMaterial = unsafeCoerce $ unsafePerformEffect do
     mat <- mkMeshBasicMaterial 0xffff88
     setTransparent true mat
@@ -80,20 +80,20 @@ activeMaterial = unsafeCoerce $ unsafePerformEffect do
     pure mat
 
 -- | material for transparent roof plate
-transparentMaterial :: forall a. Material a
+transparentMaterial :: MeshBasicMaterial
 transparentMaterial = unsafeCoerce $ unsafePerformEffect do
     mat <- mkMeshBasicMaterial 0xffffff
     setTransparent true mat
     setOpacity 0.01 mat
     pure mat
 
-getMaterial :: forall a. Boolean -> Boolean -> Material a
+getMaterial :: Boolean -> Boolean -> MeshBasicMaterial
 getMaterial true  true  = activeMaterial
 getMaterial false true  = defMaterial
 getMaterial _     false = transparentMaterial
 
 -- | create roof mesh
-createRoofMesh :: forall a. Array Vector2 -> Boolean -> Boolean -> Effect (TappableMesh a)
+createRoofMesh :: Array Vector2 -> Boolean -> Boolean -> Effect TappableMesh
 createRoofMesh ps active canEditRoof = do
     shp <- mkShape ps
     geo <- mkShapeGeometry shp
@@ -112,13 +112,13 @@ testSimplePolygon :: Array Vector2 -> Boolean
 testSimplePolygon ps = isSimplePolygon (f <$> ps)
     where f p = [vecX p, vecY p]
 
-mkNode :: forall a. String -> Effect (Object3D a)
+mkNode :: String -> Effect Object3D
 mkNode name  = do
     obj <- mkObject3D
     setName name obj
     pure obj
 
-setupRoofNode :: forall a b. Object3D a -> Object3D b -> RoofPlate -> Effect Unit
+setupRoofNode :: forall a b. IsObject3D a => IsObject3D b => a -> b -> RoofPlate -> Effect Unit
 setupRoofNode obj content roof = do
     let c = roof ^. _center
     setPosition (mkVec3 (vecX c) (vecY c) (vecZ c + 0.05)) obj
@@ -142,23 +142,23 @@ setupRoofNode obj content roof = do
 -- only the x, y coordinates
 -- NOTE: the last point will be dropped here because it's the same with the
 -- first one
-getBorderPoints :: forall a. Object3D a -> RoofPlate -> Effect (Array Vector2)
+getBorderPoints :: forall a. IsObject3D a => a -> RoofPlate -> Effect (Array Vector2)
 getBorderPoints obj roof = traverse toLocal $ fromMaybe [] (init $ roof ^. _borderPoints)
     where toLocal p = do
               np <- worldToLocal p obj
               pure $ mkVec2 (vecX np) (vecY np)
 
-renderMesh :: forall a b. Object3D a -> { last :: Maybe (TappableMesh b), now :: TappableMesh b } -> Effect Unit
+renderMesh :: forall a. IsObject3D a => a -> { last :: Maybe TappableMesh, now :: TappableMesh } -> Effect Unit
 renderMesh obj {last, now} = do
     traverse_ (flip remove obj <<< view _mesh) last
     add (now ^. _mesh) obj
 
-getNewRoof :: forall a. Object3D a -> RoofPlate -> Event (Array Vector2) -> Effect (Event RoofOperation)
+getNewRoof :: forall a. IsObject3D a => a -> RoofPlate -> Event (Array Vector2) -> Effect (Event RoofOperation)
 getNewRoof obj roof newVertices = do
     let toParent v = applyMatrix (matrix obj) (mkVec3 (vecX v) (vecY v) 0.0)
     pure $ (RoofOpUpdate <<< flip updateRoofPlate roof <<< map toParent) <$> newVertices
 
-renderPanels :: forall a. Object3D a -> RackingType -> Array Panel -> Dynamic EditorMode -> HouseEditor (Effect Unit)
+renderPanels :: forall a. IsObject3D a => a -> RackingType -> Array Panel -> Dynamic EditorMode -> HouseEditor (Effect Unit)
 renderPanels content rackType panels modeDyn = do
     -- don't build the panel layer when it's roof editing mode
     let builder RoofEditing = pure Nothing
@@ -171,7 +171,7 @@ renderPanels content rackType panels modeDyn = do
     liftEffect $ subscribeDyn (withLast panelLayerDyn) render
 
 -- | Create RoofNode for a RoofPlate
-createRoofNode :: forall a. RoofPlate -> RackingType -> Array Panel -> Dynamic Boolean -> HouseEditor (RoofNode a)
+createRoofNode :: RoofPlate -> RackingType -> Array Panel -> Dynamic Boolean -> HouseEditor RoofNode
 createRoofNode roof rackType panels isActive = do
     obj <- liftEffect $ mkNode "roofplate"
     content <- liftEffect $ mkNode "roof-content"

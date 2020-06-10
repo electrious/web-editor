@@ -25,10 +25,10 @@ import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, subscribeDyn)
 import FRP.Event (Event, create, keepLatest, sampleOn, subscribe)
 import FRP.Event.Extra (foldEffect, mergeArray, multicast, performEvent)
-import Three.Core.Geometry (Geometry, mkCircleGeometry)
-import Three.Core.Material (Material, mkMeshBasicMaterial)
+import Three.Core.Geometry (CircleGeometry, Geometry, mkCircleGeometry)
+import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial)
 import Three.Core.Mesh (Mesh)
-import Three.Core.Object3D (Object3D, add, remove, setPosition, setVisible)
+import Three.Core.Object3D (class IsObject3D, Object3D, add, remove, setPosition, setVisible)
 import Three.Math.Vector (Vector2, Vector3, dist, mkVec2, mkVec3, vecX, vecY)
 import UI.DraggableObject (DraggableObject, _draggableObject, _isDragging, createDraggableObject)
 import Unsafe.Coerce (unsafeCoerce)
@@ -38,10 +38,10 @@ toVec2 v = mkVec2 (vecX v) (vecY v)
 
 
 -- | create red markers for vertices
-mkRedMarkers :: forall a. Event Boolean
-                       -> Event (Maybe Int)
-                       -> Array Vector2
-                       -> Effect (Array (DraggableObject a))
+mkRedMarkers :: Event Boolean
+             -> Event (Maybe Int)
+             -> Array Vector2
+             -> Effect (Array DraggableObject)
 mkRedMarkers roofActive activeMarker ps = traverse mkMarker psIdx
     where psIdx = zip ps (range 0 (length ps - 1))
           mkMarker (Tuple pos idx) = do
@@ -50,11 +50,11 @@ mkRedMarkers roofActive activeMarker ps = traverse mkMarker psIdx
                   f act (Just actIdx) = act && actIdx == idx
               
                   isActive = multicast $ lift2 f roofActive activeMarker
-              createDraggableObject isActive idx pos Nothing Nothing
+              createDraggableObject isActive idx pos (Nothing :: Maybe Geometry) Nothing
 
 
 -- | get red markers' active status event
-getRedMarkerActiveStatus :: forall a. Event (Array (DraggableObject a)) -> Event (Maybe Int)
+getRedMarkerActiveStatus :: Event (Array DraggableObject) -> Event (Maybe Int)
 getRedMarkerActiveStatus ms = statusForDragging <|> statusForNewMarker
     where g idx m = (\d -> if d then Just idx else Nothing) <$> m ^. _isDragging
           h objs = foldl (<|>) empty (mapWithIndex g objs)
@@ -63,20 +63,20 @@ getRedMarkerActiveStatus ms = statusForDragging <|> statusForNewMarker
           statusForNewMarker = const Nothing <$> ms
 
 -- | delete old marker objects and add new ones.
-attachObjs :: forall a b c. Object3D a -> Array (DraggableObject b) -> Array (DraggableObject c) -> Effect (Array (DraggableObject b))
+attachObjs :: forall a. IsObject3D a => a -> Array DraggableObject -> Array DraggableObject -> Effect (Array DraggableObject)
 attachObjs parent newObjs objs = do
-    traverse_ (\o -> remove (o ^. _draggableObject) parent *> dispose o) objs
+    traverse_ (\o -> remove (o ^. _draggableObject :: Object3D) parent *> dispose o) objs
     traverse_ (view _draggableObject >>> flip add parent) newObjs
     pure newObjs
 
-roofDeleteMaterial :: forall a. Material a
+roofDeleteMaterial :: MeshBasicMaterial
 roofDeleteMaterial = unsafeCoerce $ unsafePerformEffect (mkMeshBasicMaterial 0xffaa22)
 
-roofDeleteGeometry :: forall a. Geometry a
+roofDeleteGeometry :: CircleGeometry
 roofDeleteGeometry = unsafeCoerce $ unsafePerformEffect (mkCircleGeometry 0.6 32)
 
 -- | create the roof delete marker button
-createRoofDeleteMarker :: forall a. Effect (TappableMesh a)
+createRoofDeleteMarker :: Effect TappableMesh
 createRoofDeleteMarker = mkTappableMesh roofDeleteGeometry roofDeleteMaterial
 
 
@@ -88,30 +88,30 @@ newtype GreenMarkerPoint = GreenMarkerPoint {
 
 derive instance newtypeGreenMarkerPoint :: Newtype GreenMarkerPoint _
 
-newtype GreenMarker a = GreenMarker {
-    mesh  :: TappableMesh a,
+newtype GreenMarker = GreenMarker {
+    mesh  :: TappableMesh,
     point :: GreenMarkerPoint
 }
 
-derive instance newtypeGreenMarker :: Newtype (GreenMarker a) _
+derive instance newtypeGreenMarker :: Newtype GreenMarker _
 
-_greenMesh :: forall a. Lens' (GreenMarker a) (Mesh a)
+_greenMesh :: Lens' GreenMarker Mesh
 _greenMesh = _mesh <<< _mesh
 
 -- | create material and geometry for the green marker.
-greenMaterial :: forall a. Material a
+greenMaterial :: MeshBasicMaterial
 greenMaterial = unsafeCoerce $ unsafePerformEffect (mkMeshBasicMaterial 0x22ff22)
 
-greenGeometry :: forall a. Geometry a
+greenGeometry :: CircleGeometry
 greenGeometry = unsafeCoerce $ unsafePerformEffect (mkCircleGeometry 0.3 32)
 
-mkGreenMarkerMesh :: forall a. Vector2 -> Effect (TappableMesh a)
+mkGreenMarkerMesh :: Vector2 -> Effect TappableMesh
 mkGreenMarkerMesh p = do
     m <- mkTappableMesh greenGeometry greenMaterial
     setPosition (mkVec3 (vecX p) (vecY p) 0.01) $ m ^. _mesh
     pure m
 
-mkGreenMarker :: forall a. GreenMarkerPoint -> Effect (GreenMarker a)
+mkGreenMarker :: GreenMarkerPoint -> Effect GreenMarker
 mkGreenMarker p = do
     m <- mkGreenMarkerMesh $ p ^. _position
     pure $ GreenMarker { mesh: m, point: p }
@@ -139,10 +139,10 @@ greenMarkerPositions vertices = h <$> filter g d
           g r = r.dist > 1.0
           h r = r.point
 
-setActive :: forall a. Array (GreenMarker a) -> Boolean -> Effect Unit
+setActive :: Array GreenMarker -> Boolean -> Effect Unit
 setActive ms active = traverse_ (\m -> setVisible active (m ^. _greenMesh)) ms
 
-updatePos :: forall c. GreenMarker c -> GreenMarkerPoint -> Effect (GreenMarker c)
+updatePos :: GreenMarker -> GreenMarkerPoint -> Effect GreenMarker
 updatePos o p = do
     let pos = p ^. _position
     setPosition (mkVec3 (vecX pos) (vecY pos) 0.01) (o ^. _greenMesh)
@@ -150,7 +150,7 @@ updatePos o p = do
 
 -- function to create/delete/update green marker objects based on new
 -- list of GreenMarkerPoint
-updateMarkers :: forall a b. Object3D a -> Array GreenMarkerPoint -> Array (GreenMarker b) -> Effect (Array (GreenMarker b))
+updateMarkers :: forall a. IsObject3D a => a -> Array GreenMarkerPoint -> Array GreenMarker -> Effect (Array GreenMarker)
 updateMarkers parent ps oldObjs | length ps == length oldObjs = sequence (zipWith updatePos oldObjs ps)
                                 | length ps > length oldObjs = do
                                         updObjs <- sequence (zipWith updatePos oldObjs (take (length oldObjs) ps))
@@ -164,7 +164,7 @@ updateMarkers parent ps oldObjs | length ps == length oldObjs = sequence (zipWit
                                         pure updObjs
                                 | otherwise = pure oldObjs
 
-mkGreenMarkers :: forall a. Object3D a -> Event Boolean -> Event (Array Vector2) -> Event GreenMarkerPoint
+mkGreenMarkers :: forall a. IsObject3D a => a -> Event Boolean -> Event (Array Vector2) -> Event GreenMarkerPoint
 mkGreenMarkers parent active vertices = keepLatest $ getTapForAll <$> markers
     where mPosList = greenMarkerPositions <$> vertices
           markers = multicast $ foldEffect (updateMarkers parent) mPosList []
@@ -200,12 +200,12 @@ _deleteRoof :: Lens' RoofEditor (Event SceneTapEvent)
 _deleteRoof = _Newtype <<< prop (SProxy :: SProxy "deleteRoof")
 
 -- get new positions after dragging
-getPosition :: forall a. Array (DraggableObject a) -> Event (Array Vector2)
+getPosition :: Array DraggableObject -> Event (Array Vector2)
 getPosition os = mergeArray (f <$> os)
     where f o = g <$> o ^. _position
           g p = toVec2 p
 
-getDelEvt :: forall a. Array (DraggableObject a) -> Event Int
+getDelEvt :: Array DraggableObject -> Event Int
 getDelEvt os = foldl (<|>) empty (f <$> os)
     where f o = o ^. _tapped
 
@@ -213,7 +213,7 @@ delMarker :: Int -> Array Vector2 -> Array Vector2
 delMarker idx ps = fromMaybe [] (deleteAt idx ps)
 
 -- | create roof editor
-createRoofEditor :: forall a. Object3D a -> Dynamic Boolean -> Array Vector2 -> Effect RoofEditor
+createRoofEditor :: forall a. IsObject3D a => a -> Dynamic Boolean -> Array Vector2 -> Effect RoofEditor
 createRoofEditor parent active ps = do
     -- internal event for maintaining the roof active status
     { event: roofActive, push: setRoofActive } <- create

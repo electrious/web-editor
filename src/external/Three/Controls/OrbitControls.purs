@@ -3,13 +3,13 @@ module Three.Controls.OrbitControls where
 import Prelude
 
 import Effect (Effect)
-import Three.Core.Camera (Camera)
+import Three.Core.Camera (class IsCamera)
 import Three.Math.Vector (Vector3)
 import Util (ffi, fpi)
 import Web.DOM (Element)
 
 foreign import data OrbitControls :: Type
-foreign import mkOrbitControls :: forall a. Camera a -> Element -> Effect OrbitControls
+foreign import mkOrbitControls :: forall c. IsCamera c => c -> Element -> Effect OrbitControls
 
 update :: OrbitControls -> Effect Unit
 update = fpi ["o", ""] "o.update()"
