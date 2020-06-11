@@ -1,11 +1,7 @@
 const three = require('three')
 
-exports.mkMesh = geo => {
-    return mat => {
-        return _ => {
-            return new three.Mesh(geo, mat)
-        }
-    }
+exports.mkMesh = _ => _ => geo => mat => _ => {
+    return new three.Mesh(geo, mat)
 }
 
 exports.isMesh = m => {

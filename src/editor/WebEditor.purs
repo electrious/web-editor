@@ -135,8 +135,7 @@ createScene sizeDyn modeDyn elem = do
     let cameraDefDist = length (position camera)
 
     -- setup the orbit controls
-    let f = mkOrbitControls
-    orbitCtrl <- f camera (domElement renderer)
+    orbitCtrl <- mkOrbitControls camera (domElement renderer)
     setupOrbitControls orbitCtrl
 
     let isShowing = (==) Showing <$> modeDyn

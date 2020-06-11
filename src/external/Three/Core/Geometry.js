@@ -20,10 +20,6 @@ exports.mkShapeGeometry = shp => _ => {
     return new three.ShapeGeometry(shp)
 }
 
-exports.isBufferGeometry = geo => {
-    return geo instanceof three.BufferGeometry
-}
-
 exports.isBufferAttribute = attr => {
     return attr instanceof three.BufferAttribute
 }

@@ -40,8 +40,6 @@ foreign import data BufferAttribute :: Type
 instance isGeometryBufferGeometry :: IsGeometry BufferGeometry
 instance isBufferGeometryBufferGeometry :: IsBufferGeometry BufferGeometry
 
-foreign import isBufferGeometry :: forall geo. IsGeometry geo => geo -> Boolean
-
 getAttribute :: forall geo. IsBufferGeometry geo => String -> geo -> BufferAttribute
 getAttribute = ffi ["name", "geo"] "geo.getAttribute(name)"
 
