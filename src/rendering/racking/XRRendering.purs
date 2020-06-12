@@ -1,6 +1,6 @@
 module Rendering.Racking.XRRendering where
 
-import Prelude
+import Prelude hiding (add)
 
 import Data.Lens ((^.))
 import Data.Meter (inch, meterVal)
@@ -12,6 +12,7 @@ import Model.Racking.XR10.LFoot (LFoot)
 import Model.Racking.XR10.Rail (Rail)
 import Model.Racking.XR10.Splice (Splice)
 import Model.Racking.XR10.Stopper (Stopper)
+import Rendering.Racking.Common (buildClamp)
 import Rendering.Renderable (class Renderable)
 import Renderring.MaterialLoader (blackMaterial)
 import Three.Core.Geometry (BoxGeometry, CylinderGeometry, mkBoxGeometry, mkCylinderGeometry)
@@ -81,31 +82,11 @@ lfootSideBox = unsafePerformEffect $ mkBoxGeometry 0.047752 0.010668 0.0762
 newtype ClampRenderable = ClampRenderable Clamp
 instance renderableClamp :: Renderable ClampRenderable Object3D where
     render (ClampRenderable c) = do
-        body <- mkMesh clampBodyCy blackMaterial
-        setName "body" body
-        setRotation (mkEuler (pi / 2.0) 0.0 0.0) body
-        setPosition (mkVec3 0.0 0.0 0.02) body
-
-        head <- mkMesh clampHeadCy blackMaterial
-        setName "head" head
-        setRotation (mkEuler (pi / 2.0) 0.0 0.0) head
-        setPosition (mkVec3 0.0 0.0 0.043) head
-
-        m <- mkObject3D
-        setName "Clamp" m
-        add body m
-        add head m
+        m <- buildClamp
         setPosition (mkVec3 (meterVal $ c ^. _x)
                             (meterVal $ c ^. _y)
                             (meterVal $ c ^. _z)) m
         pure m
-
-clampBodyCy :: CylinderGeometry
-clampBodyCy = unsafePerformEffect $ mkCylinderGeometry 0.005 0.06
-
-clampHeadCy :: CylinderGeometry
-clampHeadCy = unsafePerformEffect $ mkCylinderGeometry 0.015 0.006
-
 
 newtype StopperRenderable = StopperRenderable Stopper
 instance renderableStopper :: Renderable StopperRenderable Mesh where

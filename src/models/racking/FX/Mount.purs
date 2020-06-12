@@ -4,14 +4,18 @@ import Prelude
 
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
+import Data.Lens (Lens')
+import Data.Lens.Iso.Newtype (_Newtype)
+import Data.Lens.Record (prop)
 import Data.Meter (Meter, inch, meter)
 import Data.Newtype (class Newtype)
+import Data.Symbol (SProxy(..))
 import Data.UUID (UUID)
 import Editor.Common.ProtoCodable (class ProtoDecodable, fromProto)
 import Effect (Effect)
-import Util (ffi, fpi)
 import Model.Class (class HasPBUUID, class IsPBArrayComp, getArrayNumber, getUUID, getX, getY, getZ)
 import Model.UUID (PBUUID)
+import Util (ffi, fpi)
 
 foreign import data MountPB :: Type
 foreign import mkMountPB :: Effect MountPB
@@ -64,3 +68,6 @@ instance protoDecodableMount :: ProtoDecodable Mount MountPB where
         flashId     : fromProto $ getFlash m,
         clampX      : meter $ getClampX m
     }
+
+_clampX :: Lens' Mount Meter
+_clampX = _Newtype <<< prop (SProxy :: SProxy "clampX")
