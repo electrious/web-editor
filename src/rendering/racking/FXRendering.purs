@@ -25,9 +25,9 @@ import Three.Math.Euler (mkEuler)
 import Three.Math.Vector (mkVec3)
 
 
-newtype FXRackingCOmponentRenderable = FXRackingCOmponentRenderable FXRackingComponent
-instance renderableFXRackingComponent :: Renderable FXRackingCOmponentRenderable Object3D where
-    render (FXRackingCOmponentRenderable f) = do
+newtype FXRackingComponentRenderable = FXRackingComponentRenderable FXRackingComponent
+instance renderableFXRackingComponent :: Renderable FXRackingComponentRenderable Object3D where
+    render (FXRackingComponentRenderable f) = do
         comp <- mkObject3D
         setName "FXRackingComponent" comp
 
