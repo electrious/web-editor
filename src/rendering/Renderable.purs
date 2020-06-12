@@ -9,4 +9,4 @@ class IsObject3D b <= Renderable a b where
 
 
 class IsObject3D b <= RenderableWithSlope a b where
-    renderWithSlope :: a -> Angle -> Effect b
+    renderWithSlope :: Angle -> a -> Effect b

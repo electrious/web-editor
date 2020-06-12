@@ -4,7 +4,8 @@ import Prelude hiding (add)
 
 import Data.Lens ((^.))
 import Data.Meter (inch, meterVal)
-import Editor.Common.Lenses (_length, _x, _y, _z)
+import Data.Traversable (traverse, traverse_)
+import Editor.Common.Lenses (_clamps, _flashes, _length, _lfeet, _rails, _splices, _stoppers, _x, _y, _z)
 import Effect.Unsafe (unsafePerformEffect)
 import Math (pi)
 import Model.Racking.XR10.Clamp (Clamp)
@@ -12,14 +13,41 @@ import Model.Racking.XR10.LFoot (LFoot)
 import Model.Racking.XR10.Rail (Rail)
 import Model.Racking.XR10.Splice (Splice)
 import Model.Racking.XR10.Stopper (Stopper)
-import Rendering.Racking.Common (buildClamp)
-import Rendering.Renderable (class Renderable)
+import Model.Racking.XR10.XRRackingComponent (XRRackingComponent)
+import Rendering.Racking.Common (FlashRenderable(..), buildClamp)
+import Rendering.Renderable (class Renderable, render)
 import Renderring.MaterialLoader (blackMaterial)
 import Three.Core.Geometry (BoxGeometry, CylinderGeometry, mkBoxGeometry, mkCylinderGeometry)
 import Three.Core.Mesh (Mesh, mkMesh)
 import Three.Core.Object3D (Object3D, add, mkObject3D, setName, setPosition, setRotation, setScale)
 import Three.Math.Euler (mkEuler)
 import Three.Math.Vector (mkVec3)
+
+newtype XRRackingComponentRenderable = XRRackingComponentRenderable XRRackingComponent
+instance renderableXRRackingComponent :: Renderable XRRackingComponentRenderable Object3D where
+    render (XRRackingComponentRenderable x) = do
+        comp <- mkObject3D
+        setName "XRRackingComponent" comp
+
+        flashes :: Array Mesh <- traverse render (FlashRenderable <$> x ^. _flashes)
+        traverse_ (flip add comp) flashes
+
+        rails :: Array Mesh <- traverse render (RailRenderable <$> x ^. _rails)
+        traverse_ (flip add comp) rails
+
+        splices :: Array Mesh <- traverse render (SpliceRenderable <$> x ^. _splices)
+        traverse_ (flip add comp) splices
+
+        lfeet :: Array Object3D <- traverse render (LFootRenderable <$> x ^. _lfeet)
+        traverse_ (flip add comp) lfeet
+
+        clamps :: Array Object3D <- traverse render (ClampRenderable <$> x ^. _clamps)
+        traverse_ (flip add comp) clamps
+
+        stoppers :: Array Mesh <- traverse render (StopperRenderable <$> x ^. _stoppers)
+        traverse_ (flip add comp) stoppers
+
+        pure comp
 
 newtype RailRenderable = RailRenderable Rail
 instance renderableRail :: Renderable RailRenderable Mesh where

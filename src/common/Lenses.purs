@@ -151,3 +151,60 @@ _roofRackings = _Newtype <<< prop (SProxy :: SProxy "roofRackings")
 
 _modeDyn :: forall t a r. Newtype t { modeDyn :: a | r } => Lens' t a
 _modeDyn = _Newtype <<< prop (SProxy :: SProxy "modeDyn")
+
+_arrayNumber :: forall t a r. Newtype t { arrayNumber :: a | r } => Lens' t a
+_arrayNumber = _Newtype <<< prop (SProxy :: SProxy "arrayNumber")
+
+_flashes :: forall t a r. Newtype t { flashes :: a | r } => Lens' t a
+_flashes = _Newtype <<< prop (SProxy :: SProxy "flashes")
+
+_rails :: forall t a r. Newtype t { rails :: a | r } => Lens' t a
+_rails = _Newtype <<< prop (SProxy :: SProxy "rails")
+
+_railsNum :: forall t a r. Newtype t { railsNum :: a | r } => Lens' t a
+_railsNum = _Newtype <<< prop (SProxy :: SProxy "railsNum")
+
+_splices :: forall t a r. Newtype t { splices :: a | r } => Lens' t a 
+_splices = _Newtype <<< prop (SProxy :: SProxy "splices")
+
+_lfeet :: forall t a r. Newtype t { lfeet :: a | r } => Lens' t a 
+_lfeet = _Newtype <<< prop (SProxy :: SProxy "lfeet")
+
+_clamps :: forall t a r. Newtype t { clamps :: a | r } => Lens' t a
+_clamps = _Newtype <<< prop (SProxy :: SProxy "clamps")
+
+_stoppers :: forall t a r. Newtype t { stoppers :: a | r } => Lens' t a 
+_stoppers = _Newtype <<< prop (SProxy :: SProxy "stoppers")
+
+_mounts :: forall t a r. Newtype t { mounts :: a | r } => Lens' t a
+_mounts = _Newtype <<< prop (SProxy :: SProxy "mounts")
+
+_bridges :: forall t a r. Newtype t { bridges :: a | r } => Lens' t a
+_bridges = _Newtype <<< prop (SProxy :: SProxy "bridges")
+
+_skirts :: forall t a r. Newtype t { skirts :: a | r } => Lens' t a
+_skirts = _Newtype <<< prop (SProxy :: SProxy "skirts")
+
+_leftEndCaps :: forall t a r. Newtype t { leftEndCaps :: a | r } => Lens' t a
+_leftEndCaps = _Newtype <<< prop (SProxy :: SProxy "leftEndCaps")
+
+_rightEndCaps :: forall t a r. Newtype t { rightEndCaps :: a | r } => Lens' t a
+_rightEndCaps = _Newtype <<< prop (SProxy :: SProxy "rightEndCaps")
+
+_supportRails :: forall t a r. Newtype t { supportRails :: a | r } => Lens' t a
+_supportRails = _Newtype <<< prop (SProxy :: SProxy "supportRails")
+
+_baseMounts :: forall t a r. Newtype t { baseMounts :: a | r } => Lens' t a
+_baseMounts = _Newtype <<< prop (SProxy :: SProxy "baseMounts")
+
+_tiltLegs :: forall t a r. Newtype t { tiltLegs :: a | r } => Lens' t a 
+_tiltLegs = _Newtype <<< prop (SProxy :: SProxy "tiltLegs")
+
+_chassis :: forall t a r. Newtype t { chassis :: a | r } => Lens' t a
+_chassis = _Newtype <<< prop (SProxy :: SProxy "chassis")
+
+_blocks :: forall t a r. Newtype t { blocks :: a | r } => Lens' t a
+_blocks = _Newtype <<< prop (SProxy :: SProxy "blocks")
+
+_hoods :: forall t a r. Newtype t { hoods :: a | r } => Lens' t a
+_hoods = _Newtype <<< prop (SProxy :: SProxy "hoods")

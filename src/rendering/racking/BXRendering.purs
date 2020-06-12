@@ -5,20 +5,33 @@ import Prelude
 import Data.Function.Memoize (memoize)
 import Data.Lens ((^.))
 import Data.Meter (meterVal)
-import Editor.Common.Lenses (_x, _y, _z)
+import Data.Traversable (traverse, traverse_)
+import Editor.Common.Lenses (_chassis, _x, _y, _z)
 import Effect.Unsafe (unsafePerformEffect)
 import Math (pi)
+import Model.Racking.BX.BXRackingComponent (BXRackingComponent)
 import Model.Racking.BX.Chassis (Chassis)
 import Rendering.Racking.BXChassisObj (bxChassisObjData)
-import Rendering.Renderable (class Renderable)
+import Rendering.Renderable (class Renderable, render)
 import Renderring.MaterialLoader (blackMaterial)
 import Three.Core.Geometry (Geometry)
 import Three.Core.Mesh (Mesh, geometry, mkMesh)
-import Three.Core.Object3D (setCastShadow, setName, setPosition, setRotation, setScale)
+import Three.Core.Object3D (Object3D, add, mkObject3D, setCastShadow, setName, setPosition, setRotation, setScale)
 import Three.Loader.ObjLoader (makeOBJLoader2, parseOBJ)
 import Three.Math.Euler (mkEuler)
 import Three.Math.Vector (mkVec3)
 import Unsafe.Coerce (unsafeCoerce)
+
+newtype BXRackingComponentRenderable = BXRackingComponentRenderable BXRackingComponent
+instance renderableBXRackingComponent :: Renderable BXRackingComponentRenderable Object3D where
+    render (BXRackingComponentRenderable b) = do
+        comp <- mkObject3D
+        setName "BXRackingComponent" comp
+
+        chassis :: Array Mesh <- traverse render (ChassisRenderable <$> b ^. _chassis)
+        traverse_ (flip add comp) chassis
+
+        pure comp
 
 newtype ChassisRenderable = ChassisRenderable Chassis
 instance renderableChassis :: Renderable ChassisRenderable Mesh where

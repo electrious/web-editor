@@ -2,24 +2,52 @@ module Rendering.Racking.FXRendering where
 
 import Prelude hiding (add)
 
+import Data.Foldable (traverse_)
 import Data.Lens ((^.))
 import Data.Meter (meterVal)
-import Editor.Common.Lenses (_length, _x, _y, _z)
+import Data.Traversable (traverse)
+import Editor.Common.Lenses (_bridges, _flashes, _leftEndCaps, _length, _mounts, _rightEndCaps, _skirts, _x, _y, _z)
 import Effect (Effect)
 import Effect.Unsafe (unsafePerformEffect)
 import Math (atan, pi, sqrt)
 import Model.Racking.FX.Bridge (Bridge)
 import Model.Racking.FX.EndCap (EndCap)
+import Model.Racking.FX.FXRackingComponent (FXRackingComponent)
 import Model.Racking.FX.Mount (Mount, _clampX, mountRadius)
 import Model.Racking.FX.Skirt (Skirt)
-import Rendering.Racking.Common (buildClamp)
-import Rendering.Renderable (class Renderable)
+import Rendering.Racking.Common (FlashRenderable(..), buildClamp)
+import Rendering.Renderable (class Renderable, render)
 import Renderring.MaterialLoader (blackMaterial)
 import Three.Core.Geometry (BoxGeometry, CylinderGeometry, mkBoxGeometry, mkCylinderGeometry)
 import Three.Core.Mesh (Mesh, mkMesh)
 import Three.Core.Object3D (Object3D, add, mkObject3D, setName, setPosition, setRotation, setScale)
 import Three.Math.Euler (mkEuler)
 import Three.Math.Vector (mkVec3)
+
+
+newtype FXRackingCOmponentRenderable = FXRackingCOmponentRenderable FXRackingComponent
+instance renderableFXRackingComponent :: Renderable FXRackingCOmponentRenderable Object3D where
+    render (FXRackingCOmponentRenderable f) = do
+        comp <- mkObject3D
+        setName "FXRackingComponent" comp
+
+        flashes :: Array Mesh <- traverse render (FlashRenderable <$> f ^. _flashes)
+        traverse_ (flip add comp) flashes
+
+        mounts :: Array Object3D <- traverse render (MountRenderable <$> f ^. _mounts)
+        traverse_ (flip add comp) mounts
+
+        bridges :: Array Object3D <- traverse render (BridgeRenderable <$> f ^. _bridges)
+        traverse_ (flip add comp) bridges
+
+        skirts :: Array Mesh <- traverse render (SkirtRenderable <$> f ^. _skirts)
+        traverse_ (flip add comp) skirts
+
+        endCaps :: Array Mesh <- traverse render (EndCapRenderable <$> (f ^. _leftEndCaps <> f ^. _rightEndCaps))
+        traverse_ (flip add comp) endCaps
+
+        pure comp
+
 
 mountBotBox :: BoxGeometry
 mountBotBox = unsafePerformEffect $ mkBoxGeometry 0.0508 0.127 0.05

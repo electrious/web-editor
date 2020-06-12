@@ -1,13 +1,18 @@
-module Rendering.Racking.Common (buildClamp) where
+module Rendering.Racking.Common (buildClamp, FlashRenderable(..)) where
 
 import Prelude hiding (add)
 
+import Data.Lens ((^.))
+import Data.Meter (inch, meterVal)
+import Editor.Common.Lenses (_x, _y, _z)
 import Effect (Effect)
 import Effect.Unsafe (unsafePerformEffect)
 import Math (pi)
+import Model.Racking.Flash (Flash)
+import Rendering.Renderable (class Renderable)
 import Renderring.MaterialLoader (blackMaterial)
-import Three.Core.Geometry (CylinderGeometry, mkCylinderGeometry)
-import Three.Core.Mesh (mkMesh)
+import Three.Core.Geometry (BoxGeometry, CylinderGeometry, mkBoxGeometry, mkCylinderGeometry)
+import Three.Core.Mesh (Mesh, mkMesh)
 import Three.Core.Object3D (Object3D, add, mkObject3D, setName, setPosition, setRotation)
 import Three.Math.Euler (mkEuler)
 import Three.Math.Vector (mkVec3)
@@ -36,3 +41,18 @@ buildClamp = do
     add head m
 
     pure m
+
+newtype FlashRenderable = FlashRenderable Flash
+instance renderableFlash :: Renderable FlashRenderable Mesh where
+    render (FlashRenderable f) = do
+        m <- mkMesh flashGeo blackMaterial
+        setName "Flash" m
+        setPosition (mkVec3 (meterVal $ f ^. _x)
+                            (meterVal $ f ^. _y)
+                            (meterVal $ f ^. _z)) m
+        pure m
+
+flashGeo :: BoxGeometry
+flashGeo = unsafePerformEffect $ mkBoxGeometry (meterVal $ inch 9.0)
+                                               (meterVal $ inch 12.0)
+                                               (meterVal $ inch 0.2)
