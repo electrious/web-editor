@@ -8,7 +8,7 @@ import Data.Meter (meterVal)
 import Effect (Effect)
 import Model.Roof.ArrayConfig (ArrayConfig, _gapY)
 import Model.Roof.Panel (Panel, validatedSlope)
-import Models.RoofComponent (compBBox, compBBoxWithOffset)
+import Model.RoofComponent (compBBox, compBBoxWithOffset)
 import RBush.RBush (RBush, load, mkRBush, search)
 
 mkRTree :: Array Panel -> Effect (RBush Panel)

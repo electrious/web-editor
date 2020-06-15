@@ -11,7 +11,7 @@ import Data.Generic.Rep.Enum (genericCardinality, genericFromEnum, genericPred, 
 import Data.Generic.Rep.Ord (genericCompare)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Hardware.Size (Size(..))
-import Data.Lens (Lens', (^.))
+import Data.Lens (Lens', view, (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List.NonEmpty (singleton)
@@ -25,9 +25,10 @@ import Editor.Common.ProtoCodable (class ProtoEncodable, toProto)
 import Effect (Effect)
 import Foreign.Generic (class Decode, class Encode, ForeignError(..), decode, defaultOptions, encode, genericDecode, genericEncode)
 import Math.Angle (Angle, degree, degreeVal)
+import Model.ArrayComponent (class ArrayComponent)
 import Model.Class (class IsPBArrayComp, setArrayNumber, setX, setY)
+import Model.RoofComponent (class RoofComponent)
 import Model.UUID (PBUUID, mkPBUUID, setUUIDString)
-import Models.RoofComponent (class RoofComponent)
 import Util (ffi, fpi)
 
 newtype OrientationPB = OrientationPB Int
@@ -186,13 +187,15 @@ instance encodePanel :: Encode Panel where
 instance decodePanel :: Decode Panel where
     decode = genericDecode (defaultOptions { unwrapSingleConstructors = true })
 instance roofComponentPanel :: RoofComponent Panel where
-    compId p = p ^. _uuid
-    compX p = p ^. _x
-    compY p = p ^. _y
-    compZ _ = meter 0.0
+    compId = view _uuid
+    compX  = view _x
+    compY  = view _y
+    compZ  = const $ meter 0.0
     size p = case p ^. _orientation of
         Landscape -> Size { width: panelLong, height: panelShort }
         Portrait  -> Size { width: panelShort, height: panelLong }
+instance arrayComponentPanel :: ArrayComponent Panel where
+    arrayNumber p = p ^. _arrNumber
 instance protoEncodablePanel :: ProtoEncodable Panel PanelPB where
     toProto p = do
         pb <- mkPanelPB

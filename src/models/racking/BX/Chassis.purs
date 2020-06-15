@@ -3,21 +3,26 @@ module Model.Racking.BX.Chassis where
 import Prelude
 
 import Control.Monad.Error.Class (throwError)
+import Data.Default (def)
 import Data.Enum (class BoundedEnum, class Enum, fromEnum, toEnum)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Bounded (genericBottom, genericTop)
 import Data.Generic.Rep.Enum (genericCardinality, genericFromEnum, genericPred, genericSucc, genericToEnum)
 import Data.Generic.Rep.Show (genericShow)
+import Data.Lens (view, (.~))
 import Data.List.NonEmpty (singleton)
 import Data.Maybe (Maybe(..))
 import Data.Meter (Meter, meter)
 import Data.Newtype (class Newtype)
 import Data.UUID (UUID)
+import Editor.Common.Lenses (_arrayNumber, _height, _id, _width, _x, _y, _z)
 import Editor.Common.ProtoCodable (class ProtoDecodable, class ProtoEncodable, fromProto)
 import Effect (Effect)
 import Foreign.Generic (class Decode, class Encode, ForeignError(..), decode, encode)
-import Util (ffi, fpi)
+import Model.ArrayComponent (class ArrayComponent)
 import Model.Class (class HasLength, class HasPBUUID, class IsPBArrayComp, getArrayNumber, getUUID, getX, getY, getZ)
+import Model.RoofComponent (class RoofComponent)
+import Util (ffi, fpi)
 
 newtype ChassisKind = ChassisKind Int
 derive newtype instance eqChassisKind :: Eq ChassisKind
@@ -90,6 +95,15 @@ derive instance newtypeChassis :: Newtype Chassis _
 derive instance genericChassis :: Generic Chassis _
 instance showChassis :: Show Chassis where
     show = genericShow
+instance roofComponentChassis :: RoofComponent Chassis where
+    compId = view _id
+    compX  = view _x
+    compY  = view _y
+    compZ  = view _z
+    size _ = def # _width  .~ meter 0.3
+                 # _height .~ meter 0.3
+instance arrayComponentChassis :: ArrayComponent Chassis where
+    arrayNumber = view _arrayNumber
 instance protoDecodableChassis :: ProtoDecodable Chassis ChassisPB where
     fromProto c = Chassis {
         id          : fromProto $ getUUID c,
