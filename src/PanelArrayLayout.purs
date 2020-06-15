@@ -3,8 +3,11 @@ module Editor.PanelArrayLayout where
 import Prelude
 
 import Data.Array (filter)
+import Data.Graph (Graph, fromAdjacencyList)
 import Data.Lens ((^.))
+import Data.List (fromFoldable)
 import Data.Meter (meterVal)
+import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Model.Roof.ArrayConfig (ArrayConfig, _gapY)
 import Model.Roof.Panel (Panel, validatedSlope)
@@ -18,8 +21,14 @@ mkRTree ps = do
     load (getBox <$> ps) t
     pure t
 
-neighborPanelsInTree :: Panel -> RBush Panel -> ArrayConfig -> Effect (Array Panel)
-neighborPanelsInTree p tree cfg = filter ((/=) p) <$> search box tree
+neighborPanelsInTree :: Panel -> RBush Panel -> ArrayConfig -> Array Panel
+neighborPanelsInTree p tree cfg = filter ((/=) p) $ search box tree
     where box = compBBoxWithOffset p xOffset yOffset (validatedSlope p)
           xOffset = 0.4
           yOffset = 0.4 + meterVal (cfg ^. _gapY)
+
+mkGraph :: Array Panel -> RBush Panel -> ArrayConfig -> Graph Panel Number
+mkGraph ps tree cfg = fromAdjacencyList $ fromFoldable $ f <$> ps
+    where f p = let ns = neighborPanelsInTree p tree cfg
+                    mkNValue n = Tuple n 0.0
+                in Tuple p $ mkNValue <$> fromFoldable ns

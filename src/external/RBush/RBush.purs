@@ -33,8 +33,8 @@ foreign import mkRBush :: forall a. Effect (RBush a)
 load :: forall a. Array (BBox a) -> RBush a -> Effect Unit
 load = fpi ["items", "tree", ""] "tree.load(items)"
 
-doSearch :: forall a b. BBox a -> RBush b -> Effect (Array (BBox b))
-doSearch = ffi ["box", "tree", ""] "tree.search(box)"
+doSearch :: forall a b. BBox a -> RBush b -> Array (BBox b)
+doSearch = ffi ["box", "tree"] "tree.search(box)"
 
-search :: forall a b. BBox a -> RBush b -> Effect (Array b)
-search b t = map (_ ^. _item) <$> doSearch b t
+search :: forall a b. BBox a -> RBush b -> Array b
+search b t = (_ ^. _item) <$> doSearch b t

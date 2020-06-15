@@ -3,7 +3,7 @@ module Algorithm.MeshFlatten where
 import Prelude
 
 import Algorithm.PointInPolygon (pointInPolygon)
-import Data.Array (concat, filter, length, range, zip, zipWith)
+import Data.Array (concatMap, filter, length, range, zip, zipWith)
 import Data.Default (class Default, def)
 import Data.Foldable (maximum, minimum, sequence_)
 import Data.Lens (Lens', (^.), (.~))
@@ -12,7 +12,6 @@ import Data.Lens.Record (prop)
 import Data.Maybe (fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Data.Traversable (traverse)
 import Data.Tuple (fst, snd)
 import Editor.Common.Lenses (_center, _index, _item, _maxX, _maxY, _minX, _minY, _normal, _polygon, _position)
 import Effect (Effect)
@@ -124,37 +123,36 @@ applyFlattenedVertex geo fvs = do
     else pure geo
 
 -- | Flatten a single roof plate
-flattenRoofplate :: RBush VertexItem -> RoofPlate -> Effect (Array FlattenedVertex)
-flattenRoofplate tree roof = do
-    let flattener = roofFlattener roof
-        poly = flattener ^. _polygon
-    
-    candidates <- search (polygonBBox poly) tree
+flattenRoofplate :: RBush VertexItem -> RoofPlate -> Array FlattenedVertex
+flattenRoofplate tree roof = let flattener = roofFlattener roof
+                                 poly = flattener ^. _polygon
+                            
+                                 candidates = search (polygonBBox poly) tree
 
-    -- check if a candidate is under the roof polygon
-    let pointInRoof c = let v = c ^. _vertex
-                            point = mkVec2 (vecX v) (vecY v)
-                        in pointInPolygon poly point
-        
-        -- check the distance to the roof and angle between its normal
-        -- vector with the roof normal vector.
-        checkDistAndAngle c = let angle = angleBetween (flattener ^. _normal) (c ^. _normal)
-                                  dist = distToRoof flattener (c ^. _vertex)
-                              in (dist < 0.5 && dist >= 0.0) || (dist < 0.0 && dist > -1.0 && degreeVal angle < 20.0)
-    
-        -- filter function
-        f c = pointInRoof c && checkDistAndAngle c
-        flattenF c = FlattenedVertex {
-            index: c ^. _index,
-            position: flatten flattener (c ^. _vertex)
-        }
-    
-    pure $ flattenF <$> filter f candidates
+                                 -- check if a candidate is under the roof polygon
+                                 pointInRoof c = let v = c ^. _vertex
+                                                     point = mkVec2 (vecX v) (vecY v)
+                                                 in pointInPolygon poly point
+                                
+                                 -- check the distance to the roof and angle between its normal
+                                 -- vector with the roof normal vector.
+                                 checkDistAndAngle c = let angle = angleBetween (flattener ^. _normal) (c ^. _normal)
+                                                           dist = distToRoof flattener (c ^. _vertex)
+                                                       in (dist < 0.5 && dist >= 0.0) || (dist < 0.0 && dist > -1.0 && degreeVal angle < 20.0)
+                            
+                                 -- filter function
+                                 f c = pointInRoof c && checkDistAndAngle c
+                                 flattenF c = FlattenedVertex {
+                                     index: c ^. _index,
+                                     position: flatten flattener (c ^. _vertex)
+                                 }
+
+                            in flattenF <$> filter f candidates
 
 
 -- | flatten all roofplates
 flattenRoofPlates :: forall geo. IsBufferGeometry geo => geo -> RBush VertexItem -> Mesh -> Array RoofPlate -> Effect Unit
 flattenRoofPlates geo tree house roofs = do
-    fvs <- concat <$> traverse (flattenRoofplate tree) roofs
+    let fvs = concatMap (flattenRoofplate tree) roofs
     newGeo <- applyFlattenedVertex geo fvs
     setBufferGeometry newGeo house
