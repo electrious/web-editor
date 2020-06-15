@@ -29,7 +29,8 @@ import Model.Hardware.PanelTextureInfo (PanelTextureInfo, _premium, _standard, _
 import Model.Hardware.PanelType (PanelType(..))
 import Model.Racking.RackingType (RackingType(..))
 import Model.Roof.ArrayConfig (ArrayConfig, _panelLowestZ)
-import Model.Roof.Panel (Orientation(..), Panel, panelLong, panelShort, panelSize, validatedSlope)
+import Model.Roof.Panel (Orientation(..), Panel, panelLong, panelShort, validatedSlope)
+import Models.RoofComponent (size)
 import Three.Core.Geometry (class IsGeometry, BoxGeometry, mkBoxGeometry)
 import Three.Core.Material (class IsMaterial, MeshBasicMaterial, mkMeshBasicMaterialWithTexture)
 import Three.Core.Mesh (Mesh, mkMesh)
@@ -177,7 +178,7 @@ updatePosition p arrCfg m = setPosition pv m *> pure m
           z = meterVal $ arrCfg ^. _panelLowestZ
           pv = case validatedSlope p of
                   Nothing -> mkVec3 px py z
-                  Just slope -> let s = panelSize p
+                  Just slope -> let s = size p
                                     h = meterVal (s ^. _height) * 0.5 * sin slope
                                 in mkVec3 px py (z + h)
 

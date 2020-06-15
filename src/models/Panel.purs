@@ -3,7 +3,7 @@ module Model.Roof.Panel where
 import Prelude hiding (degree)
 
 import Control.Monad.Error.Class (throwError)
-import Data.Default (class Default, def)
+import Data.Default (class Default)
 import Data.Enum (class BoundedEnum, class Enum, fromEnum, toEnum)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Bounded (genericBottom, genericTop)
@@ -11,7 +11,7 @@ import Data.Generic.Rep.Enum (genericCardinality, genericFromEnum, genericPred, 
 import Data.Generic.Rep.Ord (genericCompare)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Hardware.Size (Size(..))
-import Data.Lens (Lens', (^.), (.~))
+import Data.Lens (Lens', (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List.NonEmpty (singleton)
@@ -20,14 +20,14 @@ import Data.Meter (Meter, meter, meterVal)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.UUID (UUID, emptyUUID, toString)
-import Editor.Common.Lenses (_alignment, _height, _id, _item, _maxX, _maxY, _minX, _minY, _orientation, _slope, _width, _x, _y)
+import Editor.Common.Lenses (_alignment, _id, _orientation, _slope, _x, _y)
 import Editor.Common.ProtoCodable (class ProtoEncodable, toProto)
 import Effect (Effect)
 import Foreign.Generic (class Decode, class Encode, ForeignError(..), decode, defaultOptions, encode, genericDecode, genericEncode)
 import Math.Angle (Angle, degree, degreeVal)
 import Model.Class (class IsPBArrayComp, setArrayNumber, setX, setY)
 import Model.UUID (PBUUID, mkPBUUID, setUUIDString)
-import RBush.RBush (BBox)
+import Models.RoofComponent (class RoofComponent)
 import Util (ffi, fpi)
 
 newtype OrientationPB = OrientationPB Int
@@ -185,6 +185,14 @@ instance encodePanel :: Encode Panel where
     encode = genericEncode (defaultOptions { unwrapSingleConstructors = true })
 instance decodePanel :: Decode Panel where
     decode = genericDecode (defaultOptions { unwrapSingleConstructors = true })
+instance roofComponentPanel :: RoofComponent Panel where
+    compId p = p ^. _uuid
+    compX p = p ^. _x
+    compY p = p ^. _y
+    compZ _ = meter 0.0
+    size p = case p ^. _orientation of
+        Landscape -> Size { width: panelLong, height: panelShort }
+        Portrait  -> Size { width: panelShort, height: panelLong }
 instance protoEncodablePanel :: ProtoEncodable Panel PanelPB where
     toProto p = do
         pb <- mkPanelPB
@@ -251,25 +259,7 @@ panelLong = meter 1.6
 panelShort :: Meter
 panelShort = meter 1.0
 
-panelSize :: Panel -> Size
-panelSize p = case p ^. _orientation of
-    Landscape -> Size { width: panelLong, height: panelShort }
-    Portrait  -> Size { width: panelShort, height: panelLong }
-
 -- only slope angles larger than 5 degrees are considered valid slope
 validatedSlope :: Panel -> Maybe Angle
 validatedSlope p | p ^. _slope < degree 5.0 = Nothing
                  | otherwise                = Just $ p ^. _slope
-
--- get bounding box of panel
-panelBBox :: Panel -> BBox Panel
-panelBBox p = def # _minX .~ x - w2
-                  # _minY .~ y - h2
-                  # _maxX .~ x + w2
-                  # _maxY .~ y + h2
-                  # _item .~ p
-    where x = meterVal $ p ^. _x
-          y = meterVal $ p ^. _y
-          s = panelSize p
-          w2 = meterVal (s ^. _width) / 2.0
-          h2 = meterVal (s ^. _height) / 2.0
