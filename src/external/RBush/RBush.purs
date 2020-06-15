@@ -1,23 +1,40 @@
-module RBush.RBush where
+module RBush.RBush (BBox, RBush, mkRBush, load, search) where
 
 import Prelude
 
+import Data.Default (class Default, def)
+import Data.Lens ((^.))
+import Data.Newtype (class Newtype)
+import Editor.Common.Lenses (_item)
 import Effect (Effect)
 import Util (ffi, fpi)
 
-type BBox a = {
+newtype BBox a = BBox {
     minX :: Number,
     minY :: Number,
     maxX :: Number,
-    maxY :: Number | a
+    maxY :: Number,
+    item :: a
 }
+derive instance newtypeBBox :: Newtype (BBox a) _
+instance defaultBBox :: Default a => Default (BBox a) where
+    def = BBox {
+        minX: 0.0,
+        minY: 0.0,
+        maxX: 0.0,
+        maxY: 0.0,
+        item: def
+    }
 
 foreign import data RBush :: Type -> Type
 
 foreign import mkRBush :: forall a. Effect (RBush a)
 
-load :: forall a. Array (BBox a) -> RBush (BBox a) -> Effect Unit
+load :: forall a. Array (BBox a) -> RBush a -> Effect Unit
 load = fpi ["items", "tree", ""] "tree.load(items)"
 
-search :: forall a b. BBox a -> RBush (BBox b) -> Effect (Array (BBox b))
-search = ffi ["box", "tree", ""] "tree.search(box)"
+doSearch :: forall a b. BBox a -> RBush b -> Effect (Array (BBox b))
+doSearch = ffi ["box", "tree", ""] "tree.search(box)"
+
+search :: forall a b. BBox a -> RBush b -> Effect (Array b)
+search b t = map (_ ^. _item) <$> doSearch b t

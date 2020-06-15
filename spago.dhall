@@ -6,6 +6,7 @@ You can edit this file as you like.
 , dependencies =
   [ "axios"
   , "console"
+  , "digraph"
   , "easy-ffi"
   , "effect"
   , "event"

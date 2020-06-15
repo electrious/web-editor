@@ -24,14 +24,14 @@ import Three.Core.Mesh (Mesh, setBufferGeometry)
 import Three.Math.Vector (Vector3, addScaled, mkVec2, mkVec3, vecX, vecY, vecZ, (<->), (<.>))
 
 
-newtype VertexItemData = VertexItemData {
+newtype VertexItem = VertexItem {
     vertex :: Vector3,
     normal :: Vector3,
     index  :: Int
 }
-derive instance newtypeVertexItemData :: Newtype VertexItemData _
-instance defaultVertexItemData :: Default VertexItemData where
-    def = VertexItemData {
+derive instance newtypeVertexItem :: Newtype VertexItem _
+instance defaultVertexItem :: Default VertexItem where
+    def = VertexItem {
         vertex : mkVec3 0.0 0.0 0.0,
         normal : mkVec3 0.0 0.0 0.0,
         index  : 0
@@ -40,15 +40,12 @@ instance defaultVertexItemData :: Default VertexItemData where
 _vertex :: forall t a r. Newtype t { vertex :: a | r } => Lens' t a
 _vertex = _Newtype <<< prop (SProxy :: SProxy "vertex" )
 
--- | vertex data that will be inserted into RTree
-type VertexItem = BBox VertexItemData
-
 -- | offset used to calculate bounding box for a point
 vertexOffset :: Number
 vertexOffset = 0.0001
 
 -- | calculate VertexItem for a vertex point
-vertexItem :: Vector3 -> Vector3 -> Int -> VertexItem
+vertexItem :: Vector3 -> Vector3 -> Int -> BBox VertexItem
 vertexItem point normal index =
     let x = vecX point
         y = vecY point
@@ -72,11 +69,11 @@ buildRTree vertices normals = do
     pure tree
 
 -- | get the bounding box of a polygon
-polygonBoundingBox :: Polygon -> BBox Unit
-polygonBoundingBox polygon = def # _minX .~ fromMaybe 0.0 (minimum xs)
-                                 # _minY .~ fromMaybe 0.0 (minimum ys)
-                                 # _maxX .~ fromMaybe 0.0 (maximum xs)
-                                 # _maxY .~ fromMaybe 0.0 (maximum ys)
+polygonBBox :: Polygon -> BBox Unit
+polygonBBox polygon = def # _minX .~ fromMaybe 0.0 (minimum xs)
+                          # _minY .~ fromMaybe 0.0 (minimum ys)
+                          # _maxX .~ fromMaybe 0.0 (maximum xs)
+                          # _maxY .~ fromMaybe 0.0 (maximum ys)
     where xs = vecX <$> polygon
           ys = vecY <$> polygon
 
@@ -132,7 +129,7 @@ flattenRoofplate tree roof = do
     let flattener = roofFlattener roof
         poly = flattener ^. _polygon
     
-    candidates <- search (polygonBoundingBox poly) tree
+    candidates <- search (polygonBBox poly) tree
 
     -- check if a candidate is under the roof polygon
     let pointInRoof c = let v = c ^. _vertex
