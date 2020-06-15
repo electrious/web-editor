@@ -21,6 +21,7 @@ import Data.Symbol (SProxy(..))
 import Data.Time.Duration (Milliseconds(..))
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
+import Data.UUID (UUID)
 import Editor.Common.Lenses (_disposable, _geometry, _id, _mesh, _modeDyn, _mouseMove, _roofId, _roofs, _slope, _tapped, _verticeTree, _wrapper)
 import Editor.Disposable (class Disposable, dispose)
 import Editor.EditorMode (EditorMode(..))
@@ -54,7 +55,7 @@ instance disposableRoofManager :: Disposable RoofManager where
 _editedRoofs :: Lens' RoofManager (Event (Array RoofEdited))
 _editedRoofs = _Newtype <<< prop (SProxy :: SProxy "editedRoofs")
 
-type RoofDict = Map String RoofPlate
+type RoofDict = Map UUID RoofPlate
 
 roofDict :: Array RoofPlate -> RoofDict
 roofDict = fromFoldable <<< map f
@@ -63,7 +64,7 @@ roofDict = fromFoldable <<< map f
 dictToArr :: RoofDict -> Array RoofPlate
 dictToArr = toUnfoldable <<< values
 
-type PanelsDict = Map String (Array Panel)
+type PanelsDict = Map UUID (Array Panel)
 
 panelDict :: Array Panel -> PanelsDict
 panelDict = foldl f Map.empty
@@ -108,7 +109,7 @@ getRoofDelete :: Array RoofNode -> Event RoofOperation
 getRoofDelete ns = foldl (<|>) empty (view _roofDelete <$> ns)
 
 -- | get the activated roof id event from an array of roof nodes
-getActivated :: Array RoofNode -> Event String
+getActivated :: Array RoofNode -> Event UUID
 getActivated ns = foldl (<|>) empty (f <$> ns)
     where f n = const (n ^. _roofId) <$> (n ^. _tapped)
 
@@ -119,7 +120,7 @@ createWrapper = do
     pure wrapper
 
 -- | function to create roof node
-mkNode :: Event (Maybe String) -> PanelsDict -> Map Int OldRoofRackingData -> RoofPlate -> HouseEditor RoofNode
+mkNode :: Event (Maybe UUID) -> PanelsDict -> Map Int OldRoofRackingData -> RoofPlate -> HouseEditor RoofNode
 mkNode activeRoof panelsDict racks roof = createRoofNode roof rackType ps (step false $ multicast $ (==) (Just (roof ^. _id)) <$> activeRoof)
     where ps = zeroSlope <$> fromMaybe [] (lookup (roof ^. _id) panelsDict)
           -- make sure slope value in panels on non-flat roof is set to zero
@@ -142,7 +143,7 @@ renderNodes wrapper { last, now } = do
     pure now
 
 -- | render dynamic roofs
-renderRoofs :: forall a. IsObject3D a => a -> Event (Maybe String) -> Event RoofDictData -> PanelsDict -> Map Int OldRoofRackingData -> HouseEditor (Event (Array RoofNode))
+renderRoofs :: forall a. IsObject3D a => a -> Event (Maybe UUID) -> Event RoofDictData -> PanelsDict -> Map Int OldRoofRackingData -> HouseEditor (Event (Array RoofNode))
 renderRoofs wrapper activeRoof roofsData panelsDict racks = do
     let rsToRender = compact $ view _roofsToRender <$> roofsData
         rsToRenderArr = dictToArr <$> rsToRender
@@ -155,7 +156,7 @@ isRoofEditing :: HouseEditor (Dynamic Boolean)
 isRoofEditing = map ((==) RoofEditing) <<< view _modeDyn <$> ask
 
 -- | function to add the roof recognizer and recognize new roofs
-recognizeNewRoofs :: HouseMeshData -> Object3D -> Event RoofDict -> Dynamic (Maybe String) -> Dynamic Boolean -> Effect RoofRecognizer
+recognizeNewRoofs :: HouseMeshData -> Object3D -> Event RoofDict -> Dynamic (Maybe UUID) -> Dynamic Boolean -> Effect RoofRecognizer
 recognizeNewRoofs meshData wrapper newRoofs activeRoof canEditRoofDyn = do
     let canShowRecognizer = (&&) <$> (isNothing <$> activeRoof) <*> canEditRoofDyn
     -- create the roof recognizer and add it to the roof wrapper object
@@ -166,7 +167,7 @@ recognizeNewRoofs meshData wrapper newRoofs activeRoof canEditRoofDyn = do
     add (recognizer ^. _marker) wrapper
     pure recognizer
 
-getActiveRoof :: HouseMeshData -> Event String -> Event RoofOperation -> Event RoofPlate -> Event (Maybe String)
+getActiveRoof :: HouseMeshData -> Event UUID -> Event RoofOperation -> Event RoofPlate -> Event (Maybe UUID)
 getActiveRoof meshData activated deleteRoofOp addedNewRoof =
                 (const Nothing <$> meshData ^. _mesh <<< _tapped) <|>
                 (Just <$> activated) <|>

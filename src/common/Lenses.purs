@@ -2,7 +2,7 @@ module Editor.Common.Lenses where
 
 import Prelude
 
-import Data.Lens (Lens')
+import Data.Lens (Lens', Lens)
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
@@ -208,3 +208,18 @@ _blocks = _Newtype <<< prop (SProxy :: SProxy "blocks")
 
 _hoods :: forall t a r. Newtype t { hoods :: a | r } => Lens' t a
 _hoods = _Newtype <<< prop (SProxy :: SProxy "hoods")
+
+_item :: forall t a r. Newtype t { item :: a | r } => Lens' t a
+_item = _Newtype <<< prop (SProxy :: SProxy "item")
+
+_minX :: forall t a r. Newtype t { minX :: a | r } => Lens' t a
+_minX = _Newtype <<< prop (SProxy :: SProxy "minX")
+
+_minY :: forall t a r. Newtype t { minY :: a | r } => Lens' t a
+_minY = _Newtype <<< prop (SProxy :: SProxy "minY")
+
+_maxX :: forall t a r. Newtype t { maxX :: a | r } => Lens' t a
+_maxX = _Newtype <<< prop (SProxy :: SProxy "maxX")
+
+_maxY :: forall t a r. Newtype t { maxY :: a | r } => Lens' t a
+_maxY = _Newtype <<< prop (SProxy :: SProxy "maxY")

@@ -4,23 +4,44 @@ import Prelude
 
 import Algorithm.PointInPolygon (pointInPolygon)
 import Data.Array (concat, filter, length, range, zip, zipWith)
+import Data.Default (class Default, def)
 import Data.Foldable (maximum, minimum, sequence_)
-import Data.Lens ((^.))
+import Data.Lens (Lens', (^.), (.~))
+import Data.Lens.Iso.Newtype (_Newtype)
+import Data.Lens.Record (prop)
 import Data.Maybe (fromMaybe)
 import Data.Newtype (class Newtype)
+import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
 import Data.Tuple (fst, snd)
-import Editor.Common.Lenses (_center, _index, _normal, _polygon, _position)
+import Editor.Common.Lenses (_center, _index, _item, _maxX, _maxY, _minX, _minY, _normal, _polygon, _position)
 import Effect (Effect)
 import Math.Angle (degreeVal)
 import Model.Roof.RoofPlate (Polygon, RoofPlate, angleBetween, getRoofPolygon)
 import RBush.RBush (BBox, RBush, load, mkRBush, search)
 import Three.Core.Geometry (class IsBufferGeometry, clone, getAttribute, isBufferAttribute, setNeedsUpdate, setXYZ)
 import Three.Core.Mesh (Mesh, setBufferGeometry)
-import Three.Math.Vector (Vector3, addScaled, mkVec2, vecX, vecY, vecZ, (<->), (<.>))
+import Three.Math.Vector (Vector3, addScaled, mkVec2, mkVec3, vecX, vecY, vecZ, (<->), (<.>))
+
+
+newtype VertexItemData = VertexItemData {
+    vertex :: Vector3,
+    normal :: Vector3,
+    index  :: Int
+}
+derive instance newtypeVertexItemData :: Newtype VertexItemData _
+instance defaultVertexItemData :: Default VertexItemData where
+    def = VertexItemData {
+        vertex : mkVec3 0.0 0.0 0.0,
+        normal : mkVec3 0.0 0.0 0.0,
+        index  : 0
+    }
+
+_vertex :: forall t a r. Newtype t { vertex :: a | r } => Lens' t a
+_vertex = _Newtype <<< prop (SProxy :: SProxy "vertex" )
 
 -- | vertex data that will be inserted into RTree
-type VertexItem = BBox (vertex :: Vector3, normal :: Vector3, index:: Int)
+type VertexItem = BBox VertexItemData
 
 -- | offset used to calculate bounding box for a point
 vertexOffset :: Number
@@ -31,15 +52,13 @@ vertexItem :: Vector3 -> Vector3 -> Int -> VertexItem
 vertexItem point normal index =
     let x = vecX point
         y = vecY point
-    in {
-        minX   : x - vertexOffset,
-        minY   : y - vertexOffset,
-        maxX   : x + vertexOffset,
-        maxY   : y + vertexOffset,
-        vertex : point,
-        normal : normal,
-        index  : index
-    }
+    in def # _minX .~ x - vertexOffset
+           # _minY .~ y - vertexOffset
+           # _maxX .~ x + vertexOffset
+           # _maxY .~ y + vertexOffset
+           # _item .~ (def # _vertex .~ point
+                           # _normal .~ normal
+                           # _index  .~ index)
 
 -- | build an RTree from a list of vertices
 buildRTree :: Array Vector3 -> Array Vector3 -> Effect (RBush VertexItem)
@@ -53,14 +72,13 @@ buildRTree vertices normals = do
     pure tree
 
 -- | get the bounding box of a polygon
-polygonBoundingBox :: Polygon -> BBox ()
-polygonBoundingBox polygon = { minX: minX, minY: minY, maxX: maxX, maxY: maxY}
+polygonBoundingBox :: Polygon -> BBox Unit
+polygonBoundingBox polygon = def # _minX .~ fromMaybe 0.0 (minimum xs)
+                                 # _minY .~ fromMaybe 0.0 (minimum ys)
+                                 # _maxX .~ fromMaybe 0.0 (maximum xs)
+                                 # _maxY .~ fromMaybe 0.0 (maximum ys)
     where xs = vecX <$> polygon
           ys = vecY <$> polygon
-          minX = fromMaybe 0.0 (minimum xs)
-          minY = fromMaybe 0.0 (minimum ys)
-          maxX = fromMaybe 0.0 (maximum xs)
-          maxY = fromMaybe 0.0 (maximum ys)
 
 newtype RoofFlattener = RoofFlattener {
     normal  :: Vector3,
@@ -117,19 +135,22 @@ flattenRoofplate tree roof = do
     candidates <- search (polygonBoundingBox poly) tree
 
     -- check if a candidate is under the roof polygon
-    let pointInRoof c = let v = c.vertex
+    let pointInRoof c = let v = c ^. _vertex
                             point = mkVec2 (vecX v) (vecY v)
                         in pointInPolygon poly point
         
         -- check the distance to the roof and angle between its normal
         -- vector with the roof normal vector.
-        checkDistAndAngle c = let angle = angleBetween (flattener ^. _normal) c.normal
-                                  dist = distToRoof flattener c.vertex
+        checkDistAndAngle c = let angle = angleBetween (flattener ^. _normal) (c ^. _normal)
+                                  dist = distToRoof flattener (c ^. _vertex)
                               in (dist < 0.5 && dist >= 0.0) || (dist < 0.0 && dist > -1.0 && degreeVal angle < 20.0)
     
         -- filter function
         f c = pointInRoof c && checkDistAndAngle c
-        flattenF c = FlattenedVertex { index: c.index, position: flatten flattener c.vertex }
+        flattenF c = FlattenedVertex {
+            index: c ^. _index,
+            position: flatten flattener (c ^. _vertex)
+        }
     
     pure $ flattenF <$> filter f candidates
 

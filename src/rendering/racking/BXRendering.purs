@@ -1,6 +1,6 @@
 module Rendering.Racking.BXRendering where
 
-import Prelude
+import Prelude hiding (add)
 
 import Data.Function.Memoize (memoize)
 import Data.Lens ((^.))

@@ -14,7 +14,7 @@ import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Data.UUID (genUUID, toString)
+import Data.UUID (UUID, emptyUUID, genUUID, parseUUID, toString)
 import Editor.Common.Lenses (_alignment, _center, _id, _leadId, _normal, _orientation, _slope)
 import Effect (Effect)
 import Foreign.Generic (class Decode, class Encode, decode, defaultOptions, encode, genericDecode, genericEncode)
@@ -25,7 +25,7 @@ import Three.Math.Vector (class Vector, Vector2, Vector3, addScaled, cross, leng
 
 -- | define the core RoofPlate type as a record
 newtype RoofPlate = RoofPlate {
-    id            :: String,
+    id            :: UUID,
     intId         :: Int,
     leadId        :: Int,
     borderPoints  :: Array Vector3,
@@ -148,7 +148,7 @@ vecArr v = [vecX v, vecY v, vecZ v]
 -- | Convert external JSRoofPlate to internal RoofPlate
 fromJSRoofPlate :: JSRoofPlate -> RoofPlate
 fromJSRoofPlate (JSRoofPlate r) = RoofPlate {
-    id            : r.uuid,
+    id            : fromMaybe emptyUUID $ parseUUID r.uuid,
     intId         : r.id,
     leadId        : r.lead_id,
     borderPoints  : point2Vec <$> r.border_points,
@@ -166,7 +166,7 @@ fromJSRoofPlate (JSRoofPlate r) = RoofPlate {
 toJSRoofPlate :: RoofPlate -> JSRoofPlate
 toJSRoofPlate r = JSRoofPlate {
     id                : r ^. _roofIntId,
-    uuid              : r ^. _id,
+    uuid              : toString $ r ^. _id,
     lead_id           : r ^. _leadId,
     border_points     : vec2Point <$> r ^. _borderPoints,
     unified_points    : r ^. _unifiedPoints,
@@ -248,7 +248,7 @@ newRoofPlate center normal = do
         borderPoints = defBorderPoints center gutter rafter
 
     pure $ RoofPlate {
-        id            : toString u,
+        id            : u,
         intId         : 0,
         leadId        : 0,
         borderPoints  : borderPoints,
@@ -265,7 +265,7 @@ newRoofPlate center normal = do
 
 -- | Types of operations applied to roofs
 data RoofOperation = RoofOpCreate RoofPlate
-                   | RoofOpDelete String
+                   | RoofOpDelete UUID
                    | RoofOpUpdate RoofPlate
 
 derive instance genericRoofOp :: Generic RoofOperation _

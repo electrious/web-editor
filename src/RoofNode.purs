@@ -13,6 +13,7 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (sequence_, traverse, traverse_)
+import Data.UUID (UUID)
 import Editor.ArrayBuilder (runArrayBuilder)
 import Editor.Common.Lenses (_center, _id, _mesh, _modeDyn, _slope, _tapped, _wrapper)
 import Editor.Disposable (class Disposable, dispose)
@@ -41,7 +42,7 @@ import Three.Math.Vector (Vector2, Vector3, applyMatrix, mkVec2, mkVec3, vecX, v
 import Unsafe.Coerce (unsafeCoerce)
 
 newtype RoofNode = RoofNode {
-    roofId     :: String,
+    roofId     :: UUID,
     roofUpdate :: Event RoofOperation,
     roofDelete :: Event RoofOperation,
     tapped     :: Event SceneTapEvent,

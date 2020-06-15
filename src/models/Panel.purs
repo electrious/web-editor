@@ -3,6 +3,7 @@ module Model.Roof.Panel where
 import Prelude hiding (degree)
 
 import Control.Monad.Error.Class (throwError)
+import Data.Default (class Default, def)
 import Data.Enum (class BoundedEnum, class Enum, fromEnum, toEnum)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Bounded (genericBottom, genericTop)
@@ -10,7 +11,7 @@ import Data.Generic.Rep.Enum (genericCardinality, genericFromEnum, genericPred, 
 import Data.Generic.Rep.Ord (genericCompare)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Hardware.Size (Size(..))
-import Data.Lens (Lens', (^.))
+import Data.Lens (Lens', (^.), (.~))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List.NonEmpty (singleton)
@@ -18,13 +19,15 @@ import Data.Maybe (Maybe(..))
 import Data.Meter (Meter, meter, meterVal)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Editor.Common.Lenses (_alignment, _id, _orientation, _slope, _x, _y)
+import Data.UUID (UUID, emptyUUID, toString)
+import Editor.Common.Lenses (_alignment, _height, _id, _item, _maxX, _maxY, _minX, _minY, _orientation, _slope, _width, _x, _y)
 import Editor.Common.ProtoCodable (class ProtoEncodable, toProto)
 import Effect (Effect)
 import Foreign.Generic (class Decode, class Encode, ForeignError(..), decode, defaultOptions, encode, genericDecode, genericEncode)
 import Math.Angle (Angle, degree, degreeVal)
 import Model.Class (class IsPBArrayComp, setArrayNumber, setX, setY)
 import Model.UUID (PBUUID, mkPBUUID, setUUIDString)
+import RBush.RBush (BBox)
 import Util (ffi, fpi)
 
 newtype OrientationPB = OrientationPB Int
@@ -157,10 +160,10 @@ instance protoEncodableAlignment :: ProtoEncodable Alignment AlignmentPB where
 
 newtype Panel = Panel {
     id             :: Int,
-    uuid           :: String,
+    uuid           :: UUID,
     lead_id        :: Int,
     roofplate_id   :: Int,
-    roofplate_uuid :: String,
+    roofplate_uuid :: UUID,
     row_number     :: Int,
     array_number   :: Int,
     x              :: Meter,
@@ -174,6 +177,10 @@ derive instance newtypePanel :: Newtype Panel _
 derive instance genericPanel :: Generic Panel _
 instance showPanel :: Show Panel where
     show = genericShow
+instance eqPanel :: Eq Panel where
+    eq p1 p2 = p1 ^. _uuid == p2 ^. _uuid
+instance ordPanel :: Ord Panel where
+    compare p1 p2 = compare (p1 ^. _uuid) (p2 ^. _uuid)
 instance encodePanel :: Encode Panel where
     encode = genericEncode (defaultOptions { unwrapSingleConstructors = true })
 instance decodePanel :: Decode Panel where
@@ -183,13 +190,13 @@ instance protoEncodablePanel :: ProtoEncodable Panel PanelPB where
         pb <- mkPanelPB
         setId (p ^. _id) pb
         u1 <- mkPBUUID
-        setUUIDString (p ^. _uuid) u1
+        setUUIDString (toString $ p ^. _uuid) u1
         setUUID u1 pb
 
         setLeadId (p ^. _leadId) pb
 
         u2 <- mkPBUUID
-        setUUIDString (p ^. _roofUUID) u2
+        setUUIDString (toString $ p ^. _roofUUID) u2
         setRoofplateUUID u2 pb
         
         setRowNumber (p ^. _rowNumber) pb
@@ -203,8 +210,22 @@ instance protoEncodablePanel :: ProtoEncodable Panel PanelPB where
         setAlignment alignPb pb
 
         pure pb
-
-_uuid :: Lens' Panel String
+instance defaultPanel :: Default Panel where
+    def = Panel {
+        id             : 0,
+        uuid           : emptyUUID,
+        lead_id        : 0,
+        roofplate_id   : 0,
+        roofplate_uuid : emptyUUID,
+        row_number     : 0,
+        array_number   : 0,
+        x              : meter 0.0,
+        y              : meter 0.0,
+        slope          : degree 0.0,
+        orientation    : Landscape,
+        alignment      : Grid
+    }
+_uuid :: Lens' Panel UUID
 _uuid = _Newtype <<< prop (SProxy :: SProxy "uuid")
 
 _leadId :: Lens' Panel Int
@@ -213,7 +234,7 @@ _leadId = _Newtype <<< prop (SProxy :: SProxy "lead_id")
 _roofId :: Lens' Panel Int
 _roofId = _Newtype <<< prop (SProxy :: SProxy "roofplate_id")
 
-_roofUUID :: Lens' Panel String
+_roofUUID :: Lens' Panel UUID
 _roofUUID = _Newtype <<< prop (SProxy :: SProxy "roofplate_uuid")
 
 _rowNumber :: Lens' Panel Int
@@ -239,3 +260,16 @@ panelSize p = case p ^. _orientation of
 validatedSlope :: Panel -> Maybe Angle
 validatedSlope p | p ^. _slope < degree 5.0 = Nothing
                  | otherwise                = Just $ p ^. _slope
+
+-- get bounding box of panel
+panelBBox :: Panel -> BBox Panel
+panelBBox p = def # _minX .~ x - w2
+                  # _minY .~ y - h2
+                  # _maxX .~ x + w2
+                  # _maxY .~ y + h2
+                  # _item .~ p
+    where x = meterVal $ p ^. _x
+          y = meterVal $ p ^. _y
+          s = panelSize p
+          w2 = meterVal (s ^. _width) / 2.0
+          h2 = meterVal (s ^. _height) / 2.0
