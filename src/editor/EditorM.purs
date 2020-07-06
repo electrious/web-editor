@@ -23,7 +23,7 @@ newtype EditorConfig = EditorConfig {
     elem            :: Maybe Element,
     sizeDyn         :: Dynamic Size,
     modeDyn         :: Dynamic EditorMode,
-    flyCameraTarget :: Maybe Vector3
+    flyCameraTarget :: Dynamic (Maybe Vector3)
 }
 
 derive instance newtypeEditorConfig :: Newtype EditorConfig _
@@ -32,7 +32,7 @@ instance defaultEditorConfig :: Default EditorConfig where
         elem            : Nothing,
         sizeDyn         : step (size 800 600) empty,
         modeDyn         : step Showing empty,
-        flyCameraTarget : Nothing
+        flyCameraTarget : step Nothing empty
     }
 
 _elem :: Lens' EditorConfig (Maybe Element)
@@ -41,7 +41,7 @@ _elem = _Newtype <<< prop (SProxy :: SProxy "elem")
 _sizeDyn :: Lens' EditorConfig (Dynamic Size)
 _sizeDyn = _Newtype <<< prop (SProxy :: SProxy "sizeDyn")
 
-_flyCameraTarget :: Lens' EditorConfig (Maybe Vector3)
+_flyCameraTarget :: Lens' EditorConfig (Dynamic (Maybe Vector3))
 _flyCameraTarget = _Newtype <<< prop (SProxy :: SProxy "flyCameraTarget")
 
 newtype EditorM a = EditorM (ReaderT EditorConfig Effect a)
