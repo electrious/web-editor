@@ -16,20 +16,23 @@ import Editor.SceneEvent (Size, size)
 import Effect (Effect)
 import Effect.Class (class MonadEffect)
 import FRP.Dynamic (Dynamic, step)
+import Three.Math.Vector (Vector3)
 import Web.DOM (Element)
 
 newtype EditorConfig = EditorConfig {
-    elem    :: Maybe Element,
-    sizeDyn :: Dynamic Size,
-    modeDyn :: Dynamic EditorMode
+    elem            :: Maybe Element,
+    sizeDyn         :: Dynamic Size,
+    modeDyn         :: Dynamic EditorMode,
+    flyCameraTarget :: Maybe Vector3
 }
 
 derive instance newtypeEditorConfig :: Newtype EditorConfig _
 instance defaultEditorConfig :: Default EditorConfig where
     def = EditorConfig {
-        elem    : Nothing,
-        sizeDyn : step (size 800 600) empty,
-        modeDyn : step Showing empty
+        elem            : Nothing,
+        sizeDyn         : step (size 800 600) empty,
+        modeDyn         : step Showing empty,
+        flyCameraTarget : Nothing
     }
 
 _elem :: Lens' EditorConfig (Maybe Element)
@@ -37,6 +40,9 @@ _elem = _Newtype <<< prop (SProxy :: SProxy "elem")
 
 _sizeDyn :: Lens' EditorConfig (Dynamic Size)
 _sizeDyn = _Newtype <<< prop (SProxy :: SProxy "sizeDyn")
+
+_flyCameraTarget :: Lens' EditorConfig (Maybe Vector3)
+_flyCameraTarget = _Newtype <<< prop (SProxy :: SProxy "flyCameraTarget")
 
 newtype EditorM a = EditorM (ReaderT EditorConfig Effect a)
 

@@ -6,6 +6,7 @@ import Data.Array (cons)
 import Data.Foldable (sequence_)
 import Data.Int (toNumber)
 import Data.Lens ((^.))
+import Data.Maybe (Maybe, fromMaybe)
 import Data.Newtype (class Newtype)
 import Editor.Common.Lenses (_deltaX, _deltaY, _height, _shiftDragged, _width, _zoomed)
 import Editor.Disposable (class Disposable, dispose)
@@ -27,7 +28,7 @@ import Three.Core.Object3D (Object3D, add, hasParent, lookAt, mkObject3D, parent
 import Three.Core.Scene (disposeScene, mkScene)
 import Three.Core.WebGLRenderer (domElement, mkWebGLRenderer, render, setSize)
 import Three.Math.Euler (mkEuler)
-import Three.Math.Vector (length, mkVec3, multiplyScalar, normal, vecX, vecY)
+import Three.Math.Vector (Vector3, length, mkVec3, multiplyScalar, normal, vecX, vecY)
 import Web.DOM (Element)
 import Web.DOM.Element (toNode)
 import Web.DOM.Node (appendChild)
@@ -95,8 +96,8 @@ moveWithShiftDrag obj drag scale | not (hasParent obj) = pure unit
                                     translateX (vecX lVec * scale / 10.0) obj
                                     translateY (vecY lVec * scale / 10.0) obj
 
-setupOrbitControls :: OrbitControls -> Effect Unit
-setupOrbitControls c = do
+setupOrbitControls :: OrbitControls -> Maybe Vector3 -> Effect Unit
+setupOrbitControls c target = do
     setAutoRotate true c
     setAutoRotateSpeed 0.5 c
     enableDamping true c
@@ -106,11 +107,12 @@ setupOrbitControls c = do
     setMaxPolarAngle (radianVal $ degree 50.0) c
     setMinDistance 15.0 c
     setMaxDistance 35.0 c
-    setTarget (mkVec3 0.0 0.0 (-5.0)) c
+    let t = fromMaybe (mkVec3 0.0 0.0 (-5.0)) target
+    setTarget t c
 
 -- | internal function to create the threejs scene, camera, light and renderer
-createScene :: forall a. Dynamic Size -> Dynamic EditorMode -> Element -> Effect (WebEditor a)
-createScene sizeDyn modeDyn elem = do
+createScene :: forall a. Dynamic Size -> Dynamic EditorMode -> Maybe Vector3 -> Element -> Effect (WebEditor a)
+createScene sizeDyn modeDyn target elem = do
     -- set the default Up direction as z axis in the scene
     setDefaultUp (mkVec3 0.0 0.0 1.0)
 
@@ -136,7 +138,7 @@ createScene sizeDyn modeDyn elem = do
 
     -- setup the orbit controls
     orbitCtrl <- mkOrbitControls camera (domElement renderer)
-    setupOrbitControls orbitCtrl
+    setupOrbitControls orbitCtrl target
 
     let isShowing = (==) Showing <$> modeDyn
         canEdit = not <$> isShowing

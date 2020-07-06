@@ -16,7 +16,7 @@ import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
 import Editor.Common.Lenses (_houseId, _leadId, _modeDyn, _roofRackings, _wrapper)
 import Editor.Disposable (dispose)
-import Editor.EditorM (EditorM, _elem, _sizeDyn)
+import Editor.EditorM (EditorM, _elem, _flyCameraTarget, _sizeDyn)
 import Editor.House (loadHouseModel)
 import Editor.HouseEditor (HouseEditor, _dataServer, performEditorEvent, runAPIInEditor)
 import Editor.RoofManager (_editedRoofs, createRoofManager)
@@ -35,6 +35,7 @@ createEditor = do
     let mkEditor elem = do
             scene <- liftEffect $ createScene (cfg ^. _sizeDyn)
                                               (cfg ^. _modeDyn)
+                                              (cfg ^. _flyCameraTarget)
                                               elem
             -- start the rednerring
             liftEffect $ window >>= renderLoop scene
