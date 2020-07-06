@@ -6,12 +6,15 @@ import Data.Array (filter)
 import Data.Graph (Graph, fromAdjacencyList)
 import Data.Lens ((^.))
 import Data.List (fromFoldable)
+import Data.Map (Map)
 import Data.Meter (meterVal)
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Model.Roof.ArrayConfig (ArrayConfig, _gapY)
 import Model.Roof.Panel (Panel, validatedSlope)
 import Model.RoofComponent (compBBox, compBBoxWithOffset)
+import Model.UpdatedPanels (UpdatedPanels(..), empty)
+import Model.PanelArray (PanelArray)
 import RBush.RBush (RBush, load, mkRBush, search)
 
 mkRTree :: Array Panel -> Effect (RBush Panel)
@@ -32,3 +35,6 @@ mkGraph ps tree cfg = fromAdjacencyList $ fromFoldable $ f <$> ps
     where f p = let ns = neighborPanelsInTree p tree cfg
                     mkNValue n = Tuple n 0.0
                 in Tuple p $ mkNValue <$> fromFoldable ns
+
+splitPanelArrays :: RBush Panel -> ArrayConfig -> Tuple (Map Int PanelArray) UpdatedPanels
+splitPanelArrays tree cfg = Tuple (toDict arrs) empty

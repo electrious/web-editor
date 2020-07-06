@@ -2,6 +2,7 @@ module Model.Roof.Panel where
 
 import Prelude hiding (degree)
 
+import Algorithm.Segment (Segment(..), mkSegment)
 import Control.Monad.Error.Class (throwError)
 import Data.Default (class Default)
 import Data.Enum (class BoundedEnum, class Enum, fromEnum, toEnum)
@@ -20,14 +21,15 @@ import Data.Meter (Meter, meter, meterVal)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.UUID (UUID, emptyUUID, toString)
-import Editor.Common.Lenses (_alignment, _id, _orientation, _slope, _x, _y)
+import Editor.Common.Lenses (_alignment, _id, _orientation, _slope, _width, _x, _y)
 import Editor.Common.ProtoCodable (class ProtoEncodable, toProto)
 import Effect (Effect)
 import Foreign.Generic (class Decode, class Encode, ForeignError(..), decode, defaultOptions, encode, genericDecode, genericEncode)
 import Math.Angle (Angle, degree, degreeVal)
 import Model.ArrayComponent (class ArrayComponent)
 import Model.Class (class IsPBArrayComp, setArrayNumber, setX, setY)
-import Model.RoofComponent (class RoofComponent)
+import Model.Roof.ArrayConfig (ArrayConfig(..), _gapX)
+import Model.RoofComponent (class RoofComponent, size)
 import Model.UUID (PBUUID, mkPBUUID, setUUIDString)
 import Util (ffi, fpi)
 
@@ -210,7 +212,7 @@ instance protoEncodablePanel :: ProtoEncodable Panel PanelPB where
         setUUIDString (toString $ p ^. _roofUUID) u2
         setRoofplateUUID u2 pb
         
-        setRowNumber (p ^. _rowNumber) pb
+        setRowNumber (p ^. _row_number) pb
         setArrayNumber (p ^. _arrNumber) pb
         setX (meterVal $ p ^. _x) pb
         setY (meterVal $ p ^. _y) pb
@@ -248,8 +250,8 @@ _roofId = _Newtype <<< prop (SProxy :: SProxy "roofplate_id")
 _roofUUID :: Lens' Panel UUID
 _roofUUID = _Newtype <<< prop (SProxy :: SProxy "roofplate_uuid")
 
-_rowNumber :: Lens' Panel Int
-_rowNumber = _Newtype <<< prop (SProxy :: SProxy "row_number")
+_row_number :: Lens' Panel Int
+_row_number = _Newtype <<< prop (SProxy :: SProxy "row_number")
 
 _arrNumber :: Lens' Panel Int
 _arrNumber = _Newtype <<< prop (SProxy :: SProxy "array_number")
@@ -266,3 +268,12 @@ panelShort = meter 1.0
 validatedSlope :: Panel -> Maybe Angle
 validatedSlope p | p ^. _slope < degree 5.0 = Nothing
                  | otherwise                = Just $ p ^. _slope
+
+
+panelSegment :: ArrayConfig -> Panel -> Segment Panel
+panelSegment cfg p = mkSegment (x - w2 - gapX2) (x + w2 + gapX2) y p
+    where s = size p
+          w2 = meterVal (s ^. _width) / 2.0
+          gapX2 = meterVal (cfg ^. _gapX) / 2.0
+          x = meterVal $ p ^. _x
+          y = meterVal $ p ^. _y

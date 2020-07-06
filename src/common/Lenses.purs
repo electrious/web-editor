@@ -2,7 +2,7 @@ module Editor.Common.Lenses where
 
 import Prelude
 
-import Data.Lens (Lens', Lens)
+import Data.Lens (Lens')
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
@@ -223,3 +223,9 @@ _maxX = _Newtype <<< prop (SProxy :: SProxy "maxX")
 
 _maxY :: forall t a r. Newtype t { maxY :: a | r } => Lens' t a
 _maxY = _Newtype <<< prop (SProxy :: SProxy "maxY")
+
+_panels :: forall t a r. Newtype t { panels :: a | r } => Lens' t a
+_panels = _Newtype <<< prop (SProxy :: SProxy "panels")
+
+_rowNumber :: forall t a r. Newtype t { rowNumber :: a | r } => Lens' t a
+_rowNumber = _Newtype <<< prop (SProxy :: SProxy "rowNumber")
