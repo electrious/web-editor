@@ -73,26 +73,27 @@ derive newtype instance bindAPI :: Bind API
 derive newtype instance monadAPI :: Monad API
 derive newtype instance monadAsKAPI :: MonadAsk APIConfig API
 
-
 foreign import getErrorMessage :: Error -> String
 
 runAPI :: forall a. API a -> APIConfig -> Effect a
 runAPI (API a) = runReaderT a
 
--- | call an API and get the result Event
-callAPI :: forall req res. Encode req => Decode res => Method -> String -> req -> API (Event (F res))
-callAPI m url req = do
+apiAction :: forall req res. Encode req => Decode res => Method -> String -> req -> API (Aff (Either Error res))
+apiAction m url req = do
     cfg <- ask
     let defHeaders = [Header "Content-Type" "application/json"]
-        authHeader = Array.singleton <<< Header "Authorization" <$> cfg ^. _auth
-        userHeader = Array.singleton <<< Header "x-user-id" <<< show <$> cfg ^. _xUserId
-        
-        aff = genericAxios url [method m
-                              , headers (defHeaders <> fromMaybe [] authHeader <> fromMaybe [] userHeader)
-                              , baseUrl $ cfg ^. _baseUrl] req
-        toF (Left e) = throwError $ singleton $ ForeignError $ getErrorMessage e
-        toF (Right v) = pure v
-    pure $ (toF <<< join) <$> affEvt aff
+        authHeader = fromMaybe [] $ Array.singleton <<< Header "Authorization" <$> cfg ^. _auth
+        userHeader = fromMaybe [] $ Array.singleton <<< Header "x-user-id" <<< show <$> cfg ^. _xUserId
+    
+    pure $ genericAxios url [method m
+                           , headers (defHeaders <> authHeader <> userHeader)
+                           , baseUrl $ cfg ^. _baseUrl] req
+
+-- | call an API and get the result Event
+callAPI :: forall req res. Encode req => Decode res => Method -> String -> req -> API (Event (F res))
+callAPI m url req = apiAction m url req >>= affEvt >>> map (join >>> toF) >>> pure
+    where toF (Left e)  = throwError $ singleton $ ForeignError $ getErrorMessage e
+          toF (Right v) = pure v
 
 -- | call an API, log any errors to console and return only valid result
 callAPI' :: forall req res. Encode req => Decode res => Method -> String -> req -> API (Event res)
