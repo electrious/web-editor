@@ -2,7 +2,7 @@ module Model.Roof.Panel where
 
 import Prelude hiding (degree)
 
-import Algorithm.Segment (Segment(..), mkSegment)
+import Algorithm.Segment (Segment, mkSegment)
 import Control.Monad.Error.Class (throwError)
 import Data.Default (class Default)
 import Data.Enum (class BoundedEnum, class Enum, fromEnum, toEnum)
@@ -15,6 +15,8 @@ import Data.Hardware.Size (Size(..))
 import Data.Lens (Lens', view, (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
+import Data.List (List)
+import Data.List as List
 import Data.List.NonEmpty (singleton)
 import Data.Maybe (Maybe(..))
 import Data.Meter (Meter, meter, meterVal)
@@ -28,7 +30,7 @@ import Foreign.Generic (class Decode, class Encode, ForeignError(..), decode, de
 import Math.Angle (Angle, degree, degreeVal)
 import Model.ArrayComponent (class ArrayComponent)
 import Model.Class (class IsPBArrayComp, setArrayNumber, setX, setY)
-import Model.Roof.ArrayConfig (ArrayConfig(..), _gapX)
+import Model.Roof.ArrayConfig (ArrayConfig, _gapX)
 import Model.RoofComponent (class RoofComponent, size)
 import Model.UUID (PBUUID, mkPBUUID, setUUIDString)
 import Util (ffi, fpi)
@@ -129,6 +131,10 @@ instance decodeOrient :: Decode Orientation where
 instance protoEncodableOrientation :: ProtoEncodable Orientation OrientationPB where
     toProto Landscape = pure orientationLandscape
     toProto Portrait  = pure orientationPortrait
+
+flipOrientation :: Orientation -> Orientation
+flipOrientation Landscape = Portrait
+flipOrientation Portrait  = Landscape
 
 data Alignment = Grid
                | Brick
@@ -270,8 +276,8 @@ validatedSlope p | p ^. _slope < degree 5.0 = Nothing
                  | otherwise                = Just $ p ^. _slope
 
 
-panelSegment :: ArrayConfig -> Panel -> Segment Panel
-panelSegment cfg p = mkSegment (x - w2 - gapX2) (x + w2 + gapX2) y p
+panelSegment :: ArrayConfig -> Panel -> Segment (List Panel)
+panelSegment cfg p = mkSegment (x - w2 - gapX2) (x + w2 + gapX2) y (List.singleton p)
     where s = size p
           w2 = meterVal (s ^. _width) / 2.0
           gapX2 = meterVal (cfg ^. _gapX) / 2.0

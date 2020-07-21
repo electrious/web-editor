@@ -59,6 +59,12 @@ _deltaX = _Newtype <<< prop (SProxy :: SProxy "deltaX")
 _deltaY :: forall t a r. Newtype t { deltaY :: a | r } => Lens' t a
 _deltaY = _Newtype <<< prop (SProxy :: SProxy "deltaY")
 
+_centerX :: forall t a r. Newtype t { centerX :: a | r } => Lens' t a
+_centerX = _Newtype <<< prop (SProxy :: SProxy "centerX")
+
+_centerY :: forall t a r. Newtype t { centerY :: a | r } => Lens' t a
+_centerY = _Newtype <<< prop (SProxy :: SProxy "centerY")
+
 _width :: forall t a r. Newtype t { width :: a | r } => Lens' t a
 _width = _Newtype <<< prop (SProxy :: SProxy "width")
 
@@ -229,3 +235,9 @@ _panels = _Newtype <<< prop (SProxy :: SProxy "panels")
 
 _rowNumber :: forall t a r. Newtype t { rowNumber :: a | r } => Lens' t a
 _rowNumber = _Newtype <<< prop (SProxy :: SProxy "rowNumber")
+
+_rows :: forall t a r. Newtype t { rows :: a | r } => Lens' t a
+_rows = _Newtype <<< prop (SProxy :: SProxy "rows")
+
+_config :: forall t a r. Newtype t { config :: a | r } => Lens' t a
+_config = _Newtype <<< prop (SProxy :: SProxy "config")
