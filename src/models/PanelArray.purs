@@ -6,8 +6,9 @@ import Algorithm.Segment (_segData)
 import Algorithm.SegmentRow (SegmentRow, _segments, groupSegments, mergeSegments)
 import Data.Foldable (class Foldable, foldl)
 import Data.Int (toNumber)
-import Data.Lens (view, (^.), (.~), (%~))
+import Data.Lens (view, (%~), (.~), (^.))
 import Data.List (List(..), concatMap, head, mapWithIndex, sortBy, toUnfoldable, (:))
+import Data.List as List
 import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (fromJust, maybe)
@@ -36,6 +37,7 @@ newtype PanelArray = PanelArray {
     panelsUpdated :: UpdatedPanels
 }
 derive instance newtypePanelArray :: Newtype PanelArray _
+
 -- | make a simple panel array with provided orientation and array config only
 simplePanelArray :: Orientation -> ArrayConfig -> PanelArray
 simplePanelArray o cfg = PanelArray {
@@ -108,6 +110,17 @@ newtype ArrayWithCenter = ArrayWithCenter {
 }
 
 derive instance newtypeArrayWithCenter :: Newtype ArrayWithCenter _
+
+mkArrayWithCenter :: forall f. Foldable f => f Panel -> ArrayWithCenter
+mkArrayWithCenter ps = toArr $ foldl f (Triple 0.0 0.0 0) ps
+    where f (Triple x y n) p = let nx = x + meterVal (p ^. _x)
+                                   ny = y + meterVal (p ^. _y)
+                               in Triple nx ny (n + 1)
+          toArr (Triple x y n) = ArrayWithCenter {
+              centerX : meter (x / toNumber n),
+              centerY : meter (y / toNumber n),
+              panels  : List.fromFoldable ps
+          }
 
 guessAlignment :: forall f. Foldable f => f Panel -> Alignment
 guessAlignment ps = let f (Tuple g b) p = if p ^. _alignment == Grid
