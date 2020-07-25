@@ -15,7 +15,7 @@ import Data.Symbol (SProxy(..))
 import Data.Traversable (sequence_, traverse, traverse_)
 import Data.UUID (UUID)
 import Editor.ArrayBuilder (runArrayBuilder)
-import Editor.Common.Lenses (_center, _id, _mesh, _modeDyn, _slope, _tapped, _wrapper)
+import Editor.Common.Lenses (_center, _id, _mesh, _modeDyn, _slope, _tapped, _object)
 import Editor.Disposable (class Disposable, dispose)
 import Editor.EditorMode (EditorMode(..))
 import Editor.HouseEditor (HouseEditor, performEditorDyn)
@@ -166,8 +166,8 @@ renderPanels content rackType panels modeDyn = do
         builder _ = Just <$> runArrayBuilder rackType (createPanelLayer panels)
 
         render { last, now } = do
-            traverse_ (flip remove content <<< view _wrapper) $ join last
-            traverse_ (flip add content <<< view _wrapper) now
+            traverse_ (flip remove content <<< view _object) $ join last
+            traverse_ (flip add content <<< view _object) now
     panelLayerDyn <- performEditorDyn $ builder <$> modeDyn
     liftEffect $ subscribeDyn (withLast panelLayerDyn) render
 

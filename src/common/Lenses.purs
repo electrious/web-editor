@@ -71,6 +71,9 @@ _width = _Newtype <<< prop (SProxy :: SProxy "width")
 _height :: forall t a r. Newtype t { height :: a | r } => Lens' t a
 _height = _Newtype <<< prop (SProxy :: SProxy "height")
 
+_object :: forall t a r. Newtype t { object :: a | r } => Lens' t a
+_object = _Newtype <<< prop (SProxy :: SProxy "object")
+
 _disposable :: forall t a r. Newtype t { disposable :: a | r } => Lens' t a
 _disposable = _Newtype <<< prop (SProxy :: SProxy "disposable")
 
