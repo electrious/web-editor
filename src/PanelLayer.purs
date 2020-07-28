@@ -39,14 +39,6 @@ createPanelLayer ps = do
     layer <- liftEffect mkObject3D
     liftEffect $ setName "panel-layer" layer
 
-    -- render all panels
-    panelNodeDyns <- mergeDynArray <$> traverse mkPanelMesh ps
-    
-    let doRender { last, now } = do
-            traverse_ (flip remove layer) $ fromMaybe [] last
-            traverse_ (flip add layer) now
-
-    d <- liftEffect $ subscribeDyn (withLast panelNodeDyns) doRender
 
     pure $ PanelLayer {
         object     : layer,
