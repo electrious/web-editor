@@ -13,6 +13,7 @@ import Data.Generic.Rep.Show (genericShow)
 import Data.Lens (Lens', (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
+import Data.List (List(..), (:))
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Meter (meterVal)
 import Data.Newtype (class Newtype)
@@ -32,12 +33,24 @@ import Model.Roof.ArrayConfig (ArrayConfig, _panelLowestZ)
 import Model.Roof.Panel (Orientation(..), Panel, panelLong, panelShort, validatedSlope)
 import Model.RoofComponent (size)
 import Three.Core.Geometry (class IsGeometry, BoxGeometry, mkBoxGeometry)
-import Three.Core.Material (class IsMaterial, MeshBasicMaterial, mkMeshBasicMaterialWithTexture)
+import Three.Core.Material (class IsMaterial, MeshBasicMaterial, mkMeshBasicMaterialWithTexture, setOpacity)
 import Three.Core.Mesh (Mesh, mkMesh)
-import Three.Core.Object3D (add, rotateWithEuler, setName, setPosition, setRenderOrder)
+import Three.Core.Object3D (add, rotateWithEuler, setCastShadow, setName, setPosition, setRenderOrder)
 import Three.Loader.TextureLoader (loadTexture, mkTextureLoader)
 import Three.Math.Euler (mkEuler)
 import Three.Math.Vector (mkVec3)
+
+data PanelOpacity = Opaque
+                  | Transparent
+derive instance eqPanelOpacity :: Eq PanelOpacity
+
+opacityValue :: PanelOpacity -> Number
+opacityValue Opaque      = 1.0
+opacityValue Transparent = 0.2
+
+isOpaque :: PanelOpacity -> Boolean
+isOpaque Opaque = true
+isOpaque _      = false
 
 -- texture type used for panels
 data PanelTextureType = PremiumTexture
@@ -95,7 +108,8 @@ newtype PanelNode = PanelNode {
     panel       :: Panel,
     panelObject :: Mesh,
     tapped      :: Event Panel,
-    dragged     :: Event (DragInfo Panel)
+    dragged     :: Event (DragInfo Panel),
+    materials   :: List MeshBasicMaterial
 }
 
 derive instance newtypePanelNode :: Newtype PanelNode _
@@ -105,6 +119,9 @@ _panel = _Newtype <<< prop (SProxy :: SProxy "panel")
 
 _panelObject :: forall t a r. Newtype t { panelObject :: a | r } => Lens' t a
 _panelObject = _Newtype <<< prop (SProxy :: SProxy "panelObject")
+
+_materials :: forall t a r. Newtype t { materials :: a | r } => Lens' t a
+_materials = _Newtype <<< prop (SProxy :: SProxy "materials")
 
 mkTopFrame :: forall geo mat. IsGeometry geo => IsMaterial mat => geo -> mat -> Effect Mesh
 mkTopFrame geo mat = do
@@ -158,7 +175,8 @@ mkPanelMesh arrCfg info panelType p = do
                  panel       : p,
                  panelObject : mesh,
                  tapped      : const p <$> m ^. _tapped,
-                 dragged     : mkDragInfo p <$> m ^. _dragged
+                 dragged     : mkDragInfo p <$> m ^. _dragged,
+                 materials   : (bodyMat : blackMat : Nil)
               }
     -- create frames
     top   <- mkTopFrame horiGeo blackMat
@@ -167,7 +185,7 @@ mkPanelMesh arrCfg info panelType p = do
     right <- mkRightFrame vertGeo blackMat
 
     -- add frame meshes to panel mesh
-    traverse_ (flip add (node ^. _panelObject)) [top, bot, left, right]
+    traverse_ (flip add mesh) [top, bot, left, right]
     updateRotation p node
     updatePosition p arrCfg node
 
@@ -198,3 +216,9 @@ updateRotation p node = rotateWithEuler euler m
 
           rotateForFlat Landscape slope = mkEuler 0.0 (- radianVal slope) (pi / 2.0)
           rotateForFlat Portrait  slope = mkEuler (radianVal slope) 0.0 0.0
+
+updateOpacity :: PanelOpacity -> PanelNode -> Effect Unit
+updateOpacity opacity node = traverse_ (setOpacity (opacityValue opacity)) (node ^. _materials)
+
+enableShadows :: Boolean -> PanelNode -> Effect Unit
+enableShadows e node = setCastShadow e (node ^. _panelObject)
