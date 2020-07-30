@@ -18,7 +18,7 @@ import Editor.Common.Lenses (_houseId, _leadId, _modeDyn, _roofRackings, _wrappe
 import Editor.Disposable (dispose)
 import Editor.EditorM (EditorM, _elem, _flyCameraTarget, _sizeDyn)
 import Editor.House (loadHouseModel)
-import Editor.HouseEditor (HouseEditor, _dataServer, performEditorEvent, runAPIInEditor)
+import Editor.HouseEditor (HouseEditor, _dataServer, _screenshotDelay, performEditorEvent, runAPIInEditor)
 import Editor.RoofManager (_editedRoofs, createRoofManager)
 import Editor.WebEditor (WebEditor, _canvas, addDisposable, addToScene, createScene, renderLoop)
 import Effect.Class (liftEffect)
@@ -79,7 +79,7 @@ loadHouse editor = do
         
         getScreenshot _ = toDataUrl "image/png" (editor ^. _canvas)
 
-        screenshotEvt = performEvent $ getScreenshot <$> delay 100 loadedEvt
+        screenshotEvt = performEvent $ getScreenshot <$> delay (cfg ^. _screenshotDelay) loadedEvt
     e <- liftEffect $ loadHouseModel (cfg ^. _dataServer) (cfg ^. _leadId)
     racksEvt <- runAPIInEditor $ loadRacking (cfg ^. _houseId)
     let roofRackDatEvt = g <$> racksEvt
