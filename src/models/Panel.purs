@@ -12,7 +12,7 @@ import Data.Generic.Rep.Enum (genericCardinality, genericFromEnum, genericPred, 
 import Data.Generic.Rep.Ord (genericCompare)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Hardware.Size (Size(..))
-import Data.Lens (Lens', view, (^.))
+import Data.Lens (Lens', view, (^.), (%~))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (List)
@@ -33,6 +33,7 @@ import Model.Class (class IsPBArrayComp, setArrayNumber, setX, setY)
 import Model.Roof.ArrayConfig (ArrayConfig, _gapX)
 import Model.RoofComponent (class RoofComponent, size)
 import Model.UUID (PBUUID, mkPBUUID, setUUIDString)
+import Three.Math.Vector (Vector3, vecX, vecY)
 import Util (ffi, fpi)
 
 newtype OrientationPB = OrientationPB Int
@@ -275,6 +276,10 @@ validatedSlope :: Panel -> Maybe Angle
 validatedSlope p | p ^. _slope < degree 5.0 = Nothing
                  | otherwise                = Just $ p ^. _slope
 
+
+addDelta :: Vector3 -> Panel -> Panel
+addDelta delta p = p # _x %~ (+) (meter $ vecX delta)
+                     # _y %~ (+) (meter $ vecY delta)
 
 panelSegment :: ArrayConfig -> Panel -> Segment (List Panel)
 panelSegment cfg p = mkSegment (x - w2 - gapX2) (x + w2 + gapX2) y (List.singleton p)

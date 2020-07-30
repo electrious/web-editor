@@ -10,7 +10,7 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Bounded (genericBottom, genericTop)
 import Data.Generic.Rep.Enum (genericCardinality, genericFromEnum, genericPred, genericSucc, genericToEnum)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Lens (Lens', (^.))
+import Data.Lens (Lens', (^.), (.~), (%~))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (List(..), (:))
@@ -30,15 +30,16 @@ import Model.Hardware.PanelTextureInfo (PanelTextureInfo, _premium, _standard, _
 import Model.Hardware.PanelType (PanelType(..))
 import Model.Racking.RackingType (RackingType(..))
 import Model.Roof.ArrayConfig (ArrayConfig, _panelLowestZ)
-import Model.Roof.Panel (Orientation(..), Panel, panelLong, panelShort, validatedSlope)
+import Model.Roof.Panel (Orientation(..), Panel, addDelta, panelLong, panelShort, validatedSlope)
 import Model.RoofComponent (size)
 import Three.Core.Geometry (class IsGeometry, BoxGeometry, mkBoxGeometry)
 import Three.Core.Material (class IsMaterial, MeshBasicMaterial, mkMeshBasicMaterialWithTexture, setOpacity)
 import Three.Core.Mesh (Mesh, mkMesh)
-import Three.Core.Object3D (add, rotateWithEuler, setCastShadow, setName, setPosition, setRenderOrder)
+import Three.Core.Object3D (add, position, rotateWithEuler, setCastShadow, setName, setPosition, setRenderOrder)
 import Three.Loader.TextureLoader (loadTexture, mkTextureLoader)
 import Three.Math.Euler (mkEuler)
-import Three.Math.Vector (mkVec3)
+import Three.Math.Vector (Vector3, mkVec3)
+import Three.Math.Vector as Vector
 
 data PanelOpacity = Opaque
                   | Transparent
@@ -191,6 +192,22 @@ mkPanelMesh arrCfg info panelType p = do
 
     pure node
 
+changePanel :: ArrayConfig -> Panel -> PanelNode -> Effect PanelNode
+changePanel arrCfg p node = do
+    updateRotation p node
+    updatePosition p arrCfg node
+    pure $ node # _panel .~ p
+
+
+moveBy :: Vector3 -> PanelNode -> Effect PanelNode
+moveBy delta node = do
+    let m      = node ^. _panelObject
+        pos    = position m
+        newPos = Vector.add pos delta
+
+    setPosition newPos m
+    pure $ node # _panel %~ addDelta delta
+
 -- update panel mesh position based on array config and the corresponding panel model
 updatePosition :: Panel -> ArrayConfig -> PanelNode -> Effect Unit
 updatePosition p arrCfg node = setPosition pv m
@@ -222,3 +239,6 @@ updateOpacity opacity node = traverse_ (setOpacity (opacityValue opacity)) (node
 
 enableShadows :: Boolean -> PanelNode -> Effect Unit
 enableShadows e node = setCastShadow e (node ^. _panelObject)
+
+changeToNormal :: PanelNode -> Effect PanelNode
+changeToNormal node = updateOpacity Opaque node *> pure node
