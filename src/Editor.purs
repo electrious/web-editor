@@ -20,10 +20,12 @@ import Editor.EditorM (EditorM, _elem, _flyCameraTarget, _sizeDyn)
 import Editor.House (loadHouseModel)
 import Editor.HouseEditor (HouseEditor, _dataServer, performEditorEvent, runAPIInEditor)
 import Editor.RoofManager (_editedRoofs, createRoofManager)
-import Editor.WebEditor (WebEditor, addDisposable, addToScene, createScene, renderLoop)
+import Editor.WebEditor (WebEditor, _canvas, addDisposable, addToScene, createScene, renderLoop)
 import Effect.Class (liftEffect)
 import FRP.Event (Event, create, keepLatest)
+import FRP.Event.Extra (delay, performEvent)
 import Model.Roof.RoofPlate (RoofEdited)
+import Three.Core.WebGLRenderer (toDataUrl)
 import Unsafe.Coerce (unsafeCoerce)
 import Web.HTML (window)
 
@@ -45,6 +47,7 @@ createEditor = do
 
 newtype House = House {
     loaded     :: Event Unit,
+    screenshot :: Event String,
     roofUpdate :: Event (Array RoofEdited)
 }
 
@@ -70,7 +73,10 @@ loadHouse editor = do
             
             liftEffect $ loadedFunc unit
             pure (mgr ^. _editedRoofs)
+        
+        getScreenshot _ = toDataUrl "image/png" (editor ^. _canvas)
 
+        screenshotEvt = performEvent $ getScreenshot <$> delay 10 loadedEvt
     e <- liftEffect $ loadHouseModel (cfg ^. _dataServer) (cfg ^. _leadId)
     racksEvt <- runAPIInEditor $ loadRacking (cfg ^. _houseId)
     let roofRackDatEvt = g <$> racksEvt
@@ -81,5 +87,6 @@ loadHouse editor = do
 
     pure $ House {
         loaded     : loadedEvt,
+        screenshot : screenshotEvt,
         roofUpdate : roofUpdEvt
     }

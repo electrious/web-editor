@@ -20,3 +20,6 @@ domElement = ffi ["r"] "r.domElement"
 
 render :: forall a b. Scene a -> Camera b -> WebGLRenderer -> Effect Unit
 render = fpi ["scene", "camera", "r", ""] "r.render(scene, camera)"
+
+toDataUrl :: String -> Element -> Effect String
+toDataUrl = fpi ["img", "r", ""] "r.toDataUrl(img)"
