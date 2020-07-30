@@ -1,4 +1,4 @@
-module Editor.Editor (createEditor, loadHouse, House, _loaded, _roofUpdate) where
+module Editor.Editor (createEditor, loadHouse, House, _loaded, _screenshot, _roofUpdate) where
 
 import Prelude hiding (add)
 
@@ -56,6 +56,9 @@ derive instance newtypeHouse :: Newtype House _
 _loaded :: Lens' House (Event Unit)
 _loaded = _Newtype <<< prop (SProxy :: SProxy "loaded")
 
+_screenshot :: forall t a r. Newtype t { screenshot :: a | r } => Lens' t a
+_screenshot = _Newtype <<< prop (SProxy :: SProxy "screenshot")
+
 _roofUpdate :: Lens' House (Event (Array RoofEdited))
 _roofUpdate = _Newtype <<< prop (SProxy :: SProxy "roofUpdate")
 
@@ -76,7 +79,7 @@ loadHouse editor = do
         
         getScreenshot _ = toDataUrl "image/png" (editor ^. _canvas)
 
-        screenshotEvt = performEvent $ getScreenshot <$> delay 10 loadedEvt
+        screenshotEvt = performEvent $ getScreenshot <$> delay 100 loadedEvt
     e <- liftEffect $ loadHouseModel (cfg ^. _dataServer) (cfg ^. _leadId)
     racksEvt <- runAPIInEditor $ loadRacking (cfg ^. _houseId)
     let roofRackDatEvt = g <$> racksEvt

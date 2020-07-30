@@ -6,3 +6,7 @@ exports.mkWebGLRenderer = _ => {
         preserveDrawingBuffer: true
     })
 }
+
+exports.toDataUrl = img => canvas => _ => {
+    return canvas.toDataURL(img)
+}
