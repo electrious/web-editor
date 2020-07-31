@@ -157,8 +157,8 @@ mkRightFrame geo mat = do
     pure right
 
 -- | make a default panel mesh node
-mkPanelMesh :: ArrayConfig -> PanelTextureInfo -> PanelType -> Panel -> Effect PanelNode
-mkPanelMesh arrCfg info panelType p = do
+mkPanelNode :: ArrayConfig -> PanelTextureInfo -> PanelType -> Panel -> Effect PanelNode
+mkPanelNode arrCfg info panelType p = do
     -- create the panel body first
     let bodyGeo = panelGeometry unit
         vertGeo = verticalGeometry unit
