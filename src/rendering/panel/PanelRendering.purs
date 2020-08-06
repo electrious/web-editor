@@ -1,10 +1,11 @@
 module Editor.Rendering.PanelRendering where
 
-import Prelude
+import Prelude hiding (add)
 
+import Control.Alt ((<|>))
+import Control.Plus (empty)
 import Data.Compactable (compact)
-import Data.Default (class Default, def)
-import Data.Foldable (foldl, length, traverse_)
+import Data.Foldable (class Foldable, foldl, foldlDefault, length, traverse_)
 import Data.Lens (Lens', view, (%~), (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
@@ -15,22 +16,22 @@ import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
-import Data.TraversableWithIndex (traverseWithIndex)
+import Data.Triple (Triple(..))
 import Data.Tuple (Tuple(..))
 import Data.UUID (UUID)
-import Editor.ArrayBuilder (ArrayBuilder(..), getArrayConfig, getPanelType, getTextureInfo)
-import Editor.PanelNode (PanelNode(..), PanelOpacity, _panel, _panelObject, changePanel, changeToNormal, enableShadows, isOpaque, mkPanelNode, moveBy, updateOpacity)
+import Editor.ArrayBuilder (ArrayBuilder, getArrayConfig, getPanelType, getTextureInfo)
+import Editor.Common.Lenses (_dragged, _tapped)
+import Editor.PanelNode (PanelNode, PanelOpacity, _panel, _panelObject, changePanel, changeToNormal, enableShadows, isOpaque, mkPanelNode, moveBy, updateOpacity)
 import Editor.UI.DragInfo (DragInfo)
 import Effect (Effect)
-import FRP.Dynamic (Dynamic, fold, step)
-import FRP.Event (Event)
+import FRP.Dynamic (Dynamic, dynEvent, sampleDyn, step)
+import FRP.Event (Event, keepLatest)
 import FRP.Event.Extra (foldEffect)
-import Model.Hardware.PanelTextureInfo (PanelTextureInfo(..))
+import Model.Hardware.PanelTextureInfo (PanelTextureInfo)
 import Model.Hardware.PanelType (PanelType)
 import Model.Roof.ArrayConfig (ArrayConfig)
 import Model.Roof.Panel (Panel, _arrNumber, _uuid)
-import Three.Core.Material (setOpacity)
-import Three.Core.Object3D (Object3D, add, parent, remove)
+import Three.Core.Object3D (Object3D, add, remove)
 import Three.Math.Vector (Vector3)
 
 -- | Panel operation that change a panel array.
@@ -63,9 +64,9 @@ _opacity = _Newtype <<< prop (SProxy :: SProxy "opacity")
 
 -- | Panel Renderer that manages all panels rendered
 newtype PanelRenderer = PanelRenderer {
-    panelTapped  :: Event Panel,
-    panelDragged :: Event (DragInfo Panel),
-    allPanels    :: Dynamic (List Panel)
+    tapped    :: Event Panel,
+    dragged   :: Event (DragInfo Panel),
+    allPanels :: Dynamic (List Panel)
 }
 
 derive instance newtypePanelRenderer :: Newtype PanelRenderer _
@@ -98,20 +99,25 @@ _tempPanelNodes = _Newtype <<< prop (SProxy :: SProxy "tempPanelNodes")
 panelRendered :: Panel -> RendererState -> Boolean
 panelRendered p st = member (p ^. _uuid) (st ^. _renderedPanels)
 
+allPanelsRendered :: RendererState -> List Panel
+allPanelsRendered st = view _panel <$> values (st ^. _renderedPanels)
+
+panelNodeList2Map :: List PanelNode -> Map UUID PanelNode
+panelNodeList2Map = fromFoldable <<< map mkT
+    where mkT pn = Tuple (pn ^. _panel ^. _uuid) pn
+
 -- | data type used to update the panel renderer's internal state
 data RendererOp = ArrayOp PanelOperation ArrayConfig PanelType PanelOpacity
-                | UpdateArrayConfig ArrayConfig
+                | UpdateArrayConfig ArrayConfig PanelType PanelOpacity
                 | UpdateOpacity PanelOpacity
 
 updateStateWithOp :: PanelTextureInfo -> RendererOp -> RendererState -> Effect RendererState
 updateStateWithOp textInfo (ArrayOp op arrCfg panelType opacity) st = updateStateWithArrayOp textInfo arrCfg panelType opacity op st
-updateStateWithOp textInfo (UpdateArrayConfig arrCfg) st = do
+updateStateWithOp textInfo (UpdateArrayConfig arrCfg panelType opacity) st = do
     let ps = values $ view _panel <$> st ^. _renderedPanels
     traverse_ (remove (st ^. _parent) <<< view _panelObject) (st ^. _renderedPanels)
-
-    pure st
-    
-    
+    nps <- traverse (renderPanelNode arrCfg textInfo panelType opacity st) ps
+    pure $ st # _renderedPanels .~ panelNodeList2Map (compact nps)
 updateStateWithOp _ (UpdateOpacity op) st = traverse (updateOpacity op) (st ^. _renderedPanels) *> pure st
 
 
@@ -135,9 +141,7 @@ updateStateWithArrayOp textInfo arrCfg panelType opacity (AddPanel p) st = do
         Nothing -> pure st
 updateStateWithArrayOp textInfo arrCfg panelType opacity (AddPanels ps) st = do
     pns <- traverse (renderPanelNode arrCfg textInfo panelType opacity st) ps
-    let mkT pn = Tuple (pn ^. _panel ^. _uuid) pn
-        newPNm = fromFoldable $ mkT <$> compact pns
-    pure $ st # _renderedPanels %~ union newPNm
+    pure $ st # _renderedPanels %~ union (panelNodeList2Map $ compact pns)
 updateStateWithArrayOp textInfo arrCfg panelType _ (TempPanels ps) st = renderTempPanels textInfo arrCfg panelType ps st
 updateStateWithArrayOp _ _ _ _ (DelPanel pid) st =
     case lookup pid (st ^. _renderedPanels) of
@@ -194,8 +198,33 @@ createPanelRenderer cfg = do
     textureInfo  <- getTextureInfo
     panelTypeDyn <- getPanelType
     
-    let statesEvt = foldEffect (updateStateWithOp textureInfo) (cfg ^. _operations) def
+    let opacityDyn = cfg ^. _opacity
+
+        mkArrayOp op (Triple arrCfg pt opacity) = ArrayOp op arrCfg pt opacity
+        arrayOpEvt = sampleDyn (Triple <$> arrCfgDyn <*> panelTypeDyn <*> opacityDyn) (mkArrayOp <$> cfg ^. _operations)
+
+        mkArrCfgOp arrCfg (Tuple pt opacity) = UpdateArrayConfig arrCfg pt opacity
+        arrCfgOpEvt = sampleDyn (Tuple <$> panelTypeDyn <*> opacityDyn) (mkArrCfgOp <$> dynEvent arrCfgDyn)
+
+        opacityOpEvt = UpdateOpacity <$> dynEvent opacityDyn
+
+        defState = RendererState {
+            parent         : cfg ^. _parent,
+            renderedPanels : Map.empty,
+            tempPanelNodes : Nil
+        }
+        stateEvt = foldEffect (updateStateWithOp textureInfo) (arrayOpEvt <|> arrCfgOpEvt <|> opacityOpEvt) defState
+        statesDyn = step defState stateEvt
+
+        panelNodesEvt = (values <<< view _renderedPanels) <$> stateEvt
+
 
     pure $ PanelRenderer {
-
+        tapped    : keepLatest $ leftmost <<< map (view _tapped) <$> panelNodesEvt,
+        dragged   : keepLatest $ leftmost <<< map (view _dragged) <$> panelNodesEvt,
+        allPanels : allPanelsRendered <$> statesDyn
     }
+
+
+leftmost :: forall a f. Foldable f => f (Event a) -> Event a
+leftmost = foldlDefault (<|>) empty
