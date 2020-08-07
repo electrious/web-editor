@@ -247,9 +247,3 @@ _config = _Newtype <<< prop (SProxy :: SProxy "config")
 
 _panelsUpdated :: forall t a r. Newtype t { panelsUpdated :: a | r } => Lens' t a
 _panelsUpdated = _Newtype <<< prop (SProxy :: SProxy "panelsUpdated")
-
-_tapped :: forall t a r. Newtype t { tapped :: a | r } => Lens' t a
-_tapped = _Newtype <<< prop (SProxy :: SProxy "tapped")
-
-_dragged :: forall t a r. Newtype t { dragged :: a | r } => Lens' t a
-_dragged = _Newtype <<< prop (SProxy :: SProxy "dragged")

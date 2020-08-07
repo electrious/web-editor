@@ -21,28 +21,19 @@ import Data.Tuple (Tuple(..))
 import Data.UUID (UUID)
 import Editor.ArrayBuilder (ArrayBuilder, getArrayConfig, getPanelType, getTextureInfo)
 import Editor.Common.Lenses (_dragged, _tapped)
+import Editor.PanelOperation (PanelOperation(..))
 import Editor.PanelNode (PanelNode, PanelOpacity, _panel, _panelObject, changePanel, changeToNormal, enableShadows, isOpaque, mkPanelNode, moveBy, updateOpacity)
 import Editor.UI.DragInfo (DragInfo)
 import Effect (Effect)
 import FRP.Dynamic (Dynamic, dynEvent, sampleDyn, step)
 import FRP.Event (Event, keepLatest)
-import FRP.Event.Extra (foldEffect)
+import FRP.Event.Extra (foldEffect, multicast)
 import Model.Hardware.PanelTextureInfo (PanelTextureInfo)
 import Model.Hardware.PanelType (PanelType)
 import Model.Roof.ArrayConfig (ArrayConfig)
 import Model.Roof.Panel (Panel, _arrNumber, _uuid)
 import Three.Core.Object3D (Object3D, add, remove)
 import Three.Math.Vector (Vector3)
-
--- | Panel operation that change a panel array.
-data PanelOperation = AddPanel Panel
-                    | AddPanels (List Panel)
-                    | TempPanels (List Panel)
-                    | DelPanel UUID
-                    | DeleteAll
-                    | UpdatePanel Panel
-                    | MoveArray Int Vector3
-                    | PreserveTempPanels
 
 -- | parameters for setting up a panel renderer.
 newtype PanelRendererConfig = PanelRendererConfig {
@@ -213,15 +204,14 @@ createPanelRenderer cfg = do
             renderedPanels : Map.empty,
             tempPanelNodes : Nil
         }
-        stateEvt = foldEffect (updateStateWithOp textureInfo) (arrayOpEvt <|> arrCfgOpEvt <|> opacityOpEvt) defState
+        stateEvt = multicast $ foldEffect (updateStateWithOp textureInfo) (arrayOpEvt <|> arrCfgOpEvt <|> opacityOpEvt) defState
         statesDyn = step defState stateEvt
 
-        panelNodesEvt = (values <<< view _renderedPanels) <$> stateEvt
-
+        panelNodesEvt = multicast $ values <<< view _renderedPanels <$> stateEvt
 
     pure $ PanelRenderer {
-        tapped    : keepLatest $ leftmost <<< map (view _tapped) <$> panelNodesEvt,
-        dragged   : keepLatest $ leftmost <<< map (view _dragged) <$> panelNodesEvt,
+        tapped    : multicast $ keepLatest $ leftmost <<< map (view _tapped) <$> panelNodesEvt,
+        dragged   : multicast $ keepLatest $ leftmost <<< map (view _dragged) <$> panelNodesEvt,
         allPanels : allPanelsRendered <$> statesDyn
     }
 

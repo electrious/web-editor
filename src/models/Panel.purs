@@ -4,7 +4,7 @@ import Prelude hiding (degree)
 
 import Algorithm.Segment (Segment, mkSegment)
 import Control.Monad.Error.Class (throwError)
-import Data.Default (class Default)
+import Data.Default (class Default, def)
 import Data.Enum (class BoundedEnum, class Enum, fromEnum, toEnum)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Bounded (genericBottom, genericTop)
@@ -12,7 +12,7 @@ import Data.Generic.Rep.Enum (genericCardinality, genericFromEnum, genericPred, 
 import Data.Generic.Rep.Ord (genericCompare)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Hardware.Size (Size(..))
-import Data.Lens (Lens', view, (^.), (%~))
+import Data.Lens (Lens', view, (^.), (%~), (.~))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (List)
@@ -23,7 +23,7 @@ import Data.Meter (Meter, meter, meterVal)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.UUID (UUID, emptyUUID, toString)
-import Editor.Common.Lenses (_alignment, _id, _orientation, _slope, _width, _x, _y)
+import Editor.Common.Lenses (_alignment, _height, _id, _orientation, _slope, _width, _x, _y)
 import Editor.Common.ProtoCodable (class ProtoEncodable, toProto)
 import Effect (Effect)
 import Foreign.Generic (class Decode, class Encode, ForeignError(..), decode, defaultOptions, encode, genericDecode, genericEncode)
@@ -201,8 +201,10 @@ instance roofComponentPanel :: RoofComponent Panel where
     compY  = view _y
     compZ  = const $ meter 0.0
     size p = case p ^. _orientation of
-        Landscape -> Size { width: panelLong, height: panelShort }
-        Portrait  -> Size { width: panelShort, height: panelLong }
+        Landscape -> def # _width  .~ panelLong
+                         # _height .~ panelShort
+        Portrait  -> def # _width  .~ panelShort
+                         # _height .~ panelLong
 instance arrayComponentPanel :: ArrayComponent Panel where
     arrayNumber p = p ^. _arrNumber
 instance protoEncodablePanel :: ProtoEncodable Panel PanelPB where
@@ -271,8 +273,9 @@ panelLong = meter 1.6
 panelShort :: Meter
 panelShort = meter 1.0
 
+-- | Get validated slope value for any value that has slope.
 -- only slope angles larger than 5 degrees are considered valid slope
-validatedSlope :: Panel -> Maybe Angle
+validatedSlope :: forall a r. Newtype a { slope :: Angle | r } => a -> Maybe Angle
 validatedSlope p | p ^. _slope < degree 5.0 = Nothing
                  | otherwise                = Just $ p ^. _slope
 
