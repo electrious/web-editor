@@ -8,6 +8,7 @@ import Data.Meter (meterVal)
 import Data.Traversable (traverse)
 import Editor.Common.Lenses (_bridges, _flashes, _leftEndCaps, _length, _mounts, _rightEndCaps, _skirts, _x, _y, _z)
 import Effect (Effect)
+import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
 import Math (atan, pi, sqrt)
 import Model.Racking.FX.Bridge (Bridge)
@@ -28,23 +29,23 @@ import Three.Math.Vector (mkVec3)
 newtype FXRackingComponentRenderable = FXRackingComponentRenderable FXRackingComponent
 instance renderableFXRackingComponent :: Renderable FXRackingComponentRenderable Object3D where
     render (FXRackingComponentRenderable f) = do
-        comp <- mkObject3D
-        setName "FXRackingComponent" comp
+        comp <- liftEffect mkObject3D
+        liftEffect $ setName "FXRackingComponent" comp
 
         flashes :: Array Mesh <- traverse render (FlashRenderable <$> f ^. _flashes)
-        traverse_ (flip add comp) flashes
+        liftEffect $ traverse_ (flip add comp) flashes
 
         mounts :: Array Object3D <- traverse render (MountRenderable <$> f ^. _mounts)
-        traverse_ (flip add comp) mounts
+        liftEffect $ traverse_ (flip add comp) mounts
 
         bridges :: Array Object3D <- traverse render (BridgeRenderable <$> f ^. _bridges)
-        traverse_ (flip add comp) bridges
+        liftEffect $ traverse_ (flip add comp) bridges
 
         skirts :: Array Mesh <- traverse render (SkirtRenderable <$> f ^. _skirts)
-        traverse_ (flip add comp) skirts
+        liftEffect $ traverse_ (flip add comp) skirts
 
         endCaps :: Array Mesh <- traverse render (EndCapRenderable <$> (f ^. _leftEndCaps <> f ^. _rightEndCaps))
-        traverse_ (flip add comp) endCaps
+        liftEffect $ traverse_ (flip add comp) endCaps
 
         pure comp
 
@@ -89,7 +90,7 @@ buildMount = do
 
 newtype MountRenderable = MountRenderable Mount
 instance renderableMount :: Renderable MountRenderable Object3D where
-    render (MountRenderable m) = do
+    render (MountRenderable m) = liftEffect do
         let bx = meterVal $ m ^. _clampX - m ^. _x
 
         clamp <- buildClamp
@@ -123,7 +124,7 @@ instance renderableMount :: Renderable MountRenderable Object3D where
 
 newtype BridgeRenderable = BridgeRenderable Bridge
 instance renderableBridge :: Renderable BridgeRenderable Object3D where
-    render (BridgeRenderable b) = do
+    render (BridgeRenderable b) = liftEffect do
         top <- mkMesh bridgeTopBox blackMaterial
         setName "top" top
         setPosition (mkVec3 0.0 0.0 0.02) top
@@ -158,7 +159,7 @@ bridgeBotBox = unsafePerformEffect $ mkBoxGeometry 0.2032 0.1 0.003
 
 newtype SkirtRenderable = SkirtRenderable Skirt
 instance renderableSkirt :: Renderable SkirtRenderable Mesh where
-    render (SkirtRenderable s) = do
+    render (SkirtRenderable s) = liftEffect do
         m <- mkMesh skirtBox blackMaterial
         setName "Skirt" m
         setScale (mkVec3 (meterVal $ s ^. _length) 1.0 1.0) m
@@ -173,7 +174,7 @@ skirtBox = unsafePerformEffect $ mkBoxGeometry 1.0 0.03 0.04
 
 newtype EndCapRenderable = EndCapRenderable EndCap
 instance renderableEndCap :: Renderable EndCapRenderable Mesh where
-    render (EndCapRenderable e) = do
+    render (EndCapRenderable e) = liftEffect do
         m <- mkMesh endCapBox blackMaterial
         setName "EndCap" m
         setPosition (mkVec3 (meterVal $ e ^. _x)

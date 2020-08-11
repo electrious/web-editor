@@ -6,11 +6,13 @@ import Effect (Effect)
 import Three.Core.Geometry (class IsBufferGeometry, class IsGeometry)
 import Three.Core.Material (class IsMaterial)
 import Three.Core.Object3D (class IsObject3D)
+import Unsafe.Coerce (unsafeCoerce)
 import Util (ffi, fpi)
 
 foreign import data Mesh :: Type
 foreign import mkMesh :: forall geo mat. IsGeometry geo => IsMaterial mat => geo -> mat -> Effect Mesh
-instance isObject3DMesh :: IsObject3D Mesh
+instance isObject3DMesh :: IsObject3D Mesh where
+    toObject3D = unsafeCoerce
 
 foreign import isMesh :: Mesh -> Boolean
 

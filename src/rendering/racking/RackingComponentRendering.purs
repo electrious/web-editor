@@ -2,6 +2,7 @@ module Rendering.Racking.RackingComponentRendering where
 
 import Prelude hiding (add)
 
+import Effect.Class (liftEffect)
 import Model.Racking.RoofRackingData (RackingComp(..))
 import Rendering.Racking.BXRendering (BXRackingComponentRenderable(..))
 import Rendering.Racking.FXRendering (FXRackingComponentRenderable(..))
@@ -19,10 +20,10 @@ instance renderableRackingComp :: RenderableWithSlope RackignCompRenderable Obje
             f (XRFlat fl) = renderWithSlope slope $ XRFlatRackingComponentRenderable fl
             f (BX bx)     = render $ BXRackingComponentRenderable bx
             f (GAF gaf)   = render $ GAFRackingComponentRenderable gaf
-        c <- mkObject3D
-        setName "RackingComp" c
+        c <- liftEffect mkObject3D
+        liftEffect $ setName "RackingComp" c
         
         comp :: Object3D <- f r
-        add comp c
+        liftEffect $ add comp c
 
         pure c

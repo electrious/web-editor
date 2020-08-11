@@ -5,7 +5,7 @@ import Prelude
 import Algorithm.RoofCheck (couldBeRoof)
 import Custom.Mesh (TappableMesh, mkTappableMesh)
 import Data.Compactable (compact)
-import Data.Lens (Lens', (^.))
+import Data.Lens (Lens', view, (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..))
@@ -25,7 +25,7 @@ import Three.Core.Face3 (normal)
 import Three.Core.Geometry (CircleGeometry, mkCircleGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial)
 import Three.Core.Mesh (Mesh)
-import Three.Core.Object3D (class IsObject3D, Object3D, hasParent, localToWorld, lookAt, parent, setName, setPosition, setVisible, worldToLocal)
+import Three.Core.Object3D (class IsObject3D, Object3D, hasParent, localToWorld, lookAt, parent, setName, setPosition, setVisible, toObject3D, worldToLocal)
 import Three.Math.Vector (Vector3, addScaled, (<+>))
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -37,6 +37,8 @@ newtype RoofRecognizer = RoofRecognizer {
 }
 
 derive instance newtypeRoofRecognizer :: Newtype RoofRecognizer _
+instance isObject3DRoofRecognizer :: IsObject3D RoofRecognizer where
+    toObject3D = toObject3D <<< view _marker
 instance disposeRoofRecognizer :: Disposable RoofRecognizer where
     dispose r = r ^. _disposable
 
@@ -61,25 +63,25 @@ adderMarkerGeo = unsafeCoerce $ unsafePerformEffect (mkCircleGeometry 1.0 32)
 createAdderMarker :: Effect TappableMesh
 createAdderMarker = do
     marker <- mkTappableMesh adderMarkerGeo adderMarkerMat
-    setName "add-roof-marker" $ marker ^. _mesh
+    setName "add-roof-marker" marker
     pure marker
 
 
 showMarker :: TappableMesh -> Maybe CandidatePoint -> Effect Unit
-showMarker marker Nothing = setVisible false $ marker ^. _mesh
-showMarker marker (Just p) | not (hasParent $ marker ^. _mesh) = setVisible false $ marker ^. _mesh
+showMarker marker Nothing = setVisible false marker
+showMarker marker (Just p) | not (hasParent marker) = setVisible false marker
                            | otherwise = do
-                                 setVisible true $ marker ^. _mesh
+                                 setVisible true marker
                                  -- get the local position of the candidate point
                                  -- and move it along the normal vector a bit.
                                  -- then used as the new position of the marker
                                  let np = addScaled p.position p.faceNormal 0.03
-                                 setPosition np $ marker ^. _mesh
+                                 setPosition np marker
 
                                  -- set the target direction of the marker
                                  let target = p.position <+> p.faceNormal
-                                 targetW <- localToWorld target (parent (marker ^. _mesh) :: Object3D)
-                                 lookAt targetW $ marker ^. _mesh
+                                 targetW <- localToWorld target (parent marker :: Object3D)
+                                 lookAt targetW marker
 
 
 -- | create a roof recognizer
@@ -93,7 +95,7 @@ createRoofRecognizer houseWrapper roofs mouseMove canShow = do
     marker <- createAdderMarker
 
     -- hide the marker by default
-    setVisible false $ marker ^. _mesh
+    setVisible false marker
 
     let getCandidatePoint evt rs = do
             isRoof <- couldBeRoof houseWrapper rs evt

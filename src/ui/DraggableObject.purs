@@ -6,13 +6,13 @@ import Control.Alt ((<|>))
 import Custom.Mesh (DraggableMesh, TapDragMesh, calcDragDelta, mkDraggableMesh, mkTapDragMesh, validateDrag)
 import Data.Filterable (filter)
 import Data.Foldable (sequence_)
-import Data.Lens (Lens', (^.))
+import Data.Lens (Lens', view, (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Editor.Common.Lenses (_disposable, _dragged, _mesh, _tapped)
+import Editor.Common.Lenses (_disposable, _dragged, _object, _tapped)
 import Editor.Disposable (class Disposable)
 import Editor.SceneEvent (isDragEnd, isDragStart)
 import Effect (Effect)
@@ -21,7 +21,7 @@ import FRP.Event (Event, subscribe)
 import FRP.Event.Extra (foldWithDef, multicast)
 import Three.Core.Geometry (class IsGeometry, mkCircleGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial, setOpacity, setTransparent)
-import Three.Core.Object3D (Object3D, add, hasParent, mkObject3D, parent, setName, setPosition, setRenderOrder, setVisible, worldToLocal)
+import Three.Core.Object3D (class IsObject3D, Object3D, add, hasParent, mkObject3D, parent, setName, setPosition, setRenderOrder, setVisible, worldToLocal)
 import Three.Math.Vector (Vector2, Vector3, mkVec3, vecX, vecY, (<+>))
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -34,12 +34,10 @@ newtype DraggableObject = DraggableObject {
 }
 
 derive instance newtypeDraggableEvent :: Newtype DraggableObject _
-
+instance isObject3DDraggableObject :: IsObject3D DraggableObject where
+    toObject3D = view _object
 instance disposableDraggableObject :: Disposable DraggableObject where
     dispose d = d ^. _disposable
-
-_draggableObject :: Lens' DraggableObject Object3D
-_draggableObject = _Newtype <<< prop (SProxy :: SProxy "object")
 
 _position :: Lens' DraggableObject (Event Vector3)
 _position = _Newtype <<< prop (SProxy :: SProxy "position")
@@ -91,19 +89,19 @@ createDraggableObject active index position customGeo customMat = do
     mesh <- createVisibleObject customGeo customMat
 
     let defPosition = mkVec3 (vecX position) (vecY position) 0.1
-    setPosition defPosition $ mesh ^. _mesh
-    setVisible false $ mesh ^. _mesh  -- invisible by default
+    setPosition defPosition mesh
+    setVisible false mesh  -- invisible by default
     
-    add (mesh ^. _mesh) dragObj
+    add mesh dragObj
 
     -- create the invisible circle
     invCircle <- createInvisibleCircle
-    setPosition defPosition $ invCircle ^. _mesh
-    setVisible false $ invCircle ^. _mesh
-    setRenderOrder 10 $ invCircle ^. _mesh
-    add (invCircle ^. _mesh) dragObj
+    setPosition defPosition invCircle
+    setVisible false invCircle
+    setRenderOrder 10 invCircle
+    add invCircle dragObj
 
-    disp1 <- subscribe active (flip setVisible (mesh ^. _mesh))
+    disp1 <- subscribe active (flip setVisible mesh)
 
     let dragEvts = multicast $ mesh ^. _dragged <|> invCircle ^. _dragged
         evts = multicast $ validateDrag dragEvts
@@ -112,7 +110,7 @@ createDraggableObject active index position customGeo customMat = do
 
         dragging = (const true <$> startEvt) <|> (const false <$> endEvt)
     
-    disp2 <- subscribe dragging (flip setVisible (invCircle ^. _mesh))
+    disp2 <- subscribe dragging (flip setVisible invCircle)
 
     let toLocal v = if hasParent dragObj
                     then Just <$> worldToLocal v (parent dragObj :: Object3D)
@@ -126,8 +124,8 @@ createDraggableObject active index position customGeo customMat = do
         newPos = multicast $ foldWithDef updatePos delta defPosition
     
     disp3 <- subscribe newPos \p -> do
-                setPosition p $ mesh ^. _mesh
-                setPosition p $ invCircle ^. _mesh
+                setPosition p mesh
+                setPosition p invCircle
 
     pure $ DraggableObject {
         object     : dragObj,

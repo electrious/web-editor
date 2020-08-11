@@ -32,10 +32,10 @@ instance defaultEditorConfig :: Default EditorConfig where
         modeDyn : step Showing empty
     }
 
-_elem :: Lens' EditorConfig (Maybe Element)
+_elem :: forall t a r. Newtype t { elem :: a | r } => Lens' t a
 _elem = _Newtype <<< prop (SProxy :: SProxy "elem")
 
-_sizeDyn :: Lens' EditorConfig (Dynamic Size)
+_sizeDyn :: forall t a r. Newtype t { sizeDyn :: a | r } => Lens' t a
 _sizeDyn = _Newtype <<< prop (SProxy :: SProxy "sizeDyn")
 
 newtype EditorM a = EditorM (ReaderT EditorConfig Effect a)

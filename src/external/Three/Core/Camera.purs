@@ -4,6 +4,7 @@ import Prelude
 
 import Effect (Effect)
 import Three.Core.Object3D (class IsObject3D)
+import Unsafe.Coerce (unsafeCoerce)
 import Util (fpi)
 
 foreign import data Camera :: Type
@@ -11,8 +12,10 @@ foreign import data PerspectiveCamera :: Type
 
 foreign import mkPerspectiveCamera :: Number -> Number -> Number -> Number -> Effect PerspectiveCamera
 
-instance isObject3DCamera :: IsObject3D Camera
-instance isObject3DPerspectiveCamera :: IsObject3D PerspectiveCamera
+instance isObject3DCamera :: IsObject3D Camera where
+    toObject3D = unsafeCoerce
+instance isObject3DPerspectiveCamera :: IsObject3D PerspectiveCamera where
+    toObject3D = unsafeCoerce
 
 class IsObject3D a <= IsCamera a
 

@@ -6,7 +6,7 @@ import Algorithm.MeshFlatten (VertexItem, buildRTree)
 import Data.Array (range)
 import Data.Compactable (compact)
 import Data.Foldable (find, traverse_)
-import Data.Lens ((^.))
+import Data.Lens (view, (^.))
 import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype)
 import Data.Traversable (traverse)
@@ -18,7 +18,7 @@ import RBush.RBush (RBush)
 import Three.Core.Geometry (class IsGeometry, BufferGeometry, Geometry, count, getAttribute, getX, getY, getZ)
 import Three.Core.Material (class IsMaterial, MaterialCreator, MeshBasicMaterial, getMaterial, preload, setTransparent)
 import Three.Core.Mesh (Mesh, bufferGeometry, geometry, isMesh, mkMesh)
-import Three.Core.Object3D (class IsObject3D, Object3D, add, children, remove, setCastShadow, setName, setReceiveShadow)
+import Three.Core.Object3D (class IsObject3D, Object3D, add, children, remove, setCastShadow, setName, setReceiveShadow, toObject3D)
 import Three.Loader.ObjLoader (loadMTL, loadOBJ, makeMTLLoader, makeOBJLoader2, setPath)
 import Three.Math.Vector (Vector3, mkVec3)
 
@@ -33,6 +33,8 @@ newtype HouseMesh = HouseMesh {
 }
 
 derive instance newtypeHouseMesh :: Newtype HouseMesh _
+instance isObject3DHouseMesh :: IsObject3D HouseMesh where
+    toObject3D = toObject3D <<< view _mesh
 
 -- | create new HouseMesh, which is a mesh composed with the tap and mouse
 -- events from the mesh.
@@ -69,7 +71,7 @@ applyMaterialCreator matCreator obj = do
             let geo :: Geometry
                 geo = geometry old
             newMesh <- mkHouseMesh geo mat
-            add (newMesh ^. _mesh) obj
+            add newMesh obj
             pure newMesh
     traverse upd oldMesh
 

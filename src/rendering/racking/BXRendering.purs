@@ -7,6 +7,7 @@ import Data.Lens ((^.))
 import Data.Meter (meterVal)
 import Data.Traversable (traverse, traverse_)
 import Editor.Common.Lenses (_chassis, _x, _y, _z)
+import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
 import Math (pi)
 import Model.Racking.BX.BXRackingComponent (BXRackingComponent)
@@ -25,17 +26,17 @@ import Unsafe.Coerce (unsafeCoerce)
 newtype BXRackingComponentRenderable = BXRackingComponentRenderable BXRackingComponent
 instance renderableBXRackingComponent :: Renderable BXRackingComponentRenderable Object3D where
     render (BXRackingComponentRenderable b) = do
-        comp <- mkObject3D
-        setName "BXRackingComponent" comp
+        comp <- liftEffect mkObject3D
+        liftEffect $ setName "BXRackingComponent" comp
 
         chassis :: Array Mesh <- traverse render (ChassisRenderable <$> b ^. _chassis)
-        traverse_ (flip add comp) chassis
+        liftEffect $ traverse_ (flip add comp) chassis
 
         pure comp
 
 newtype ChassisRenderable = ChassisRenderable Chassis
 instance renderableChassis :: Renderable ChassisRenderable Mesh where
-    render (ChassisRenderable c) = do
+    render (ChassisRenderable c) = liftEffect do
         m <- mkMesh (chassisGeo "chassis") blackMaterial
         setName "Chassis" m
         setCastShadow false m

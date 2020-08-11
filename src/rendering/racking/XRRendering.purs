@@ -6,6 +6,7 @@ import Data.Lens ((^.))
 import Data.Meter (inch, meterVal)
 import Data.Traversable (traverse, traverse_)
 import Editor.Common.Lenses (_clamps, _flashes, _length, _lfeet, _rails, _splices, _stoppers, _x, _y, _z)
+import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
 import Math (pi)
 import Model.Racking.XR10.Clamp (Clamp)
@@ -26,32 +27,32 @@ import Three.Math.Vector (mkVec3)
 newtype XRRackingComponentRenderable = XRRackingComponentRenderable XRRackingComponent
 instance renderableXRRackingComponent :: Renderable XRRackingComponentRenderable Object3D where
     render (XRRackingComponentRenderable x) = do
-        comp <- mkObject3D
-        setName "XRRackingComponent" comp
+        comp <- liftEffect mkObject3D
+        liftEffect $ setName "XRRackingComponent" comp
 
         flashes :: Array Mesh <- traverse render (FlashRenderable <$> x ^. _flashes)
-        traverse_ (flip add comp) flashes
+        liftEffect $ traverse_ (flip add comp) flashes
 
         rails :: Array Mesh <- traverse render (RailRenderable <$> x ^. _rails)
-        traverse_ (flip add comp) rails
+        liftEffect $ traverse_ (flip add comp) rails
 
         splices :: Array Mesh <- traverse render (SpliceRenderable <$> x ^. _splices)
-        traverse_ (flip add comp) splices
+        liftEffect $ traverse_ (flip add comp) splices
 
         lfeet :: Array Object3D <- traverse render (LFootRenderable <$> x ^. _lfeet)
-        traverse_ (flip add comp) lfeet
+        liftEffect $ traverse_ (flip add comp) lfeet
 
         clamps :: Array Object3D <- traverse render (ClampRenderable <$> x ^. _clamps)
-        traverse_ (flip add comp) clamps
+        liftEffect $ traverse_ (flip add comp) clamps
 
         stoppers :: Array Mesh <- traverse render (StopperRenderable <$> x ^. _stoppers)
-        traverse_ (flip add comp) stoppers
+        liftEffect $ traverse_ (flip add comp) stoppers
 
         pure comp
 
 newtype RailRenderable = RailRenderable Rail
 instance renderableRail :: Renderable RailRenderable Mesh where
-    render (RailRenderable rail) = do
+    render (RailRenderable rail) = liftEffect do
         mesh <- mkMesh railGeometry blackMaterial
         setName "Rail" mesh
         setScale (mkVec3 (meterVal $ rail ^. _length) 1.0 1.0) mesh
@@ -68,7 +69,7 @@ railGeometry = unsafePerformEffect $ mkBoxGeometry 1.0 h l
 
 newtype SpliceRenderable = SpliceRenderable Splice
 instance renderableSplice :: Renderable SpliceRenderable Mesh where
-    render (SpliceRenderable s) = do
+    render (SpliceRenderable s) = liftEffect do
         mesh <- mkMesh spliceGeometry blackMaterial
         setName "Splice" mesh
         setPosition (mkVec3 (meterVal $ s ^. _x)
@@ -82,7 +83,7 @@ spliceGeometry = unsafePerformEffect $ mkBoxGeometry 0.1778 0.02 0.06
 
 newtype LFootRenderable = LFootRenderable LFoot
 instance renderableLFoot :: Renderable LFootRenderable Object3D where
-    render (LFootRenderable l) = do
+    render (LFootRenderable l) = liftEffect do
         bot <- mkMesh lfootBotBox blackMaterial
         setName "bottom" bot
         setPosition (mkVec3 0.0 (-0.019) 0.0) bot
@@ -109,7 +110,7 @@ lfootSideBox = unsafePerformEffect $ mkBoxGeometry 0.047752 0.010668 0.0762
 
 newtype ClampRenderable = ClampRenderable Clamp
 instance renderableClamp :: Renderable ClampRenderable Object3D where
-    render (ClampRenderable c) = do
+    render (ClampRenderable c) = liftEffect do
         m <- buildClamp
         setPosition (mkVec3 (meterVal $ c ^. _x)
                             (meterVal $ c ^. _y)
@@ -118,7 +119,7 @@ instance renderableClamp :: Renderable ClampRenderable Object3D where
 
 newtype StopperRenderable = StopperRenderable Stopper
 instance renderableStopper :: Renderable StopperRenderable Mesh where
-    render (StopperRenderable s) = do
+    render (StopperRenderable s) = liftEffect do
         m <- mkMesh stopperCy blackMaterial
         setName "Stopper" m
         setRotation (mkEuler (pi / 2.0) 0.0 0.0) m

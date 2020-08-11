@@ -10,7 +10,7 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Bounded (genericBottom, genericTop)
 import Data.Generic.Rep.Enum (genericCardinality, genericFromEnum, genericPred, genericSucc, genericToEnum)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Lens (Lens', (^.), (.~), (%~))
+import Data.Lens (Lens', view, (%~), (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (List(..), (:))
@@ -35,7 +35,7 @@ import Model.RoofComponent (size)
 import Three.Core.Geometry (class IsGeometry, BoxGeometry, mkBoxGeometry)
 import Three.Core.Material (class IsMaterial, MeshBasicMaterial, mkMeshBasicMaterialWithTexture, setOpacity)
 import Three.Core.Mesh (Mesh, mkMesh)
-import Three.Core.Object3D (add, position, rotateWithEuler, setCastShadow, setName, setPosition, setRenderOrder)
+import Three.Core.Object3D (class IsObject3D, add, position, rotateWithEuler, setCastShadow, setName, setPosition, setRenderOrder, toObject3D)
 import Three.Loader.TextureLoader (loadTexture, mkTextureLoader)
 import Three.Math.Euler (mkEuler)
 import Three.Math.Vector (Vector3, mkVec3)
@@ -114,6 +114,8 @@ newtype PanelNode = PanelNode {
 }
 
 derive instance newtypePanelNode :: Newtype PanelNode _
+instance isObject3DPanelNode :: IsObject3D PanelNode where
+    toObject3D = toObject3D <<< view _panelObject
 
 _panel :: forall t a r. Newtype t { panel :: a | r } => Lens' t a
 _panel = _Newtype <<< prop (SProxy :: SProxy "panel")
@@ -170,11 +172,10 @@ mkPanelNode arrCfg info panelType p = do
         bodyMat = getPanelMaterial info $ panelTextureType rackingType panelType
 
     m <- mkTapDragMesh bodyGeo bodyMat
-    let mesh = m ^. _mesh
-    setName "panel-body" mesh
+    setName "panel-body" m
     let node = PanelNode {
                  panel       : p,
-                 panelObject : mesh,
+                 panelObject : m ^. _mesh,
                  tapped      : const p <$> m ^. _tapped,
                  dragged     : mkDragInfo p <$> m ^. _dragged,
                  materials   : (bodyMat : blackMat : Nil)
@@ -186,7 +187,7 @@ mkPanelNode arrCfg info panelType p = do
     right <- mkRightFrame vertGeo blackMat
 
     -- add frame meshes to panel mesh
-    traverse_ (flip add mesh) [top, bot, left, right]
+    traverse_ (flip add m) [top, bot, left, right]
     updateRotation p node
     updatePosition p arrCfg node
 
@@ -210,9 +211,8 @@ moveBy delta node = do
 
 -- update panel mesh position based on array config and the corresponding panel model
 updatePosition :: Panel -> ArrayConfig -> PanelNode -> Effect Unit
-updatePosition p arrCfg node = setPosition pv m
-    where m  = node ^. _panelObject
-          px = meterVal $ p ^. _x
+updatePosition p arrCfg = setPosition pv
+    where px = meterVal $ p ^. _x
           py = meterVal $ p ^. _y
           z  = meterVal $ arrCfg ^. _panelLowestZ
           pv = case validatedSlope p of
@@ -223,9 +223,8 @@ updatePosition p arrCfg node = setPosition pv m
 
 -- update the rotation of the panel mesh
 updateRotation :: Panel -> PanelNode -> Effect Unit
-updateRotation p node = rotateWithEuler euler m
-    where m = node ^. _panelObject
-          euler = case validatedSlope p of
+updateRotation p = rotateWithEuler euler
+    where euler = case validatedSlope p of
                      Nothing -> rotateForNormal $ p ^. _orientation
                      Just slope -> rotateForFlat (p ^. _orientation) slope
           rotateForNormal Landscape = mkEuler 0.0 0.0 (pi / 2.0)
@@ -238,7 +237,7 @@ updateOpacity :: PanelOpacity -> PanelNode -> Effect Unit
 updateOpacity opacity node = traverse_ (setOpacity (opacityValue opacity)) (node ^. _materials)
 
 enableShadows :: Boolean -> PanelNode -> Effect Unit
-enableShadows e node = setCastShadow e (node ^. _panelObject)
+enableShadows e node = setCastShadow e node
 
 changeToNormal :: PanelNode -> Effect PanelNode
 changeToNormal node = updateOpacity Opaque node *> pure node

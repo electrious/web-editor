@@ -4,7 +4,7 @@ import Prelude
 
 import Data.Compactable (compact)
 import Data.Default (def)
-import Data.Lens ((^.), (.~))
+import Data.Lens (view, (.~), (^.))
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Tuple (Tuple(..))
@@ -17,7 +17,7 @@ import FRP.Event.Extra (multicast, performEvent)
 import Three.Core.Geometry (class IsGeometry)
 import Three.Core.Material (class IsMaterial)
 import Three.Core.Mesh (Mesh, mkMesh)
-import Three.Core.Object3D (class IsObject3D, Object3D, hasParent, parent, worldToLocal)
+import Three.Core.Object3D (class IsObject3D, Object3D, hasParent, parent, toObject3D, worldToLocal)
 import Three.Math.Vector (Vector3, mkVec3, (<->))
 
 newtype TappableMesh = TappableMesh {
@@ -26,6 +26,8 @@ newtype TappableMesh = TappableMesh {
 }
 
 derive instance newtypeTappableMesh :: Newtype TappableMesh _
+instance isObject3DTappableMesh :: IsObject3D TappableMesh where
+    toObject3D = toObject3D <<< view _mesh
 
 tapEvtOn :: Mesh -> Event SceneTapEvent
 tapEvtOn m = makeEvent \k -> do
@@ -74,6 +76,8 @@ newtype DraggableMesh = DraggableMesh {
 }
 
 derive instance newtypeDraggableMesh :: Newtype DraggableMesh _
+instance isObject3DDraggableMesh :: IsObject3D DraggableMesh where
+    toObject3D = toObject3D <<< view _mesh
 
 dragEvtOn :: Mesh -> Event SceneDragEvent
 dragEvtOn m = makeEvent \k -> do
@@ -107,6 +111,8 @@ newtype TapDragMesh = TapDragMesh {
 }
 
 derive instance newtypeTapDragMesh :: Newtype TapDragMesh _
+instance toObject3DTapDragMesh :: IsObject3D TapDragMesh where
+    toObject3D = toObject3D <<< view _mesh
 
 mkTapDragMesh :: forall geo mat. IsGeometry geo => IsMaterial mat => geo -> mat -> Effect TapDragMesh
 mkTapDragMesh geo mat = do

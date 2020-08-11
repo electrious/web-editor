@@ -164,7 +164,7 @@ recognizeNewRoofs meshData wrapper newRoofs activeRoof canEditRoofDyn = do
                                        (dictToArr <$> newRoofs)
                                        (meshData ^. _mesh <<< _mouseMove)
                                        canShowRecognizer
-    add (recognizer ^. _marker) wrapper
+    add recognizer wrapper
     pure recognizer
 
 getActiveRoof :: HouseMeshData -> Event UUID -> Event RoofOperation -> Event RoofPlate -> Event (Maybe UUID)

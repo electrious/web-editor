@@ -6,6 +6,7 @@ import Data.Lens ((^.))
 import Data.Meter (inch, meterVal)
 import Editor.Common.Lenses (_x, _y, _z)
 import Effect (Effect)
+import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
 import Math (pi)
 import Model.Racking.Flash (Flash)
@@ -44,7 +45,7 @@ buildClamp = do
 
 newtype FlashRenderable = FlashRenderable Flash
 instance renderableFlash :: Renderable FlashRenderable Mesh where
-    render (FlashRenderable f) = do
+    render (FlashRenderable f) = liftEffect do
         m <- mkMesh flashGeo blackMaterial
         setName "Flash" m
         setPosition (mkVec3 (meterVal $ f ^. _x)

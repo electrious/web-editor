@@ -27,10 +27,9 @@ import FRP.Event (Event, create, keepLatest, sampleOn, subscribe)
 import FRP.Event.Extra (foldEffect, mergeArray, multicast, performEvent)
 import Three.Core.Geometry (CircleGeometry, Geometry, mkCircleGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial)
-import Three.Core.Mesh (Mesh)
-import Three.Core.Object3D (class IsObject3D, Object3D, add, remove, setPosition, setVisible)
+import Three.Core.Object3D (class IsObject3D, add, remove, setPosition, setVisible, toObject3D)
 import Three.Math.Vector (Vector2, Vector3, dist, mkVec2, mkVec3, vecX, vecY)
-import UI.DraggableObject (DraggableObject, _draggableObject, _isDragging, createDraggableObject)
+import UI.DraggableObject (DraggableObject, _isDragging, createDraggableObject)
 import Unsafe.Coerce (unsafeCoerce)
 
 toVec2 :: Vector3 -> Vector2
@@ -65,8 +64,8 @@ getRedMarkerActiveStatus ms = statusForDragging <|> statusForNewMarker
 -- | delete old marker objects and add new ones.
 attachObjs :: forall a. IsObject3D a => a -> Array DraggableObject -> Array DraggableObject -> Effect (Array DraggableObject)
 attachObjs parent newObjs objs = do
-    traverse_ (\o -> remove (o ^. _draggableObject :: Object3D) parent *> dispose o) objs
-    traverse_ (view _draggableObject >>> flip add parent) newObjs
+    traverse_ (\o -> remove o parent *> dispose o) objs
+    traverse_ (flip add parent) newObjs
     pure newObjs
 
 roofDeleteMaterial :: MeshBasicMaterial
@@ -94,9 +93,8 @@ newtype GreenMarker = GreenMarker {
 }
 
 derive instance newtypeGreenMarker :: Newtype GreenMarker _
-
-_greenMesh :: Lens' GreenMarker Mesh
-_greenMesh = _mesh <<< _mesh
+instance isObject3DGreenMarker :: IsObject3D GreenMarker where
+    toObject3D = toObject3D <<< view _mesh
 
 -- | create material and geometry for the green marker.
 greenMaterial :: MeshBasicMaterial
@@ -108,7 +106,7 @@ greenGeometry = unsafeCoerce $ unsafePerformEffect (mkCircleGeometry 0.3 32)
 mkGreenMarkerMesh :: Vector2 -> Effect TappableMesh
 mkGreenMarkerMesh p = do
     m <- mkTappableMesh greenGeometry greenMaterial
-    setPosition (mkVec3 (vecX p) (vecY p) 0.01) $ m ^. _mesh
+    setPosition (mkVec3 (vecX p) (vecY p) 0.01) m
     pure m
 
 mkGreenMarker :: GreenMarkerPoint -> Effect GreenMarker
@@ -122,7 +120,7 @@ greenMarkerPositions [] = []
 greenMarkerPositions [a] = []
 greenMarkerPositions vertices = h <$> filter g d
     where -- take all vertices and their indices
-          v1List = mapWithIndex (\i v -> Tuple i v) vertices
+          v1List = mapWithIndex Tuple vertices
           -- a new list with the head put to end
           v2List = fromMaybe [] $ lift2 snoc (tail vertices) (head vertices)
 
@@ -140,12 +138,12 @@ greenMarkerPositions vertices = h <$> filter g d
           h r = r.point
 
 setActive :: Array GreenMarker -> Boolean -> Effect Unit
-setActive ms active = traverse_ (\m -> setVisible active (m ^. _greenMesh)) ms
+setActive ms active = traverse_ (\m -> setVisible active m) ms
 
 updatePos :: GreenMarker -> GreenMarkerPoint -> Effect GreenMarker
 updatePos o p = do
     let pos = p ^. _position
-    setPosition (mkVec3 (vecX pos) (vecY pos) 0.01) (o ^. _greenMesh)
+    setPosition (mkVec3 (vecX pos) (vecY pos) 0.01) o
     pure $ GreenMarker { mesh: o ^. _mesh, point: p }
 
 -- function to create/delete/update green marker objects based on new
@@ -155,12 +153,12 @@ updateMarkers parent ps oldObjs | length ps == length oldObjs = sequence (zipWit
                                 | length ps > length oldObjs = do
                                         updObjs <- sequence (zipWith updatePos oldObjs (take (length oldObjs) ps))
                                         newObjs <- sequence (mkGreenMarker <$> takeEnd (length ps - length oldObjs) ps)
-                                        traverse_ (\o -> add (o ^. _greenMesh) parent) newObjs
+                                        traverse_ (flip add parent) newObjs
                                         pure (updObjs <> newObjs)
                                 | length ps < length oldObjs = do
                                         updObjs <- sequence (zipWith updatePos (take (length ps) oldObjs) ps)
                                         let delObjs = takeEnd (length oldObjs - length ps) oldObjs
-                                        traverse_ (\o -> remove (o ^. _greenMesh) parent) delObjs
+                                        traverse_ (flip remove parent) delObjs
                                         pure updObjs
                                 | otherwise = pure oldObjs
 
@@ -257,13 +255,13 @@ createRoofEditor parent active ps = do
     
     -- create the roof delete button
     roofDel <- createRoofDeleteMarker
-    add (roofDel ^. _mesh) parent
+    add roofDel parent
 
     -- update roof delete button position
-    d4 <- subscribe (verticesCenter <$> newVertices) (flip setPosition (roofDel ^. _mesh))
+    d4 <- subscribe (verticesCenter <$> newVertices) (flip setPosition roofDel)
 
     -- Show the roof delete button when roof's active
-    d5 <- subscribe roofActive (flip setVisible (roofDel ^. _mesh))
+    d5 <- subscribe roofActive (flip setVisible roofDel)
 
     -- set the default vertices
     updateVertList ps
