@@ -4,10 +4,13 @@ import Prelude hiding (add)
 
 import Custom.Mesh (mkTapDragMesh)
 import Data.Function.Memoize (memoize)
-import Data.Lens (view, (^.))
+import Data.Lens (Lens, Lens', view, (^.))
+import Data.Lens.Iso.Newtype (_Newtype)
+import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..))
 import Data.Meter (meterVal)
 import Data.Newtype (class Newtype)
+import Data.Symbol (SProxy(..))
 import Editor.Common.Lenses (_button, _dragged, _height, _orientation, _tapped, _x, _y, _z)
 import Editor.UI.DragInfo (DragInfo, mkDragInfo)
 import Effect (Effect)
@@ -28,14 +31,18 @@ import Three.Math.Euler (mkEuler)
 import Three.Math.Vector (Vector3, mkVec3)
 
 newtype PlusButtonNode = PlusButtonNode {
-    button  :: Object3D,
-    tapped  :: Event PlusButton,
-    dragged :: Event (DragInfo PlusButton)
+    plusButton :: PlusButton,
+    button     :: Object3D,
+    tapped     :: Event PlusButton,
+    dragged    :: Event (DragInfo PlusButton)
 }
 
 derive instance newtypePlusButtonNode :: Newtype PlusButtonNode _
 instance isObject3DPlusButtonNode :: IsObject3D PlusButtonNode where
     toObject3D = view _button
+
+_plusButton :: forall t a r. Newtype t { plusButton :: a | r } => Lens' t a
+_plusButton = _Newtype <<< prop (SProxy :: SProxy "plusButton")
 
 plusButtonGeo :: Unit -> BoxGeometry
 plusButtonGeo = memoize $ const $ unsafePerformEffect $ mkBoxGeometry 1.0 1.0 0.001
@@ -89,7 +96,8 @@ instance renderablePlusButtonNode :: Renderable PlusButton PlusButtonNode where
                 setPosition (mkVec3 (meterVal $ pb ^. _x) (meterVal $ pb ^. _y) (meterVal $ pb ^. _z)) btn
         
         pure $ PlusButtonNode {
-            button  : btn,
-            tapped  : const pb <$> invNode ^. _tapped,
-            dragged : mkDragInfo pb <$> invNode ^. _dragged
+            plusButton : pb,
+            button     : btn,
+            tapped     : const pb <$> invNode ^. _tapped,
+            dragged    : mkDragInfo pb <$> invNode ^. _dragged
         }
