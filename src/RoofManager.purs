@@ -27,7 +27,7 @@ import Editor.Disposable (class Disposable, dispose)
 import Editor.EditorMode (EditorMode(..))
 import Editor.House (HouseMeshData)
 import Editor.HouseEditor (HouseEditor, _panels, _roofPlates, performEditorEvent)
-import Editor.RoofNode (RoofNode, _roofDelete, _roofObject, _roofUpdate, createRoofNode)
+import Editor.RoofNode (RoofNode, _roofDelete, _roofUpdate, createRoofNode)
 import Editor.RoofRecognizer (RoofRecognizer, _addedNewRoof, _marker, createRoofRecognizer)
 import Effect (Effect)
 import Effect.Class (liftEffect)
@@ -133,13 +133,13 @@ mkNode activeRoof panelsDict racks roof = createRoofNode roof rackType ps (step 
 delOldNode :: forall a. IsObject3D a => a -> RoofNode -> Effect Unit
 delOldNode wrapper rn = do
     dispose rn
-    remove (rn ^. _roofObject) wrapper
+    remove rn wrapper
 
 -- delete old nodes and add new ones to the wrapper
 renderNodes :: forall a. IsObject3D a => a -> { last :: Maybe (Array RoofNode), now :: Array RoofNode } -> Effect (Array RoofNode)
 renderNodes wrapper { last, now } = do
     traverse_ (delOldNode wrapper) $ fromMaybe [] last
-    traverse_ (flip add wrapper <<< view _roofObject) now
+    traverse_ (flip add wrapper) now
     pure now
 
 -- | render dynamic roofs

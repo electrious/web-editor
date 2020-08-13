@@ -37,12 +37,13 @@ import Model.Roof.RoofPlate (RoofOperation(..), RoofPlate, _azimuth, _borderPoin
 import SimplePolygon (isSimplePolygon)
 import Three.Core.Geometry (mkShape, mkShapeGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial, setOpacity, setTransparent)
-import Three.Core.Object3D (class IsObject3D, Object3D, add, matrix, mkObject3D, remove, rotateX, rotateZ, setName, setPosition, updateMatrix, updateMatrixWorld, worldToLocal)
+import Three.Core.Object3D (class IsObject3D, Object3D, add, matrix, mkObject3D, remove, rotateX, rotateZ, setName, setPosition, toObject3D, updateMatrix, updateMatrixWorld, worldToLocal)
 import Three.Math.Vector (Vector2, Vector3, applyMatrix, mkVec2, mkVec3, vecX, vecY, vecZ)
 import Unsafe.Coerce (unsafeCoerce)
 
 newtype RoofNode = RoofNode {
     roofId     :: UUID,
+    roof       :: RoofPlate,
     roofUpdate :: Event RoofOperation,
     roofDelete :: Event RoofOperation,
     tapped     :: Event SceneTapEvent,
@@ -51,7 +52,8 @@ newtype RoofNode = RoofNode {
 }
 
 derive instance newtypeRoofNode :: Newtype RoofNode _
-
+instance isObject3DRoofNode :: IsObject3D RoofNode where
+    toObject3D = view _roofObject
 instance disposableRoofNode :: Disposable RoofNode where
     dispose (RoofNode { disposable }) = disposable
 
@@ -209,6 +211,7 @@ createRoofNode roof rackType panels isActive = do
 
         pure $ RoofNode {
             roofId     : roof ^. _id,
+            roof       : roof,
             roofDelete : multicast $ const (RoofOpDelete $ roof ^. _id) <$> delRoofEvt,
             roofUpdate : multicast newRoof,
             tapped     : multicast $ keepLatest $ view _tapped <$> (dynEvent meshDyn),

@@ -17,6 +17,7 @@ You can edit this file as you like.
   , "math"
   , "memoize"
   , "newtype"
+  , "numbers"
   , "profunctor-lenses"
   , "psci-support"
   , "uuid"

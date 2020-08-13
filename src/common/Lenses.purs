@@ -250,3 +250,6 @@ _panelsUpdated = _Newtype <<< prop (SProxy :: SProxy "panelsUpdated")
 
 _button :: forall t a r. Newtype t { button :: a | r } => Lens' t a
 _button = _Newtype <<< prop (SProxy :: SProxy "button")
+
+_name :: forall t a r. Newtype t { name :: a | r } => Lens' t a
+_name = _Newtype <<< prop (SProxy :: SProxy "name")
