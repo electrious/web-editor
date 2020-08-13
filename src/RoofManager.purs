@@ -8,11 +8,11 @@ import Control.Monad.Reader (ask)
 import Control.Plus (empty)
 import Data.Array (cons)
 import Data.Compactable (compact)
-import Data.Foldable (foldl, sequence_, traverse_)
+import Data.Foldable (class Foldable, foldl, sequence_, traverse_)
 import Data.Lens (Lens', view, (^.), (%~), (.~))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.List (toUnfoldable)
+import Data.List (List, singleton, toUnfoldable)
 import Data.Map (Map, delete, fromFoldable, insert, lookup, member, update, values)
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe, isNothing)
@@ -57,20 +57,20 @@ _editedRoofs = _Newtype <<< prop (SProxy :: SProxy "editedRoofs")
 
 type RoofDict = Map UUID RoofPlate
 
-roofDict :: Array RoofPlate -> RoofDict
+roofDict :: List RoofPlate -> RoofDict
 roofDict = fromFoldable <<< map f
     where f r = Tuple (r ^. _id) r
 
-dictToArr :: RoofDict -> Array RoofPlate
+dictToArr :: RoofDict -> List RoofPlate
 dictToArr = toUnfoldable <<< values
 
-type PanelsDict = Map UUID (Array Panel)
+type PanelsDict = Map UUID (List Panel)
 
-panelDict :: Array Panel -> PanelsDict
+panelDict :: forall f. Foldable f => f Panel -> PanelsDict
 panelDict = foldl f Map.empty
     where f d p = if member (p ^. _roofUUID) d
                   then update (Just <<< cons p) (p ^. _roofUUID) d
-                  else insert (p ^. _roofUUID) [p] d
+                  else insert (p ^. _roofUUID) (singleton p) d
 
 -- internal data structure used to manage roofs
 newtype RoofDictData = RoofDictData {

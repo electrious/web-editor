@@ -253,3 +253,6 @@ _button = _Newtype <<< prop (SProxy :: SProxy "button")
 
 _name :: forall t a r. Newtype t { name :: a | r } => Lens' t a
 _name = _Newtype <<< prop (SProxy :: SProxy "name")
+
+_apiConfig :: forall t a r. Newtype t { apiConfig :: a | r } => Lens' t a
+_apiConfig = _Newtype <<< prop (SProxy :: SProxy "apiConfig")

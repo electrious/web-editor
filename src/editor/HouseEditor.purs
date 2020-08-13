@@ -11,6 +11,7 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
+import Editor.Common.Lenses (_apiConfig)
 import Editor.EditorMode (EditorMode(..))
 import Effect (Effect)
 import Effect.Class (class MonadEffect, liftEffect)
@@ -50,15 +51,8 @@ instance defaultHouseConfig :: Default HouseConfig where
 _roofPlates :: Lens' HouseConfig (Array RoofPlate)
 _roofPlates = _Newtype <<< prop (SProxy :: SProxy "roofPlates")
 
-_panels :: Lens' HouseConfig (Array Panel)
-_panels = _Newtype <<< prop (SProxy :: SProxy "panels")
-
 _dataServer :: Lens' HouseConfig String
 _dataServer = _Newtype <<< prop (SProxy :: SProxy "dataServer")
-
-_apiConfig :: Lens' HouseConfig APIConfig
-_apiConfig = _Newtype <<< prop (SProxy :: SProxy "apiConfig")
-
 
 newtype HouseEditor a = HouseEditor (ReaderT HouseConfig Effect a)
 
