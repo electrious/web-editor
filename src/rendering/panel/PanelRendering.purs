@@ -1,11 +1,11 @@
-module Editor.Rendering.PanelRendering where
+module Editor.Rendering.PanelRendering (PanelRendererConfig(..), _parent, _operations,
+    _opacity, PanelRenderer, _allPanels, createPanelRenderer) where
 
 import Prelude hiding (add)
 
 import Control.Alt ((<|>))
-import Control.Plus (empty)
 import Data.Compactable (compact)
-import Data.Foldable (class Foldable, foldl, foldlDefault, length, traverse_)
+import Data.Foldable (foldl, length, traverse_)
 import Data.Lens (Lens', view, (%~), (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
@@ -21,13 +21,13 @@ import Data.Tuple (Tuple(..))
 import Data.UUID (UUID)
 import Editor.ArrayBuilder (ArrayBuilder, getArrayConfig, getPanelType, getTextureInfo)
 import Editor.Common.Lenses (_dragged, _tapped)
-import Editor.PanelOperation (PanelOperation(..))
 import Editor.PanelNode (PanelNode, PanelOpacity, _panel, changePanel, changeToNormal, enableShadows, isOpaque, mkPanelNode, moveBy, updateOpacity)
+import Editor.PanelOperation (PanelOperation(..))
 import Editor.UI.DragInfo (DragInfo)
 import Effect (Effect)
 import FRP.Dynamic (Dynamic, dynEvent, sampleDyn, step)
 import FRP.Event (Event, keepLatest)
-import FRP.Event.Extra (foldEffect, multicast)
+import FRP.Event.Extra (foldEffect, leftmost, multicast)
 import Model.Hardware.PanelTextureInfo (PanelTextureInfo)
 import Model.Hardware.PanelType (PanelType)
 import Model.Roof.ArrayConfig (ArrayConfig)
@@ -60,12 +60,6 @@ newtype PanelRenderer = PanelRenderer {
 }
 
 derive instance newtypePanelRenderer :: Newtype PanelRenderer _
-
-_panelTapped :: forall t a r. Newtype t { panelTapped :: a | r } => Lens' t a
-_panelTapped = _Newtype <<< prop (SProxy :: SProxy "panelTapped")
-
-_panelDragged :: forall t a r. Newtype t { panelDragged :: a | r } => Lens' t a
-_panelDragged = _Newtype <<< prop (SProxy :: SProxy "panelDragged")
 
 _allPanels :: forall t a r. Newtype t { allPanels :: a | r } => Lens' t a
 _allPanels = _Newtype <<< prop (SProxy :: SProxy "allPanels")
@@ -213,7 +207,3 @@ createPanelRenderer cfg = do
         dragged   : multicast $ keepLatest $ leftmost <<< map (view _dragged) <$> panelNodesEvt,
         allPanels : allPanelsRendered <$> statesDyn
     }
-
-
-leftmost :: forall a f. Foldable f => f (Event a) -> Event a
-leftmost = foldlDefault (<|>) empty

@@ -1,4 +1,6 @@
-module Editor.Rendering.ButtonsRenderer where
+module Editor.Rendering.ButtonsRenderer (ButtonOperation(..),
+    ButtonsRenderer, _plusTapped, _plusDragged, _rotTapped,
+    mkButtonsRenderer) where
 
 import Prelude hiding (add)
 
@@ -13,18 +15,18 @@ import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse, traverse_)
 import Editor.Common.Lenses (_dragged, _id, _tapped)
-import Editor.Rendering.PanelRendering (leftmost)
 import Editor.UI.DragInfo (DragInfo)
 import Editor.UI.PlusButton (PlusButtonNode, _plusButton)
 import Editor.UI.RotateButton (RotateButtonNode)
 import Effect (Effect)
 import FRP.Event (Event, keepLatest)
-import FRP.Event.Extra (foldEffect, multicast)
+import FRP.Event.Extra (foldEffect, leftmost, multicast)
 import Model.PlusButton (PlusButton)
 import Model.RotateButton (RotateButton)
 import Rendering.Renderable (RendererConfig, RenderingM, render, runRenderingM)
 import Three.Core.Object3D (class IsObject3D, add, remove)
 
+-- Operations to update the buttons renderer
 data ButtonOperation = RenderPlusButtons (List PlusButton)
                      | RenderRotateButtons (List RotateButton)
                      | HideButtonsExcept PlusButtonNode
@@ -67,7 +69,7 @@ _plusBtns = _Newtype <<< prop (SProxy :: SProxy "plusBtns")
 _rotBtns :: forall t a r. Newtype t { rotBtns :: a | r } => Lens' t a
 _rotBtns = _Newtype <<< prop (SProxy :: SProxy "rotBtns")
 
-
+-- | helper function to apply buttons operation and update the internal state
 applyOp :: forall a. IsObject3D a => a -> RendererConfig -> ButtonOperation -> ButtonRendererState -> Effect ButtonRendererState
 applyOp parent cfg (RenderPlusButtons ps) st = do
     nst   <- delPlusNodes parent st
@@ -89,16 +91,19 @@ applyOp parent cfg ResetButtons st = do
     nst <- delPlusNodes parent st
     delRotNodes parent nst
 
+-- delete all plus buttons
 delPlusNodes :: forall a. IsObject3D a => a -> ButtonRendererState -> Effect ButtonRendererState
 delPlusNodes parent st = do
     traverse_ (flip remove parent) (st ^. _plusBtns)
     pure $ st # _plusBtns .~ Nil
 
+-- delete all rotate buttons
 delRotNodes :: forall a. IsObject3D a => a -> ButtonRendererState -> Effect ButtonRendererState
 delRotNodes parent st = do
     traverse_ (flip remove parent) (st ^. _rotBtns)
     pure $ st # _rotBtns .~ Nil
 
+-- | create buttons renderer that will render all buttons
 mkButtonsRenderer :: forall a. IsObject3D a => a -> Event ButtonOperation -> RenderingM ButtonsRenderer
 mkButtonsRenderer parent opEvt = do
     cfg <- ask
