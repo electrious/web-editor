@@ -6,7 +6,7 @@ import API (APIConfig)
 import Data.Lens (Lens')
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.List (List)
+import Data.List (List, foldl)
 import Data.Map (delete, empty, insert, update)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
@@ -43,9 +43,9 @@ _finished = _Newtype <<< prop (SProxy :: SProxy "finished")
 
 -- apply panel operations to internal panel dicts
 applyOp :: PanelOperation -> PanelsDict -> PanelsDict
-applyOp (AddPanel p) m   = insert (p ^. _uuid) p m
-applyOp (AddPanels ps) m = traverse (\p -> insert (p ^. _uuid) p m) ps
-applyOp (DelPanel pid) m = delete pid m
-applyOp DeleteAll m      = empty
-applyOp (UpdatePanel p)  = update (const p) (p ^. _uuid) m
-
+applyOp (AddPanel p) m      = insert (p ^. _uuid) p m
+applyOp (AddPanels ps) m    = traverse (\p -> insert (p ^. _uuid) p m) ps
+applyOp (DelPanel pid) m    = delete pid m
+applyOp (DelPanels pids) m  = foldl (flip delete) m pids
+applyOp DeleteAll m         = empty
+applyOp (UpdatePanels ps) m = foldl (\p -> update (const p) (p ^. _uuid)) m ps

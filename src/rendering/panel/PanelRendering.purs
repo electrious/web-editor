@@ -22,7 +22,7 @@ import Data.UUID (UUID)
 import Editor.ArrayBuilder (ArrayBuilder, getArrayConfig, getPanelType, getTextureInfo)
 import Editor.Common.Lenses (_dragged, _tapped)
 import Editor.PanelNode (PanelNode, PanelOpacity, _panel, changePanel, changeToNormal, enableShadows, isOpaque, mkPanelNode, moveBy, updateOpacity)
-import Editor.PanelOperation (PanelOperation(..))
+import Editor.PanelOperation (ArrayOperation(..), PanelOperation(..))
 import Editor.UI.DragInfo (DragInfo)
 import Effect (Effect)
 import FRP.Dynamic (Dynamic, dynEvent, sampleDyn, step)
@@ -37,7 +37,7 @@ import Three.Core.Object3D (Object3D, add, remove)
 -- | parameters for setting up a panel renderer.
 newtype PanelRendererConfig = PanelRendererConfig {
     parent      :: Object3D,
-    operations  :: Event PanelOperation,
+    operations  :: Event ArrayOperation,
     opacity     :: Dynamic PanelOpacity
 }
 
@@ -91,7 +91,7 @@ panelNodeList2Map = fromFoldable <<< map mkT
     where mkT pn = Tuple (pn ^. _panel ^. _uuid) pn
 
 -- | data type used to update the panel renderer's internal state
-data RendererOp = ArrayOp PanelOperation ArrayConfig PanelType PanelOpacity
+data RendererOp = ArrayOp ArrayOperation ArrayConfig PanelType PanelOpacity
                 | UpdateArrayConfig ArrayConfig PanelType PanelOpacity
                 | UpdateOpacity PanelOpacity
 
@@ -117,28 +117,37 @@ renderPanelNode arrCfg textInfo panelType opacity st p =
         else pure Nothing
 
 -- | process array operations and update the internal renderer state.
-updateStateWithArrayOp :: PanelTextureInfo -> ArrayConfig -> PanelType -> PanelOpacity -> PanelOperation -> RendererState -> Effect RendererState
-updateStateWithArrayOp textInfo arrCfg panelType opacity (AddPanel p) st = do
+updateStateWithPanelOp :: PanelTextureInfo -> ArrayConfig -> PanelType -> PanelOpacity -> PanelOperation -> RendererState -> Effect RendererState
+updateStateWithPanelOp textInfo arrCfg panelType opacity (AddPanel p) st = do
     pn <- renderPanelNode arrCfg textInfo panelType opacity st p
     case pn of
         Just n -> pure $ st # _renderedPanels %~ insert (p ^. _uuid) n
         Nothing -> pure st
-updateStateWithArrayOp textInfo arrCfg panelType opacity (AddPanels ps) st = do
+updateStateWithPanelOp textInfo arrCfg panelType opacity (AddPanels ps) st = do
     pns <- traverse (renderPanelNode arrCfg textInfo panelType opacity st) ps
     pure $ st # _renderedPanels %~ union (panelNodeList2Map $ compact pns)
-updateStateWithArrayOp textInfo arrCfg panelType _ (TempPanels ps) st = renderTempPanels textInfo arrCfg panelType ps st
-updateStateWithArrayOp _ _ _ _ (DelPanel pid) st =
+updateStateWithPanelOp _ _ _ _ (DelPanel pid) st =
     case lookup pid (st ^. _renderedPanels) of
         Nothing -> pure st
         Just pn -> do remove (st ^. _parent) pn
                       pure $ st # _renderedPanels %~ delete pid
-updateStateWithArrayOp _ _ _ _ DeleteAll st = do traverse_ (remove (st ^. _parent)) (st ^. _renderedPanels)
+updateStateWithPanelOp _ _ _ _ (DelPanels pids) st = do
+    let doRemove pid = case lookup pid (st ^. _renderedPanels) of
+                        Nothing -> pure Nothing
+                        Just pn -> remove (st ^. _parent) pn *> pure (Just pid)
+    npids <- compact <$> traverse doRemove pids
+    pure $ st # _renderedPanels %~ flip (foldl (flip delete)) npids
+updateStateWithPanelOp _ _ _ _ DeleteAll st = do traverse_ (remove (st ^. _parent)) (st ^. _renderedPanels)
                                                  pure $ st # _renderedPanels .~ Map.empty
-updateStateWithArrayOp _ arrCfg _ _ (UpdatePanel p) st =
-    case lookup (p ^. _uuid) (st ^. _renderedPanels) of
-        Nothing -> pure st
-        Just pn -> do newPn <- changePanel arrCfg p pn
-                      pure $ st # _renderedPanels %~ update (const $ Just newPn) (p ^. _uuid)
+updateStateWithPanelOp _ arrCfg _ _ (UpdatePanels ps) st = do
+    let updM m pn = update (const $ Just pn) (pn ^. _panel <<< _uuid) m
+        pns = compact $ (\p -> Tuple p <$> lookup (p ^. _uuid) (st ^. _renderedPanels)) <$> ps
+    newPs <- traverse (\(Tuple p pn) -> changePanel arrCfg p pn) pns
+    pure $ st # _renderedPanels %~ flip (foldl updM) newPs
+
+updateStateWithArrayOp :: PanelTextureInfo -> ArrayConfig -> PanelType -> PanelOpacity -> ArrayOperation -> RendererState -> Effect RendererState
+updateStateWithArrayOp textInfo arrCfg panelType opacity (PanelOperation op) st = updateStateWithPanelOp textInfo arrCfg panelType opacity op st
+updateStateWithArrayOp textInfo arrCfg panelType _ (TempPanels ps) st = renderTempPanels textInfo arrCfg panelType ps st
 updateStateWithArrayOp _ _ _ _ (MoveArray arr delta) st = do
     let ps = st ^. _renderedPanels
         doMove pn = if pn ^. (_panel <<< _arrNumber) == arr
