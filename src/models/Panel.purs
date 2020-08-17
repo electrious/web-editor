@@ -23,7 +23,7 @@ import Data.Meter (Meter, meter, meterVal)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.UUID (UUID, emptyUUID, toString)
-import Editor.Common.Lenses (_alignment, _height, _id, _orientation, _slope, _width, _x, _y)
+import Editor.Common.Lenses (_alignment, _arrayNumber, _height, _id, _orientation, _rowNumber, _slope, _width, _x, _y)
 import Editor.Common.ProtoCodable (class ProtoEncodable, toProto)
 import Effect (Effect)
 import Foreign.Generic (class Decode, class Encode, ForeignError(..), decode, defaultOptions, encode, genericDecode, genericEncode)
@@ -291,3 +291,12 @@ panelSegment cfg p = mkSegment (x - w2 - gapX2) (x + w2 + gapX2) y (List.singlet
           gapX2 = meterVal (cfg ^. _gapX) / 2.0
           x = meterVal $ p ^. _x
           y = meterVal $ p ^. _y
+
+-- | check if a panel has any changed fields
+isDifferent :: Panel -> Panel -> Boolean
+isDifferent p1 p2 = p1 ^. _x /= p2 ^. _x ||
+                    p1 ^. _y /= p2 ^. _y ||
+                    p1 ^. _arrNumber /= p2 ^. _arrNumber ||
+                    p1 ^. _row_number /= p2 ^. _row_number ||
+                    p1 ^. _orientation /= p2 ^. _orientation ||
+                    p1 ^. _alignment /= p2 ^. _alignment
