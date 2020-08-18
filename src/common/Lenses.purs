@@ -23,6 +23,9 @@ _roofId = _Newtype <<< prop (SProxy :: SProxy "roofId")
 _roofs :: forall t a r. Newtype t { roofs :: a | r } => Lens' t a
 _roofs = _Newtype <<< prop (SProxy :: SProxy "roofs")
 
+_roof :: forall t a r. Newtype t { roof :: a | r } => Lens' t a
+_roof = _Newtype <<< prop (SProxy :: SProxy "roof")
+
 _center :: forall t a r. Newtype t { center :: a | r } => Lens' t a
 _center = _Newtype <<< prop (SProxy :: SProxy "center")
 

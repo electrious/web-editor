@@ -2,14 +2,13 @@ module Editor.PanelAPIInterpreter where
 
 import Prelude
 
-import API (APIConfig)
+import API (API, APIConfig, runAPI)
 import API.Panel (createPanel, createPanels, deletePanels, deletePanelsInRoof, updatePanels)
 import Data.Filterable (filter)
-import Data.Lens (Lens')
+import Data.Lens (Lens', (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.List (List(..), foldl, fromFoldable)
-import Data.List.Lazy (concat)
+import Data.List (List(..), foldl, fromFoldable, toUnfoldable, (:))
 import Data.Map (delete, empty, insert, lookup, member, update, values)
 import Data.Map.Internal (keys)
 import Data.Maybe (Maybe(..))
@@ -17,15 +16,14 @@ import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Time.Duration (Milliseconds(..))
 import Data.Traversable (traverse)
+import Data.Tuple (Tuple(..))
 import Data.UUID (UUID)
-import Editor.Common.Lenses (_apiConfig, _id, _leadId, _panels)
+import Editor.Common.Lenses (_apiConfig, _id, _leadId, _panels, _roof)
 import Editor.PanelOperation (PanelOperation(..))
 import Editor.Rendering.PanelRendering (_operations)
-import Editor.RoofManager (PanelsDict, panelDict)
-import Effect (Effect)
 import FRP.Event (Event, fold, keepLatest, withLast)
-import FRP.Event.Extra (debounce, performEvent)
-import Model.Roof.Panel (Panel, _uuid, isDifferent)
+import FRP.Event.Extra (debounce, leftmost, performEvent)
+import Model.Roof.Panel (Panel, PanelDict, _uuid, isDifferent, panelDict)
 import Model.Roof.RoofPlate (RoofPlate)
 
 newtype PanelAPIInterpreterConfig = PanelAPIInterpreterConfig {
@@ -52,25 +50,25 @@ _finished = _Newtype <<< prop (SProxy :: SProxy "finished")
 
 
 -- apply panel operations to internal panel dicts
-applyOp :: PanelOperation -> PanelsDict -> PanelsDict
+applyOp :: PanelOperation -> PanelDict -> PanelDict
 applyOp (AddPanel p) m      = insert (p ^. _uuid) p m
-applyOp (AddPanels ps) m    = traverse (\p -> insert (p ^. _uuid) p m) ps
+applyOp (AddPanels ps) m    = foldl (\m p -> insert (p ^. _uuid) p m) m ps
 applyOp (DelPanel pid) m    = delete pid m
 applyOp (DelPanels pids) m  = foldl (flip delete) m pids
 applyOp DeleteAll m         = empty
-applyOp (UpdatePanels ps) m = foldl (\p -> update (const p) (p ^. _uuid)) m ps
+applyOp (UpdatePanels ps) m = foldl (\m p -> update (const $ Just p) (p ^. _uuid) m) m ps
 
 
 -- calculate diff between two PanelsDict and return the least needed PanelOperations
-diff :: PanelsDict -> PanelsDict -> List PanelOperation
-diff newD oldD = concat $ fromFoldable [AddPanels <$> new, DelPanels <$> del, UpdatePanels <$> upd]
+diff :: PanelDict -> PanelDict -> List PanelOperation
+diff newD oldD = fromFoldable [AddPanels new, DelPanels del, UpdatePanels upd]
     where f (Tuple new upd) p = case lookup (p ^. _uuid) oldD of
                                     Just op -> if isDifferent p op
                                                then Tuple new (p : upd)
                                                else Tuple new upd
                                     Nothing -> Tuple (p : new) upd
           Tuple new upd = foldl f (Tuple Nil Nil) (values newD)
-          del = filter (not <<< member _ newD) (keys oldD)
+          del = filter (\i -> not $ member i newD) (keys oldD)
 
 
 mkPanelAPIInterpreter :: PanelAPIInterpreterConfig -> PanelAPIInterpreter
@@ -80,7 +78,7 @@ mkPanelAPIInterpreter cfg = PanelAPIInterpreter { finished: debounce t apiResEvt
           roofId = roof ^. _id
           apiCfg = cfg  ^. _apiConfig
 
-          t = Milliseconds 2000
+          t = Milliseconds 2000.0
 
           dictState = panelDict $ cfg ^. _panels
           newStEvt  = fold applyOp (cfg ^. _operations) dictState
@@ -88,14 +86,15 @@ mkPanelAPIInterpreter cfg = PanelAPIInterpreter { finished: debounce t apiResEvt
           calcOp { last: Just od, now: nd } = diff nd od
           calcOp { last: Nothing, now: _  } = Nil
 
-          newOpEvt  = calcOp <$> withLast (debounce t newOps)
+          newOpEvt  = calcOp <$> withLast (debounce t newStEvt)
 
-          apiResEvt = keepLatest $ performEvent $ flip runAPI apiCfg <<< callPanelAPI leadId roofId <$> newOpEvt
+          runOps    = map leftmost <<< traverse (flip runAPI apiCfg <<< callPanelAPI leadId roofId)
+          apiResEvt = keepLatest $ performEvent $ runOps <$> newOpEvt
 
 callPanelAPI :: Int -> UUID -> PanelOperation -> API (Event Unit)
 callPanelAPI leadId roofId (AddPanel p)      = createPanel leadId p
-callPanelAPI leadId roofId (AddPanels ps)    = createPanels leadId roofId ps
+callPanelAPI leadId roofId (AddPanels ps)    = createPanels leadId roofId (toUnfoldable ps)
 callPanelAPI leadId roofId (DelPanel pid)    = deletePanels leadId [pid]
-callPanelAPI leadId roofId (DelPanels pids)  = deletePanels leadId (fromFoldable pids)
+callPanelAPI leadId roofId (DelPanels pids)  = deletePanels leadId (toUnfoldable pids)
 callPanelAPI leadId roofId DeleteAll         = deletePanelsInRoof leadId roofId
-callPanelAPI leadId roofId (UpdatePanels ps) = updatePanels leadId ps
+callPanelAPI leadId roofId (UpdatePanels ps) = updatePanels leadId (toUnfoldable ps)

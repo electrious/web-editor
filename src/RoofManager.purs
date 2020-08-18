@@ -37,7 +37,7 @@ import FRP.Event.Extra (debounce, delay, multicast, performEvent, skip)
 import Math.Angle (degree)
 import Model.Racking.OldRackingSystem (OldRoofRackingData, guessRackingType)
 import Model.Racking.RackingType (RackingType(..))
-import Model.Roof.Panel (Panel, _roofUUID)
+import Model.Roof.Panel (Panel, PanelsDict, _roofUUID, panelsDict)
 import Model.Roof.RoofPlate (RoofEdited, RoofOperation(..), RoofPlate, _roofIntId, isFlat, toRoofEdited)
 import Three.Core.Object3D (class IsObject3D, Object3D, add, mkObject3D, remove, setName)
 
@@ -63,14 +63,6 @@ roofDict = fromFoldable <<< map f
 
 dictToArr :: RoofDict -> List RoofPlate
 dictToArr = toUnfoldable <<< values
-
-type PanelsDict = Map UUID (List Panel)
-
-panelDict :: forall f. Foldable f => f Panel -> PanelsDict
-panelDict = foldl f Map.empty
-    where f d p = if member (p ^. _roofUUID) d
-                  then update (Just <<< cons p) (p ^. _roofUUID) d
-                  else insert (p ^. _roofUUID) (singleton p) d
 
 -- internal data structure used to manage roofs
 newtype RoofDictData = RoofDictData {
@@ -187,7 +179,7 @@ createRoofManager meshData racks = do
 
     -- get the default roof plates as a dict
     defRoofDict    <- roofDict <<< view _roofPlates <$> ask
-    panelsDict     <- panelDict <<< view _panels <$> ask
+    panelsDict     <- panelsDict <<< view _panels <$> ask
     canEditRoofDyn <- isRoofEditing
 
     -- render roofs dynamically

@@ -6,24 +6,26 @@ import Algorithm.Segment (Segment, mkSegment)
 import Control.Monad.Error.Class (throwError)
 import Data.Default (class Default, def)
 import Data.Enum (class BoundedEnum, class Enum, fromEnum, toEnum)
+import Data.Foldable (class Foldable, foldl)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Bounded (genericBottom, genericTop)
 import Data.Generic.Rep.Enum (genericCardinality, genericFromEnum, genericPred, genericSucc, genericToEnum)
 import Data.Generic.Rep.Ord (genericCompare)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Hardware.Size (Size(..))
 import Data.Lens (Lens', view, (^.), (%~), (.~))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.List (List)
+import Data.List (List, (:))
 import Data.List as List
 import Data.List.NonEmpty (singleton)
+import Data.Map (Map, insert, member, update)
+import Data.Map as Map
 import Data.Maybe (Maybe(..))
 import Data.Meter (Meter, meter, meterVal)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.UUID (UUID, emptyUUID, toString)
-import Editor.Common.Lenses (_alignment, _arrayNumber, _height, _id, _orientation, _rowNumber, _slope, _width, _x, _y)
+import Editor.Common.Lenses (_alignment, _height, _id, _orientation, _slope, _width, _x, _y)
 import Editor.Common.ProtoCodable (class ProtoEncodable, toProto)
 import Effect (Effect)
 import Foreign.Generic (class Decode, class Encode, ForeignError(..), decode, defaultOptions, encode, genericDecode, genericEncode)
@@ -300,3 +302,18 @@ isDifferent p1 p2 = p1 ^. _x /= p2 ^. _x ||
                     p1 ^. _row_number /= p2 ^. _row_number ||
                     p1 ^. _orientation /= p2 ^. _orientation ||
                     p1 ^. _alignment /= p2 ^. _alignment
+
+
+type PanelsDict = Map UUID (List Panel)
+
+panelsDict :: forall f. Foldable f => f Panel -> PanelsDict
+panelsDict = foldl f Map.empty
+    where f d p = if member (p ^. _roofUUID) d
+                  then update (Just <<< (:) p) (p ^. _roofUUID) d
+                  else insert (p ^. _roofUUID) (List.singleton p) d
+
+type PanelDict = Map UUID Panel
+
+panelDict :: forall f. Foldable f => f Panel -> PanelDict
+panelDict = foldl f Map.empty
+    where f d p = insert (p ^. _uuid) p d
