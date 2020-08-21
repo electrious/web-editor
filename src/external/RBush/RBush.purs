@@ -1,4 +1,4 @@
-module RBush.RBush (BBox, RBush, mkRBush, load, search) where
+module RBush.RBush (BBox, RBush, mkRBush, load, insert, search) where
 
 import Prelude
 
@@ -32,6 +32,9 @@ foreign import mkRBush :: forall a. Effect (RBush a)
 
 load :: forall a. Array (BBox a) -> RBush a -> Effect Unit
 load = fpi ["items", "tree", ""] "tree.load(items)"
+
+insert :: forall a. BBox a -> RBush a -> Effect Unit
+insert = fpi ["item", "tree", ""] "tree.insert(item)"
 
 doSearch :: forall a b. BBox a -> RBush b -> Array (BBox b)
 doSearch = ffi ["box", "tree"] "tree.search(box)"

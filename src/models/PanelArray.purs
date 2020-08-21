@@ -18,9 +18,10 @@ import Data.Tuple (Tuple(..), fst, snd)
 import Data.Unfoldable (class Unfoldable)
 import Editor.Common.Lenses (_alignment, _arrayNumber, _centerX, _centerY, _config, _height, _orientation, _panels, _rackingType, _rowNumber, _rows, _width, _x, _y)
 import Model.ArrayRow (ArrayRow, mkArrayRow)
+import Model.PanelSegment (panelSegment)
 import Model.Racking.RackingType (RackingType(..))
 import Model.Roof.ArrayConfig (ArrayConfig, _gapX)
-import Model.Roof.Panel (Alignment(..), Orientation(..), Panel, _arrNumber, _row_number, flipOrientation, panelSegment)
+import Model.Roof.Panel (Alignment(..), Orientation(..), Panel, _arrNumber, _row_number, flipOrientation)
 import Model.RoofComponent (size)
 import Model.UpdatedPanels (UpdatedPanels, fromFoldable, merge)
 import Partial.Unsafe (unsafePartial)
@@ -33,7 +34,7 @@ newtype PanelArray = PanelArray {
     orientation   :: Orientation,
     centerX       :: Meter,
     centerY       :: Meter,
-    rows          :: List ArrayRow,
+    rows          :: Array ArrayRow,
     panelsUpdated :: UpdatedPanels
 }
 derive instance newtypePanelArray :: Newtype PanelArray _
@@ -48,7 +49,7 @@ simplePanelArray o cfg = PanelArray {
     orientation   : o,
     centerX       : meter 0.0,
     centerY       : meter 0.0,
-    rows          : Nil,
+    rows          : [],
     panelsUpdated : fromFoldable []
 }
 
@@ -66,7 +67,7 @@ mkPanelArray arrNum arr cfg = PanelArray {
 }
     where Tuple newPs upd1 = updateArrayNumbers (arr ^. _panels) arrNum
           Tuple rows upd2  = splitToRows cfg newPs
-          ps = concatMap (view _panels) rows
+          ps = concatMap (view _panels) (List.fromFoldable rows)
 
 mkPanelArrayMap :: forall f. Foldable f => Functor f => f PanelArray -> Map Int PanelArray
 mkPanelArrayMap = Map.fromFoldable <<< map mkT

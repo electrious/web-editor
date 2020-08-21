@@ -2,7 +2,6 @@ module Model.Roof.Panel where
 
 import Prelude hiding (degree)
 
-import Algorithm.Segment (Segment, mkSegment)
 import Control.Monad.Error.Class (throwError)
 import Data.Default (class Default, def)
 import Data.Enum (class BoundedEnum, class Enum, fromEnum, toEnum)
@@ -32,8 +31,7 @@ import Foreign.Generic (class Decode, class Encode, ForeignError(..), decode, de
 import Math.Angle (Angle, degree, degreeVal)
 import Model.ArrayComponent (class ArrayComponent)
 import Model.Class (class IsPBArrayComp, setArrayNumber, setX, setY)
-import Model.Roof.ArrayConfig (ArrayConfig, _gapX)
-import Model.RoofComponent (class RoofComponent, size)
+import Model.RoofComponent (class RoofComponent)
 import Model.UUID (PBUUID, mkPBUUID, setUUIDString)
 import Three.Math.Vector (Vector3, vecX, vecY)
 import Util (ffi, fpi)
@@ -285,14 +283,6 @@ validatedSlope p | p ^. _slope < degree 5.0 = Nothing
 addDelta :: Vector3 -> Panel -> Panel
 addDelta delta p = p # _x %~ (+) (meter $ vecX delta)
                      # _y %~ (+) (meter $ vecY delta)
-
-panelSegment :: ArrayConfig -> Panel -> Segment (List Panel)
-panelSegment cfg p = mkSegment (x - w2 - gapX2) (x + w2 + gapX2) y (List.singleton p)
-    where s = size p
-          w2 = meterVal (s ^. _width) / 2.0
-          gapX2 = meterVal (cfg ^. _gapX) / 2.0
-          x = meterVal $ p ^. _x
-          y = meterVal $ p ^. _y
 
 -- | check if a panel has any changed fields
 isDifferent :: Panel -> Panel -> Boolean
