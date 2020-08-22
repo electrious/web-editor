@@ -14,6 +14,7 @@ import Math.Angle (Angle, degree)
 import Model.ArrayComponent (class ArrayComponent)
 import Model.Roof.Panel (Orientation(..), panelLong, panelShort)
 import Model.RoofComponent (class RoofComponent)
+import Model.UUID (class HasUUID)
 
 plusBtnZ :: Meter
 plusBtnZ = meter 0.2
@@ -40,6 +41,8 @@ instance defaultPlusButton :: Default PlusButton where
         slope       : degree 0.0,
         arrayNumber : 0
     }
+instance hasUUIDPlusButton :: HasUUID PlusButton where
+    idLens = _id
 instance showPlusButton :: Show PlusButton where
     show = genericShow
 instance roofComponentPlusButton :: RoofComponent PlusButton where

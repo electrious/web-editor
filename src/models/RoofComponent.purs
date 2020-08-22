@@ -10,7 +10,6 @@ import Data.Meter (Meter, meterVal)
 import Data.UUID (UUID)
 import Editor.Common.Lenses (_height, _item, _maxX, _maxY, _minX, _minY, _width)
 import Math.Angle (Angle, cos, degree)
-import Model.Roof.RoofPlate (RoofPlate(..))
 import RBush.RBush (BBox)
 
 class RoofComponent a where
