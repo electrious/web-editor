@@ -67,6 +67,7 @@ foreign import normal         :: forall a. Vector a => a -> a
 infixr 5 dot as <.>
 infixr 6 add as <+>
 infixr 6 sub as <->
+infixr 7 multiplyScalar as <**>
 
 instance vecVec2 :: Vector Vector2
 instance vecVec3 :: Vector Vector3
