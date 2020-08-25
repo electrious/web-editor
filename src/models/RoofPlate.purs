@@ -2,6 +2,7 @@ module Model.Roof.RoofPlate where
 
 import Prelude hiding (degree)
 
+import Clipper (Path, vec2IntPoint)
 import Data.Array ((..))
 import Data.Array as Arr
 import Data.Enum (fromEnum, toEnum)

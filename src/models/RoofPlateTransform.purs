@@ -2,9 +2,10 @@ module Model.Roof.RoofPlateTransform where
 
 import Prelude hiding (degree)
 
+import Algorithm.PointInPolygon (pointInPolygon)
 import Data.Array ((!!))
 import Data.Default (class Default, def)
-import Data.Foldable (class Foldable, foldl)
+import Data.Foldable (class Foldable, foldl, all)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Lens (Lens', (^.), (.~))
@@ -16,9 +17,10 @@ import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple(..), snd)
 import Editor.Common.Lenses (_center, _normal)
+import Editor.RoofEditor (toVec2)
 import Math (abs, atan, sqrt)
 import Math.Angle (Angle, cos, degree, degreeVal, radian, sin)
-import Model.Roof.RoofPlate (RoofPlate, _borderPoints, _coefs, _rotation)
+import Model.Roof.RoofPlate (Polygon, RoofPlate, _borderPoints, _coefs, _rotation, getRoofPolygon)
 import Three.Math.Vector (Vector3, cross, length, mkVec3, normal, vecX, vecY, vecZ, (<**>), (<+>), (<->), (<.>))
 
 -- data type representing the right and top vectors for a roof plate
@@ -143,3 +145,15 @@ lineVectors :: forall f. Foldable f => f Vector3 -> List Vector3
 lineVectors ps = zipWith (<->) pl npl
     where pl = fromFoldable ps
           npl = fromMaybe Nil $ snoc <$> tail pl <*> head pl
+
+
+-- \ check if a polygon contains a point inside.
+wrapAroundPoint :: Polygon -> RoofPlateTransform -> Vector3 -> Boolean
+wrapAroundPoint poly t = pointInPolygon poly <<< toVec2 <<< transformVector t
+
+-- | check if a Roofplate contains all points in a list. The Points should be in
+-- roofplate's local coordinate
+wrapAroundPoints :: forall f. Foldable f => RoofPlate -> f Vector3 -> Boolean
+wrapAroundPoints roof = all (wrapAroundPoint poly t)
+    where poly = getRoofPolygon roof
+          t    = getRoofTransform roof

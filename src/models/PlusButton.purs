@@ -6,15 +6,17 @@ import Data.Default (class Default, def)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Lens (view, (^.), (.~))
-import Data.Meter (Meter, meter)
+import Data.List (List(..), (:))
+import Data.Meter (Meter, meter, meterVal)
 import Data.Newtype (class Newtype)
 import Data.UUID (UUID, emptyUUID)
 import Editor.Common.Lenses (_arrayNumber, _height, _id, _orientation, _width, _x, _y, _z)
 import Math.Angle (Angle, degree)
 import Model.ArrayComponent (class ArrayComponent)
 import Model.Roof.Panel (Orientation(..), panelLong, panelShort)
-import Model.RoofComponent (class RoofComponent)
+import Model.RoofComponent (class RoofComponent, compX, compY, size)
 import Model.UUID (class HasUUID)
+import Three.Math.Vector (Vector3, mkVec3)
 
 plusBtnZ :: Meter
 plusBtnZ = meter 0.2
@@ -57,3 +59,16 @@ instance roofComponentPlusButton :: RoofComponent PlusButton where
                          # _height .~ panelLong
 instance arrayComponentPlusButton :: ArrayComponent PlusButton where
     arrayNumber = view _arrayNumber
+
+
+btnVertices :: PlusButton -> List Vector3
+btnVertices pb = v1 : v2 : v3 : v4 : Nil
+    where s  = size pb
+          x  = meterVal $ compX pb
+          y  = meterVal $ compY pb
+          w2 = meterVal (s ^. _width) / 2.0
+          h2 = meterVal (s ^. _height) / 2.0
+          v1 = mkVec3 (x - w2) (y - h2) 0.0
+          v2 = mkVec3 (x - w2) (y + h2) 0.0
+          v3 = mkVec3 (x + w2) (y + h2) 0.0
+          v4 = mkVec3 (x + w2) (y - h2) 0.0

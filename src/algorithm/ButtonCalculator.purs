@@ -15,10 +15,11 @@ import Editor.Common.Lenses (_alignment, _arrayNumber, _config, _orientation, _p
 import Effect (Effect)
 import Math (abs)
 import Model.PanelArray (PanelArray)
-import Model.PlusButton (PlusButton)
+import Model.PlusButton (PlusButton, btnVertices)
 import Model.Roof.ArrayConfig (ArrayConfig, _panelSlope, colDistance, rowDistance)
 import Model.Roof.Panel (Alignment(..), Panel, _arrNumber, _row_number, validatedSlope)
 import Model.Roof.RoofPlate (RoofPlate)
+import Model.Roof.RoofPlateTransform (wrapAroundPoints)
 import Model.RoofComponent (compBBox, compX, compY, size)
 import Model.RotateButton (RotateButton)
 import Model.UUID (assignNewIds)
@@ -111,8 +112,7 @@ plusBtnsForArray arr pTree roof = do
                     oldPBs = search pbBox btnTree
                     panels = search pbBox pTree
                 
-                -- TODO: validate the button is inside the roof
-                if Array.null oldPBs && Array.null panels
+                if Array.null oldPBs && Array.null panels && wrapAroundPoints roof (btnVertices btn)
                     then insert pbBox btnTree *> pure true
                     else pure false
             )

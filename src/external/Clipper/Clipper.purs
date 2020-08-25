@@ -2,11 +2,21 @@ module Clipper where
 
 import Prelude
 
+import Data.Int (round)
 import Effect (Effect)
+import Three.Math.Vector (class HasX, class HasY, vecX, vecY)
 import Util (ffi, fpi)
 
 foreign import data IntPoint :: Type
 foreign import mkIntPoint :: Int -> Int -> IntPoint
+
+scale :: Number
+scale = 1000.0
+
+vec2IntPoint :: forall v. HasX v => HasY v => v -> IntPoint
+vec2IntPoint v = mkIntPoint x y
+    where x = round $ vecX v * scale
+          y = round $ vecY v * scale
 
 type Path = Array IntPoint
 type Paths = Array Path
