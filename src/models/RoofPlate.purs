@@ -2,9 +2,9 @@ module Model.Roof.RoofPlate where
 
 import Prelude hiding (degree)
 
-import Clipper (Path, vec2IntPoint)
 import Data.Array ((..))
 import Data.Array as Arr
+import Data.Default (class Default, def)
 import Data.Enum (fromEnum, toEnum)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
@@ -51,7 +51,22 @@ instance encodeRoofPlate :: Encode RoofPlate where
     encode = encode <<< toJSRoofPlate
 instance decodeRoofPlate :: Decode RoofPlate where
     decode = map fromJSRoofPlate <<< decode
-
+instance defaultRoofPlate :: Default RoofPlate where
+    def = RoofPlate {
+        id            : emptyUUID,
+        intId         : 0,
+        leadId        : 0,
+        borderPoints  : [],
+        unifiedPoints : Nothing,
+        coefs         : [],
+        center        : def,
+        normal        : def,
+        orientation   : Landscape,
+        alignment     : Grid,
+        slope         : def,
+        azimuth       : def,
+        rotation      : def
+    }
 _roofIntId :: Lens' RoofPlate Int
 _roofIntId = _Newtype <<< prop (SProxy :: SProxy "intId")
 
@@ -141,7 +156,7 @@ instance decodeJSRoofPlate :: Decode JSRoofPlate where
 
 arrVec :: Array Number -> Vector3
 arrVec [x, y, z] = mkVec3 x y z
-arrVec _ = mkVec3 0.0 0.0 0.0
+arrVec _ = def
 
 vecArr :: Vector3 -> Array Number
 vecArr v = [vecX v, vecY v, vecZ v]

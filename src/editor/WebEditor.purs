@@ -3,6 +3,7 @@ module Editor.WebEditor where
 import Prelude hiding (add,degree)
 
 import Data.Array (cons)
+import Data.Default (def)
 import Data.Foldable (sequence_)
 import Data.Int (toNumber)
 import Data.Lens ((^.))
@@ -62,10 +63,10 @@ capVal bot top v | v < bot = bot
 setupCameraPos :: forall c. IsCamera c => c -> Effect Unit
 setupCameraPos camera = do
     setPosition (mkVec3 0.0 (-40.0) 20.0) camera
-    lookAt (mkVec3 0.0 0.0 0.0) camera
+    lookAt def camera
 
 resetContentPos :: forall a. IsObject3D a => a -> Effect Unit
-resetContentPos = setPosition (mkVec3 0.0 0.0 0.0)
+resetContentPos = setPosition def
 
 resetContentRot :: forall a. IsObject3D a => a -> Effect Unit
 resetContentRot = setRotation (mkEuler 0.0 0.0 0.0)

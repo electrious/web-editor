@@ -20,7 +20,7 @@ import Model.Roof.RoofPlate (Polygon, RoofPlate, angleBetween, getRoofPolygon)
 import RBush.RBush (BBox, RBush, load, mkRBush, search)
 import Three.Core.Geometry (class IsBufferGeometry, clone, getAttribute, isBufferAttribute, setNeedsUpdate, setXYZ)
 import Three.Core.Mesh (Mesh, setBufferGeometry)
-import Three.Math.Vector (Vector3, addScaled, mkVec2, mkVec3, vecX, vecY, vecZ, (<->), (<.>))
+import Three.Math.Vector (Vector3, addScaled, mkVec2, vecX, vecY, vecZ, (<->), (<.>))
 
 
 newtype VertexItem = VertexItem {
@@ -31,8 +31,8 @@ newtype VertexItem = VertexItem {
 derive instance newtypeVertexItem :: Newtype VertexItem _
 instance defaultVertexItem :: Default VertexItem where
     def = VertexItem {
-        vertex : mkVec3 0.0 0.0 0.0,
-        normal : mkVec3 0.0 0.0 0.0,
+        vertex : def,
+        normal : def,
         index  : 0
     }
 

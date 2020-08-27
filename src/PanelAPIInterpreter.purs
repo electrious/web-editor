@@ -4,6 +4,8 @@ import Prelude
 
 import API (API, APIConfig, runAPI)
 import API.Panel (createPanel, createPanels, deletePanels, deletePanelsInRoof, updatePanels)
+import Control.Plus as Plus
+import Data.Default (class Default, def)
 import Data.Filterable (filter)
 import Data.Lens (Lens', (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
@@ -17,7 +19,7 @@ import Data.Symbol (SProxy(..))
 import Data.Time.Duration (Milliseconds(..))
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import Data.UUID (UUID)
+import Data.UUID (UUID, emptyUUID)
 import Editor.Common.Lenses (_apiConfig, _id, _leadId, _panels, _roof)
 import Editor.PanelOperation (PanelOperation(..))
 import Editor.Rendering.PanelRendering (_operations)
@@ -35,6 +37,14 @@ newtype PanelAPIInterpreterConfig = PanelAPIInterpreterConfig {
 }
 
 derive instance newtypePanelAPIInterpreterConfig :: Newtype PanelAPIInterpreterConfig _
+instance defaultPanelAPIInterpreterConfig :: Default PanelAPIInterpreterConfig where
+    def = PanelAPIInterpreterConfig {
+        apiConfig  : def,
+        roof       : def,
+        clientId   : emptyUUID,
+        panels     : Nil,
+        operations : Plus.empty
+    }
 
 _clientId :: forall t a r. Newtype t { clientId :: a | r } => Lens' t a
 _clientId = _Newtype <<< prop (SProxy :: SProxy "clientId")

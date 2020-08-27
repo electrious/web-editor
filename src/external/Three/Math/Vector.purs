@@ -2,6 +2,7 @@ module Three.Math.Vector  where
 
 import Prelude hiding (add,sub)
 
+import Data.Default (class Default)
 import Three.Math.Matrix (Matrix4)
 import Util (ffi)
 
@@ -18,6 +19,12 @@ instance eqVec2 :: Eq Vector2 where
 
 instance eqVec3 :: Eq Vector3 where
   eq = vEq
+
+instance defaultVector2 :: Default Vector2 where
+    def = mkVec2 0.0 0.0
+
+instance defaultVector3 :: Default Vector3 where
+    def = mkVec3 0.0 0.0 0.0
 
 class HasX a
 class HasY a

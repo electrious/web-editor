@@ -35,12 +35,11 @@ derive instance genericRoofPlateTransform :: Generic RoofPlateTransform _
 instance showRoofPlateTransform :: Show RoofPlateTransform where
     show = genericShow
 instance defaultRoofPlateTransform :: Default RoofPlateTransform where
-    def = let zero = mkVec3 0.0 0.0 0.0
-          in RoofPlateTransform {
-                center : zero,
-                right  : zero,
-                top    : zero
-            }
+    def = RoofPlateTransform {
+              center : def,
+              right  : def,
+              top    : def
+          }
 
 _right :: forall t a r. Newtype t { right :: a | r } => Lens' t a
 _right = _Newtype <<< prop (SProxy :: SProxy "right")
@@ -134,7 +133,7 @@ absIncline v = radian $ abs $ atan $ vecZ v / mag
 
 -- calculate the largest line in a list of line vectors
 longestVector :: forall f. Foldable f => f Vector3 -> Vector3
-longestVector = snd <<< foldl f (Tuple 0.0 (mkVec3 0.0 0.0 0.0))
+longestVector = snd <<< foldl f (Tuple 0.0 def)
     where f (Tuple len ov) v = let vl = length v
                               in if vl > len
                                  then Tuple vl v
