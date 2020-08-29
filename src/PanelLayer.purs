@@ -3,32 +3,36 @@ module Editor.PanelLayer where
 import Prelude hiding (add)
 
 import Control.Plus (empty)
-import Data.Default (def)
-import Data.Lens (Lens', view, (^.))
+import Data.Default (class Default, def)
+import Data.Foldable (class Foldable, null)
+import Data.Lens (Lens', Lens, view, (^.), (.~))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.List (List(..))
-import Data.Maybe (fromMaybe)
+import Data.List (List(..), singleton, (:))
+import Data.Map (lookup)
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse, traverse_)
-import Editor.ArrayBuilder (ArrayBuilder)
-import Editor.Common.Lenses (_disposable, _object, _roof)
+import Editor.ArrayBuilder (ArrayBuilder, _arrayConfig)
+import Editor.Common.Lenses (_apiConfig, _disposable, _object, _panels, _panelsUpdated, _rackingType, _roof)
 import Editor.Disposable (class Disposable)
-import Editor.PanelAPIInterpreter (PanelAPIInterpreter(..), mkPanelAPIInterpreter)
-import Editor.PanelArrayLayout (PanelsLayout(..))
+import Editor.PanelAPIInterpreter (PanelAPIInterpreter(..), _finished, mkPanelAPIInterpreter)
+import Editor.PanelArrayLayout (PanelsLayout(..), defaultLayout, layoutPanels)
 import Editor.PanelNode (PanelOpacity, mkPanelNode)
-import Editor.PanelOperation (ArrayOperation)
-import Editor.Rendering.ButtonsRenderer (mkButtonsRenderer)
+import Editor.PanelOperation (ArrayOperation(..), PanelOperation(..))
+import Editor.Rendering.ButtonsRenderer (ButtonOperation, mkButtonsRenderer)
 import Editor.Rendering.PanelRendering (PanelRenderer, PanelRendererConfig(..), _opacity, createPanelRenderer)
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import FRP.Dynamic (Dynamic(..), mergeDynArray, subscribeDyn, withLast)
+import FRP.Dynamic (Dynamic(..), mergeDynArray, sampleDyn, step, subscribeDyn, withLast)
 import FRP.Event (Event, fix)
 import Model.Hardware.PanelModel (PanelModel(..))
+import Model.Racking.RackingType (RackingType(..))
 import Model.Roof.ArrayConfig (ArrayConfig(..))
-import Model.Roof.Panel (Orientation, Panel)
+import Model.Roof.Panel (Orientation(..), Panel, _uuid)
 import Model.Roof.RoofPlate (RoofPlate(..))
+import Model.UpdatedPanels (UpdatedPanels(..), delete, get)
 import Three.Core.Object3D (class IsObject3D, Object3D, add, mkObject3D, remove, setName, toObject3D)
 
 newtype PanelLayerConfig = PanelLayerConfig {
@@ -59,8 +63,6 @@ newtype PanelLayer = PanelLayer {
     roof                :: RoofPlate, 
     arrayConfig         :: Dynamic ArrayConfig,
 
-    layout              :: Dynamic PanelsLayout,
-
     arrayChanged        :: Event Unit,
     serverUpdated       :: Event Unit,
     arrayDragging       :: Dynamic Boolean,
@@ -88,23 +90,71 @@ _arrayDragging = _Newtype <<< prop (SProxy :: SProxy "arrayDragging")
 _inactiveArrayTapped :: forall t a r. Newtype t { inactiveArrayTapped :: a | r } => Lens' t a
 _inactiveArrayTapped = _Newtype <<< prop (SProxy :: SProxy "inactiveArrayTapped")
 
+
+-- | internal panel layer state data structure
+newtype PanelLayerState = PanelLayerState {
+    arrayConfig      :: ArrayConfig,
+
+    roofActive       :: Boolean,
+    
+    layout           :: PanelsLayout,
+    orientationToUse :: Maybe Orientation,
+
+    panelOperations  :: List PanelOperation,
+    arrayOperations  :: List ArrayOperation,
+    btnsOperations   :: List ButtonOperation
+}
+
+derive instance newtypePanelLayerState :: Newtype PanelLayerState _
+instance defaultPanelLayerState :: Default PanelLayerState where
+    def = PanelLayerState {
+        arrayConfig      : def,
+        layout           : def,
+        orientationToUse : Nothing,
+        panelOperations  : Nil,
+        arrayOperations  : Nil,
+        btnsOperations   : Nil
+    }
+
+_orientationToUse :: forall t a r. Newtype t { orientationToUse :: a | r } => Lens' t a
+_orientationToUse = _Newtype <<< prop (SProxy :: SProxy "orientationToUse")
+
+_panelOperations :: forall t a r. Newtype t { panelOperations :: a | r } => Lens' t a
+_panelOperations = _Newtype <<< prop (SProxy :: SProxy "panelOperations")
+
+_arrayOperations :: forall t a r. Newtype t { arrayOperations :: a | r } => Lens' t a
+_arrayOperations = _Newtype <<< prop (SProxy :: SProxy "arrayOperations")
+
+_btnsOperations :: forall t a r. Newtype t { btnsOperations :: a | r } => Lens' t a
+_btnsOperations = _Newtype <<< prop (SProxy :: SProxy "btnsOperations")
+
 createPanelLayer :: PanelLayerConfig -> ArrayBuilder PanelLayer
 createPanelLayer cfg = do
     layer <- liftEffect mkObject3D
     liftEffect $ setName "panel-layer" layer
 
-    let arrOpEvt = empty
+    let roof = cfg ^. _roof
+        arrCfgDyn = cfg ^. _arrayConfig
+        arrOpEvt = empty
+        panelOpEvt = empty
 
     panelRenderer <- setupPanelRenderer layer arrOpEvt (cfg ^. _opacity)
     btnsRenderer  <- mkButtonsRenderer layer btnOpEvt
-    let apiInterpreter = mkPanelAPIInterpreter def
+    let apiInterpreter = mkPanelAPIInterpreter $ def # _apiConfig  .~ cfg ^. _apiConfig
+                                                     # _roof       .~ roof
+                                                     # _panels     .~ Nil
+                                                     # _operations .~ panelOpEvt
 
+        layoutDyn = step Nothing empty
 
     pure $ PanelLayer {
         object     : layer,
         disposable : pure unit,
 
-        roof       : cfg ^. _roof
+        roof        : roof,
+        arrayConfig : arrCfgDyn,
+        layout      : layoutDyn,
+        serverUpdated : apiInterpreter ^. _finished
     }
 
 
@@ -114,3 +164,39 @@ setupPanelRenderer parent opEvt opacity = createPanelRenderer $ PanelRendererCon
         operations : opEvt,
         opacity    : opacity
     }
+
+
+-- | function to update the ArrayLayout data structure 
+updateLayout :: forall f. Foldable f => PanelLayerState -> f Panel -> Effect PanelsLayout
+updateLayout st ps = if null ps
+                     then defaultLayout orient cfg
+                     else layoutPanels ps cfg
+    where cfg = st ^. _arrayConfig
+          orient = if cfg ^. _rackingType == BX  -- always use landscape for BX system
+                   then Landscape
+                   else fromMaybe Landscape $ st ^. _orientationToUse
+
+-- | get all panels in the current state
+allPanels :: PanelLayerState -> List Panel
+allPanels st = st ^. (_layout <<< _panels)
+
+-- | add a new panel to the current state
+addPanel :: PanelLayerState -> Panel -> Effect PanelLayerState
+addPanel st p = do
+    let oldPs = allPanels
+        ps = p : oldPs
+
+    -- update layout with new panels
+    newLayout <- updateLayout st ps
+
+    -- get the updated new panel
+    let updatedPs = newLayout ^. _panelsUpdated
+        newP = fromMaybe p $ get (p ^. _uuid) updatedPs
+        newUpdPs = delete (p ^. _uuid) updatedPs
+
+        addNewPOp = AddPanel newP
+        updOps = UpdatePanels $ newUpdPs ^. _panels
+        pOps = addNewPOp : updOps : Nil
+
+    pure $ st # _panelOperations .~ pOps
+              # _layout          .~ newLayout

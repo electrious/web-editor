@@ -36,9 +36,9 @@ import Three.Core.Object3D (Object3D, add, remove)
 
 -- | parameters for setting up a panel renderer.
 newtype PanelRendererConfig = PanelRendererConfig {
-    parent      :: Object3D,
-    operations  :: Event ArrayOperation,
-    opacity     :: Dynamic PanelOpacity
+    parent     :: Object3D,
+    operations :: Event ArrayOperation,
+    opacity    :: Dynamic PanelOpacity
 }
 
 derive instance newtypePanelRendererConfig :: Newtype PanelRendererConfig _

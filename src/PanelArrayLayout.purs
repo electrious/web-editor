@@ -3,7 +3,9 @@ module Editor.PanelArrayLayout where
 import Prelude
 
 import Data.Array as Array
+import Data.Default (class Default, def)
 import Data.Filterable (filter)
+import Data.Foldable (class Foldable)
 import Data.FoldableWithIndex (foldlWithIndex)
 import Data.Graph (Graph, connectedComponents, fromAdjacencyList, vertices)
 import Data.Lens (Lens', view, (^.))
@@ -42,6 +44,14 @@ newtype PanelsLayout = PanelsLayout {
 }
 
 derive instance newtypePanelsLayout :: Newtype PanelsLayout _
+instance defaultPanelsLayout :: Default PanelsLayout where
+    def = PanelsLayout {
+        tree          : def,
+        panels        : Nil,
+        config        : def,
+        arrays        : Map.empty,
+        panelsUpdated : def
+    }
 
 _tree :: Lens' PanelsLayout (RBush Panel)
 _tree = _Newtype <<< prop (SProxy :: SProxy "tree")
@@ -49,7 +59,7 @@ _tree = _Newtype <<< prop (SProxy :: SProxy "tree")
 _arrays :: Lens' PanelsLayout (Map Int PanelArray)
 _arrays = _Newtype <<< prop (SProxy :: SProxy "arrays")
 
-layoutPanels :: Array Panel -> ArrayConfig -> Effect PanelsLayout
+layoutPanels :: forall f. Foldable f => Functor f => f Panel -> ArrayConfig -> Effect PanelsLayout
 layoutPanels ps cfg = do
     tree <- mkRTree ps
     let graph              = mkGraph ps tree cfg
@@ -100,11 +110,11 @@ findActiveArray l = fromMaybe 0 $ (_.arr) $ foldlWithIndex f init (l ^. _arrays)
                            then { arr: Just i, x: cx, y: cy }
                            else res
 
-mkRTree :: Array Panel -> Effect (RBush Panel)
+mkRTree :: forall f. Functor f => Foldable f => f Panel -> Effect (RBush Panel)
 mkRTree ps = do
     t <- mkRBush
     let getBox p = compBBox p (validatedSlope p) 
-    load (getBox <$> ps) t
+    load (Array.fromFoldable $ getBox <$> ps) t
     pure t
 
 neighborPanelsInTree :: Panel -> RBush Panel -> ArrayConfig -> List Panel
@@ -113,7 +123,7 @@ neighborPanelsInTree p tree cfg = filter ((/=) p) $ fromFoldable $ search box tr
           xOffset = 0.4
           yOffset = 0.4 + meterVal (cfg ^. _gapY)
 
-mkGraph :: Array Panel -> RBush Panel -> ArrayConfig -> Graph Panel Number
+mkGraph :: forall f. Foldable f => Functor f => f Panel -> RBush Panel -> ArrayConfig -> Graph Panel Number
 mkGraph ps tree cfg = fromAdjacencyList $ fromFoldable $ f <$> ps
     where f p = let ns = neighborPanelsInTree p tree cfg
                     mkNValue n = Tuple n 0.0

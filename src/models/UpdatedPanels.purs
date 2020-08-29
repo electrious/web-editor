@@ -2,6 +2,7 @@ module Model.UpdatedPanels where
 
 import Prelude
 
+import Data.Default (class Default)
 import Data.Foldable (class Foldable)
 import Data.Lens ((%~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
@@ -16,6 +17,8 @@ import Model.Roof.Panel (Panel, _uuid)
 
 newtype UpdatedPanels = UpdatedPanels (Map UUID Panel)
 derive instance newtypeUpdatedPanels :: Newtype UpdatedPanels _
+instance defaultUpdatedPanels :: Default UpdatedPanels where
+    def = empty
 
 empty :: UpdatedPanels
 empty = UpdatedPanels Map.empty

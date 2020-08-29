@@ -7,6 +7,7 @@ import Data.Lens ((^.))
 import Data.Newtype (class Newtype)
 import Editor.Common.Lenses (_item)
 import Effect (Effect)
+import Effect.Unsafe (unsafePerformEffect)
 import Util (ffi, fpi)
 
 newtype BBox a = BBox {
@@ -29,6 +30,9 @@ instance defaultBBox :: Default a => Default (BBox a) where
 foreign import data RBush :: Type -> Type
 
 foreign import mkRBush :: forall a. Effect (RBush a)
+
+instance defaultRBush :: Default (RBush a) where
+    def = unsafePerformEffect mkRBush
 
 load :: forall a. Array (BBox a) -> RBush a -> Effect Unit
 load = fpi ["items", "tree", ""] "tree.load(items)"
