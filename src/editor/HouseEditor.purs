@@ -23,29 +23,31 @@ import Model.Roof.Panel (Panel)
 import Model.Roof.RoofPlate (RoofPlate)
 
 newtype HouseConfig = HouseConfig {
-    leadId      :: Int,
-    houseId     :: Int,
-    roofPlates  :: Array RoofPlate,
-    panels      :: Array Panel,
-    dataServer  :: String,
-    modeDyn     :: Dynamic EditorMode,
-    textureInfo :: PanelTextureInfo,
-    panelType   :: Dynamic PanelType,
-    apiConfig   :: APIConfig
+    leadId        :: Int,
+    houseId       :: Int,
+    roofPlates    :: Array RoofPlate,
+    panels        :: Array Panel,
+    dataServer    :: String,
+    modeDyn       :: Dynamic EditorMode,
+    textureInfo   :: PanelTextureInfo,
+    rotBtnTexture :: String,
+    panelType     :: Dynamic PanelType,
+    apiConfig     :: APIConfig
 }
 
 derive instance newtypeHouseConfig :: Newtype HouseConfig _
 instance defaultHouseConfig :: Default HouseConfig where
     def = HouseConfig {
-        leadId      : 0,
-        houseId     : 0,
-        roofPlates  : [],
-        panels      : [],
-        dataServer  : "",
-        modeDyn     : step Showing empty,
-        textureInfo : def,
-        panelType   : step Standard empty,
-        apiConfig   : def
+        leadId        : 0,
+        houseId       : 0,
+        roofPlates    : [],
+        panels        : [],
+        dataServer    : "",
+        modeDyn       : step Showing empty,
+        textureInfo   : def,
+        rotBtnTexture : "",
+        panelType     : step Standard empty,
+        apiConfig     : def
     }
 
 _roofPlates :: Lens' HouseConfig (Array RoofPlate)
@@ -53,6 +55,10 @@ _roofPlates = _Newtype <<< prop (SProxy :: SProxy "roofPlates")
 
 _dataServer :: Lens' HouseConfig String
 _dataServer = _Newtype <<< prop (SProxy :: SProxy "dataServer")
+
+_rotBtnTexture :: forall t a r. Newtype t { rotBtnTexture :: a | r } => Lens' t a
+_rotBtnTexture = _Newtype <<< prop (SProxy :: SProxy "rotBtnTexture")
+
 
 newtype HouseEditor a = HouseEditor (ReaderT HouseConfig Effect a)
 
