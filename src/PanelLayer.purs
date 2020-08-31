@@ -19,7 +19,7 @@ import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.UUID (UUID)
 import Editor.ArrayBuilder (ArrayBuilder, _arrayConfig, liftRenderingM)
-import Editor.Common.Lenses (_alignment, _apiConfig, _arrayNumber, _disposable, _object, _panels, _panelsUpdated, _rackingType, _roof, _rows)
+import Editor.Common.Lenses (_alignment, _apiConfig, _arrayNumber, _disposable, _object, _orientation, _panels, _panelsUpdated, _rackingType, _roof, _rows)
 import Editor.Disposable (class Disposable)
 import Editor.PanelAPIInterpreter (_finished, mkPanelAPIInterpreter)
 import Editor.PanelArrayLayout (PanelsLayout, _arrays, _tree, defaultLayout, findActiveArray, getArrayAt, layoutPanels, neighbors)
@@ -286,6 +286,14 @@ updateAlignment cfg st algn = case filter ((/=) algn <<< view _alignment) $ getA
 
         checkAndUpdateBtnOps cfg true $ st # _panelOperations .~ toUpdOp : toDelOp
                                            # _layout          .~ newLayout
+
+
+updateOrientation :: PanelLayerConfig -> PanelLayerState -> Orientation -> Effect PanelLayerState
+updateOrientation cfg st o = do
+    let nst = st # _orientationToUse .~ Just o
+    newLayout <- updateLayout nst Nil
+    checkAndUpdateBtnOps cfg true $ nst # _panelOperations .~ singleton DeleteAll
+                                        # _layout          .~ newLayout
 
 checkAndUpdateBtnOps :: PanelLayerConfig -> Boolean -> PanelLayerState -> Effect PanelLayerState
 checkAndUpdateBtnOps cfg arrayChanged st = if st ^. _roofActive
