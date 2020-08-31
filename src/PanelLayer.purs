@@ -2,38 +2,40 @@ module Editor.PanelLayer where
 
 import Prelude hiding (add)
 
+import API (APIConfig)
+import Algorithm.ButtonCalculator (plusBtnsForArray, rotateBtnsForArray)
 import Control.Plus (empty)
 import Data.Default (class Default, def)
 import Data.Foldable (class Foldable, null)
-import Data.Lens (Lens', Lens, view, (^.), (.~))
+import Data.Lens (Lens', view, (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.List (List(..), singleton, (:))
-import Data.Map (lookup)
+import Data.List (List(..), (:))
+import Data.Map (size)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Data.Traversable (traverse, traverse_)
-import Editor.ArrayBuilder (ArrayBuilder, _arrayConfig)
+import Editor.ArrayBuilder (ArrayBuilder, _arrayConfig, liftRenderingM)
 import Editor.Common.Lenses (_apiConfig, _disposable, _object, _panels, _panelsUpdated, _rackingType, _roof)
 import Editor.Disposable (class Disposable)
-import Editor.PanelAPIInterpreter (PanelAPIInterpreter(..), _finished, mkPanelAPIInterpreter)
-import Editor.PanelArrayLayout (PanelsLayout(..), defaultLayout, layoutPanels)
-import Editor.PanelNode (PanelOpacity, mkPanelNode)
-import Editor.PanelOperation (ArrayOperation(..), PanelOperation(..))
-import Editor.Rendering.ButtonsRenderer (ButtonOperation, mkButtonsRenderer)
-import Editor.Rendering.PanelRendering (PanelRenderer, PanelRendererConfig(..), _opacity, createPanelRenderer)
+import Editor.PanelAPIInterpreter (_finished, mkPanelAPIInterpreter)
+import Editor.PanelArrayLayout (PanelsLayout, _arrays, _tree, defaultLayout, findActiveArray, getArrayAt, layoutPanels)
+import Editor.PanelNode (PanelOpacity)
+import Editor.PanelOperation (ArrayOperation, PanelOperation(..))
+import Editor.Rendering.ButtonsRenderer (ButtonOperation(..), mkButtonsRenderer)
+import Editor.Rendering.PanelRendering (PanelRenderer, PanelRendererConfig(..), _opacity, _operations, createPanelRenderer)
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import FRP.Dynamic (Dynamic(..), mergeDynArray, sampleDyn, step, subscribeDyn, withLast)
-import FRP.Event (Event, fix)
-import Model.Hardware.PanelModel (PanelModel(..))
+import FRP.Dynamic (Dynamic, step)
+import FRP.Event (Event)
+import Model.Hardware.PanelModel (PanelModel)
+import Model.PanelArray (PanelArray)
 import Model.Racking.RackingType (RackingType(..))
-import Model.Roof.ArrayConfig (ArrayConfig(..))
+import Model.Roof.ArrayConfig (ArrayConfig)
 import Model.Roof.Panel (Orientation(..), Panel, _uuid)
-import Model.Roof.RoofPlate (RoofPlate(..))
-import Model.UpdatedPanels (UpdatedPanels(..), delete, get)
-import Three.Core.Object3D (class IsObject3D, Object3D, add, mkObject3D, remove, setName, toObject3D)
+import Model.Roof.RoofPlate (RoofPlate)
+import Model.UpdatedPanels (delete, get, toUnfoldable)
+import Three.Core.Object3D (class IsObject3D, Object3D, mkObject3D, setName)
 
 newtype PanelLayerConfig = PanelLayerConfig {
     roof            :: RoofPlate,
@@ -42,7 +44,8 @@ newtype PanelLayerConfig = PanelLayerConfig {
     arrayConfig     :: Dynamic ArrayConfig,
     panelType       :: Dynamic PanelModel,
     initPanels      :: Event (List Panel),
-    opacity         :: Dynamic PanelOpacity
+    opacity         :: Dynamic PanelOpacity,
+    apiConfig       :: APIConfig
 }
 
 derive instance newtypePanelLayerConfig :: Newtype PanelLayerConfig _
@@ -96,7 +99,8 @@ newtype PanelLayerState = PanelLayerState {
     arrayConfig      :: ArrayConfig,
 
     roofActive       :: Boolean,
-    
+    activeArray      :: Maybe Int,
+
     layout           :: PanelsLayout,
     orientationToUse :: Maybe Orientation,
 
@@ -109,12 +113,17 @@ derive instance newtypePanelLayerState :: Newtype PanelLayerState _
 instance defaultPanelLayerState :: Default PanelLayerState where
     def = PanelLayerState {
         arrayConfig      : def,
+        roofActive       : false,
+        activeArray      : Nothing,
         layout           : def,
         orientationToUse : Nothing,
         panelOperations  : Nil,
         arrayOperations  : Nil,
         btnsOperations   : Nil
     }
+
+_activeArray :: forall t a r. Newtype t { activeArray :: a | r } => Lens' t a
+_activeArray = _Newtype <<< prop (SProxy :: SProxy "activeArray")
 
 _orientationToUse :: forall t a r. Newtype t { orientationToUse :: a | r } => Lens' t a
 _orientationToUse = _Newtype <<< prop (SProxy :: SProxy "orientationToUse")
@@ -133,13 +142,14 @@ createPanelLayer cfg = do
     layer <- liftEffect mkObject3D
     liftEffect $ setName "panel-layer" layer
 
-    let roof = cfg ^. _roof
-        arrCfgDyn = cfg ^. _arrayConfig
-        arrOpEvt = empty
+    let roof       = cfg ^. _roof
+        arrCfgDyn  = cfg ^. _arrayConfig
+        arrOpEvt   = empty
         panelOpEvt = empty
+        btnOpEvt   = empty
 
     panelRenderer <- setupPanelRenderer layer arrOpEvt (cfg ^. _opacity)
-    btnsRenderer  <- mkButtonsRenderer layer btnOpEvt
+    btnsRenderer  <- liftRenderingM $ mkButtonsRenderer layer btnOpEvt
     let apiInterpreter = mkPanelAPIInterpreter $ def # _apiConfig  .~ cfg ^. _apiConfig
                                                      # _roof       .~ roof
                                                      # _panels     .~ Nil
@@ -148,13 +158,15 @@ createPanelLayer cfg = do
         layoutDyn = step Nothing empty
 
     pure $ PanelLayer {
-        object     : layer,
-        disposable : pure unit,
+        object              : layer,
+        disposable          : pure unit,
 
-        roof        : roof,
-        arrayConfig : arrCfgDyn,
-        layout      : layoutDyn,
-        serverUpdated : apiInterpreter ^. _finished
+        roof                : roof,
+        arrayConfig         : arrCfgDyn,
+        arrayChanged        : empty,
+        serverUpdated       : apiInterpreter ^. _finished,
+        arrayDragging       : step false empty,
+        inactiveArrayTapped : empty
     }
 
 
@@ -167,7 +179,7 @@ setupPanelRenderer parent opEvt opacity = createPanelRenderer $ PanelRendererCon
 
 
 -- | function to update the ArrayLayout data structure 
-updateLayout :: forall f. Foldable f => PanelLayerState -> f Panel -> Effect PanelsLayout
+updateLayout :: forall f. Foldable f => Functor f => PanelLayerState -> f Panel -> Effect PanelsLayout
 updateLayout st ps = if null ps
                      then defaultLayout orient cfg
                      else layoutPanels ps cfg
@@ -181,22 +193,48 @@ allPanels :: PanelLayerState -> List Panel
 allPanels st = st ^. (_layout <<< _panels)
 
 -- | add a new panel to the current state
-addPanel :: PanelLayerState -> Panel -> Effect PanelLayerState
-addPanel st p = do
-    let oldPs = allPanels
-        ps = p : oldPs
+addPanel :: PanelLayerConfig -> PanelLayerState -> Panel -> Effect PanelLayerState
+addPanel cfg st p = do
+    let oldPs = allPanels st
+        ps    = p : oldPs
 
     -- update layout with new panels
     newLayout <- updateLayout st ps
 
     -- get the updated new panel
     let updatedPs = newLayout ^. _panelsUpdated
-        newP = fromMaybe p $ get (p ^. _uuid) updatedPs
-        newUpdPs = delete (p ^. _uuid) updatedPs
+        newP      = fromMaybe p $ get (p ^. _uuid) updatedPs
+        newUpdPs  = delete (p ^. _uuid) updatedPs
 
         addNewPOp = AddPanel newP
-        updOps = UpdatePanels $ newUpdPs ^. _panels
-        pOps = addNewPOp : updOps : Nil
+        updOps    = UpdatePanels $ toUnfoldable newUpdPs
+        pOps      = addNewPOp : updOps : Nil
 
-    pure $ st # _panelOperations .~ pOps
-              # _layout          .~ newLayout
+    checkAndUpdateBtnOps cfg true $ st # _panelOperations .~ pOps
+                                       # _layout          .~ newLayout
+
+
+checkAndUpdateBtnOps :: PanelLayerConfig -> Boolean -> PanelLayerState -> Effect PanelLayerState
+checkAndUpdateBtnOps cfg arrayChanged st = if st ^. _roofActive
+    then do
+        let layout = st ^. _layout
+            actArr = fromMaybe 1000000 $ st ^. _activeArray
+            arrCnt = size $ layout ^. _arrays
+            newActArr = if arrayChanged && actArr >= arrCnt then findActiveArray layout else actArr
+            arr = getArrayAt newActArr layout
+        case arr of
+            Just a -> do btnOps <- btnOpsForArray cfg st a
+                         pure $ st # _btnsOperations .~ btnOps
+                                   # _activeArray    .~ Just newActArr
+            Nothing -> pure st
+    else pure st
+
+-- | calculate button operations for a panel array
+btnOpsForArray :: PanelLayerConfig -> PanelLayerState -> PanelArray -> Effect (List ButtonOperation)
+btnOpsForArray cfg st arr = do
+    plusBtns <- plusBtnsForArray arr (st ^. _layout <<< _tree) (cfg ^. _roof)
+    rotBtns  <- rotateBtnsForArray arr plusBtns
+    let reset  = ResetButtons
+        plusOp = RenderPlusButtons plusBtns
+        rotOp  = RenderRotateButtons rotBtns
+    pure $ reset : plusOp : rotOp : Nil
