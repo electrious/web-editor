@@ -4,24 +4,25 @@ import Prelude hiding (add)
 
 import API (APIConfig)
 import Algorithm.ButtonCalculator (plusBtnsForArray, rotateBtnsForArray)
+import Algorithm.PanelAligning (alignPanelRows)
 import Control.Plus (empty)
 import Data.Default (class Default, def)
 import Data.Filterable (filter)
-import Data.Foldable (class Foldable, foldl, null)
+import Data.Foldable (class Foldable, any, foldl, null)
 import Data.Lens (Lens', view, (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.List (List(..), (:))
-import Data.Map (size)
+import Data.List (List(..), fromFoldable, partition, singleton, (:))
+import Data.Map (lookup, size)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.UUID (UUID)
 import Editor.ArrayBuilder (ArrayBuilder, _arrayConfig, liftRenderingM)
-import Editor.Common.Lenses (_apiConfig, _disposable, _object, _panels, _panelsUpdated, _rackingType, _roof)
+import Editor.Common.Lenses (_alignment, _apiConfig, _arrayNumber, _disposable, _object, _panels, _panelsUpdated, _rackingType, _roof, _rows)
 import Editor.Disposable (class Disposable)
 import Editor.PanelAPIInterpreter (_finished, mkPanelAPIInterpreter)
-import Editor.PanelArrayLayout (PanelsLayout, _arrays, _tree, defaultLayout, findActiveArray, getArrayAt, layoutPanels)
+import Editor.PanelArrayLayout (PanelsLayout, _arrays, _tree, defaultLayout, findActiveArray, getArrayAt, layoutPanels, neighbors)
 import Editor.PanelNode (PanelOpacity)
 import Editor.PanelOperation (ArrayOperation, PanelOperation(..))
 import Editor.Rendering.ButtonsRenderer (ButtonOperation(..), mkButtonsRenderer)
@@ -30,13 +31,15 @@ import Effect (Effect)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic, step)
 import FRP.Event (Event)
+import Model.ArrayComponent (arrayNumber)
 import Model.Hardware.PanelModel (PanelModel)
 import Model.PanelArray (PanelArray)
 import Model.Racking.RackingType (RackingType(..))
 import Model.Roof.ArrayConfig (ArrayConfig)
-import Model.Roof.Panel (Orientation(..), Panel, _uuid)
+import Model.Roof.Panel (Alignment, Orientation(..), Panel, _arrNumber, _uuid)
 import Model.Roof.RoofPlate (RoofPlate)
-import Model.UpdatedPanels (delete, deletePanels, get, toUnfoldable)
+import Model.UpdatedPanels (delete, deletePanels, get, merge, toUnfoldable)
+import Model.UpdatedPanels as UpdatedPanels
 import Three.Core.Object3D (class IsObject3D, Object3D, mkObject3D, setName)
 
 newtype PanelLayerConfig = PanelLayerConfig {
@@ -194,6 +197,10 @@ updateLayout st ps = if null ps
 allPanels :: PanelLayerState -> List Panel
 allPanels st = st ^. (_layout <<< _panels)
 
+clearOperations :: PanelLayerState -> PanelLayerState
+clearOperations st = st # _panelOperations .~ Nil
+                        # _btnsOperations  .~ Nil
+
 -- | add a new panel to the current state
 addPanel :: PanelLayerConfig -> PanelLayerState -> Panel -> Effect PanelLayerState
 addPanel cfg st p = do
@@ -248,6 +255,38 @@ deletePanel cfg st pid = do
                                        # _layout          .~ newLayout
 
 
+-- | get the current active PanelArray value
+getActiveArray :: PanelLayerState -> Maybe PanelArray
+getActiveArray st = join $ flip lookup (st ^. _layout <<< _arrays) <$> st ^. _activeArray
+
+updateAlignment :: PanelLayerConfig -> PanelLayerState -> Alignment -> Effect PanelLayerState
+updateAlignment cfg st algn = case filter ((/=) algn <<< view _alignment) $ getActiveArray st of
+    Nothing -> pure $ clearOperations st
+    Just arr -> do
+        let rows    = fromFoldable $ arr ^. _rows
+            aligned = alignPanelRows algn rows
+            layout  = st ^. _layout
+
+            -- check if there're panels touching other arrays
+            touched = panelsTouchingOtherArray layout aligned
+            toDel   = touched.yes
+            toUpd   = touched.no
+
+            -- panels from other arrays
+            psOtherArrs = filter ((/=) (arr ^. _arrayNumber) <<< arrayNumber) $ allPanels st
+
+        -- update layout with all updated panels
+        newLayout <- updateLayout st $ append toUpd psOtherArrs
+
+        -- combine all panels that have been changed
+        let updated = toUnfoldable $ merge (newLayout ^. _panelsUpdated) (UpdatedPanels.fromFoldable toUpd)
+
+            toDelOp = if null toDel then Nil else singleton $ DelPanels (view _uuid <$> toDel)
+            toUpdOp = UpdatePanels updated
+
+        checkAndUpdateBtnOps cfg true $ st # _panelOperations .~ toUpdOp : toDelOp
+                                           # _layout          .~ newLayout
+
 checkAndUpdateBtnOps :: PanelLayerConfig -> Boolean -> PanelLayerState -> Effect PanelLayerState
 checkAndUpdateBtnOps cfg arrayChanged st = if st ^. _roofActive
     then do
@@ -272,3 +311,9 @@ btnOpsForArray cfg st arr = do
         plusOp = RenderPlusButtons plusBtns
         rotOp  = RenderRotateButtons rotBtns
     pure $ reset : plusOp : rotOp : Nil
+
+
+-- | get panels that has touched other arrays in a list of panels
+panelsTouchingOtherArray :: PanelsLayout -> List Panel -> { no :: List Panel, yes :: List Panel }
+panelsTouchingOtherArray layout = partition f
+    where f p = any ((/=) (arrayNumber p) <<< arrayNumber) $ neighbors layout p
