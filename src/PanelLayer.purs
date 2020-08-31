@@ -6,7 +6,8 @@ import API (APIConfig)
 import Algorithm.ButtonCalculator (plusBtnsForArray, rotateBtnsForArray)
 import Control.Plus (empty)
 import Data.Default (class Default, def)
-import Data.Foldable (class Foldable, null)
+import Data.Filterable (filter)
+import Data.Foldable (class Foldable, foldl, null)
 import Data.Lens (Lens', view, (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
@@ -15,6 +16,7 @@ import Data.Map (size)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
+import Data.UUID (UUID)
 import Editor.ArrayBuilder (ArrayBuilder, _arrayConfig, liftRenderingM)
 import Editor.Common.Lenses (_apiConfig, _disposable, _object, _panels, _panelsUpdated, _rackingType, _roof)
 import Editor.Disposable (class Disposable)
@@ -34,7 +36,7 @@ import Model.Racking.RackingType (RackingType(..))
 import Model.Roof.ArrayConfig (ArrayConfig)
 import Model.Roof.Panel (Orientation(..), Panel, _uuid)
 import Model.Roof.RoofPlate (RoofPlate)
-import Model.UpdatedPanels (delete, get, toUnfoldable)
+import Model.UpdatedPanels (delete, deletePanels, get, toUnfoldable)
 import Three.Core.Object3D (class IsObject3D, Object3D, mkObject3D, setName)
 
 newtype PanelLayerConfig = PanelLayerConfig {
@@ -208,9 +210,41 @@ addPanel cfg st p = do
 
         addNewPOp = AddPanel newP
         updOps    = UpdatePanels $ toUnfoldable newUpdPs
-        pOps      = addNewPOp : updOps : Nil
 
-    checkAndUpdateBtnOps cfg true $ st # _panelOperations .~ pOps
+    checkAndUpdateBtnOps cfg true $ st # _panelOperations .~ addNewPOp : updOps : Nil
+                                       # _layout          .~ newLayout
+
+
+addPanels :: PanelLayerConfig -> PanelLayerState -> List Panel -> Effect PanelLayerState
+addPanels cfg st ps = do
+    let oldPs = allPanels st
+        newPs = append ps oldPs
+
+    -- update layout with new panels
+    newLayout <- updateLayout st newPs
+
+    let updPs = newLayout ^. _panelsUpdated
+        f ops p = case get (p ^. _uuid) updPs of
+                    Just np -> np : ops
+                    Nothing -> ops
+        nps = foldl f Nil ps
+        updatedPs = deletePanels (view _uuid <$> nps) updPs
+
+        newPsOp = AddPanels nps
+        updOps  = UpdatePanels $ toUnfoldable updatedPs
+    
+    checkAndUpdateBtnOps cfg true $ st # _panelOperations .~ newPsOp : updOps : Nil
+                                       # _layout          .~ newLayout
+
+deletePanel :: PanelLayerConfig -> PanelLayerState -> UUID -> Effect PanelLayerState
+deletePanel cfg st pid = do
+    let ps = filter ((/=) pid <<< view _uuid) $ allPanels st
+    
+    newLayout <- updateLayout st ps
+    let delPOp = DelPanel pid
+        updOps = UpdatePanels $ toUnfoldable (newLayout ^. _panelsUpdated)
+    
+    checkAndUpdateBtnOps cfg true $ st # _panelOperations .~ delPOp : updOps : Nil
                                        # _layout          .~ newLayout
 
 
