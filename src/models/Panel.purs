@@ -79,7 +79,6 @@ instance decodeAlign :: Decode Alignment where
 newtype Panel = Panel {
     id             :: Int,
     uuid           :: String,
-    lead_id        :: Int,
     roofplate_id   :: Int,
     roofplate_uuid :: String,
     row_number     :: Int,
@@ -102,9 +101,6 @@ instance decodePanel :: Decode Panel where
 
 _uuid :: Lens' Panel String
 _uuid = _Newtype <<< prop (SProxy :: SProxy "uuid")
-
-_leadId :: Lens' Panel Int
-_leadId = _Newtype <<< prop (SProxy :: SProxy "lead_id")
 
 _roofId :: Lens' Panel Int
 _roofId = _Newtype <<< prop (SProxy :: SProxy "roofplate_id")

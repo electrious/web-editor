@@ -15,7 +15,7 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.UUID (genUUID, toString)
-import Editor.Common.Lenses (_alignment, _center, _id, _leadId, _normal, _orientation, _slope)
+import Editor.Common.Lenses (_alignment, _center, _id, _normal, _orientation, _slope)
 import Effect (Effect)
 import Foreign.Generic (class Decode, class Encode, decode, defaultOptions, encode, genericDecode, genericEncode)
 import Math as Math
@@ -27,7 +27,6 @@ import Three.Math.Vector (class Vector, Vector2, Vector3, addScaled, cross, leng
 newtype RoofPlate = RoofPlate {
     id            :: String,
     intId         :: Int,
-    leadId        :: Int,
     borderPoints  :: Array Vector3,
     unifiedPoints :: Maybe (Array UnifiedPoint),
     coefs         :: Array Number,
@@ -117,7 +116,6 @@ instance decodeUnifiedPoint :: Decode UnifiedPoint where
 newtype JSRoofPlate = JSRoofPlate {
     id                :: Int,
     uuid              :: String,
-    lead_id           :: Int,
     border_points     :: Array Point,
     unified_points    :: Maybe (Array UnifiedPoint),
     orientation       :: Int,
@@ -150,7 +148,6 @@ fromJSRoofPlate :: JSRoofPlate -> RoofPlate
 fromJSRoofPlate (JSRoofPlate r) = RoofPlate {
     id            : r.uuid,
     intId         : r.id,
-    leadId        : r.lead_id,
     borderPoints  : point2Vec <$> r.border_points,
     unifiedPoints : r.unified_points,
     coefs         : r.coefs,
@@ -167,7 +164,6 @@ toJSRoofPlate :: RoofPlate -> JSRoofPlate
 toJSRoofPlate r = JSRoofPlate {
     id                : r ^. _roofIntId,
     uuid              : r ^. _id,
-    lead_id           : r ^. _leadId,
     border_points     : vec2Point <$> r ^. _borderPoints,
     unified_points    : r ^. _unifiedPoints,
     orientation       : fromEnum $ r ^. _orientation,
@@ -250,7 +246,6 @@ newRoofPlate center normal = do
     pure $ RoofPlate {
         id            : toString u,
         intId         : 0,
-        leadId        : 0,
         borderPoints  : borderPoints,
         unifiedPoints : Nothing,
         coefs         : [],
