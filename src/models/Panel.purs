@@ -77,9 +77,7 @@ instance decodeAlign :: Decode Alignment where
                       Nothing -> throwError $ singleton $ ForeignError ("can't decode Alignment from " <> show i)
 
 newtype Panel = Panel {
-    id             :: Int,
     uuid           :: String,
-    roofplate_id   :: Int,
     roofplate_uuid :: String,
     row_number     :: Int,
     array_number   :: Int,
@@ -101,9 +99,6 @@ instance decodePanel :: Decode Panel where
 
 _uuid :: Lens' Panel String
 _uuid = _Newtype <<< prop (SProxy :: SProxy "uuid")
-
-_roofId :: Lens' Panel Int
-_roofId = _Newtype <<< prop (SProxy :: SProxy "roofplate_id")
 
 _roofUUID :: Lens' Panel String
 _roofUUID = _Newtype <<< prop (SProxy :: SProxy "roofplate_uuid")
