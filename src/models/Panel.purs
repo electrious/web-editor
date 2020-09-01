@@ -14,7 +14,7 @@ import Data.Generic.Rep.Show (genericShow)
 import Data.Lens (Lens', view, (^.), (%~), (.~))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.List (List, (:))
+import Data.List (List(..), (:))
 import Data.List as List
 import Data.List.NonEmpty (singleton)
 import Data.Map (Map, insert, member, update)
@@ -31,9 +31,9 @@ import Foreign.Generic (class Decode, class Encode, ForeignError(..), decode, de
 import Math.Angle (Angle, degree, degreeVal)
 import Model.ArrayComponent (class ArrayComponent)
 import Model.Class (class IsPBArrayComp, setArrayNumber, setX, setY)
-import Model.RoofComponent (class RoofComponent)
+import Model.RoofComponent (class RoofComponent, compX, compY, size)
 import Model.UUID (PBUUID, mkPBUUID, setUUIDString)
-import Three.Math.Vector (Vector3, vecX, vecY)
+import Three.Math.Vector (Vector3, mkVec3, vecX, vecY)
 import Util (ffi, fpi)
 
 newtype OrientationPB = OrientationPB Int
@@ -307,3 +307,16 @@ type PanelDict = Map UUID Panel
 panelDict :: forall f. Foldable f => f Panel -> PanelDict
 panelDict = foldl f Map.empty
     where f d p = insert (p ^. _uuid) p d
+
+-- | get panel vertices list
+panelVertices :: Panel -> List Vector3
+panelVertices p = v1 : v2 : v3 : v4 : Nil
+    where s  = size p
+          x  = meterVal $ compX p
+          y  = meterVal $ compY p
+          w2 = meterVal (s ^. _width) / 2.0
+          h2 = meterVal (s ^. _height) / 2.0
+          v1 = mkVec3 (x - w2) (y - h2) 0.0
+          v2 = mkVec3 (x - w2) (y + h2) 0.0
+          v3 = mkVec3 (x + w2) (y + h2) 0.0
+          v4 = mkVec3 (x + w2) (y - h2) 0.0

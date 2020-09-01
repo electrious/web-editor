@@ -14,19 +14,20 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (List(..), fromFoldable, partition, singleton, (:))
 import Data.Map (lookup, size)
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (Maybe(..), fromMaybe, maybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.UUID (UUID)
 import Editor.ArrayBuilder (ArrayBuilder, _arrayConfig, liftRenderingM)
-import Editor.Common.Lenses (_alignment, _apiConfig, _arrayNumber, _disposable, _object, _orientation, _panels, _panelsUpdated, _rackingType, _roof, _rows)
+import Editor.Common.Lenses (_alignment, _apiConfig, _arrayNumber, _disposable, _object, _panels, _panelsUpdated, _point, _rackingType, _roof, _rows)
 import Editor.Disposable (class Disposable)
 import Editor.PanelAPIInterpreter (_finished, mkPanelAPIInterpreter)
 import Editor.PanelArrayLayout (PanelsLayout, _arrays, _tree, defaultLayout, findActiveArray, getArrayAt, layoutPanels, neighbors)
 import Editor.PanelNode (PanelOpacity)
-import Editor.PanelOperation (ArrayOperation, PanelOperation(..))
+import Editor.PanelOperation (ArrayOperation(..), PanelOperation(..))
 import Editor.Rendering.ButtonsRenderer (ButtonOperation(..), mkButtonsRenderer)
 import Editor.Rendering.PanelRendering (PanelRenderer, PanelRendererConfig(..), _opacity, _operations, createPanelRenderer)
+import Editor.UI.DragInfo (DragInfo(..))
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic, step)
@@ -36,11 +37,14 @@ import Model.Hardware.PanelModel (PanelModel)
 import Model.PanelArray (PanelArray)
 import Model.Racking.RackingType (RackingType(..))
 import Model.Roof.ArrayConfig (ArrayConfig)
-import Model.Roof.Panel (Alignment, Orientation(..), Panel, _arrNumber, _uuid)
+import Model.Roof.Panel (Alignment, Orientation(..), Panel, _arrNumber, _uuid, panelVertices)
 import Model.Roof.RoofPlate (RoofPlate)
+import Model.Roof.RoofPlateTransform (wrapAroundPoints)
 import Model.UpdatedPanels (delete, deletePanels, get, merge, toUnfoldable)
+import Model.UpdatedPanels as UpdatePanels
 import Model.UpdatedPanels as UpdatedPanels
-import Three.Core.Object3D (class IsObject3D, Object3D, mkObject3D, setName)
+import Three.Core.Object3D (class IsObject3D, Object3D, mkObject3D, setName, worldToLocal)
+import Three.Math.Vector (Vector3, (<->))
 
 newtype PanelLayerConfig = PanelLayerConfig {
     roof            :: RoofPlate,
@@ -101,6 +105,8 @@ _inactiveArrayTapped = _Newtype <<< prop (SProxy :: SProxy "inactiveArrayTapped"
 
 -- | internal panel layer state data structure
 newtype PanelLayerState = PanelLayerState {
+    object           :: Object3D,
+
     arrayConfig      :: ArrayConfig,
 
     roofActive       :: Boolean,
@@ -109,19 +115,24 @@ newtype PanelLayerState = PanelLayerState {
     layout           :: PanelsLayout,
     orientationToUse :: Maybe Orientation,
 
+    lastDragPos      :: Maybe Vector3,
+
     panelOperations  :: List PanelOperation,
     arrayOperations  :: List ArrayOperation,
     btnsOperations   :: List ButtonOperation
 }
 
 derive instance newtypePanelLayerState :: Newtype PanelLayerState _
-instance defaultPanelLayerState :: Default PanelLayerState where
-    def = PanelLayerState {
+
+mkState :: Object3D -> PanelLayerState
+mkState obj = PanelLayerState {
+        object           : obj,
         arrayConfig      : def,
         roofActive       : false,
         activeArray      : Nothing,
         layout           : def,
         orientationToUse : Nothing,
+        lastDragPos      : Nothing,
         panelOperations  : Nil,
         arrayOperations  : Nil,
         btnsOperations   : Nil
@@ -129,6 +140,9 @@ instance defaultPanelLayerState :: Default PanelLayerState where
 
 _activeArray :: forall t a r. Newtype t { activeArray :: a | r } => Lens' t a
 _activeArray = _Newtype <<< prop (SProxy :: SProxy "activeArray")
+
+_lastDragPos :: forall t a r. Newtype t { lastDragPos :: a | r } => Lens' t a
+_lastDragPos = _Newtype <<< prop (SProxy :: SProxy "lastDragPos")
 
 _orientationToUse :: forall t a r. Newtype t { orientationToUse :: a | r } => Lens' t a
 _orientationToUse = _Newtype <<< prop (SProxy :: SProxy "orientationToUse")
@@ -295,6 +309,46 @@ updateOrientation cfg st o = do
     checkAndUpdateBtnOps cfg true $ nst # _panelOperations .~ singleton DeleteAll
                                         # _layout          .~ newLayout
 
+
+startDragging :: PanelLayerConfig -> PanelLayerState -> DragInfo Panel -> Effect PanelLayerState
+startDragging cfg st d = if not (st ^. _roofActive) || st ^. _activeArray /= Just (d ^. _object <<< _arrNumber)
+                         then pure st
+                         else do
+                            p <- worldToLocal (d ^. _point) (st ^. _object)
+                            pure $ st # _lastDragPos .~ Just p
+
+drag :: PanelLayerConfig -> PanelLayerState -> DragInfo Panel -> Effect PanelLayerState
+drag cfg st d = if not (st ^. _roofActive) || st ^. _activeArray /= Just (d ^. _object <<< _arrNumber)
+                then pure st
+                else do
+                    p <- worldToLocal (d ^. _point) (st ^. _object)
+                    let delta = maybe def (\lp -> p <-> lp) (st ^. _lastDragPos)
+                        arrNum = d ^. _object <<< _arrNumber
+                    pure $ st # _lastDragPos .~ Just p
+                              # _arrayOperations .~ singleton (MoveArray arrNum delta)
+
+endDragging :: PanelLayerConfig -> PanelLayerState -> Int -> Effect PanelLayerState
+endDragging cfg st arr = if not (st ^. _roofActive) || st ^. _activeArray /= Just arr
+    then pure st
+    else do
+        let allPs   = allPanels st
+            -- partition all panels into current array panels and other array panels
+            arrPs   = partition ((==) arr <<< arrayNumber) allPs
+            -- check if the current array panels is outside of the roof or touching other arrays
+            outside = panelsOutsideRoof cfg arrPs.yes
+            touched = panelsTouchingOtherArray (st ^. _layout) outside.no
+            -- delete panels outside roof or touching other arrays
+            toDel   = append outside.yes touched.yes
+        -- update layout with left panels and panels in other arrays
+        newLayout <- updateLayout st $ append arrPs.no touched.no
+        -- merge all updated panels
+        let updated = merge (newLayout ^. _panelsUpdated) (UpdatePanels.fromFoldable touched.no)
+
+            delOp = DelPanels (view _uuid <$> toDel)
+            updOp = UpdatePanels (toUnfoldable updated)
+        checkAndUpdateBtnOps cfg true $ st # _panelOperations .~ delOp : updOp : Nil
+                                           # _layout          .~ newLayout
+
 checkAndUpdateBtnOps :: PanelLayerConfig -> Boolean -> PanelLayerState -> Effect PanelLayerState
 checkAndUpdateBtnOps cfg arrayChanged st = if st ^. _roofActive
     then do
@@ -325,3 +379,8 @@ btnOpsForArray cfg st arr = do
 panelsTouchingOtherArray :: PanelsLayout -> List Panel -> { no :: List Panel, yes :: List Panel }
 panelsTouchingOtherArray layout = partition f
     where f p = any ((/=) (arrayNumber p) <<< arrayNumber) $ neighbors layout p
+
+
+panelsOutsideRoof :: PanelLayerConfig -> List Panel -> { no :: List Panel, yes :: List Panel }
+panelsOutsideRoof cfg = partition f
+    where f p = not $ wrapAroundPoints (cfg ^. _roof) (panelVertices p)
