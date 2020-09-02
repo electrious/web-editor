@@ -6,17 +6,16 @@ import Prelude hiding (add)
 
 import Control.Monad.Reader (ask)
 import Data.Default (class Default, def)
-import Data.Filterable (filter)
 import Data.Lens (Lens', view, (^.), (.~))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.List (List(..), singleton)
+import Data.List (List(..), find, fromFoldable, partition)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse, traverse_)
 import Editor.Common.Lenses (_dragged, _id, _tapped)
 import Editor.UI.DragInfo (DragInfo)
-import Editor.UI.PlusButton (PlusButtonNode, _plusButton)
+import Editor.UI.PlusButton (PlusButtonNode, _plusButton, moveBy)
 import Editor.UI.RotateButton (RotateButtonNode)
 import Effect (Effect)
 import FRP.Event (Event, keepLatest)
@@ -25,11 +24,13 @@ import Model.PlusButton (PlusButton)
 import Model.RotateButton (RotateButton)
 import Rendering.Renderable (RendererConfig, RenderingM, render, runRenderingM)
 import Three.Core.Object3D (class IsObject3D, add, remove)
+import Three.Math.Vector (Vector3)
 
 -- Operations to update the buttons renderer
 data ButtonOperation = RenderPlusButtons (List PlusButton)
                      | RenderRotateButtons (List RotateButton)
-                     | HideButtonsExcept PlusButtonNode
+                     | HideButtonsExcept PlusButton
+                     | MovePlusButton PlusButton Vector3
                      | ResetButtons
 
 
@@ -81,15 +82,22 @@ applyOp parent cfg (RenderRotateButtons rs) st = do
     nodes <- runRenderingM (traverse render rs) cfg
     traverse_ (flip add parent) nodes
     pure $ nst # _rotBtns .~ nodes
-applyOp parent cfg (HideButtonsExcept pn) st = do
-    let _i  = _plusButton <<< _id
-        f p = p ^. _i /= pn ^. _i
-    traverse_ (flip remove parent) $ filter f (st ^. _plusBtns)
+applyOp parent cfg (HideButtonsExcept pb) st = do
+    let f p = p ^. _plusButton <<< _id /= pb ^. _id
+        hiddenBtns = partition f (st ^. _plusBtns)
+    traverse_ (flip remove parent) hiddenBtns.yes
     nst <- delRotNodes parent st
-    pure $ nst # _plusBtns .~ singleton pn
+    pure $ nst # _plusBtns .~ hiddenBtns.no
+               # _rotBtns  .~ Nil
+applyOp parent cfg (MovePlusButton pb delta) st = do
+    let pn = find ((==) (pb ^. _id) <<< view (_plusButton <<< _id)) $ st ^. _plusBtns
+    npn <- traverse (moveBy delta) pn
+    pure $ st # _plusBtns .~ fromFoldable npn
 applyOp parent cfg ResetButtons st = do
     nst <- delPlusNodes parent st
-    delRotNodes parent nst
+    _ <- delRotNodes parent nst
+    pure $ st # _plusBtns .~ Nil
+              # _rotBtns  .~ Nil
 
 -- delete all plus buttons
 delPlusNodes :: forall a. IsObject3D a => a -> ButtonRendererState -> Effect ButtonRendererState

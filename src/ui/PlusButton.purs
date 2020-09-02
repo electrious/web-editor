@@ -4,7 +4,7 @@ import Prelude hiding (add)
 
 import Custom.Mesh (mkTapDragMesh)
 import Data.Function.Memoize (memoize)
-import Data.Lens (Lens, Lens', view, (^.))
+import Data.Lens (Lens, Lens', view, (^.), (%~))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..))
@@ -19,16 +19,16 @@ import Effect.Unsafe (unsafePerformEffect)
 import FRP.Event (Event)
 import Math (pi)
 import Math.Angle (radianVal, sin)
-import Model.PlusButton (PlusButton)
+import Model.PlusButton (PlusButton, addDelta)
 import Model.Roof.Panel (Orientation(..), validatedSlope)
 import Model.RoofComponent (size)
 import Rendering.Renderable (class Renderable)
 import Three.Core.Geometry (BoxGeometry, mkBoxGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial, setOpacity)
 import Three.Core.Mesh (Mesh, mkMesh)
-import Three.Core.Object3D (class IsObject3D, Object3D, add, mkObject3D, setCastShadow, setName, setPosition, setRenderOrder, setRotation, setScale)
+import Three.Core.Object3D (class IsObject3D, Object3D, add, mkObject3D, position, setCastShadow, setName, setPosition, setRenderOrder, setRotation, setScale)
 import Three.Math.Euler (mkEuler)
-import Three.Math.Vector (Vector3, mkVec3)
+import Three.Math.Vector (Vector3, mkVec3, (<+>))
 
 newtype PlusButtonNode = PlusButtonNode {
     plusButton :: PlusButton,
@@ -57,6 +57,15 @@ mkPlusBtnPart scale pos = do
     setPosition pos m
     setCastShadow false m
     pure m
+
+moveBy :: Vector3 -> PlusButtonNode -> Effect PlusButtonNode
+moveBy delta node = do
+    let b = node ^. _button
+        pos = position b
+        newPos = pos <+> delta
+    
+    setPosition newPos b
+    pure $ node # _plusButton %~ addDelta delta
 
 instance renderablePlusButtonNode :: Renderable PlusButton PlusButtonNode where
     render pb = liftEffect do

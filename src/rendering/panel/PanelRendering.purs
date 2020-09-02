@@ -160,6 +160,7 @@ updateStateWithArrayOp _ _ _ _ PreserveTempPanels st = do
         f m n = insert (n ^. (_panel <<< _uuid)) n m
     newPs <- traverse changeToNormal ps
     pure $ st # _renderedPanels %~ flip (foldl f) newPs
+              # _tempPanelNodes .~ Nil
 
 
 -- | render temporary panels

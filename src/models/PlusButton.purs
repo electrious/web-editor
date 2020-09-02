@@ -5,7 +5,7 @@ import Prelude hiding (degree)
 import Data.Default (class Default, def)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Lens (view, (^.), (.~))
+import Data.Lens (view, (^.), (.~), (%~))
 import Data.List (List(..), (:))
 import Data.Meter (Meter, meter, meterVal)
 import Data.Newtype (class Newtype)
@@ -16,7 +16,7 @@ import Model.ArrayComponent (class ArrayComponent)
 import Model.Roof.Panel (Orientation(..), panelLong, panelShort)
 import Model.RoofComponent (class RoofComponent, compX, compY, size)
 import Model.UUID (class HasUUID)
-import Three.Math.Vector (Vector3, mkVec3)
+import Three.Math.Vector (Vector3, mkVec3, vecX, vecY)
 
 plusBtnZ :: Meter
 plusBtnZ = meter 0.2
@@ -72,3 +72,7 @@ btnVertices pb = v1 : v2 : v3 : v4 : Nil
           v2 = mkVec3 (x - w2) (y + h2) 0.0
           v3 = mkVec3 (x + w2) (y + h2) 0.0
           v4 = mkVec3 (x + w2) (y - h2) 0.0
+
+addDelta :: Vector3 -> PlusButton -> PlusButton
+addDelta delta p = p # _x %~ (+) (meter $ vecX delta)
+                     # _y %~ (+) (meter $ vecY delta)

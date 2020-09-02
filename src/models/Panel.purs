@@ -23,7 +23,7 @@ import Data.Maybe (Maybe(..))
 import Data.Meter (Meter, meter, meterVal)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Data.UUID (UUID, emptyUUID, toString)
+import Data.UUID (UUID, emptyUUID, genUUID, toString)
 import Editor.Common.Lenses (_alignment, _height, _id, _orientation, _slope, _width, _x, _y)
 import Editor.Common.ProtoCodable (class ProtoEncodable, toProto)
 import Effect (Effect)
@@ -320,3 +320,10 @@ panelVertices p = v1 : v2 : v3 : v4 : Nil
           v2 = mkVec3 (x - w2) (y + h2) 0.0
           v3 = mkVec3 (x + w2) (y + h2) 0.0
           v4 = mkVec3 (x + w2) (y - h2) 0.0
+
+clonePanelTo :: Panel -> Meter -> Meter -> Effect Panel
+clonePanelTo p x y = do
+    i <- genUUID
+    pure $ p # _uuid .~ i
+             # _x    .~ x
+             # _y    .~ y

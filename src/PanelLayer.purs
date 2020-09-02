@@ -5,29 +5,33 @@ import Prelude hiding (add)
 import API (APIConfig)
 import Algorithm.ButtonCalculator (plusBtnsForArray, rotateBtnsForArray)
 import Algorithm.PanelAligning (alignPanelRows)
+import Algorithm.TempPanels (tempPanels)
 import Control.Plus (empty)
-import Data.Default (class Default, def)
+import Data.Default (def)
 import Data.Filterable (filter)
 import Data.Foldable (class Foldable, any, foldl, null)
 import Data.Lens (Lens', view, (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (List(..), fromFoldable, partition, singleton, (:))
+import Data.List.Partial (head)
 import Data.Map (lookup, size)
 import Data.Maybe (Maybe(..), fromMaybe, maybe)
+import Data.Meter (meterVal)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.UUID (UUID)
 import Editor.ArrayBuilder (ArrayBuilder, _arrayConfig, liftRenderingM)
-import Editor.Common.Lenses (_alignment, _apiConfig, _arrayNumber, _disposable, _object, _panels, _panelsUpdated, _point, _rackingType, _roof, _rows)
+import Editor.Common.Lenses (_alignment, _apiConfig, _arrayNumber, _disposable, _dragType, _object, _panels, _panelsUpdated, _point, _rackingType, _roof, _rows, _x, _y)
 import Editor.Disposable (class Disposable)
+import Editor.Input.Commoon (DragType(..))
 import Editor.PanelAPIInterpreter (_finished, mkPanelAPIInterpreter)
 import Editor.PanelArrayLayout (PanelsLayout, _arrays, _tree, defaultLayout, findActiveArray, getArrayAt, layoutPanels, neighbors)
 import Editor.PanelNode (PanelOpacity)
 import Editor.PanelOperation (ArrayOperation(..), PanelOperation(..))
 import Editor.Rendering.ButtonsRenderer (ButtonOperation(..), mkButtonsRenderer)
 import Editor.Rendering.PanelRendering (PanelRenderer, PanelRendererConfig(..), _opacity, _operations, createPanelRenderer)
-import Editor.UI.DragInfo (DragInfo(..))
+import Editor.UI.DragInfo (DragInfo)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic, step)
@@ -35,6 +39,7 @@ import FRP.Event (Event)
 import Model.ArrayComponent (arrayNumber)
 import Model.Hardware.PanelModel (PanelModel)
 import Model.PanelArray (PanelArray)
+import Model.PlusButton (PlusButton)
 import Model.Racking.RackingType (RackingType(..))
 import Model.Roof.ArrayConfig (ArrayConfig)
 import Model.Roof.Panel (Alignment, Orientation(..), Panel, _arrNumber, _uuid, panelVertices)
@@ -43,8 +48,9 @@ import Model.Roof.RoofPlateTransform (wrapAroundPoints)
 import Model.UpdatedPanels (delete, deletePanels, get, merge, toUnfoldable)
 import Model.UpdatedPanels as UpdatePanels
 import Model.UpdatedPanels as UpdatedPanels
+import Partial.Unsafe (unsafePartial)
 import Three.Core.Object3D (class IsObject3D, Object3D, mkObject3D, setName, worldToLocal)
-import Three.Math.Vector (Vector3, (<->))
+import Three.Math.Vector (Vector3, mkVec3, (<->))
 
 newtype PanelLayerConfig = PanelLayerConfig {
     roof            :: RoofPlate,
@@ -115,7 +121,9 @@ newtype PanelLayerState = PanelLayerState {
     layout           :: PanelsLayout,
     orientationToUse :: Maybe Orientation,
 
+    initDragPos      :: Maybe Vector3,
     lastDragPos      :: Maybe Vector3,
+    tempPanels       :: List Panel,
 
     panelOperations  :: List PanelOperation,
     arrayOperations  :: List ArrayOperation,
@@ -132,7 +140,9 @@ mkState obj = PanelLayerState {
         activeArray      : Nothing,
         layout           : def,
         orientationToUse : Nothing,
+        initDragPos      : Nothing,
         lastDragPos      : Nothing,
+        tempPanels       : Nil,
         panelOperations  : Nil,
         arrayOperations  : Nil,
         btnsOperations   : Nil
@@ -141,8 +151,14 @@ mkState obj = PanelLayerState {
 _activeArray :: forall t a r. Newtype t { activeArray :: a | r } => Lens' t a
 _activeArray = _Newtype <<< prop (SProxy :: SProxy "activeArray")
 
+_initDragPos :: forall t a r. Newtype t { initDragPos :: a | r } => Lens' t a
+_initDragPos = _Newtype <<< prop (SProxy :: SProxy "initDragPos")
+
 _lastDragPos :: forall t a r. Newtype t { lastDragPos :: a | r } => Lens' t a
 _lastDragPos = _Newtype <<< prop (SProxy :: SProxy "lastDragPos")
+
+_tempPanels :: forall t a r. Newtype t { tempPanels :: a | r } => Lens' t a
+_tempPanels = _Newtype <<< prop (SProxy :: SProxy "tempPanels")
 
 _orientationToUse :: forall t a r. Newtype t { orientationToUse :: a | r } => Lens' t a
 _orientationToUse = _Newtype <<< prop (SProxy :: SProxy "orientationToUse")
@@ -322,7 +338,7 @@ drag cfg st d = if not (st ^. _roofActive) || st ^. _activeArray /= Just (d ^. _
                 then pure st
                 else do
                     p <- worldToLocal (d ^. _point) (st ^. _object)
-                    let delta = maybe def (\lp -> p <-> lp) (st ^. _lastDragPos)
+                    let delta = maybe def (p <-> _) (st ^. _lastDragPos)
                         arrNum = d ^. _object <<< _arrNumber
                     pure $ st # _lastDragPos .~ Just p
                               # _arrayOperations .~ singleton (MoveArray arrNum delta)
@@ -348,6 +364,34 @@ endDragging cfg st arr = if not (st ^. _roofActive) || st ^. _activeArray /= Jus
             updOp = UpdatePanels (toUnfoldable updated)
         checkAndUpdateBtnOps cfg true $ st # _panelOperations .~ delOp : updOp : Nil
                                            # _layout          .~ newLayout
+                                           # _lastDragPos     .~ Nothing
+
+
+processDraggingPlus :: PanelLayerConfig -> PanelLayerState -> DragInfo PlusButton -> Effect PanelLayerState
+processDraggingPlus cfg st d = do
+    p <- worldToLocal (d ^. _point) (st ^. _object)
+    case d ^. _dragType of
+        DragStart -> do
+            let pb = d ^. _object
+                pbPos = mkVec3 (meterVal $ pb ^. _x) (meterVal $ pb ^. _y) 0.0
+            pure $ st # _lastDragPos .~ Just p
+                      # _initDragPos .~ Just pbPos
+                      # _btnsOperations .~ singleton (HideButtonsExcept $ d ^. _object)
+        Drag -> do
+            let delta = maybe def (p <-> _) (st ^. _lastDragPos)
+                panel = unsafePartial $ head $ allPanels st
+                initPos = fromMaybe def $ st ^. _initDragPos
+            tempPs <- tempPanels (st ^. _arrayConfig) panel p initPos
+            pure $ st # _btnsOperations  .~ singleton (MovePlusButton (d ^. _object) delta)
+                      # _arrayOperations .~ singleton (TempPanels tempPs)
+                      # _tempPanels      .~ tempPs
+        DragEnd -> do
+            let tmpPs = st ^. _tempPanels
+            nst <- addPanels cfg st tmpPs
+            checkAndUpdateBtnOps cfg true $ nst # _btnsOperations  .~ singleton ResetButtons
+                                                # _arrayOperations .~ singleton PreserveTempPanels
+                                                # _tempPanels      .~ Nil
+                                                # _initDragPos     .~ Nothing
 
 checkAndUpdateBtnOps :: PanelLayerConfig -> Boolean -> PanelLayerState -> Effect PanelLayerState
 checkAndUpdateBtnOps cfg arrayChanged st = if st ^. _roofActive
