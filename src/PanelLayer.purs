@@ -20,6 +20,7 @@ import Data.Maybe (Maybe(..), fromMaybe, maybe)
 import Data.Meter (meterVal)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
+import Data.Tuple (Tuple(..))
 import Data.UUID (UUID)
 import Editor.ArrayBuilder (ArrayBuilder, _arrayConfig, liftRenderingM)
 import Editor.Common.Lenses (_alignment, _apiConfig, _arrayNumber, _disposable, _dragType, _object, _panels, _panelsUpdated, _point, _rackingType, _roof, _rows, _x, _y)
@@ -38,14 +39,14 @@ import FRP.Dynamic (Dynamic, step)
 import FRP.Event (Event)
 import Model.ArrayComponent (arrayNumber)
 import Model.Hardware.PanelModel (PanelModel)
-import Model.PanelArray (PanelArray)
+import Model.PanelArray (PanelArray, rotateRow)
 import Model.PlusButton (PlusButton)
 import Model.Racking.RackingType (RackingType(..))
 import Model.Roof.ArrayConfig (ArrayConfig)
 import Model.Roof.Panel (Alignment, Orientation(..), Panel, _arrNumber, _uuid, panelVertices)
 import Model.Roof.RoofPlate (RoofPlate)
 import Model.Roof.RoofPlateTransform (wrapAroundPoints)
-import Model.UpdatedPanels (delete, deletePanels, get, merge, toUnfoldable)
+import Model.UpdatedPanels (UpdatedPanels(..), delete, deletePanels, get, merge, toUnfoldable)
 import Model.UpdatedPanels as UpdatePanels
 import Model.UpdatedPanels as UpdatedPanels
 import Partial.Unsafe (unsafePartial)
@@ -392,6 +393,28 @@ processDraggingPlus cfg st d = do
                                                 # _arrayOperations .~ singleton PreserveTempPanels
                                                 # _tempPanels      .~ Nil
                                                 # _initDragPos     .~ Nothing
+
+
+rotateRowInArr :: PanelLayerConfig -> PanelLayerState -> Int -> Int -> Effect PanelLayerState
+rotateRowInArr cfg st row arr = case getArrayAt arr (st ^. _layout) of
+    Nothing    -> pure st
+    Just array -> do
+        let Tuple allPs updatedPs = rotateRow array row
+            outside = panelsOutsideRoof cfg allPs
+            touched = panelsTouchingOtherArray (st ^. _layout) outside.no
+            toDel = append outside.yes touched.yes
+            toDelIds = view _uuid <$> toDel
+
+            otherArrPs = filter ((/=) arr <<< arrayNumber) $ allPanels st
+        -- update layout with new valid panels and panels from other arrays
+        newLayout <- updateLayout st (append touched.no otherArrPs)
+        let updated = merge (newLayout ^. _panelsUpdated) (deletePanels toDelIds $ UpdatedPanels.fromFoldable updatedPs)
+
+            delOp = DelPanels toDelIds
+            updOp = UpdatePanels $ toUnfoldable updated
+
+        checkAndUpdateBtnOps cfg true $ st # _panelOperations .~ delOp : updOp : Nil
+                                           # _layout          .~ newLayout
 
 checkAndUpdateBtnOps :: PanelLayerConfig -> Boolean -> PanelLayerState -> Effect PanelLayerState
 checkAndUpdateBtnOps cfg arrayChanged st = if st ^. _roofActive
