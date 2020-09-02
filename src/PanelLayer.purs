@@ -57,7 +57,6 @@ newtype PanelLayerConfig = PanelLayerConfig {
     roof            :: RoofPlate,
     roofActive      :: Dynamic Boolean,
     mainOrientation :: Dynamic Orientation,
-    arrayConfig     :: Dynamic ArrayConfig,
     panelType       :: Dynamic PanelModel,
     initPanels      :: Event (List Panel),
     opacity         :: Dynamic PanelOpacity,
@@ -417,6 +416,25 @@ rotateRowInArr cfg st row arr = case getArrayAt arr (st ^. _layout) of
 
         checkAndUpdateBtnOps cfg true $ (clearOperations st) # _panelOperations .~ delOp : updOp : Nil
                                                              # _layout          .~ newLayout
+
+updateArrayConfig :: PanelLayerConfig -> PanelLayerState -> ArrayConfig -> Effect PanelLayerState
+updateArrayConfig cfg st arrCfg = do
+    let rt = arrCfg ^. _rackingType
+    if rt == BX || rt == XRFlat
+    then do
+        let nst = if rt == BX
+                  then st # _orientationToUse .~ Landscape
+                  else st
+        newLayout <- updateLayout st Nil
+        checkAndUpdateBtnOps cfg true $ nst # _panelOperations .~ singleton DeleteAll
+                                            # _layout          .~ newLayout
+                                            # _arrayConfig     .~ arrCfg
+    else pure # st # _arrayConfig .~ arrCfg
+
+
+updateActiveArray :: PanelLayerConfig -> PanelLayerState -> Int -> Effect PanelLayerState
+updateActiveArray cfg st arr = checkAndUpdateBtnOps cfg false $ st # _btnsOperations .~ ResetButtons
+                                                                   # _activeArray    .~ arr
 
 checkAndUpdateBtnOps :: PanelLayerConfig -> Boolean -> PanelLayerState -> Effect PanelLayerState
 checkAndUpdateBtnOps cfg arrayChanged st = if st ^. _roofActive
