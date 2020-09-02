@@ -10,7 +10,7 @@ import Control.Plus (empty)
 import Data.Default (def)
 import Data.Filterable (filter)
 import Data.Foldable (class Foldable, any, foldl, null)
-import Data.Lens (Lens', view, (.~), (^.))
+import Data.Lens (Lens', view, (.~), (%~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (List(..), fromFoldable, partition, singleton, (:))
@@ -46,7 +46,7 @@ import Model.Roof.ArrayConfig (ArrayConfig)
 import Model.Roof.Panel (Alignment, Orientation(..), Panel, _arrNumber, _uuid, panelVertices)
 import Model.Roof.RoofPlate (RoofPlate)
 import Model.Roof.RoofPlateTransform (wrapAroundPoints)
-import Model.UpdatedPanels (UpdatedPanels(..), delete, deletePanels, get, merge, toUnfoldable)
+import Model.UpdatedPanels (delete, deletePanels, get, merge, toUnfoldable)
 import Model.UpdatedPanels as UpdatePanels
 import Model.UpdatedPanels as UpdatedPanels
 import Partial.Unsafe (unsafePartial)
@@ -113,7 +113,6 @@ _inactiveArrayTapped = _Newtype <<< prop (SProxy :: SProxy "inactiveArrayTapped"
 -- | internal panel layer state data structure
 newtype PanelLayerState = PanelLayerState {
     object           :: Object3D,
-
     arrayConfig      :: ArrayConfig,
 
     roofActive       :: Boolean,
@@ -230,6 +229,7 @@ allPanels st = st ^. (_layout <<< _panels)
 
 clearOperations :: PanelLayerState -> PanelLayerState
 clearOperations st = st # _panelOperations .~ Nil
+                        # _arrayOperations .~ Nil
                         # _btnsOperations  .~ Nil
 
 -- | add a new panel to the current state
@@ -249,8 +249,8 @@ addPanel cfg st p = do
         addNewPOp = AddPanel newP
         updOps    = UpdatePanels $ toUnfoldable newUpdPs
 
-    checkAndUpdateBtnOps cfg true $ st # _panelOperations .~ addNewPOp : updOps : Nil
-                                       # _layout          .~ newLayout
+    checkAndUpdateBtnOps cfg true $ (clearOperations st) # _panelOperations .~ addNewPOp : updOps : Nil
+                                                         # _layout          .~ newLayout
 
 
 addPanels :: PanelLayerConfig -> PanelLayerState -> List Panel -> Effect PanelLayerState
@@ -271,8 +271,8 @@ addPanels cfg st ps = do
         newPsOp = AddPanels nps
         updOps  = UpdatePanels $ toUnfoldable updatedPs
     
-    checkAndUpdateBtnOps cfg true $ st # _panelOperations .~ newPsOp : updOps : Nil
-                                       # _layout          .~ newLayout
+    checkAndUpdateBtnOps cfg true $ (clearOperations st) # _panelOperations .~ newPsOp : updOps : Nil
+                                                         # _layout          .~ newLayout
 
 deletePanel :: PanelLayerConfig -> PanelLayerState -> UUID -> Effect PanelLayerState
 deletePanel cfg st pid = do
@@ -282,8 +282,8 @@ deletePanel cfg st pid = do
     let delPOp = DelPanel pid
         updOps = UpdatePanels $ toUnfoldable (newLayout ^. _panelsUpdated)
     
-    checkAndUpdateBtnOps cfg true $ st # _panelOperations .~ delPOp : updOps : Nil
-                                       # _layout          .~ newLayout
+    checkAndUpdateBtnOps cfg true $ (clearOperations st) # _panelOperations .~ delPOp : updOps : Nil
+                                                         # _layout          .~ newLayout
 
 
 -- | get the current active PanelArray value
@@ -315,13 +315,13 @@ updateAlignment cfg st algn = case filter ((/=) algn <<< view _alignment) $ getA
             toDelOp = if null toDel then Nil else singleton $ DelPanels (view _uuid <$> toDel)
             toUpdOp = UpdatePanels updated
 
-        checkAndUpdateBtnOps cfg true $ st # _panelOperations .~ toUpdOp : toDelOp
-                                           # _layout          .~ newLayout
+        checkAndUpdateBtnOps cfg true $ (clearOperations st) # _panelOperations .~ toUpdOp : toDelOp
+                                                             # _layout          .~ newLayout
 
 
 updateOrientation :: PanelLayerConfig -> PanelLayerState -> Orientation -> Effect PanelLayerState
 updateOrientation cfg st o = do
-    let nst = st # _orientationToUse .~ Just o
+    let nst = (clearOperations st) # _orientationToUse .~ Just o
     newLayout <- updateLayout nst Nil
     checkAndUpdateBtnOps cfg true $ nst # _panelOperations .~ singleton DeleteAll
                                         # _layout          .~ newLayout
@@ -329,10 +329,10 @@ updateOrientation cfg st o = do
 
 startDragging :: PanelLayerConfig -> PanelLayerState -> DragInfo Panel -> Effect PanelLayerState
 startDragging cfg st d = if not (st ^. _roofActive) || st ^. _activeArray /= Just (d ^. _object <<< _arrNumber)
-                         then pure st
+                         then pure $ clearOperations st
                          else do
                             p <- worldToLocal (d ^. _point) (st ^. _object)
-                            pure $ st # _lastDragPos .~ Just p
+                            pure $ (clearOperations st) # _lastDragPos .~ Just p
 
 drag :: PanelLayerConfig -> PanelLayerState -> DragInfo Panel -> Effect PanelLayerState
 drag cfg st d = if not (st ^. _roofActive) || st ^. _activeArray /= Just (d ^. _object <<< _arrNumber)
@@ -341,8 +341,8 @@ drag cfg st d = if not (st ^. _roofActive) || st ^. _activeArray /= Just (d ^. _
                     p <- worldToLocal (d ^. _point) (st ^. _object)
                     let delta = maybe def (p <-> _) (st ^. _lastDragPos)
                         arrNum = d ^. _object <<< _arrNumber
-                    pure $ st # _lastDragPos .~ Just p
-                              # _arrayOperations .~ singleton (MoveArray arrNum delta)
+                    pure $ (clearOperations st) # _lastDragPos     .~ Just p
+                                                # _arrayOperations .~ singleton (MoveArray arrNum delta)
 
 endDragging :: PanelLayerConfig -> PanelLayerState -> Int -> Effect PanelLayerState
 endDragging cfg st arr = if not (st ^. _roofActive) || st ^. _activeArray /= Just arr
@@ -363,9 +363,9 @@ endDragging cfg st arr = if not (st ^. _roofActive) || st ^. _activeArray /= Jus
 
             delOp = DelPanels (view _uuid <$> toDel)
             updOp = UpdatePanels (toUnfoldable updated)
-        checkAndUpdateBtnOps cfg true $ st # _panelOperations .~ delOp : updOp : Nil
-                                           # _layout          .~ newLayout
-                                           # _lastDragPos     .~ Nothing
+        checkAndUpdateBtnOps cfg true $ (clearOperations st) # _panelOperations .~ delOp : updOp : Nil
+                                                             # _layout          .~ newLayout
+                                                             # _lastDragPos     .~ Nothing
 
 
 processDraggingPlus :: PanelLayerConfig -> PanelLayerState -> DragInfo PlusButton -> Effect PanelLayerState
@@ -373,19 +373,20 @@ processDraggingPlus cfg st d = do
     p <- worldToLocal (d ^. _point) (st ^. _object)
     case d ^. _dragType of
         DragStart -> do
-            let pb = d ^. _object
+            let pb    = d ^. _object
                 pbPos = mkVec3 (meterVal $ pb ^. _x) (meterVal $ pb ^. _y) 0.0
-            pure $ st # _lastDragPos .~ Just p
-                      # _initDragPos .~ Just pbPos
-                      # _btnsOperations .~ singleton (HideButtonsExcept $ d ^. _object)
+            pure $ (clearOperations st) # _lastDragPos    .~ Just p
+                                        # _initDragPos    .~ Just pbPos
+                                        # _btnsOperations .~ singleton (HideButtonsExcept $ d ^. _object)
         Drag -> do
-            let delta = maybe def (p <-> _) (st ^. _lastDragPos)
-                panel = unsafePartial $ head $ allPanels st
+            let delta   = maybe def (p <-> _) (st ^. _lastDragPos)
+                panel   = unsafePartial $ head $ allPanels st
                 initPos = fromMaybe def $ st ^. _initDragPos
             tempPs <- tempPanels (st ^. _arrayConfig) panel p initPos
-            pure $ st # _btnsOperations  .~ singleton (MovePlusButton (d ^. _object) delta)
-                      # _arrayOperations .~ singleton (TempPanels tempPs)
-                      # _tempPanels      .~ tempPs
+            pure $ (clearOperations st) # _btnsOperations  .~ singleton (MovePlusButton (d ^. _object) delta)
+                                        # _arrayOperations .~ singleton (TempPanels tempPs)
+                                        # _lastDragPos     .~ Just p
+                                        # _tempPanels      .~ tempPs
         DragEnd -> do
             let tmpPs = st ^. _tempPanels
             nst <- addPanels cfg st tmpPs
@@ -393,11 +394,12 @@ processDraggingPlus cfg st d = do
                                                 # _arrayOperations .~ singleton PreserveTempPanels
                                                 # _tempPanels      .~ Nil
                                                 # _initDragPos     .~ Nothing
+                                                # _lastDragPos     .~ Nothing
 
 
 rotateRowInArr :: PanelLayerConfig -> PanelLayerState -> Int -> Int -> Effect PanelLayerState
 rotateRowInArr cfg st row arr = case getArrayAt arr (st ^. _layout) of
-    Nothing    -> pure st
+    Nothing    -> pure $ clearOperations st
     Just array -> do
         let Tuple allPs updatedPs = rotateRow array row
             outside = panelsOutsideRoof cfg allPs
@@ -413,20 +415,20 @@ rotateRowInArr cfg st row arr = case getArrayAt arr (st ^. _layout) of
             delOp = DelPanels toDelIds
             updOp = UpdatePanels $ toUnfoldable updated
 
-        checkAndUpdateBtnOps cfg true $ st # _panelOperations .~ delOp : updOp : Nil
-                                           # _layout          .~ newLayout
+        checkAndUpdateBtnOps cfg true $ (clearOperations st) # _panelOperations .~ delOp : updOp : Nil
+                                                             # _layout          .~ newLayout
 
 checkAndUpdateBtnOps :: PanelLayerConfig -> Boolean -> PanelLayerState -> Effect PanelLayerState
 checkAndUpdateBtnOps cfg arrayChanged st = if st ^. _roofActive
     then do
-        let layout = st ^. _layout
-            actArr = fromMaybe 1000000 $ st ^. _activeArray
-            arrCnt = size $ layout ^. _arrays
+        let layout    = st ^. _layout
+            actArr    = fromMaybe 1000000 $ st ^. _activeArray
+            arrCnt    = size $ layout ^. _arrays
             newActArr = if arrayChanged && actArr >= arrCnt then findActiveArray layout else actArr
-            arr = getArrayAt newActArr layout
+            arr       = getArrayAt newActArr layout
         case arr of
             Just a -> do btnOps <- btnOpsForArray cfg st a
-                         pure $ st # _btnsOperations .~ btnOps
+                         pure $ st # _btnsOperations %~ flip append btnOps
                                    # _activeArray    .~ Just newActArr
             Nothing -> pure st
     else pure st
