@@ -117,6 +117,7 @@ newtype PanelLayerState = PanelLayerState {
 
     roofActive       :: Boolean,
     activeArray      :: Maybe Int,
+    oldActiveArray   :: Maybe Int,  -- remember which array was active when the roof is deactivated
 
     layout           :: PanelsLayout,
     orientationToUse :: Maybe Orientation,
@@ -127,7 +128,8 @@ newtype PanelLayerState = PanelLayerState {
 
     panelOperations  :: List PanelOperation,
     arrayOperations  :: List ArrayOperation,
-    btnsOperations   :: List ButtonOperation
+    btnsOperations   :: List ButtonOperation,
+    arrayChanged     :: Maybe Unit
 }
 
 derive instance newtypePanelLayerState :: Newtype PanelLayerState _
@@ -138,6 +140,7 @@ mkState obj = PanelLayerState {
         arrayConfig      : def,
         roofActive       : false,
         activeArray      : Nothing,
+        oldActiveArray   : Nothing,
         layout           : def,
         orientationToUse : Nothing,
         initDragPos      : Nothing,
@@ -145,11 +148,15 @@ mkState obj = PanelLayerState {
         tempPanels       : Nil,
         panelOperations  : Nil,
         arrayOperations  : Nil,
-        btnsOperations   : Nil
+        btnsOperations   : Nil,
+        arrayChanged     : Nothing
     }
 
 _activeArray :: forall t a r. Newtype t { activeArray :: a | r } => Lens' t a
 _activeArray = _Newtype <<< prop (SProxy :: SProxy "activeArray")
+
+_oldActiveArray :: forall t a r. Newtype t { oldActiveArray :: a | r } => Lens' t a
+_oldActiveArray = _Newtype <<< prop (SProxy :: SProxy "oldActiveArray")
 
 _initDragPos :: forall t a r. Newtype t { initDragPos :: a | r } => Lens' t a
 _initDragPos = _Newtype <<< prop (SProxy :: SProxy "initDragPos")
@@ -182,6 +189,7 @@ data PanelLayerOperation = POAddPanel Panel
                          | PORotRowInArr Int Int
                          | POUpdateArrayConfig ArrayConfig
                          | POActivateArray Int
+                         | POActivateRoof Boolean
 
 
 createPanelLayer :: PanelLayerConfig -> ArrayBuilder PanelLayer
@@ -247,6 +255,7 @@ applyPanelLayerOp cfg st (PODragPlusBtn d)            = processDraggingPlus cfg 
 applyPanelLayerOp cfg st (PORotRowInArr r arr)        = rotateRowInArr cfg st r arr
 applyPanelLayerOp cfg st (POUpdateArrayConfig arrCfg) = updateArrayConfig cfg st arrCfg
 applyPanelLayerOp cfg st (POActivateArray arr)        = updateActiveArray cfg st arr
+applyPanelLayerOp cfg st (POActivateRoof act)         = updateRoofActive cfg st act
 
 -- | get all panels in the current state
 allPanels :: PanelLayerState -> List Panel
@@ -256,6 +265,7 @@ clearOperations :: PanelLayerState -> PanelLayerState
 clearOperations st = st # _panelOperations .~ Nil
                         # _arrayOperations .~ Nil
                         # _btnsOperations  .~ Nil
+                        # _arrayChanged    .~ Nothing
 
 -- | add a new panel to the current state
 addPanel :: PanelLayerConfig -> PanelLayerState -> Panel -> Effect PanelLayerState
@@ -276,7 +286,7 @@ addPanel cfg st p = do
 
     checkAndUpdateBtnOps cfg true $ (clearOperations st) # _panelOperations .~ addNewPOp : updOps : Nil
                                                          # _layout          .~ newLayout
-
+                                                         # _arrayChanged    .~ Just unit
 
 addPanels :: PanelLayerConfig -> PanelLayerState -> List Panel -> Effect PanelLayerState
 addPanels cfg st ps = do
@@ -298,6 +308,7 @@ addPanels cfg st ps = do
     
     checkAndUpdateBtnOps cfg true $ (clearOperations st) # _panelOperations .~ newPsOp : updOps : Nil
                                                          # _layout          .~ newLayout
+                                                         # _arrayChanged    .~ Just unit
 
 deletePanel :: PanelLayerConfig -> PanelLayerState -> UUID -> Effect PanelLayerState
 deletePanel cfg st pid = do
@@ -309,6 +320,7 @@ deletePanel cfg st pid = do
     
     checkAndUpdateBtnOps cfg true $ (clearOperations st) # _panelOperations .~ delPOp : updOps : Nil
                                                          # _layout          .~ newLayout
+                                                         # _arrayChanged    .~ Just unit
 
 
 -- | get the current active PanelArray value
@@ -340,8 +352,9 @@ updateAlignment cfg st algn = case filter ((/=) algn <<< view _alignment) $ getA
             toDelOp = if null toDel then Nil else singleton $ DelPanels (view _uuid <$> toDel)
             toUpdOp = UpdatePanels updated
 
-        checkAndUpdateBtnOps cfg true $ (clearOperations st) # _panelOperations .~ toUpdOp : toDelOp
-                                                             # _layout          .~ newLayout
+        checkAndUpdateBtnOps cfg false $ (clearOperations st) # _panelOperations .~ toUpdOp : toDelOp
+                                                              # _layout          .~ newLayout
+                                                              # _arrayChanged    .~ Just unit
 
 
 updateOrientation :: PanelLayerConfig -> PanelLayerState -> Orientation -> Effect PanelLayerState
@@ -350,6 +363,7 @@ updateOrientation cfg st o = do
     newLayout <- updateLayout nst Nil
     checkAndUpdateBtnOps cfg true $ nst # _panelOperations .~ singleton DeleteAll
                                         # _layout          .~ newLayout
+                                        # _arrayChanged    .~ Just unit
 
 
 dragPanel :: PanelLayerConfig -> PanelLayerState -> DragInfo Panel -> Effect PanelLayerState
@@ -363,7 +377,8 @@ startDragging cfg st d = if not (st ^. _roofActive) || st ^. _activeArray /= Jus
                          then pure $ clearOperations st
                          else do
                             p <- worldToLocal (d ^. _point) (st ^. _object)
-                            pure $ (clearOperations st) # _lastDragPos .~ Just p
+                            pure $ (clearOperations st) # _lastDragPos  .~ Just p
+                                                        # _arrayChanged .~ Just unit
 
 drag :: PanelLayerConfig -> PanelLayerState -> DragInfo Panel -> Effect PanelLayerState
 drag cfg st d = if not (st ^. _roofActive) || st ^. _activeArray /= Just (d ^. _object <<< _arrNumber)
@@ -397,6 +412,7 @@ endDragging cfg st arr = if not (st ^. _roofActive) || st ^. _activeArray /= Jus
         checkAndUpdateBtnOps cfg true $ (clearOperations st) # _panelOperations .~ delOp : updOp : Nil
                                                              # _layout          .~ newLayout
                                                              # _lastDragPos     .~ Nothing
+                                                             # _arrayChanged    .~ Just unit
 
 
 processDraggingPlus :: PanelLayerConfig -> PanelLayerState -> DragInfo PlusButton -> Effect PanelLayerState
@@ -426,6 +442,7 @@ processDraggingPlus cfg st d = do
                                                 # _tempPanels      .~ Nil
                                                 # _initDragPos     .~ Nothing
                                                 # _lastDragPos     .~ Nothing
+                                                # _arrayChanged    .~ Just unit
 
 
 rotateRowInArr :: PanelLayerConfig -> PanelLayerState -> Int -> Int -> Effect PanelLayerState
@@ -448,6 +465,7 @@ rotateRowInArr cfg st row arr = case getArrayAt arr (st ^. _layout) of
 
         checkAndUpdateBtnOps cfg true $ (clearOperations st) # _panelOperations .~ delOp : updOp : Nil
                                                              # _layout          .~ newLayout
+                                                             # _arrayChanged    .~ Just unit
 
 updateArrayConfig :: PanelLayerConfig -> PanelLayerState -> ArrayConfig -> Effect PanelLayerState
 updateArrayConfig cfg st arrCfg = do
@@ -455,18 +473,30 @@ updateArrayConfig cfg st arrCfg = do
     if rt == BX || rt == XRFlat
     then do
         let nst = if rt == BX
-                  then st # _orientationToUse .~ Just Landscape
-                  else st
-        newLayout <- updateLayout st Nil
+                  then (clearOperations st) # _orientationToUse .~ Just Landscape
+                  else clearOperations st
+        newLayout <- updateLayout nst Nil
         checkAndUpdateBtnOps cfg true $ nst # _panelOperations .~ singleton DeleteAll
                                             # _layout          .~ newLayout
                                             # _arrayConfig     .~ arrCfg
-    else pure $ st # _arrayConfig .~ arrCfg
+                                            # _arrayChanged    .~ Just unit
+    else pure $ (clearOperations st) # _arrayConfig .~ arrCfg
 
 
 updateActiveArray :: PanelLayerConfig -> PanelLayerState -> Int -> Effect PanelLayerState
-updateActiveArray cfg st arr = checkAndUpdateBtnOps cfg false $ st # _btnsOperations .~ singleton ResetButtons
-                                                                   # _activeArray    .~ Just arr
+updateActiveArray cfg st arr = checkAndUpdateBtnOps cfg false $ (clearOperations st) # _btnsOperations .~ singleton ResetButtons
+                                                                                     # _activeArray    .~ Just arr
+
+updateRoofActive :: PanelLayerConfig -> PanelLayerState -> Boolean -> Effect PanelLayerState
+updateRoofActive cfg st active = if active
+    then do let layout = st ^. _layout
+                arr = case st ^. _oldActiveArray of
+                         Just oa -> if oa >= 0 && oa < size (layout ^. _arrays)
+                                    then oa
+                                    else findActiveArray layout
+                         Nothing -> findActiveArray layout
+            updateActiveArray cfg st arr
+    else pure $ (clearOperations st) # _oldActiveArray .~ st ^. _activeArray
 
 checkAndUpdateBtnOps :: PanelLayerConfig -> Boolean -> PanelLayerState -> Effect PanelLayerState
 checkAndUpdateBtnOps cfg arrayChanged st = if st ^. _roofActive
