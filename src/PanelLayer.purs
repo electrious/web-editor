@@ -6,6 +6,7 @@ import API (APIConfig)
 import Algorithm.ButtonCalculator (plusBtnsForArray, rotateBtnsForArray)
 import Algorithm.PanelAligning (alignPanelRows)
 import Algorithm.TempPanels (tempPanels)
+import Control.Monad.Reader (ask)
 import Control.Plus (empty)
 import Data.Default (def)
 import Data.Filterable (filter)
@@ -171,13 +172,26 @@ _arrayOperations = _Newtype <<< prop (SProxy :: SProxy "arrayOperations")
 _btnsOperations :: forall t a r. Newtype t { btnsOperations :: a | r } => Lens' t a
 _btnsOperations = _Newtype <<< prop (SProxy :: SProxy "btnsOperations")
 
+
+data PanelLayerOperation = POAddPanel Panel
+                         | PODeletePanel UUID
+                         | POUpdateAlignment Alignment
+                         | POUpdateOrientation Orientation
+                         | PODragPanel (DragInfo Panel)
+                         | PODragPlusBtn (DragInfo PlusButton)
+                         | PORotRowInArr Int Int
+                         | POUpdateArrayConfig ArrayConfig
+                         | POActivateArray Int
+
+
 createPanelLayer :: PanelLayerConfig -> ArrayBuilder PanelLayer
 createPanelLayer cfg = do
     layer <- liftEffect mkObject3D
     liftEffect $ setName "panel-layer" layer
 
+    arrCfgDyn <- view _arrayConfig <$> ask
+
     let roof       = cfg ^. _roof
-        arrCfgDyn  = cfg ^. _arrayConfig
         arrOpEvt   = empty
         panelOpEvt = empty
         btnOpEvt   = empty
@@ -221,6 +235,18 @@ updateLayout st ps = if null ps
           orient = if cfg ^. _rackingType == BX  -- always use landscape for BX system
                    then Landscape
                    else fromMaybe Landscape $ st ^. _orientationToUse
+
+
+applyPanelLayerOp :: PanelLayerConfig -> PanelLayerState -> PanelLayerOperation -> Effect PanelLayerState
+applyPanelLayerOp cfg st (POAddPanel p)               = addPanel cfg st p
+applyPanelLayerOp cfg st (PODeletePanel pid)          = deletePanel cfg st pid
+applyPanelLayerOp cfg st (POUpdateAlignment a)        = updateAlignment cfg st a
+applyPanelLayerOp cfg st (POUpdateOrientation o)      = updateOrientation cfg st o
+applyPanelLayerOp cfg st (PODragPanel d)              = dragPanel cfg st d
+applyPanelLayerOp cfg st (PODragPlusBtn d)            = processDraggingPlus cfg st d
+applyPanelLayerOp cfg st (PORotRowInArr r arr)        = rotateRowInArr cfg st r arr
+applyPanelLayerOp cfg st (POUpdateArrayConfig arrCfg) = updateArrayConfig cfg st arrCfg
+applyPanelLayerOp cfg st (POActivateArray arr)        = updateActiveArray cfg st arr
 
 -- | get all panels in the current state
 allPanels :: PanelLayerState -> List Panel
@@ -326,6 +352,12 @@ updateOrientation cfg st o = do
                                         # _layout          .~ newLayout
 
 
+dragPanel :: PanelLayerConfig -> PanelLayerState -> DragInfo Panel -> Effect PanelLayerState
+dragPanel cfg st d = case d ^. _dragType of
+    DragStart -> startDragging cfg st d
+    Drag      -> drag cfg st d
+    DragEnd   -> endDragging cfg st (d ^. _object <<< _arrNumber)
+
 startDragging :: PanelLayerConfig -> PanelLayerState -> DragInfo Panel -> Effect PanelLayerState
 startDragging cfg st d = if not (st ^. _roofActive) || st ^. _activeArray /= Just (d ^. _object <<< _arrNumber)
                          then pure $ clearOperations st
@@ -423,18 +455,18 @@ updateArrayConfig cfg st arrCfg = do
     if rt == BX || rt == XRFlat
     then do
         let nst = if rt == BX
-                  then st # _orientationToUse .~ Landscape
+                  then st # _orientationToUse .~ Just Landscape
                   else st
         newLayout <- updateLayout st Nil
         checkAndUpdateBtnOps cfg true $ nst # _panelOperations .~ singleton DeleteAll
                                             # _layout          .~ newLayout
                                             # _arrayConfig     .~ arrCfg
-    else pure # st # _arrayConfig .~ arrCfg
+    else pure $ st # _arrayConfig .~ arrCfg
 
 
 updateActiveArray :: PanelLayerConfig -> PanelLayerState -> Int -> Effect PanelLayerState
-updateActiveArray cfg st arr = checkAndUpdateBtnOps cfg false $ st # _btnsOperations .~ ResetButtons
-                                                                   # _activeArray    .~ arr
+updateActiveArray cfg st arr = checkAndUpdateBtnOps cfg false $ st # _btnsOperations .~ singleton ResetButtons
+                                                                   # _activeArray    .~ Just arr
 
 checkAndUpdateBtnOps :: PanelLayerConfig -> Boolean -> PanelLayerState -> Effect PanelLayerState
 checkAndUpdateBtnOps cfg arrayChanged st = if st ^. _roofActive
