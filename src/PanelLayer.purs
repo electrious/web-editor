@@ -22,30 +22,31 @@ import Data.Meter (meterVal)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple(..))
-import Data.UUID (UUID)
+import Data.UUID (UUID, genUUID)
 import Editor.ArrayBuilder (ArrayBuilder, _arrayConfig, liftRenderingM)
-import Editor.Common.Lenses (_alignment, _apiConfig, _arrayNumber, _disposable, _dragType, _object, _panels, _panelsUpdated, _point, _rackingType, _roof, _rows, _x, _y)
+import Editor.Common.Lenses (_alignment, _apiConfig, _arrayNumber, _disposable, _dragType, _id, _object, _orientation, _panels, _panelsUpdated, _point, _rackingType, _roof, _rows, _slope, _tapped, _x, _y)
 import Editor.Disposable (class Disposable)
 import Editor.Input.Commoon (DragType(..))
-import Editor.PanelAPIInterpreter (_finished, mkPanelAPIInterpreter)
+import Editor.PanelAPIInterpreter (PanelAPIInterpreter, _finished, mkPanelAPIInterpreter)
 import Editor.PanelArrayLayout (PanelsLayout, _arrays, _tree, defaultLayout, findActiveArray, getArrayAt, layoutPanels, neighbors)
 import Editor.PanelNode (PanelOpacity)
 import Editor.PanelOperation (ArrayOperation(..), PanelOperation(..))
-import Editor.Rendering.ButtonsRenderer (ButtonOperation(..), mkButtonsRenderer)
+import Editor.Rendering.ButtonsRenderer (ButtonOperation(..), ButtonsRenderer, _plusTapped, mkButtonsRenderer)
 import Editor.Rendering.PanelRendering (PanelRenderer, PanelRendererConfig(..), _opacity, _operations, createPanelRenderer)
 import Editor.UI.DragInfo (DragInfo)
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import FRP.Dynamic (Dynamic, step)
-import FRP.Event (Event)
+import FRP.Dynamic (Dynamic, gateDyn, step)
+import FRP.Event (Event, create, gateBy)
+import FRP.Event.Extra (multicast)
 import Model.ArrayComponent (arrayNumber)
 import Model.Hardware.PanelModel (PanelModel)
 import Model.PanelArray (PanelArray, rotateRow)
 import Model.PlusButton (PlusButton)
 import Model.Racking.RackingType (RackingType(..))
 import Model.Roof.ArrayConfig (ArrayConfig)
-import Model.Roof.Panel (Alignment, Orientation(..), Panel, _arrNumber, _uuid, panelVertices)
-import Model.Roof.RoofPlate (RoofPlate)
+import Model.Roof.Panel (Alignment, Orientation(..), Panel, _arrNumber, _roofId, _roofUUID, _uuid, panelVertices)
+import Model.Roof.RoofPlate (RoofPlate, _roofIntId)
 import Model.Roof.RoofPlateTransform (wrapAroundPoints)
 import Model.UpdatedPanels (delete, deletePanels, get, merge, toUnfoldable)
 import Model.UpdatedPanels as UpdatePanels
@@ -77,15 +78,18 @@ _initPanels = _Newtype <<< prop (SProxy :: SProxy "initPanels")
 
 newtype PanelLayer = PanelLayer {
     object              :: Object3D,
+    renderer            :: PanelRenderer,
+    btnsRenderer        :: ButtonsRenderer,
+    apiInterpreter      :: PanelAPIInterpreter,
+
     disposable          :: Effect Unit,
 
-    roof                :: RoofPlate, 
-    arrayConfig         :: Dynamic ArrayConfig,
+    roof                :: RoofPlate,
 
     arrayChanged        :: Event Unit,
     serverUpdated       :: Event Unit,
     arrayDragging       :: Dynamic Boolean,
-    inactiveArrayTapped :: Event Unit
+    inactiveRoofTapped  :: Event Unit
 }
 
 derive instance newtypePanelLayer :: Newtype PanelLayer _
@@ -94,8 +98,28 @@ instance isObject3DPanelLayer :: IsObject3D PanelLayer where
 instance disposablePanelLayer :: Disposable PanelLayer where
     dispose = view _disposable
 
-_layout :: forall t a r. Newtype t { layout :: a | r } => Lens' t a
-_layout = _Newtype <<< prop (SProxy :: SProxy "layout")
+defPanelLayerWith :: Object3D -> RoofPlate -> PanelRenderer -> ButtonsRenderer -> PanelAPIInterpreter -> PanelLayer
+defPanelLayerWith obj roof renderer btnsRenderer apiInterpreter = PanelLayer {
+    object             : obj,
+    renderer           : renderer,
+    btnsRenderer       : btnsRenderer,
+    apiInterpreter     : apiInterpreter,
+    disposable         : pure unit,
+    roof               : roof,
+    arrayChanged       : empty,
+    serverUpdated      : empty,
+    arrayDragging      : step false empty,
+    inactiveRoofTapped : empty
+}
+
+_renderer :: forall t a r. Newtype t { renderer :: a | r } => Lens' t a
+_renderer = _Newtype <<< prop (SProxy :: SProxy "renderer")
+
+_btnsRenderer :: forall t a r. Newtype t { btnsRenderer :: a | r } => Lens' t a
+_btnsRenderer = _Newtype <<< prop (SProxy :: SProxy "btnsRenderer")
+
+_apiInterpreter :: forall t a r. Newtype t { apiInterpreter :: a | r } => Lens' t a
+_apiInterpreter = _Newtype <<< prop (SProxy :: SProxy "apiInterpreter")
 
 _arrayChanged :: forall t a r. Newtype t { arrayChanged :: a | r } => Lens' t a
 _arrayChanged = _Newtype <<< prop (SProxy :: SProxy "arrayChanged")
@@ -106,8 +130,8 @@ _serverUpdated = _Newtype <<< prop (SProxy :: SProxy "serverUpdated")
 _arrayDragging :: forall t a r. Newtype t { arrayDragging :: a | r } => Lens' t a
 _arrayDragging = _Newtype <<< prop (SProxy :: SProxy "arrayDragging")
 
-_inactiveArrayTapped :: forall t a r. Newtype t { inactiveArrayTapped :: a | r } => Lens' t a
-_inactiveArrayTapped = _Newtype <<< prop (SProxy :: SProxy "inactiveArrayTapped")
+_inactiveRoofTapped :: forall t a r. Newtype t { inactiveRoofTapped :: a | r } => Lens' t a
+_inactiveRoofTapped = _Newtype <<< prop (SProxy :: SProxy "inactiveRoofTapped")
 
 
 -- | internal panel layer state data structure
@@ -158,6 +182,9 @@ _activeArray = _Newtype <<< prop (SProxy :: SProxy "activeArray")
 _oldActiveArray :: forall t a r. Newtype t { oldActiveArray :: a | r } => Lens' t a
 _oldActiveArray = _Newtype <<< prop (SProxy :: SProxy "oldActiveArray")
 
+_layout :: forall t a r. Newtype t { layout :: a | r } => Lens' t a
+_layout = _Newtype <<< prop (SProxy :: SProxy "layout")
+
 _initDragPos :: forall t a r. Newtype t { initDragPos :: a | r } => Lens' t a
 _initDragPos = _Newtype <<< prop (SProxy :: SProxy "initDragPos")
 
@@ -200,6 +227,7 @@ createPanelLayer cfg = do
     arrCfgDyn <- view _arrayConfig <$> ask
 
     let roof       = cfg ^. _roof
+
         arrOpEvt   = empty
         panelOpEvt = empty
         btnOpEvt   = empty
@@ -210,20 +238,9 @@ createPanelLayer cfg = do
                                                      # _roof       .~ roof
                                                      # _panels     .~ Nil
                                                      # _operations .~ panelOpEvt
+        panelLayer = defPanelLayerWith layer roof panelRenderer btnsRenderer apiInterpreter
 
-        layoutDyn = step Nothing empty
-
-    pure $ PanelLayer {
-        object              : layer,
-        disposable          : pure unit,
-
-        roof                : roof,
-        arrayConfig         : arrCfgDyn,
-        arrayChanged        : empty,
-        serverUpdated       : apiInterpreter ^. _finished,
-        arrayDragging       : step false empty,
-        inactiveArrayTapped : empty
-    }
+    pure $ panelLayer # _serverUpdated .~ apiInterpreter ^. _finished
 
 
 setupPanelRenderer :: Object3D -> Event ArrayOperation -> Dynamic PanelOpacity -> ArrayBuilder PanelRenderer
@@ -233,6 +250,41 @@ setupPanelRenderer parent opEvt opacity = createPanelRenderer $ PanelRendererCon
         opacity    : opacity
     }
 
+
+setupPanelLayer :: PanelLayerConfig -> PanelLayer -> ArrayBuilder PanelLayer
+setupPanelLayer cfg layer = do
+    let panelTapEvt     = multicast $ layer ^. _renderer <<< _tapped
+        plusTapEvt      = multicast $ layer ^. _btnsRenderer <<< _plusTapped
+
+        roofActiveDyn   = cfg ^. _roofActive
+        roofInactiveDyn = not <$> roofActiveDyn
+
+        -- valid panel tap event when the roof is active
+        panelTapped     = multicast $ gateDyn roofActiveDyn panelTapEvt
+    
+    { event: activeArrayEvt, push: pushActiveArray } <- liftEffect create
+
+    -- if tapped panel is in an inactive array
+    let actArrEvt = (POActivateArray <<< arrayNumber) <$> gateBy (\aa p -> aa == Just (arrayNumber p)) activeArrayEvt panelTapped
+        delPanelEvt = (PODeletePanel <<< view _uuid) <$> gateBy (\aa p -> aa /= Just (arrayNumber p)) activeArrayEvt panelTapped
+
+    
+
+    -- panel tapped when the roof is inactive, let's pipe the tap event to parent
+    pure $ layer # _inactiveRoofTapped .~ multicast (const unit <$> gateDyn roofInactiveDyn panelTapEvt)
+
+
+mkPanelAtPlusBtnPos :: RoofPlate -> PlusButton -> Effect Panel
+mkPanelAtPlusBtnPos roof pb = do
+    i <- genUUID
+    pure $ def # _uuid        .~ i
+               # _roofId      .~ roof ^. _roofIntId
+               # _roofUUID    .~ roof ^. _id
+               # _arrNumber   .~ pb ^. _arrayNumber
+               # _x           .~ pb ^. _x
+               # _y           .~ pb ^. _y
+               # _slope       .~ pb ^. _slope
+               # _orientation .~ pb ^. _orientation
 
 -- | function to update the ArrayLayout data structure 
 updateLayout :: forall f. Foldable f => Functor f => PanelLayerState -> f Panel -> Effect PanelsLayout
