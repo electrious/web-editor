@@ -75,13 +75,13 @@ derive instance newtypeSceneDragEvent :: Newtype SceneDragEvent _
 instance defaultSceneDragEvent :: Default SceneDragEvent where
     def = SceneDragEvent { dragType: DragStart, distance: 0.0, point: mkVec3 0.0 0.0 0.0 }
 
-isDragStart :: SceneDragEvent -> Boolean
+isDragStart :: forall t r. Newtype t { dragType :: DragType | r } => t -> Boolean
 isDragStart e = e ^. _dragType == DragStart
 
-isDrag :: SceneDragEvent -> Boolean
+isDrag :: forall t r. Newtype t { dragType :: DragType | r } => t -> Boolean
 isDrag e = e ^. _dragType == Drag
 
-isDragEnd :: SceneDragEvent -> Boolean
+isDragEnd :: forall t r. Newtype t { dragType :: DragType | r } => t -> Boolean
 isDragEnd e = e ^. _dragType == DragEnd
 
 -- | add end event to SceneDragEvent stream if there's no input for a while

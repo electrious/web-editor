@@ -6,10 +6,12 @@ import API (APIConfig)
 import Algorithm.ButtonCalculator (plusBtnsForArray, rotateBtnsForArray)
 import Algorithm.PanelAligning (alignPanelRows)
 import Algorithm.TempPanels (tempPanels)
+import Control.Alt ((<|>))
 import Control.Monad.Reader (ask)
 import Control.Plus (empty)
+import Custom.Mesh (DraggableMesh, mkDraggableMesh)
 import Data.Default (def)
-import Data.Filterable (filter)
+import Data.Filterable (compact, filter)
 import Data.Foldable (class Foldable, any, foldl, null)
 import Data.Lens (Lens', view, (.~), (%~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
@@ -21,44 +23,50 @@ import Data.Maybe (Maybe(..), fromMaybe, maybe)
 import Data.Meter (meterVal)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
+import Data.Time.Duration (Milliseconds(..))
 import Data.Tuple (Tuple(..))
 import Data.UUID (UUID, genUUID)
 import Editor.ArrayBuilder (ArrayBuilder, _arrayConfig, liftRenderingM)
-import Editor.Common.Lenses (_alignment, _apiConfig, _arrayNumber, _disposable, _dragType, _id, _object, _orientation, _panels, _panelsUpdated, _point, _rackingType, _roof, _rows, _slope, _tapped, _x, _y)
+import Editor.Common.Lenses (_alignment, _apiConfig, _arrayNumber, _disposable, _dragType, _dragged, _id, _object, _orientation, _panels, _panelsUpdated, _point, _rackingType, _roof, _rowNumber, _rows, _slope, _tapped, _x, _y)
 import Editor.Disposable (class Disposable)
 import Editor.Input.Commoon (DragType(..))
 import Editor.PanelAPIInterpreter (PanelAPIInterpreter, _finished, mkPanelAPIInterpreter)
 import Editor.PanelArrayLayout (PanelsLayout, _arrays, _tree, defaultLayout, findActiveArray, getArrayAt, layoutPanels, neighbors)
 import Editor.PanelNode (PanelOpacity)
 import Editor.PanelOperation (ArrayOperation(..), PanelOperation(..))
-import Editor.Rendering.ButtonsRenderer (ButtonOperation(..), ButtonsRenderer, _plusTapped, mkButtonsRenderer)
+import Editor.Rendering.ButtonsRenderer (ButtonOperation(..), ButtonsRenderer, _plusDragged, _plusTapped, _rotTapped, mkButtonsRenderer)
 import Editor.Rendering.PanelRendering (PanelRenderer, PanelRendererConfig(..), _opacity, _operations, createPanelRenderer)
-import Editor.UI.DragInfo (DragInfo)
+import Editor.SceneEvent (isDrag, isDragEnd, isDragStart)
+import Editor.UI.DragInfo (DragInfo, mkDragInfo)
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import FRP.Dynamic (Dynamic, gateDyn, step)
-import FRP.Event (Event, create, gateBy)
-import FRP.Event.Extra (multicast)
+import FRP.Dynamic (Dynamic, dynEvent, gateDyn, sampleDyn, step, subscribeDyn)
+import FRP.Event (Event, create, gate, gateBy)
+import FRP.Event.Extra (debounce, foldEffect, multicast, performEvent, skip)
 import Model.ArrayComponent (arrayNumber)
 import Model.Hardware.PanelModel (PanelModel)
 import Model.PanelArray (PanelArray, rotateRow)
 import Model.PlusButton (PlusButton)
 import Model.Racking.RackingType (RackingType(..))
 import Model.Roof.ArrayConfig (ArrayConfig)
-import Model.Roof.Panel (Alignment, Orientation(..), Panel, _arrNumber, _roofId, _roofUUID, _uuid, panelVertices)
+import Model.Roof.Panel (Alignment(..), Orientation(..), Panel, _arrNumber, _roofId, _roofUUID, _uuid, panelVertices)
 import Model.Roof.RoofPlate (RoofPlate, _roofIntId)
 import Model.Roof.RoofPlateTransform (wrapAroundPoints)
 import Model.UpdatedPanels (delete, deletePanels, get, merge, toUnfoldable)
 import Model.UpdatedPanels as UpdatePanels
 import Model.UpdatedPanels as UpdatedPanels
 import Partial.Unsafe (unsafePartial)
-import Three.Core.Object3D (class IsObject3D, Object3D, mkObject3D, setName, worldToLocal)
+import Three.Core.Geometry (mkBoxGeometry)
+import Three.Core.Material (mkMeshBasicMaterial, setOpacity)
+import Three.Core.Object3D (class IsObject3D, Object3D, add, mkObject3D, setCastShadow, setName, setRenderOrder, setVisible, worldToLocal)
 import Three.Math.Vector (Vector3, mkVec3, (<->))
 
 newtype PanelLayerConfig = PanelLayerConfig {
     roof            :: RoofPlate,
     roofActive      :: Dynamic Boolean,
-    mainOrientation :: Dynamic Orientation,
+    mainOrientation :: Dynamic Orientation, -- project wise orientation used for new array
+    orientation     :: Dynamic Orientation, -- current orientation of the roof
+    alignment       :: Dynamic Alignment,
     panelType       :: Dynamic PanelModel,
     initPanels      :: Event (List Panel),
     opacity         :: Dynamic PanelOpacity,
@@ -240,7 +248,12 @@ createPanelLayer cfg = do
                                                      # _operations .~ panelOpEvt
         panelLayer = defPanelLayerWith layer roof panelRenderer btnsRenderer apiInterpreter
 
-    pure $ panelLayer # _serverUpdated .~ apiInterpreter ^. _finished
+    Tuple nLayer stateEvt <- setupPanelLayer cfg panelLayer
+    let pOpEvt     = view _panelOperations <$> stateEvt
+        arrayOpEvt = view _arrayOperations <$> stateEvt
+        btnOpsEvt  = view _btnsOperations  <$> stateEvt
+
+    pure $ nLayer # _serverUpdated .~ apiInterpreter ^. _finished
 
 
 setupPanelRenderer :: Object3D -> Event ArrayOperation -> Dynamic PanelOpacity -> ArrayBuilder PanelRenderer
@@ -251,28 +264,109 @@ setupPanelRenderer parent opEvt opacity = createPanelRenderer $ PanelRendererCon
     }
 
 
-setupPanelLayer :: PanelLayerConfig -> PanelLayer -> ArrayBuilder PanelLayer
+setupPanelLayer :: PanelLayerConfig -> PanelLayer -> ArrayBuilder (Tuple PanelLayer (Event PanelLayerState))
 setupPanelLayer cfg layer = do
-    let panelTapEvt     = multicast $ layer ^. _renderer <<< _tapped
-        plusTapEvt      = multicast $ layer ^. _btnsRenderer <<< _plusTapped
+    let roof            = cfg ^. _roof
+
+        panelTapEvt     = multicast $ layer ^. _renderer <<< _tapped
+        plusTapEvt      = layer ^. _btnsRenderer <<< _plusTapped
 
         roofActiveDyn   = cfg ^. _roofActive
         roofInactiveDyn = not <$> roofActiveDyn
 
         -- valid panel tap event when the roof is active
         panelTapped     = multicast $ gateDyn roofActiveDyn panelTapEvt
-    
+
+        newPanelEvt     = performEvent $ mkPanelAtPlusBtnPos roof <$> plusTapEvt
+
+    -- read the ArrayConfig event
+    arrCfgEvt <- dynEvent <<< view _arrayConfig <$> ask
+
     { event: activeArrayEvt, push: pushActiveArray } <- liftEffect create
+
+    { event: canDragPB, push: pushCanDragPB } <- liftEffect create
+    Tuple draggingPb dragPBEvt <- liftEffect $ setupPlusBtnDragging layer canDragPB
+    let canDragArray = not <$> dynEvent draggingPb
+    Tuple nlayer dragPanelEvt <- liftEffect $ setupPanelDragging layer canDragArray
+
+    d <- liftEffect $ subscribeDyn (nlayer ^. _arrayDragging) (not >>> pushCanDragPB)
 
     -- if tapped panel is in an inactive array
     let actArrEvt = (POActivateArray <<< arrayNumber) <$> gateBy (\aa p -> aa == Just (arrayNumber p)) activeArrayEvt panelTapped
         delPanelEvt = (PODeletePanel <<< view _uuid) <$> gateBy (\aa p -> aa /= Just (arrayNumber p)) activeArrayEvt panelTapped
+        addPanelEvt = POAddPanel <$> newPanelEvt
+        rotRowEvt = (\rb -> PORotRowInArr (rb ^. _rowNumber) (rb ^. _arrayNumber)) <$> layer ^. _btnsRenderer <<< _rotTapped
+        updArrCfgEvt = POUpdateArrayConfig <$> skip 1 arrCfgEvt
+        actRoofEvt = POActivateRoof <$> dynEvent (cfg ^. _roofActive)
+        updAlgnEvt = POUpdateAlignment <$> dynEvent (cfg ^. _alignment)
+        updOrientEvt = POUpdateOrientation <$> dynEvent (cfg ^. _orientation)
 
+        opEvt = dragPBEvt <|> dragPanelEvt <|> actArrEvt <|> delPanelEvt <|>
+                addPanelEvt <|> rotRowEvt <|> updArrCfgEvt <|> actRoofEvt <|>
+                updAlgnEvt <|> updOrientEvt
     
+        stateEvt = multicast $ foldEffect (flip (applyPanelLayerOp cfg)) opEvt (mkState $ layer ^. _object)
 
     -- panel tapped when the roof is inactive, let's pipe the tap event to parent
-    pure $ layer # _inactiveRoofTapped .~ multicast (const unit <$> gateDyn roofInactiveDyn panelTapEvt)
+        resLayer = nlayer # _inactiveRoofTapped .~ multicast (const unit <$> gateDyn roofInactiveDyn panelTapEvt)
+                          # _disposable %~ ((<*) d)
+    pure $ Tuple resLayer stateEvt
 
+setupPanelDragging :: PanelLayer -> Event Boolean -> Effect (Tuple PanelLayer (Event PanelLayerOperation))
+setupPanelDragging layer canDragArray = do
+    -- add drag helper
+    helper <- mkDragHelper
+    add helper (layer ^. _object)
+
+    let panelDragEvt = gate canDragArray $ layer ^. _renderer <<< _dragged
+        draggingPanelDyn = step Nothing $ (Just <<< view _object) <$> panelDragEvt
+
+        -- let the drag events from drag helper take up the current dragging panel
+        helperDragEvt = compact $ sampleDyn draggingPanelDyn $ (\d p -> flip mkDragInfo d <$> p) <$> helper ^. _dragged
+
+        -- drag events from both panel and helper
+        dEvt = multicast $ panelDragEvt <|> helperDragEvt
+
+        dragStart = multicast $ filter isDragStart dEvt
+        dragEnd = multicast $ debounce (Milliseconds 100.0) $ filter isDragEnd dEvt
+
+        isDragging = step false $ (const true <$> dragStart) <|> (const false <$> dragEnd)
+
+        dragEvt = gateDyn isDragging $ filter isDrag dEvt
+
+    -- only enable the helper when user is actually dragging a panel
+    d <- subscribeDyn isDragging (flip setVisible helper)
+
+    let nLayer = layer # _arrayDragging .~ isDragging
+                       # _disposable %~ ((<*) d)
+
+        evt = PODragPanel <$> (dragStart <|> dragEvt <|> dragEnd)
+    pure $ Tuple nLayer evt
+
+
+setupPlusBtnDragging :: PanelLayer -> Event Boolean -> Effect (Tuple (Dynamic Boolean) (Event PanelLayerOperation))
+setupPlusBtnDragging layer canDragPlus = do
+    -- add drag helper
+    helper <- mkDragHelper
+    add helper (layer ^. _object)
+
+    let pbDrag = multicast $ gate canDragPlus $ layer ^. _btnsRenderer <<< _plusDragged
+        draggingPbDyn = step Nothing $ (Just <<< view _object) <$> pbDrag
+
+        -- let the drag events from drag helper take up the current dragging plus button
+        helperDragEvt = multicast $ compact $ sampleDyn draggingPbDyn $ (\d p -> flip mkDragInfo d <$> p) <$> helper ^. _dragged
+
+        dEvt = multicast $ pbDrag <|> helperDragEvt
+
+        dragStart = multicast $ filter isDragStart dEvt
+        dragEnd = multicast $ debounce (Milliseconds 100.0) $ filter isDragEnd dEvt
+
+        isDragging = step false $ (const true <$> dragStart) <|> (const false <$> dragEnd)
+        dragEvt = multicast $ gateDyn isDragging $ filter isDrag dEvt
+
+        evt = PODragPlusBtn <$> (dragStart <|> dragEvt <|> dragEnd)
+
+    pure $ Tuple isDragging evt
 
 mkPanelAtPlusBtnPos :: RoofPlate -> PlusButton -> Effect Panel
 mkPanelAtPlusBtnPos roof pb = do
@@ -323,7 +417,10 @@ clearOperations st = st # _panelOperations .~ Nil
 addPanel :: PanelLayerConfig -> PanelLayerState -> Panel -> Effect PanelLayerState
 addPanel cfg st p = do
     let oldPs = allPanels st
-        ps    = p : oldPs
+        -- use current layout's array alignment as default alignment value of the new panel
+        algn  = maybe Grid (view _alignment) $ getArrayAt (p ^. _arrNumber) (st ^. _layout)
+        np    = p # _alignment .~ algn
+        ps    = np : oldPs
 
     -- update layout with new panels
     newLayout <- updateLayout st ps
@@ -468,33 +565,35 @@ endDragging cfg st arr = if not (st ^. _roofActive) || st ^. _activeArray /= Jus
 
 
 processDraggingPlus :: PanelLayerConfig -> PanelLayerState -> DragInfo PlusButton -> Effect PanelLayerState
-processDraggingPlus cfg st d = do
-    p <- worldToLocal (d ^. _point) (st ^. _object)
-    case d ^. _dragType of
-        DragStart -> do
-            let pb    = d ^. _object
-                pbPos = mkVec3 (meterVal $ pb ^. _x) (meterVal $ pb ^. _y) 0.0
-            pure $ (clearOperations st) # _lastDragPos    .~ Just p
-                                        # _initDragPos    .~ Just pbPos
-                                        # _btnsOperations .~ singleton (HideButtonsExcept $ d ^. _object)
-        Drag -> do
-            let delta   = maybe def (p <-> _) (st ^. _lastDragPos)
-                panel   = unsafePartial $ head $ allPanels st
-                initPos = fromMaybe def $ st ^. _initDragPos
-            tempPs <- tempPanels (st ^. _arrayConfig) panel p initPos
-            pure $ (clearOperations st) # _btnsOperations  .~ singleton (MovePlusButton (d ^. _object) delta)
-                                        # _arrayOperations .~ singleton (TempPanels tempPs)
-                                        # _lastDragPos     .~ Just p
-                                        # _tempPanels      .~ tempPs
-        DragEnd -> do
-            let tmpPs = st ^. _tempPanels
-            nst <- addPanels cfg st tmpPs
-            checkAndUpdateBtnOps cfg true $ nst # _btnsOperations  .~ singleton ResetButtons
-                                                # _arrayOperations .~ singleton PreserveTempPanels
-                                                # _tempPanels      .~ Nil
-                                                # _initDragPos     .~ Nothing
-                                                # _lastDragPos     .~ Nothing
-                                                # _arrayChanged    .~ Just unit
+processDraggingPlus cfg st d = if null (allPanels st)
+    then pure $ clearOperations st
+    else do
+        p <- worldToLocal (d ^. _point) (st ^. _object)
+        case d ^. _dragType of
+            DragStart -> do
+                let pb    = d ^. _object
+                    pbPos = mkVec3 (meterVal $ pb ^. _x) (meterVal $ pb ^. _y) 0.0
+                pure $ (clearOperations st) # _lastDragPos    .~ Just p
+                                            # _initDragPos    .~ Just pbPos
+                                            # _btnsOperations .~ singleton (HideButtonsExcept $ d ^. _object)
+            Drag -> do
+                let delta   = maybe def (p <-> _) (st ^. _lastDragPos)
+                    panel   = unsafePartial $ head $ allPanels st
+                    initPos = fromMaybe def $ st ^. _initDragPos
+                tempPs <- tempPanels (st ^. _arrayConfig) panel p initPos
+                pure $ (clearOperations st) # _btnsOperations  .~ singleton (MovePlusButton (d ^. _object) delta)
+                                            # _arrayOperations .~ singleton (TempPanels tempPs)
+                                            # _lastDragPos     .~ Just p
+                                            # _tempPanels      .~ tempPs
+            DragEnd -> do
+                let tmpPs = st ^. _tempPanels
+                nst <- addPanels cfg st tmpPs
+                checkAndUpdateBtnOps cfg true $ nst # _btnsOperations  .~ singleton ResetButtons
+                                                    # _arrayOperations .~ singleton PreserveTempPanels
+                                                    # _tempPanels      .~ Nil
+                                                    # _initDragPos     .~ Nothing
+                                                    # _lastDragPos     .~ Nothing
+                                                    # _arrayChanged    .~ Just unit
 
 
 rotateRowInArr :: PanelLayerConfig -> PanelLayerState -> Int -> Int -> Effect PanelLayerState
@@ -502,10 +601,10 @@ rotateRowInArr cfg st row arr = case getArrayAt arr (st ^. _layout) of
     Nothing    -> pure $ clearOperations st
     Just array -> do
         let Tuple allPs updatedPs = rotateRow array row
-            outside = panelsOutsideRoof cfg allPs
-            touched = panelsTouchingOtherArray (st ^. _layout) outside.no
-            toDel = append outside.yes touched.yes
-            toDelIds = view _uuid <$> toDel
+            outside    = panelsOutsideRoof cfg allPs
+            touched    = panelsTouchingOtherArray (st ^. _layout) outside.no
+            toDel      = append outside.yes touched.yes
+            toDelIds   = view _uuid <$> toDel
 
             otherArrPs = filter ((/=) arr <<< arrayNumber) $ allPanels st
         -- update layout with new valid panels and panels from other arrays
@@ -585,3 +684,18 @@ panelsTouchingOtherArray layout = partition f
 panelsOutsideRoof :: PanelLayerConfig -> List Panel -> { no :: List Panel, yes :: List Panel }
 panelsOutsideRoof cfg = partition f
     where f p = not $ wrapAroundPoints (cfg ^. _roof) (panelVertices p)
+
+
+-- setup a helper layer to make dragging panels/plus buttons easier
+mkDragHelper :: Effect DraggableMesh
+mkDragHelper = do
+    geo <- mkBoxGeometry 1000.0 1000.0 0.02
+    mat <- mkMeshBasicMaterial 0xffffff
+    setOpacity 0.01 mat
+
+    m <- mkDraggableMesh geo mat
+    setCastShadow false m
+    setRenderOrder 30 m
+    setVisible false m
+
+    pure m
