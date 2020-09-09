@@ -303,7 +303,8 @@ setupPanelLayer cfg layer = do
     d <- liftEffect $ subscribeDyn (nlayer ^. _arrayDragging) (not >>> pushCanDragPB)
 
     -- if tapped panel is in an inactive array
-    let actArrEvt = (POActivateArray <<< arrayNumber) <$> gateBy (\aa p -> aa == Just (arrayNumber p)) activeArrayEvt panelTapped
+    let loadPanelEvt = POLoadPanels <$> cfg ^. _initPanels
+        actArrEvt = (POActivateArray <<< arrayNumber) <$> gateBy (\aa p -> aa == Just (arrayNumber p)) activeArrayEvt panelTapped
         delPanelEvt = (PODeletePanel <<< view _uuid) <$> gateBy (\aa p -> aa /= Just (arrayNumber p)) activeArrayEvt panelTapped
         addPanelEvt = POAddPanel <$> newPanelEvt
         rotRowEvt = (\rb -> PORotRowInArr (rb ^. _rowNumber) (rb ^. _arrayNumber)) <$> layer ^. _btnsRenderer <<< _rotTapped
@@ -312,13 +313,13 @@ setupPanelLayer cfg layer = do
         updAlgnEvt = POUpdateAlignment <$> dynEvent (cfg ^. _alignment)
         updOrientEvt = POUpdateOrientation <$> dynEvent (cfg ^. _orientation)
 
-        opEvt = dragPBEvt <|> dragPanelEvt <|> actArrEvt <|> delPanelEvt <|>
+        opEvt = loadPanelEvt <|> dragPBEvt <|> dragPanelEvt <|> actArrEvt <|> delPanelEvt <|>
                 addPanelEvt <|> rotRowEvt <|> updArrCfgEvt <|> actRoofEvt <|>
                 updAlgnEvt <|> updOrientEvt
     
         stateEvt = multicast $ foldEffect (flip (applyPanelLayerOp cfg)) opEvt (mkState $ layer ^. _object)
 
-    -- panel tapped when the roof is inactive, let's pipe the tap event to parent
+        -- panel tapped when the roof is inactive, let's pipe the tap event to parent
         resLayer = nlayer # _inactiveRoofTapped .~ multicast (const unit <$> gateDyn roofInactiveDyn panelTapEvt)
                           # _disposable %~ ((<*) d)
     pure $ Tuple resLayer stateEvt
