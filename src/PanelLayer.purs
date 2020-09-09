@@ -41,7 +41,7 @@ import Editor.UI.DragInfo (DragInfo, mkDragInfo)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic, dynEvent, gateDyn, sampleDyn, step, subscribeDyn)
-import FRP.Event (Event, create, gate, gateBy)
+import FRP.Event (Event, create, gate, gateBy, subscribe)
 import FRP.Event.Extra (debounce, foldEffect, multicast, performEvent, skip)
 import Model.ArrayComponent (arrayNumber)
 import Model.Hardware.PanelModel (PanelModel)
@@ -60,6 +60,7 @@ import Three.Core.Geometry (mkBoxGeometry)
 import Three.Core.Material (mkMeshBasicMaterial, setOpacity)
 import Three.Core.Object3D (class IsObject3D, Object3D, add, mkObject3D, setCastShadow, setName, setRenderOrder, setVisible, worldToLocal)
 import Three.Math.Vector (Vector3, mkVec3, (<->))
+import Util (fromFoldableE)
 
 newtype PanelLayerConfig = PanelLayerConfig {
     roof            :: RoofPlate,
@@ -234,11 +235,11 @@ createPanelLayer cfg = do
 
     arrCfgDyn <- view _arrayConfig <$> ask
 
-    let roof       = cfg ^. _roof
+    let roof = cfg ^. _roof
 
-        arrOpEvt   = empty
-        panelOpEvt = empty
-        btnOpEvt   = empty
+    { event: arrOpEvt, push: pushArrOpEvt }     <- liftEffect create
+    { event: panelOpEvt, push: pushPanelOpEvt } <- liftEffect create
+    { event: btnOpEvt, push: pushBtnOpEvt }     <- liftEffect create
 
     panelRenderer <- setupPanelRenderer layer arrOpEvt (cfg ^. _opacity)
     btnsRenderer  <- liftRenderingM $ mkButtonsRenderer layer btnOpEvt
@@ -249,12 +250,20 @@ createPanelLayer cfg = do
         panelLayer = defPanelLayerWith layer roof panelRenderer btnsRenderer apiInterpreter
 
     Tuple nLayer stateEvt <- setupPanelLayer cfg panelLayer
-    let pOpEvt     = view _panelOperations <$> stateEvt
-        arrayOpEvt = view _arrayOperations <$> stateEvt
-        btnOpsEvt  = view _btnsOperations  <$> stateEvt
+    let pOpEvt     = fromFoldableE $ view _panelOperations <$> stateEvt
+        arrayOpEvt = fromFoldableE $ view _arrayOperations <$> stateEvt
+        btnOpsEvt  = fromFoldableE $ view _btnsOperations  <$> stateEvt
+        arrChgEvt  = compact $ view _arrayChanged <$> stateEvt
 
+        pArrOpEvt  = PanelOperation <$> pOpEvt
+    
+    d1 <- liftEffect $ subscribe pOpEvt pushPanelOpEvt
+    d2 <- liftEffect $ subscribe (arrayOpEvt <|> pArrOpEvt) pushArrOpEvt
+    d3 <- liftEffect $ subscribe btnOpsEvt pushBtnOpEvt
+    
     pure $ nLayer # _serverUpdated .~ apiInterpreter ^. _finished
-
+                  # _arrayChanged  .~ arrChgEvt
+                  # _disposable    %~ ((<*) (d1 *> d2 *> d3))
 
 setupPanelRenderer :: Object3D -> Event ArrayOperation -> Dynamic PanelOpacity -> ArrayBuilder PanelRenderer
 setupPanelRenderer parent opEvt opacity = createPanelRenderer $ PanelRendererConfig {
