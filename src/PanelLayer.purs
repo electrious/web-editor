@@ -29,6 +29,7 @@ import Data.UUID (UUID, genUUID)
 import Editor.ArrayBuilder (ArrayBuilder, _arrayConfig, liftRenderingM)
 import Editor.Common.Lenses (_alignment, _apiConfig, _arrayNumber, _disposable, _dragType, _dragged, _id, _object, _orientation, _panels, _panelsUpdated, _point, _rackingType, _roof, _rowNumber, _rows, _slope, _tapped, _x, _y)
 import Editor.Disposable (class Disposable)
+import Editor.EditorMode (EditorMode(..))
 import Editor.Input.Commoon (DragType(..))
 import Editor.PanelAPIInterpreter (PanelAPIInterpreter, _finished, mkPanelAPIInterpreter)
 import Editor.PanelArrayLayout (PanelsLayout, _arrays, _tree, defaultLayout, findActiveArray, getArrayAt, layoutPanels, neighbors)
@@ -64,6 +65,7 @@ import Util (fromFoldableE)
 
 newtype PanelLayerConfig = PanelLayerConfig {
     roof            :: RoofPlate,
+    editorMode      :: Dynamic EditorMode,
     roofActive      :: Dynamic Boolean,
     mainOrientation :: Dynamic Orientation, -- project wise orientation used for new array
     orientation     :: Dynamic Orientation, -- current orientation of the roof
@@ -75,6 +77,9 @@ newtype PanelLayerConfig = PanelLayerConfig {
 }
 
 derive instance newtypePanelLayerConfig :: Newtype PanelLayerConfig _
+
+_editorMode :: forall t a r. Newtype t { editorMode :: a | r } => Lens' t a
+_editorMode = _Newtype <<< prop (SProxy :: SProxy "editorMode")
 
 _roofActive :: forall t a r. Newtype t { roofActive :: a | r } => Lens' t a
 _roofActive = _Newtype <<< prop (SProxy :: SProxy "roofActive")
@@ -147,6 +152,7 @@ _inactiveRoofTapped = _Newtype <<< prop (SProxy :: SProxy "inactiveRoofTapped")
 newtype PanelLayerState = PanelLayerState {
     object           :: Object3D,
     arrayConfig      :: ArrayConfig,
+    editorMode       :: EditorMode,
 
     roofActive       :: Boolean,
     activeArray      :: Maybe Int,
@@ -171,6 +177,7 @@ mkState :: Object3D -> PanelLayerState
 mkState obj = PanelLayerState {
         object           : obj,
         arrayConfig      : def,
+        editorMode       : Showing,
         roofActive       : false,
         activeArray      : Nothing,
         oldActiveArray   : Nothing,
@@ -227,6 +234,7 @@ data PanelLayerOperation = POLoadPanels (List Panel)
                          | POUpdateArrayConfig ArrayConfig
                          | POActivateArray Int
                          | POActivateRoof Boolean
+                         | POUpdateMode EditorMode
 
 
 createPanelLayer :: PanelLayerConfig -> ArrayBuilder PanelLayer
@@ -278,6 +286,8 @@ setupPanelRenderer parent opEvt opacity = createPanelRenderer $ PanelRendererCon
 setupPanelLayer :: PanelLayerConfig -> PanelLayer -> ArrayBuilder (Tuple PanelLayer (Event PanelLayerState))
 setupPanelLayer cfg layer = do
     let roof            = cfg ^. _roof
+        editorModeDyn   = cfg ^. _editorMode
+        canEditDyn      = ((==) ArrayEditing) <$> editorModeDyn
 
         panelTapEvt     = multicast $ layer ^. _renderer <<< _tapped
         plusTapEvt      = layer ^. _btnsRenderer <<< _plusTapped
@@ -313,11 +323,17 @@ setupPanelLayer cfg layer = do
         updAlgnEvt = POUpdateAlignment <$> dynEvent (cfg ^. _alignment)
         updOrientEvt = POUpdateOrientation <$> dynEvent (cfg ^. _orientation)
 
-        opEvt = loadPanelEvt <|> dragPBEvt <|> dragPanelEvt <|> actArrEvt <|> delPanelEvt <|>
-                addPanelEvt <|> rotRowEvt <|> updArrCfgEvt <|> actRoofEvt <|>
-                updAlgnEvt <|> updOrientEvt
-    
-        stateEvt = multicast $ foldEffect (flip (applyPanelLayerOp cfg)) opEvt (mkState $ layer ^. _object)
+        -- make sure all edit events only fired in ArrayEditing mode
+        editOpEvt = gateDyn canEditDyn $ dragPBEvt <|> dragPanelEvt <|> actArrEvt <|> delPanelEvt <|>
+                                         addPanelEvt <|> rotRowEvt <|> updArrCfgEvt <|> actRoofEvt <|>
+                                         updAlgnEvt <|> updOrientEvt
+
+        updModeEvt = POUpdateMode <$> dynEvent editorModeDyn
+
+        opEvt = editOpEvt <|> loadPanelEvt <|> updModeEvt
+
+        defState = mkState $ layer ^. _object
+        stateEvt = multicast $ foldEffect (flip (applyPanelLayerOp cfg)) opEvt defState
 
         -- panel tapped when the roof is inactive, let's pipe the tap event to parent
         resLayer = nlayer # _inactiveRoofTapped .~ multicast (const unit <$> gateDyn roofInactiveDyn panelTapEvt)
@@ -415,10 +431,14 @@ applyPanelLayerOp cfg st (PORotRowInArr r arr)        = rotateRowInArr cfg st r 
 applyPanelLayerOp cfg st (POUpdateArrayConfig arrCfg) = updateArrayConfig cfg st arrCfg
 applyPanelLayerOp cfg st (POActivateArray arr)        = updateActiveArray cfg st arr
 applyPanelLayerOp cfg st (POActivateRoof act)         = updateRoofActive cfg st act
+applyPanelLayerOp cfg st (POUpdateMode m)             = updateEditorMode cfg st m
 
 -- | get all panels in the current state
 allPanels :: PanelLayerState -> List Panel
 allPanels st = st ^. (_layout <<< _panels)
+
+canEdit :: PanelLayerState -> Boolean
+canEdit st = st ^. _editorMode == ArrayEditing
 
 clearOperations :: PanelLayerState -> PanelLayerState
 clearOperations st = st # _panelOperations .~ Nil
@@ -674,6 +694,13 @@ updateRoofActive cfg st active = if active
                          Nothing -> findActiveArray layout
             updateActiveArray cfg st arr
     else pure $ (clearOperations st) # _oldActiveArray .~ st ^. _activeArray
+
+
+-- update the editor mode. reset all buttons in showing mode and add buttons for active array in arrayediting mode
+updateEditorMode :: PanelLayerConfig -> PanelLayerState -> EditorMode -> Effect PanelLayerState
+updateEditorMode cfg st Showing      = pure $ (clearOperations st) # _btnsOperations .~ singleton ResetButtons
+updateEditorMode cfg st ArrayEditing = checkAndUpdateBtnOps cfg false $ clearOperations st
+updateEditorMode cfg st RoofEditing  = pure $ clearOperations st
 
 checkAndUpdateBtnOps :: PanelLayerConfig -> Boolean -> PanelLayerState -> Effect PanelLayerState
 checkAndUpdateBtnOps cfg arrayChanged st = if st ^. _roofActive
