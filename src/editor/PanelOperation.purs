@@ -6,7 +6,8 @@ import Model.Roof.Panel (Panel)
 import Three.Math.Vector (Vector3)
 
 -- | Panel operation that change a panel array.
-data PanelOperation = AddPanel Panel
+data PanelOperation = LoadPanels (List Panel)
+                    | AddPanel Panel
                     | AddPanels (List Panel)
                     | DelPanel UUID
                     | DelPanels (List UUID)

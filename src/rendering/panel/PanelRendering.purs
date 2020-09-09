@@ -118,6 +118,9 @@ renderPanelNode arrCfg textInfo panelType opacity st p =
 
 -- | process array operations and update the internal renderer state.
 updateStateWithPanelOp :: PanelTextureInfo -> ArrayConfig -> PanelType -> PanelOpacity -> PanelOperation -> RendererState -> Effect RendererState
+updateStateWithPanelOp textInfo arrCfg panelType opacity (LoadPanels ps) st = do
+    pns <- traverse (renderPanelNode arrCfg textInfo panelType opacity st) ps
+    pure $ st # _renderedPanels %~ union (panelNodeList2Map $ compact pns)
 updateStateWithPanelOp textInfo arrCfg panelType opacity (AddPanel p) st = do
     pn <- renderPanelNode arrCfg textInfo panelType opacity st p
     case pn of

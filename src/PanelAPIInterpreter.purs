@@ -12,6 +12,7 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (List(..), foldl, fromFoldable, toUnfoldable, (:))
 import Data.Map (delete, empty, insert, lookup, member, update, values)
+import Data.Map as Map
 import Data.Map.Internal (keys)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
@@ -20,19 +21,18 @@ import Data.Time.Duration (Milliseconds(..))
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Data.UUID (UUID, emptyUUID)
-import Editor.Common.Lenses (_apiConfig, _id, _leadId, _panels, _roof)
+import Editor.Common.Lenses (_apiConfig, _id, _leadId, _roof)
 import Editor.PanelOperation (PanelOperation(..))
 import Editor.Rendering.PanelRendering (_operations)
 import FRP.Event (Event, fold, keepLatest, withLast)
 import FRP.Event.Extra (debounce, leftmost, performEvent)
-import Model.Roof.Panel (Panel, PanelDict, _uuid, isDifferent, panelDict)
+import Model.Roof.Panel (PanelDict, _uuid, isDifferent)
 import Model.Roof.RoofPlate (RoofPlate)
 
 newtype PanelAPIInterpreterConfig = PanelAPIInterpreterConfig {
     apiConfig  :: APIConfig,
     roof       :: RoofPlate,
     clientId   :: UUID,
-    panels     :: List Panel,
     operations :: Event PanelOperation
 }
 
@@ -42,7 +42,6 @@ instance defaultPanelAPIInterpreterConfig :: Default PanelAPIInterpreterConfig w
         apiConfig  : def,
         roof       : def,
         clientId   : emptyUUID,
-        panels     : Nil,
         operations : Plus.empty
     }
 
@@ -61,6 +60,7 @@ _finished = _Newtype <<< prop (SProxy :: SProxy "finished")
 
 -- apply panel operations to internal panel dicts
 applyOp :: PanelOperation -> PanelDict -> PanelDict
+applyOp (LoadPanels ps) m   = foldl (\m p -> insert (p ^. _uuid) p m) m ps
 applyOp (AddPanel p) m      = insert (p ^. _uuid) p m
 applyOp (AddPanels ps) m    = foldl (\m p -> insert (p ^. _uuid) p m) m ps
 applyOp (DelPanel pid) m    = delete pid m
@@ -90,8 +90,7 @@ mkPanelAPIInterpreter cfg = PanelAPIInterpreter { finished: debounce t apiResEvt
 
           t = Milliseconds 2000.0
 
-          dictState = panelDict $ cfg ^. _panels
-          newStEvt  = fold applyOp (cfg ^. _operations) dictState
+          newStEvt  = fold applyOp (cfg ^. _operations) Map.empty
     
           calcOp { last: Just od, now: nd } = diff nd od
           calcOp { last: Nothing, now: _  } = Nil
@@ -102,6 +101,7 @@ mkPanelAPIInterpreter cfg = PanelAPIInterpreter { finished: debounce t apiResEvt
           apiResEvt = keepLatest $ performEvent $ runOps <$> newOpEvt
 
 callPanelAPI :: Int -> UUID -> PanelOperation -> API (Event Unit)
+callPanelAPI leadId roofId (LoadPanels ps)   = pure Plus.empty
 callPanelAPI leadId roofId (AddPanel p)      = createPanel leadId p
 callPanelAPI leadId roofId (AddPanels ps)    = createPanels leadId roofId (toUnfoldable ps)
 callPanelAPI leadId roofId (DelPanel pid)    = deletePanels leadId [pid]

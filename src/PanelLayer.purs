@@ -13,7 +13,7 @@ import Custom.Mesh (DraggableMesh, mkDraggableMesh)
 import Data.Default (def)
 import Data.Filterable (compact, filter)
 import Data.Foldable (class Foldable, any, foldl, null)
-import Data.Lens (Lens', view, (.~), (%~), (^.))
+import Data.Lens (Lens', set, view, (%~), (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (List(..), fromFoldable, partition, singleton, (:))
@@ -50,7 +50,7 @@ import Model.PlusButton (PlusButton)
 import Model.Racking.RackingType (RackingType(..))
 import Model.Roof.ArrayConfig (ArrayConfig)
 import Model.Roof.Panel (Alignment(..), Orientation(..), Panel, _arrNumber, _roofId, _roofUUID, _uuid, panelVertices)
-import Model.Roof.RoofPlate (RoofPlate, _roofIntId)
+import Model.Roof.RoofPlate (RoofPlate, _roofIntId, isFlat)
 import Model.Roof.RoofPlateTransform (wrapAroundPoints)
 import Model.UpdatedPanels (delete, deletePanels, get, merge, toUnfoldable)
 import Model.UpdatedPanels as UpdatePanels
@@ -216,7 +216,8 @@ _btnsOperations :: forall t a r. Newtype t { btnsOperations :: a | r } => Lens' 
 _btnsOperations = _Newtype <<< prop (SProxy :: SProxy "btnsOperations")
 
 
-data PanelLayerOperation = POAddPanel Panel
+data PanelLayerOperation = POLoadPanels (List Panel)
+                         | POAddPanel Panel
                          | PODeletePanel UUID
                          | POUpdateAlignment Alignment
                          | POUpdateOrientation Orientation
@@ -241,11 +242,12 @@ createPanelLayer cfg = do
     { event: panelOpEvt, push: pushPanelOpEvt } <- liftEffect create
     { event: btnOpEvt, push: pushBtnOpEvt }     <- liftEffect create
 
+    -- setup the panel renderer and button renderer
     panelRenderer <- setupPanelRenderer layer arrOpEvt (cfg ^. _opacity)
     btnsRenderer  <- liftRenderingM $ mkButtonsRenderer layer btnOpEvt
+    -- setup the panel API interpreter
     let apiInterpreter = mkPanelAPIInterpreter $ def # _apiConfig  .~ cfg ^. _apiConfig
                                                      # _roof       .~ roof
-                                                     # _panels     .~ Nil
                                                      # _operations .~ panelOpEvt
         panelLayer = defPanelLayerWith layer roof panelRenderer btnsRenderer apiInterpreter
 
@@ -401,6 +403,7 @@ updateLayout st ps = if null ps
 
 
 applyPanelLayerOp :: PanelLayerConfig -> PanelLayerState -> PanelLayerOperation -> Effect PanelLayerState
+applyPanelLayerOp cfg st (POLoadPanels ps)            = loadPanels cfg st ps
 applyPanelLayerOp cfg st (POAddPanel p)               = addPanel cfg st p
 applyPanelLayerOp cfg st (PODeletePanel pid)          = deletePanel cfg st pid
 applyPanelLayerOp cfg st (POUpdateAlignment a)        = updateAlignment cfg st a
@@ -421,6 +424,19 @@ clearOperations st = st # _panelOperations .~ Nil
                         # _arrayOperations .~ Nil
                         # _btnsOperations  .~ Nil
                         # _arrayChanged    .~ Nothing
+
+
+-- | make sure slope value of panels on non-flat roofs is set to zero
+zeroSlope :: RoofPlate -> List Panel -> List Panel
+zeroSlope roof ps | isFlat roof = ps
+                  | otherwise   = (set _slope def) <$> ps
+
+loadPanels :: PanelLayerConfig -> PanelLayerState -> List Panel -> Effect PanelLayerState
+loadPanels cfg st Nil = pure st
+loadPanels cfg st ps  = do
+    newLayout <- updateLayout st $ zeroSlope (cfg ^. _roof) ps
+    pure $ st # _layout .~ newLayout
+              # _panelOperations .~ singleton (LoadPanels ps)
 
 -- | add a new panel to the current state
 addPanel :: PanelLayerConfig -> PanelLayerState -> Panel -> Effect PanelLayerState
