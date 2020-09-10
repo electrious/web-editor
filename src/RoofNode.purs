@@ -4,22 +4,26 @@ import Prelude hiding (add)
 
 import Control.Alt ((<|>))
 import Control.Monad.Reader (ask)
+import Control.Plus (empty)
 import Custom.Mesh (TappableMesh, mkTappableMesh)
 import Data.Array (head, init, snoc)
+import Data.Default (class Default, def)
 import Data.Lens (Lens', view, (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
+import Data.List (List)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (sequence_, traverse, traverse_)
 import Data.UUID (UUID)
-import Editor.ArrayBuilder (runArrayBuilder)
-import Editor.Common.Lenses (_center, _id, _mesh, _modeDyn, _slope, _tapped, _object)
+import Editor.ArrayBuilder (ArrayBuilder, _editorMode, performArrayBuilderDyn)
+import Editor.Common.Lenses (_alignment, _center, _id, _mesh, _object, _orientation, _panelType, _roof, _slope, _tapped)
 import Editor.Disposable (class Disposable, dispose)
 import Editor.EditorMode (EditorMode(..))
-import Editor.HouseEditor (HouseEditor, performEditorDyn)
-import Editor.PanelLayer (createPanelLayer)
+import Editor.PanelLayer (PanelLayerConfig(..), _initPanels, _mainOrientation, _roofActive, createPanelLayer)
+import Editor.PanelNode (PanelOpacity(..))
+import Editor.Rendering.PanelRendering (_opacity)
 import Editor.RoofEditor (_deleteRoof, _roofVertices, createRoofEditor)
 import Editor.SceneEvent (SceneTapEvent)
 import Effect (Effect)
@@ -31,15 +35,42 @@ import FRP.Event (Event, create, keepLatest)
 import FRP.Event.Extra (multicast)
 import Math (pi)
 import Math.Angle (degreeVal, radianVal)
-import Model.Racking.RackingType (RackingType)
-import Model.Roof.Panel (Panel)
+import Model.Hardware.PanelModel (PanelModel)
+import Model.Racking.RackingType (RackingType(..))
+import Model.Roof.Panel (Alignment(..), Orientation(..), Panel)
 import Model.Roof.RoofPlate (RoofOperation(..), RoofPlate, _azimuth, _borderPoints, _rotation)
 import SimplePolygon (isSimplePolygon)
 import Three.Core.Geometry (mkShape, mkShapeGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial, setOpacity, setTransparent)
-import Three.Core.Object3D (class IsObject3D, Object3D, add, matrix, mkObject3D, remove, rotateX, rotateZ, setName, setPosition, toObject3D, updateMatrix, updateMatrixWorld, worldToLocal)
+import Three.Core.Object3D (class IsObject3D, Object3D, add, matrix, mkObject3D, remove, rotateX, rotateZ, setName, setPosition, updateMatrix, updateMatrixWorld, worldToLocal)
 import Three.Math.Vector (Vector2, Vector3, applyMatrix, mkVec2, mkVec3, vecX, vecY, vecZ)
 import Unsafe.Coerce (unsafeCoerce)
+
+newtype RoofNodeConfig = RoofNodeConfig {
+    roof            :: RoofPlate,
+    roofActive      :: Dynamic Boolean,
+    mainOrientation :: Dynamic Orientation,
+    orientation     :: Dynamic Orientation, -- current orientation of the roof
+    alignment       :: Dynamic Alignment,
+    panelType       :: Dynamic PanelModel,
+    rackingType     :: Dynamic RackingType,
+    opacity         :: Dynamic PanelOpacity,
+    initPanels      :: Event (List Panel)
+}
+
+derive instance newtypeRoofNodeConfig :: Newtype RoofNodeConfig _
+instance defaultRoofNodeConfig :: Default RoofNodeConfig where
+    def = RoofNodeConfig {
+        roof            : def,
+        roofActive      : step false empty,
+        mainOrientation : step Landscape empty,
+        orientation     : step Landscape empty,
+        alignment       : step Grid empty,
+        panelType       : step def empty,
+        rackingType     : step XR10 empty,
+        opacity         : step Opaque empty,
+        initPanels      : empty
+    }
 
 newtype RoofNode = RoofNode {
     roofId     :: UUID,
@@ -161,31 +192,44 @@ getNewRoof obj roof newVertices = do
     let toParent v = applyMatrix (matrix obj) (mkVec3 (vecX v) (vecY v) 0.0)
     pure $ (RoofOpUpdate <<< flip updateRoofPlate roof <<< map toParent) <$> newVertices
 
-renderPanels :: forall a. IsObject3D a => a -> RackingType -> Array Panel -> Dynamic EditorMode -> HouseEditor (Effect Unit)
-renderPanels content rackType panels modeDyn = do
+renderPanels :: forall a. IsObject3D a => RoofNodeConfig -> a -> ArrayBuilder (Effect Unit)
+renderPanels cfg content = do
+    modeDyn <- view _editorMode <$> ask
     -- don't build the panel layer when it's roof editing mode
     let builder RoofEditing = pure Nothing
-        builder _ = Just <$> runArrayBuilder rackType (createPanelLayer panels)
+        builder _ = Just <$> createPanelLayer (PanelLayerConfig {
+            roof            : cfg ^. _roof,
+            roofActive      : cfg ^. _roofActive,
+            mainOrientation : cfg ^. _mainOrientation,
+            orientation     : cfg ^. _orientation,
+            alignment       : cfg ^. _alignment,
+            panelType       : cfg ^. _panelType,
+            initPanels      : cfg ^. _initPanels,
+            opacity         : cfg ^. _opacity
+        })
 
         render { last, now } = do
             traverse_ (flip remove content <<< view _object) $ join last
             traverse_ (flip add content <<< view _object) now
-    panelLayerDyn <- performEditorDyn $ builder <$> modeDyn
+    panelLayerDyn <- performArrayBuilderDyn $ builder <$> modeDyn
     liftEffect $ subscribeDyn (withLast panelLayerDyn) render
 
 -- | Create RoofNode for a RoofPlate
-createRoofNode :: RoofPlate -> RackingType -> Array Panel -> Dynamic Boolean -> HouseEditor RoofNode
-createRoofNode roof rackType panels isActive = do
-    obj <- liftEffect $ mkNode "roofplate"
+createRoofNode :: RoofNodeConfig -> ArrayBuilder RoofNode
+createRoofNode cfg = do
+    obj     <- liftEffect $ mkNode "roofplate"
     content <- liftEffect $ mkNode "roof-content"
     liftEffect $ add content obj
 
-    modeDyn <- view _modeDyn <$> ask
+    modeDyn <- view _editorMode <$> ask
 
     -- render panels
-    d <- renderPanels content rackType panels modeDyn
+    d <- renderPanels cfg content
     
     let canEditRoofDyn = (==) RoofEditing <$> modeDyn
+        roof           = cfg ^. _roof
+        isActive       = cfg ^. _roofActive
+    
     -- set the roof node position
     liftEffect do
         setupRoofNode obj content roof

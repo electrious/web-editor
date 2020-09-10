@@ -26,7 +26,7 @@ import Data.Symbol (SProxy(..))
 import Data.Time.Duration (Milliseconds(..))
 import Data.Tuple (Tuple(..))
 import Data.UUID (UUID, genUUID)
-import Editor.ArrayBuilder (ArrayBuilder, _arrayConfig, liftRenderingM)
+import Editor.ArrayBuilder (ArrayBuilder, _arrayConfig, _editorMode, liftRenderingM)
 import Editor.Common.Lenses (_alignment, _apiConfig, _arrayNumber, _disposable, _dragType, _dragged, _id, _object, _orientation, _panels, _panelsUpdated, _point, _rackingType, _roof, _rowNumber, _rows, _slope, _tapped, _x, _y)
 import Editor.Disposable (class Disposable)
 import Editor.EditorMode (EditorMode(..))
@@ -65,21 +65,16 @@ import Util (fromFoldableE)
 
 newtype PanelLayerConfig = PanelLayerConfig {
     roof            :: RoofPlate,
-    editorMode      :: Dynamic EditorMode,
     roofActive      :: Dynamic Boolean,
     mainOrientation :: Dynamic Orientation, -- project wise orientation used for new array
     orientation     :: Dynamic Orientation, -- current orientation of the roof
     alignment       :: Dynamic Alignment,
     panelType       :: Dynamic PanelModel,
     initPanels      :: Event (List Panel),
-    opacity         :: Dynamic PanelOpacity,
-    apiConfig       :: APIConfig
+    opacity         :: Dynamic PanelOpacity
 }
 
 derive instance newtypePanelLayerConfig :: Newtype PanelLayerConfig _
-
-_editorMode :: forall t a r. Newtype t { editorMode :: a | r } => Lens' t a
-_editorMode = _Newtype <<< prop (SProxy :: SProxy "editorMode")
 
 _roofActive :: forall t a r. Newtype t { roofActive :: a | r } => Lens' t a
 _roofActive = _Newtype <<< prop (SProxy :: SProxy "roofActive")
@@ -243,7 +238,8 @@ createPanelLayer cfg = do
     liftEffect $ setName "panel-layer" layer
 
     arrCfgDyn <- view _arrayConfig <$> ask
-
+    apiCfg    <- view _apiConfig   <$> ask
+    
     let roof = cfg ^. _roof
 
     { event: arrOpEvt, push: pushArrOpEvt }     <- liftEffect create
@@ -254,7 +250,7 @@ createPanelLayer cfg = do
     panelRenderer <- setupPanelRenderer layer arrOpEvt (cfg ^. _opacity)
     btnsRenderer  <- liftRenderingM $ mkButtonsRenderer layer btnOpEvt
     -- setup the panel API interpreter
-    let apiInterpreter = mkPanelAPIInterpreter $ def # _apiConfig  .~ cfg ^. _apiConfig
+    let apiInterpreter = mkPanelAPIInterpreter $ def # _apiConfig  .~ apiCfg
                                                      # _roof       .~ roof
                                                      # _operations .~ panelOpEvt
         panelLayer = defPanelLayerWith layer roof panelRenderer btnsRenderer apiInterpreter
@@ -285,8 +281,9 @@ setupPanelRenderer parent opEvt opacity = createPanelRenderer $ PanelRendererCon
 
 setupPanelLayer :: PanelLayerConfig -> PanelLayer -> ArrayBuilder (Tuple PanelLayer (Event PanelLayerState))
 setupPanelLayer cfg layer = do
+    editorModeDyn <- view _editorMode <$> ask
+
     let roof            = cfg ^. _roof
-        editorModeDyn   = cfg ^. _editorMode
         canEditDyn      = ((==) ArrayEditing) <$> editorModeDyn
 
         panelTapEvt     = multicast $ layer ^. _renderer <<< _tapped

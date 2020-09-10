@@ -79,14 +79,5 @@ performEditorEvent e = do
     cfg <- ask
     pure $ makeEvent \k -> subscribe e (\v -> runHouseEditor v cfg >>= k)
 
-performEditorDyn :: forall a. Dynamic (HouseEditor a) -> HouseEditor (Dynamic a)
-performEditorDyn d = do
-    cfg <- ask
-
-    curV <- liftEffect $ current d
-    def <- liftEffect $ runHouseEditor curV cfg
-    let evt = makeEvent \k -> subscribe (dynEvent d) \v -> runHouseEditor v cfg >>= k
-    pure $ step def evt
-
 runAPIInEditor :: forall a. API a -> HouseEditor a
 runAPIInEditor api = ask >>= view _apiConfig >>> runAPI api >>> liftEffect
