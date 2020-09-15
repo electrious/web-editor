@@ -84,7 +84,7 @@ getPanelType = view _panelType <$> ask
 
 performArrayBuilderDyn :: forall a. Dynamic (ArrayBuilder a) -> ArrayBuilder (Dynamic a)
 performArrayBuilderDyn d = do
-    env <- ask
+    env  <- ask
     rCfg <- liftRenderingM ask
     
     ArrayBuilder curV <- liftEffect $ current d

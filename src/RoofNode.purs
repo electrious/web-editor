@@ -36,7 +36,6 @@ import FRP.Event.Extra (multicast)
 import Math (pi)
 import Math.Angle (degreeVal, radianVal)
 import Model.Hardware.PanelModel (PanelModel)
-import Model.Racking.RackingType (RackingType(..))
 import Model.Roof.Panel (Alignment(..), Orientation(..), Panel)
 import Model.Roof.RoofPlate (RoofOperation(..), RoofPlate, _azimuth, _borderPoints, _rotation)
 import SimplePolygon (isSimplePolygon)
@@ -53,7 +52,6 @@ newtype RoofNodeConfig = RoofNodeConfig {
     orientation     :: Dynamic Orientation, -- current orientation of the roof
     alignment       :: Dynamic Alignment,
     panelType       :: Dynamic PanelModel,
-    rackingType     :: Dynamic RackingType,
     opacity         :: Dynamic PanelOpacity,
     initPanels      :: Event (List Panel)
 }
@@ -67,7 +65,6 @@ instance defaultRoofNodeConfig :: Default RoofNodeConfig where
         orientation     : step Landscape empty,
         alignment       : step Grid empty,
         panelType       : step def empty,
-        rackingType     : step XR10 empty,
         opacity         : step Opaque empty,
         initPanels      : empty
     }

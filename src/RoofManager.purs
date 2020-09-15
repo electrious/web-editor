@@ -6,15 +6,14 @@ import Algorithm.MeshFlatten (flattenRoofPlates)
 import Control.Alt ((<|>))
 import Control.Monad.Reader (ask)
 import Control.Plus (empty)
-import Data.Array (cons)
 import Data.Compactable (compact)
+import Data.Default (def)
 import Data.Foldable (class Foldable, foldl, sequence_, traverse_)
 import Data.Lens (Lens', view, (^.), (%~), (.~))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.List (List, singleton, toUnfoldable)
-import Data.Map (Map, delete, fromFoldable, insert, lookup, member, update, values)
-import Data.Map as Map
+import Data.List (List(..), toUnfoldable)
+import Data.Map (Map, delete, fromFoldable, insert, lookup, values)
 import Data.Maybe (Maybe(..), fromMaybe, isNothing)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
@@ -22,23 +21,27 @@ import Data.Time.Duration (Milliseconds(..))
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Data.UUID (UUID)
-import Editor.Common.Lenses (_disposable, _geometry, _id, _mesh, _modeDyn, _mouseMove, _roofId, _roofs, _slope, _tapped, _verticeTree, _wrapper)
+import Data.Unfoldable (class Unfoldable)
+import Editor.ArrayBuilder (runArrayBuilder)
+import Editor.Common.Lenses (_alignment, _disposable, _geometry, _id, _mesh, _modeDyn, _mouseMove, _orientation, _panelType, _panels, _roof, _roofId, _roofs, _tapped, _verticeTree, _wrapper)
 import Editor.Disposable (class Disposable, dispose)
 import Editor.EditorMode (EditorMode(..))
 import Editor.House (HouseMeshData)
-import Editor.HouseEditor (HouseEditor, _panels, _roofPlates, performEditorEvent)
-import Editor.RoofNode (RoofNode, _roofDelete, _roofUpdate, createRoofNode)
-import Editor.RoofRecognizer (RoofRecognizer, _addedNewRoof, _marker, createRoofRecognizer)
+import Editor.HouseEditor (HouseEditor, _roofPlates, performEditorEvent)
+import Editor.PanelLayer (_initPanels, _mainOrientation, _roofActive)
+import Editor.PanelNode (PanelOpacity(..))
+import Editor.Rendering.PanelRendering (_opacity)
+import Editor.RoofNode (RoofNode, RoofNodeConfig, _roofDelete, _roofUpdate, createRoofNode)
+import Editor.RoofRecognizer (RoofRecognizer, _addedNewRoof, createRoofRecognizer)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic, step)
 import FRP.Event (Event, create, fold, keepLatest, subscribe, withLast)
 import FRP.Event.Extra (debounce, delay, multicast, performEvent, skip)
-import Math.Angle (degree)
 import Model.Racking.OldRackingSystem (OldRoofRackingData, guessRackingType)
 import Model.Racking.RackingType (RackingType(..))
-import Model.Roof.Panel (Panel, PanelsDict, _roofUUID, panelsDict)
-import Model.Roof.RoofPlate (RoofEdited, RoofOperation(..), RoofPlate, _roofIntId, isFlat, toRoofEdited)
+import Model.Roof.Panel (Alignment(..), Orientation(..), PanelsDict, panelsDict)
+import Model.Roof.RoofPlate (RoofEdited, RoofOperation(..), RoofPlate, _roofIntId, toRoofEdited)
 import Three.Core.Object3D (class IsObject3D, Object3D, add, mkObject3D, remove, setName)
 
 newtype RoofManager = RoofManager {
@@ -57,12 +60,12 @@ _editedRoofs = _Newtype <<< prop (SProxy :: SProxy "editedRoofs")
 
 type RoofDict = Map UUID RoofPlate
 
-roofDict :: List RoofPlate -> RoofDict
+roofDict :: forall f. Foldable f => Functor f => f RoofPlate -> RoofDict
 roofDict = fromFoldable <<< map f
     where f r = Tuple (r ^. _id) r
 
-dictToArr :: RoofDict -> List RoofPlate
-dictToArr = toUnfoldable <<< values
+dictToUnfoldable :: forall f. Unfoldable f => RoofDict -> f RoofPlate
+dictToUnfoldable = toUnfoldable <<< values
 
 -- internal data structure used to manage roofs
 newtype RoofDictData = RoofDictData {
@@ -112,14 +115,17 @@ createWrapper = do
     pure wrapper
 
 -- | function to create roof node
-mkNode :: Event (Maybe UUID) -> PanelsDict -> Map Int OldRoofRackingData -> RoofPlate -> HouseEditor RoofNode
-mkNode activeRoof panelsDict racks roof = createRoofNode roof rackType ps (step false $ multicast $ (==) (Just (roof ^. _id)) <$> activeRoof)
-    where ps = zeroSlope <$> fromMaybe [] (lookup (roof ^. _id) panelsDict)
-          -- make sure slope value in panels on non-flat roof is set to zero
-          zeroSlope p = if isFlat roof
-                        then p
-                        else p # _slope .~ degree 0.0
-          rackType = fromMaybe XR10 $ guessRackingType <$> lookup (roof ^. _roofIntId) racks
+mkNode :: Event (Maybe UUID) -> PanelsDict -> Map Int OldRoofRackingData -> RoofNodeConfig -> RoofPlate -> HouseEditor RoofNode
+mkNode activeRoof panelsDict racks cfg roof = runArrayBuilder rackTypeDyn roofNodeBuilder
+    where roofNodeBuilder = createRoofNode $ cfg # _roof            .~ roof
+                                                 # _roofActive      .~ roofActive
+                                                 # _initPanels      .~ delay 100 (pure ps)
+
+          rid = roof ^. _id
+          ps = fromMaybe Nil (lookup rid panelsDict)
+          rackType    = fromMaybe XR10 $ guessRackingType <$> lookup (roof ^. _roofIntId) racks
+          rackTypeDyn = step rackType empty
+          roofActive  = step false $ (==) (Just rid) <$> activeRoof
 
 -- helper function to delete and dispose an old roof node
 delOldNode :: forall a. IsObject3D a => a -> RoofNode -> Effect Unit
@@ -137,11 +143,22 @@ renderNodes wrapper { last, now } = do
 -- | render dynamic roofs
 renderRoofs :: forall a. IsObject3D a => a -> Event (Maybe UUID) -> Event RoofDictData -> PanelsDict -> Map Int OldRoofRackingData -> HouseEditor (Event (Array RoofNode))
 renderRoofs wrapper activeRoof roofsData panelsDict racks = do
-    let rsToRender = compact $ view _roofsToRender <$> roofsData
-        rsToRenderArr = dictToArr <$> rsToRender
+    let rsToRenderArr = dictToUnfoldable <$> compact (view _roofsToRender <$> roofsData)
         
+        mainOrientDyn = step Landscape empty
+        orientDyn     = step Landscape empty
+        alignDyn      = step Grid empty
+        opacityDyn    = step Opaque empty
+        panelTypeDyn  = step def empty
+
+        -- base config for roof node
+        cfg = def # _mainOrientation .~ mainOrientDyn
+                  # _orientation     .~ orientDyn
+                  # _alignment       .~ alignDyn
+                  # _panelType       .~ panelTypeDyn
+                  # _opacity         .~ opacityDyn
     -- create roofnode for each roof and render them
-    nodes <- performEditorEvent $ traverse (mkNode activeRoof panelsDict racks) <$> rsToRenderArr
+    nodes <- performEditorEvent $ traverse (mkNode activeRoof panelsDict racks cfg) <$> rsToRenderArr
     pure $ multicast $ performEvent $ renderNodes wrapper <$> withLast nodes
 
 isRoofEditing :: HouseEditor (Dynamic Boolean)
@@ -153,7 +170,7 @@ recognizeNewRoofs meshData wrapper newRoofs activeRoof canEditRoofDyn = do
     let canShowRecognizer = (&&) <$> (isNothing <$> activeRoof) <*> canEditRoofDyn
     -- create the roof recognizer and add it to the roof wrapper object
     recognizer <- createRoofRecognizer (meshData ^. _wrapper)
-                                       (dictToArr <$> newRoofs)
+                                       (dictToUnfoldable <$> newRoofs)
                                        (meshData ^. _mesh <<< _mouseMove)
                                        canShowRecognizer
     add recognizer wrapper
@@ -213,7 +230,7 @@ createRoofManager meshData racks = do
         updateRoofsData defRoofData
         updateActive Nothing
 
-    let getRoofEdited = map toRoofEdited <<< dictToArr
+    let getRoofEdited = map toRoofEdited <<< dictToUnfoldable
 
     -- skipe the first roof in teh editedRoofs event, because it's the default data
     pure $ RoofManager {
