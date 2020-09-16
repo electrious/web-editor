@@ -7,6 +7,7 @@ import Control.Monad.Reader (ask)
 import Control.Plus (empty)
 import Custom.Mesh (TappableMesh, mkTappableMesh)
 import Data.Array (head, init, snoc)
+import Data.Compactable (compact)
 import Data.Default (class Default, def)
 import Data.Lens (Lens', view, (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
@@ -16,16 +17,16 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (sequence_, traverse, traverse_)
+import Data.Tuple (Tuple(..))
 import Data.UUID (UUID)
 import Editor.ArrayBuilder (ArrayBuilder, _editorMode, performArrayBuilderDyn)
-import Editor.Common.Lenses (_alignment, _center, _id, _mesh, _object, _orientation, _panelType, _roof, _slope, _tapped)
+import Editor.Common.Lenses (_alignment, _center, _id, _mesh, _orientation, _panelType, _roof, _slope, _tapped)
 import Editor.Disposable (class Disposable, dispose)
 import Editor.EditorMode (EditorMode(..))
-import Editor.PanelLayer (PanelLayerConfig(..), _initPanels, _mainOrientation, _roofActive, createPanelLayer)
+import Editor.PanelLayer (PanelLayer, PanelLayerConfig(..), _inactiveRoofTapped, _initPanels, _mainOrientation, _roofActive, createPanelLayer)
 import Editor.PanelNode (PanelOpacity(..))
 import Editor.Rendering.PanelRendering (_opacity)
 import Editor.RoofEditor (_deleteRoof, _roofVertices, createRoofEditor)
-import Editor.SceneEvent (SceneTapEvent)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import Effect.Timer (setTimeout)
@@ -74,7 +75,7 @@ newtype RoofNode = RoofNode {
     roof       :: RoofPlate,
     roofUpdate :: Event RoofOperation,
     roofDelete :: Event RoofOperation,
-    tapped     :: Event SceneTapEvent,
+    tapped     :: Event RoofPlate,
     roofObject :: Object3D,
     disposable :: Effect Unit
 }
@@ -189,7 +190,7 @@ getNewRoof obj roof newVertices = do
     let toParent v = applyMatrix (matrix obj) (mkVec3 (vecX v) (vecY v) 0.0)
     pure $ (RoofOpUpdate <<< flip updateRoofPlate roof <<< map toParent) <$> newVertices
 
-renderPanels :: forall a. IsObject3D a => RoofNodeConfig -> a -> ArrayBuilder (Effect Unit)
+renderPanels :: forall a. IsObject3D a => RoofNodeConfig -> a -> ArrayBuilder (Tuple (Dynamic (Maybe PanelLayer)) (Effect Unit))
 renderPanels cfg content = do
     modeDyn <- view _editorMode <$> ask
     -- don't build the panel layer when it's roof editing mode
@@ -206,10 +207,11 @@ renderPanels cfg content = do
         })
 
         render { last, now } = do
-            traverse_ (flip remove content <<< view _object) $ join last
-            traverse_ (flip add content <<< view _object) now
+            traverse_ (flip remove content) $ join last
+            traverse_ (flip add content) now
     panelLayerDyn <- performArrayBuilderDyn $ builder <$> modeDyn
-    liftEffect $ subscribeDyn (withLast panelLayerDyn) render
+    d <- liftEffect $ subscribeDyn (withLast panelLayerDyn) render
+    pure $ Tuple panelLayerDyn d
 
 -- | Create RoofNode for a RoofPlate
 createRoofNode :: RoofNodeConfig -> ArrayBuilder RoofNode
@@ -221,10 +223,13 @@ createRoofNode cfg = do
     modeDyn <- view _editorMode <$> ask
 
     -- render panels
-    d <- renderPanels cfg content
+    Tuple panelLayerDyn d <- renderPanels cfg content
     
-    let canEditRoofDyn = (==) RoofEditing <$> modeDyn
+    let roofTapOnPanelEvt = keepLatest $ view _inactiveRoofTapped <$> compact (dynEvent panelLayerDyn)
+
+        canEditRoofDyn = (==) RoofEditing <$> modeDyn
         roof           = cfg ^. _roof
+        rid            = roof ^. _id
         isActive       = cfg ^. _roofActive
     
     -- set the roof node position
@@ -238,7 +243,8 @@ createRoofNode cfg = do
 
         let vertices = step ps (editor ^. _roofVertices)
             meshDyn = performDynamic (createRoofMesh <$> vertices <*> isActive <*> canEditRoofDyn)
-        
+            
+            roofTapEvt = const unit <$> keepLatest (view _tapped <$> dynEvent meshDyn)
         -- add/remove mesh to the obj
         d1 <- subscribeDyn (withLast meshDyn) (renderMesh obj)
         
@@ -251,11 +257,11 @@ createRoofNode cfg = do
         when (not $ testSimplePolygon ps) (void $ setTimeout 1000 (toDel unit))
 
         pure $ RoofNode {
-            roofId     : roof ^. _id,
+            roofId     : rid,
             roof       : roof,
-            roofDelete : multicast $ const (RoofOpDelete $ roof ^. _id) <$> delRoofEvt,
+            roofDelete : multicast $ const (RoofOpDelete rid) <$> delRoofEvt,
             roofUpdate : multicast newRoof,
-            tapped     : multicast $ keepLatest $ view _tapped <$> (dynEvent meshDyn),
+            tapped     : multicast $ const roof <$> (roofTapEvt <|> roofTapOnPanelEvt),
             roofObject : obj,
             disposable : sequence_ [d, d1, dispose editor]
         }

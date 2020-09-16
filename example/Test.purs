@@ -3,7 +3,6 @@ module Test where
 import Prelude
 
 import API (_auth, _baseUrl)
-import Control.Alt ((<|>))
 import Control.Monad.Except (runExcept)
 import Control.Plus (empty)
 import Data.Default (def)
@@ -11,17 +10,16 @@ import Data.Either (Either(..))
 import Data.Lens ((.~), (^.))
 import Data.Maybe (Maybe(..))
 import Data.Traversable (traverse)
-import Editor.Common.Lenses (_houseId, _leadId, _modeDyn, _panelType, _textureInfo)
+import Editor.Common.Lenses (_apiConfig, _houseId, _leadId, _modeDyn, _panelType, _panels, _textureInfo)
 import Editor.Editor (_roofUpdate, createEditor, loadHouse)
 import Editor.EditorM (_elem, _sizeDyn, runEditorM)
 import Editor.EditorMode (EditorMode(..))
-import Editor.HouseEditor (_apiConfig, _dataServer, _panels, _roofPlates, runHouseEditor)
+import Editor.HouseEditor (_dataServer, _roofPlates, runHouseEditor)
 import Editor.SceneEvent (size)
 import Effect (Effect)
 import Effect.Class.Console (logShow)
 import FRP.Dynamic (step)
 import FRP.Event (subscribe)
-import FRP.Event.Extra (after)
 import Foreign (Foreign)
 import Foreign.Generic (decode)
 import Model.Hardware.PanelTextureInfo (_premium, _standard, _standard72)
@@ -50,7 +48,7 @@ doTest roofDat panelDat = do
         Right roofs -> case runExcept $ decode panelDat of
             Left e -> logShow e
             Right panels -> do
-                let modeDyn = step RoofEditing empty
+                let modeDyn = step ArrayEditing empty
                     sizeDyn = step (size 800 600) empty
                     panelType = step Standard empty
 

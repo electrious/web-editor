@@ -41,11 +41,11 @@ hasParent = toObject3D >>> ffi ["o"] "o.parent !== null && o.parent !== undefine
 parent :: forall a b. IsObject3D a => IsObject3D b => a -> b
 parent = toObject3D >>> ffi ["o"] "o.parent"
 
-add :: forall a b. IsObject3D a => IsObject3D b => a -> b -> Effect Unit
+add :: forall child parent. IsObject3D child => IsObject3D parent => child -> parent -> Effect Unit
 add c p = let f = fpi ["child", "parent", ""] "parent.add(child)"
           in f (toObject3D c) (toObject3D p)
 
-remove :: forall a b. IsObject3D a => IsObject3D b => a -> b -> Effect Unit
+remove :: forall child parent. IsObject3D child => IsObject3D parent => child -> parent -> Effect Unit
 remove c p = let f = fpi ["child", "parent", ""] "parent.remove(child)"
              in f (toObject3D c) (toObject3D p)
 

@@ -13,6 +13,8 @@ import Custom.Mesh (DraggableMesh, mkDraggableMesh)
 import Data.Default (def)
 import Data.Filterable (compact, filter)
 import Data.Foldable (class Foldable, any, foldl, null)
+import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Show (genericShow)
 import Data.Lens (Lens', set, view, (%~), (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
@@ -41,9 +43,10 @@ import Editor.SceneEvent (isDrag, isDragEnd, isDragStart)
 import Editor.UI.DragInfo (DragInfo, mkDragInfo)
 import Effect (Effect)
 import Effect.Class (liftEffect)
+import Effect.Class.Console (log)
 import FRP.Dynamic (Dynamic, dynEvent, gateDyn, sampleDyn, step, subscribeDyn)
 import FRP.Event (Event, create, gate, gateBy, subscribe)
-import FRP.Event.Extra (debounce, foldEffect, multicast, performEvent, skip)
+import FRP.Event.Extra (debounce, debug, foldEffect, multicast, performEvent, skip)
 import Model.ArrayComponent (arrayNumber)
 import Model.Hardware.PanelModel (PanelModel)
 import Model.PanelArray (PanelArray, rotateRow)
@@ -231,6 +234,9 @@ data PanelLayerOperation = POLoadPanels (List Panel)
                          | POActivateRoof Boolean
                          | POUpdateMode EditorMode
 
+derive instance genericPanelLayerOperation :: Generic PanelLayerOperation _
+instance showPanelLayerOperation :: Show PanelLayerOperation where
+    show = genericShow
 
 createPanelLayer :: PanelLayerConfig -> ArrayBuilder PanelLayer
 createPanelLayer cfg = do

@@ -1,5 +1,9 @@
 module Editor.UI.DragInfo where
 
+import Prelude
+
+import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Show (genericShow)
 import Data.Lens ((^.))
 import Data.Newtype (class Newtype)
 import Editor.Common.Lenses (_distance, _dragType, _point)
@@ -15,6 +19,9 @@ newtype DragInfo a = DragInfo {
 }
 
 derive instance newtypeDragInfo :: Newtype (DragInfo a) _
+derive instance genericDragInfo :: Generic (DragInfo a) _
+instance showDragInfo :: Show a => Show (DragInfo a) where
+    show = genericShow
 
 mkDragInfo :: forall a. a -> SceneDragEvent -> DragInfo a
 mkDragInfo d evt = DragInfo {

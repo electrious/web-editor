@@ -27,7 +27,7 @@ import FRP.Event (Event, create, keepLatest, sampleOn, subscribe)
 import FRP.Event.Extra (foldEffect, mergeArray, multicast, performEvent)
 import Three.Core.Geometry (CircleGeometry, Geometry, mkCircleGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial)
-import Three.Core.Object3D (class IsObject3D, add, remove, setPosition, setVisible, toObject3D)
+import Three.Core.Object3D (class IsObject3D, add, remove, setName, setPosition, setVisible, toObject3D)
 import Three.Math.Vector (Vector2, Vector3, dist, mkVec2, mkVec3, vecX, vecY)
 import UI.DraggableObject (DraggableObject, _isDragging, createDraggableObject)
 import Unsafe.Coerce (unsafeCoerce)
@@ -49,7 +49,9 @@ mkRedMarkers roofActive activeMarker ps = traverse mkMarker psIdx
                   f act (Just actIdx) = act && actIdx == idx
               
                   isActive = multicast $ lift2 f roofActive activeMarker
-              createDraggableObject isActive idx pos (Nothing :: Maybe Geometry) Nothing
+              m <- createDraggableObject isActive idx pos (Nothing :: Maybe Geometry) Nothing
+              setName "red-marker" m
+              pure m
 
 
 -- | get red markers' active status event
@@ -76,8 +78,10 @@ roofDeleteGeometry = unsafeCoerce $ unsafePerformEffect (mkCircleGeometry 0.6 32
 
 -- | create the roof delete marker button
 createRoofDeleteMarker :: Effect TappableMesh
-createRoofDeleteMarker = mkTappableMesh roofDeleteGeometry roofDeleteMaterial
-
+createRoofDeleteMarker = do
+    m <- mkTappableMesh roofDeleteGeometry roofDeleteMaterial
+    setName "delete-marker" m
+    pure m
 
 -- | internal object for green marker point data
 newtype GreenMarkerPoint = GreenMarkerPoint {
@@ -106,6 +110,7 @@ greenGeometry = unsafeCoerce $ unsafePerformEffect (mkCircleGeometry 0.3 32)
 mkGreenMarkerMesh :: Vector2 -> Effect TappableMesh
 mkGreenMarkerMesh p = do
     m <- mkTappableMesh greenGeometry greenMaterial
+    setName "green-marker" m
     setPosition (mkVec3 (vecX p) (vecY p) 0.01) m
     pure m
 

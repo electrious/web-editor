@@ -172,7 +172,7 @@ mkPanelNode arrCfg info panelType p = do
         bodyMat = getPanelMaterial info $ panelTextureType rackingType panelType
 
     m <- mkTapDragMesh bodyGeo bodyMat
-    setName "panel-body" m
+    setName "panel" m
     let node = PanelNode {
                  panel       : p,
                  panelObject : m ^. _mesh,
