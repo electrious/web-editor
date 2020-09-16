@@ -451,14 +451,15 @@ clearOperations st = st # _panelOperations .~ Nil
 -- | make sure slope value of panels on non-flat roofs is set to zero
 zeroSlope :: RoofPlate -> List Panel -> List Panel
 zeroSlope roof ps | isFlat roof = ps
-                  | otherwise   = (set _slope def) <$> ps
+                  | otherwise   = set _slope def <$> ps
 
 loadPanels :: PanelLayerConfig -> PanelLayerState -> List Panel -> Effect PanelLayerState
 loadPanels cfg st Nil = pure st
 loadPanels cfg st ps  = do
-    newLayout <- updateLayout st $ zeroSlope (cfg ^. _roof) ps
+    let nps = zeroSlope (cfg ^. _roof) ps
+    newLayout <- updateLayout st nps
     pure $ st # _layout .~ newLayout
-              # _panelOperations .~ singleton (LoadPanels ps)
+              # _panelOperations .~ singleton (LoadPanels nps)
 
 -- | add a new panel to the current state
 addPanel :: PanelLayerConfig -> PanelLayerState -> Panel -> Effect PanelLayerState
