@@ -2,7 +2,6 @@ module Editor.PanelLayer where
 
 import Prelude hiding (add)
 
-import API (APIConfig)
 import Algorithm.ButtonCalculator (plusBtnsForArray, rotateBtnsForArray)
 import Algorithm.PanelAligning (alignPanelRows)
 import Algorithm.TempPanels (tempPanels)
@@ -43,10 +42,9 @@ import Editor.SceneEvent (isDrag, isDragEnd, isDragStart)
 import Editor.UI.DragInfo (DragInfo, mkDragInfo)
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import Effect.Class.Console (log)
 import FRP.Dynamic (Dynamic, dynEvent, gateDyn, sampleDyn, step, subscribeDyn)
 import FRP.Event (Event, create, gate, gateBy, subscribe)
-import FRP.Event.Extra (debounce, debug, foldEffect, multicast, performEvent, skip)
+import FRP.Event.Extra (debounce, foldEffect, multicast, performEvent, skip)
 import Model.ArrayComponent (arrayNumber)
 import Model.Hardware.PanelModel (PanelModel)
 import Model.PanelArray (PanelArray, rotateRow)
@@ -750,6 +748,7 @@ mkDragHelper = do
     setOpacity 0.01 mat
 
     m <- mkDraggableMesh geo mat
+    setName "drag-helper" m
     setCastShadow false m
     setRenderOrder 30 m
     setVisible false m
