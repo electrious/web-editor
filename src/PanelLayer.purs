@@ -44,7 +44,7 @@ import Effect (Effect)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic, dynEvent, gateDyn, sampleDyn, step, subscribeDyn)
 import FRP.Event (Event, create, gate, gateBy, subscribe)
-import FRP.Event.Extra (debounce, debug, foldEffect, multicast, performEvent, skip)
+import FRP.Event.Extra (debounce, foldEffect, multicast, performEvent, skip)
 import Model.ArrayComponent (arrayNumber)
 import Model.Hardware.PanelModel (PanelModel)
 import Model.PanelArray (PanelArray, rotateRow)
@@ -252,7 +252,7 @@ createPanelLayer cfg = do
 
     -- setup the panel renderer and button renderer
     panelRenderer <- setupPanelRenderer layer arrOpEvt (cfg ^. _opacity)
-    btnsRenderer  <- liftRenderingM $ mkButtonsRenderer layer (debug btnOpEvt)
+    btnsRenderer  <- liftRenderingM $ mkButtonsRenderer layer btnOpEvt
     -- setup the panel API interpreter
     let apiInterpreter = mkPanelAPIInterpreter $ def # _apiConfig  .~ apiCfg
                                                      # _roof       .~ roof
@@ -262,7 +262,7 @@ createPanelLayer cfg = do
     Tuple nLayer stateEvt <- setupPanelLayer cfg panelLayer
     let pOpEvt     = fromFoldableE $ view _panelOperations <$> stateEvt
         arrayOpEvt = fromFoldableE $ view _arrayOperations <$> stateEvt
-        btnOpsEvt  = fromFoldableE $ debug $ view _btnsOperations  <$> stateEvt
+        btnOpsEvt  = fromFoldableE $ view _btnsOperations  <$> stateEvt
         arrChgEvt  = compact $ view _arrayChanged <$> stateEvt
 
         pArrOpEvt  = PanelOperation <$> pOpEvt
@@ -699,7 +699,7 @@ updateRoofActive cfg st active = if active
     else pure $ (clearOperations st) # _oldActiveArray .~ st ^. _activeArray
                                      # _activeArray    .~ Nothing
                                      # _roofActive     .~ active
-
+                                     # _btnsOperations .~ singleton ResetButtons
 
 -- update the editor mode. reset all buttons in showing mode and add buttons for active array in arrayediting mode
 updateEditorMode :: PanelLayerConfig -> PanelLayerState -> EditorMode -> Effect PanelLayerState
