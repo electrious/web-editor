@@ -6,6 +6,8 @@ import Prelude hiding (add)
 
 import Control.Monad.Reader (ask)
 import Data.Default (class Default, def)
+import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Show (genericShow)
 import Data.Lens (Lens', view, (^.), (.~))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
@@ -33,6 +35,9 @@ data ButtonOperation = RenderPlusButtons (List PlusButton)
                      | MovePlusButton PlusButton Vector3
                      | ResetButtons
 
+derive instance genericButtonOperation :: Generic ButtonOperation _
+instance showButtonOperation :: Show ButtonOperation where
+    show = genericShow
 
 newtype ButtonsRenderer = ButtonsRenderer {
     plusTapped  :: Event PlusButton,

@@ -24,7 +24,7 @@ import Model.Roof.Panel (Orientation(..), validatedSlope)
 import Model.RoofComponent (size)
 import Rendering.Renderable (class Renderable)
 import Three.Core.Geometry (BoxGeometry, mkBoxGeometry)
-import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial, setOpacity)
+import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial, setOpacity, setTransparent)
 import Three.Core.Mesh (Mesh, mkMesh)
 import Three.Core.Object3D (class IsObject3D, Object3D, add, mkObject3D, position, setCastShadow, setName, setPosition, setRenderOrder, setRotation, setScale)
 import Three.Math.Euler (mkEuler)
@@ -82,6 +82,7 @@ instance renderablePlusButtonNode :: Renderable PlusButton PlusButtonNode where
 
         -- setup the invisible mesh for tap and drag
         mat <- mkMeshBasicMaterial 0xffffff
+        setTransparent true mat
         setOpacity 0.0001 mat
         
         invNode <- mkTapDragMesh (plusButtonGeo unit) mat
