@@ -19,7 +19,7 @@ import Model.RoofComponent (size)
 import Model.RotateButton (RotateButton)
 import Rendering.Renderable (class Renderable, _rotateButtonTexture)
 import Three.Core.Geometry (BoxGeometry, mkBoxGeometry)
-import Three.Core.Material (mkMeshBasicMaterialWithTexture)
+import Three.Core.Material (mkMeshBasicMaterialWithTexture, setTransparent)
 import Three.Core.Mesh (Mesh)
 import Three.Core.Object3D (class IsObject3D, setCastShadow, setName, setPosition, setRotation, toObject3D)
 import Three.Loader.TextureLoader (Texture, loadTexture, mkTextureLoader)
@@ -48,10 +48,10 @@ instance renderableRotateButton :: Renderable RotateButton RotateButtonNode wher
     render rb = do
         texture <- view _rotateButtonTexture <$> ask
         mat <- liftEffect $ mkMeshBasicMaterialWithTexture texture
+        liftEffect $ setTransparent true mat
         btn <- liftEffect $ mkTappableMesh (rotateBtnGeo unit) mat
         
         liftEffect $ setName "RotateButton" btn
-
         liftEffect $ setCastShadow false btn
 
         let x = meterVal $ rb ^. _x

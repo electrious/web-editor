@@ -14,7 +14,7 @@ import Editor.Common.Lenses (_apiConfig, _houseId, _leadId, _modeDyn, _panelType
 import Editor.Editor (_roofUpdate, createEditor, loadHouse)
 import Editor.EditorM (_elem, _sizeDyn, runEditorM)
 import Editor.EditorMode (EditorMode(..))
-import Editor.HouseEditor (_dataServer, _roofPlates, runHouseEditor)
+import Editor.HouseEditor (_dataServer, _roofPlates, _rotBtnTexture, runHouseEditor)
 import Editor.SceneEvent (size)
 import Effect (Effect)
 import Effect.Class.Console (logShow)
@@ -33,6 +33,7 @@ import Web.HTML.Window (document)
 foreign import solarModuleJPG :: String
 foreign import qCellSolarPanelJPG :: String
 foreign import qCellSolarPanel72PNG :: String
+foreign import rotateButtonPNG :: String
 
 serverUrl :: String
 serverUrl = "http://data.electrious.com"
@@ -70,6 +71,7 @@ doTest roofDat panelDat = do
                                    # _dataServer  .~ serverUrl
                                    # _panelType   .~ panelType
                                    # _textureInfo .~ textures
+                                   # _rotBtnTexture .~ rotateButtonPNG
                                    # _apiConfig   .~ apiCfg
                 editor <- runEditorM createEditor cfg
                 res <- traverse (flip runHouseEditor houseCfg <<< loadHouse) editor
