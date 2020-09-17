@@ -25,7 +25,7 @@ import Editor.Common.Lenses (_apiConfig, _id, _leadId, _roof)
 import Editor.PanelOperation (PanelOperation(..))
 import Editor.Rendering.PanelRendering (_operations)
 import FRP.Event (Event, fold, keepLatest, withLast)
-import FRP.Event.Extra (debounce, leftmost, performEvent)
+import FRP.Event.Extra (anyEvt, debounce, performEvent)
 import Model.Roof.Panel (PanelDict, _uuid, isDifferent)
 import Model.Roof.RoofPlate (RoofPlate)
 
@@ -97,7 +97,7 @@ mkPanelAPIInterpreter cfg = PanelAPIInterpreter { finished: debounce t apiResEvt
 
           newOpEvt  = calcOp <$> withLast (debounce t newStEvt)
 
-          runOps    = map leftmost <<< traverse (flip runAPI apiCfg <<< callPanelAPI leadId roofId)
+          runOps    = map anyEvt <<< traverse (flip runAPI apiCfg <<< callPanelAPI leadId roofId)
           apiResEvt = keepLatest $ performEvent $ runOps <$> newOpEvt
 
 callPanelAPI :: Int -> UUID -> PanelOperation -> API (Event Unit)

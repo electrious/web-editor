@@ -21,7 +21,7 @@ import Editor.UI.PlusButton (PlusButtonNode, _plusButton, moveBy)
 import Editor.UI.RotateButton (RotateButtonNode)
 import Effect (Effect)
 import FRP.Event (Event, keepLatest)
-import FRP.Event.Extra (foldEffect, leftmost, multicast)
+import FRP.Event.Extra (anyEvt, foldEffect, multicast)
 import Model.PlusButton (PlusButton)
 import Model.RotateButton (RotateButton)
 import Rendering.Renderable (RendererConfig, RenderingM, render, runRenderingM)
@@ -125,7 +125,7 @@ mkButtonsRenderer parent opEvt = do
         plusNodesEvt = multicast $ view _plusBtns <$> stateEvt
         rotNodesEvt  = view _rotBtns <$> stateEvt
     pure $ ButtonsRenderer {
-        plusTapped  : multicast $ keepLatest $ leftmost <<< map (view _tapped)  <$> plusNodesEvt,
-        plusDragged : multicast $ keepLatest $ leftmost <<< map (view _dragged) <$> plusNodesEvt,
-        rotTapped   : multicast $ keepLatest $ leftmost <<< map (view _tapped)  <$> rotNodesEvt
+        plusTapped  : multicast $ keepLatest $ anyEvt <<< map (view _tapped)  <$> plusNodesEvt,
+        plusDragged : multicast $ keepLatest $ anyEvt <<< map (view _dragged) <$> plusNodesEvt,
+        rotTapped   : multicast $ keepLatest $ anyEvt <<< map (view _tapped)  <$> rotNodesEvt
     }

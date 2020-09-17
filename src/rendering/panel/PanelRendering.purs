@@ -27,7 +27,7 @@ import Editor.UI.DragInfo (DragInfo)
 import Effect (Effect)
 import FRP.Dynamic (Dynamic, dynEvent, sampleDyn, step)
 import FRP.Event (Event, keepLatest)
-import FRP.Event.Extra (foldEffect, leftmost, multicast)
+import FRP.Event.Extra (anyEvt, foldEffect, multicast)
 import Model.Hardware.PanelTextureInfo (PanelTextureInfo)
 import Model.Hardware.PanelType (PanelType)
 import Model.Roof.ArrayConfig (ArrayConfig)
@@ -216,7 +216,7 @@ createPanelRenderer cfg = do
         panelNodesEvt = multicast $ values <<< view _renderedPanels <$> stateEvt
 
     pure $ PanelRenderer {
-        tapped    : multicast $ keepLatest $ leftmost <<< map (view _tapped) <$> panelNodesEvt,
-        dragged   : multicast $ keepLatest $ leftmost <<< map (view _dragged) <$> panelNodesEvt,
+        tapped    : multicast $ keepLatest $ anyEvt <<< map (view _tapped) <$> panelNodesEvt,
+        dragged   : multicast $ keepLatest $ anyEvt <<< map (view _dragged) <$> panelNodesEvt,
         allPanels : allPanelsRendered <$> statesDyn
     }

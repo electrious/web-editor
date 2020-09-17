@@ -44,7 +44,7 @@ import Effect (Effect)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic, dynEvent, gateDyn, sampleDyn, step, subscribeDyn)
 import FRP.Event (Event, create, gate, gateBy, subscribe)
-import FRP.Event.Extra (debounce, foldEffect, multicast, performEvent, skip)
+import FRP.Event.Extra (debounce, foldEffect, fromFoldableE, multicast, performEvent, skip)
 import Model.ArrayComponent (arrayNumber)
 import Model.Hardware.PanelModel (PanelModel)
 import Model.PanelArray (PanelArray, rotateRow)
@@ -62,7 +62,6 @@ import Three.Core.Geometry (mkBoxGeometry)
 import Three.Core.Material (mkMeshBasicMaterial, setOpacity)
 import Three.Core.Object3D (class IsObject3D, Object3D, add, mkObject3D, setCastShadow, setName, setRenderOrder, setVisible, worldToLocal)
 import Three.Math.Vector (Vector3, mkVec3, (<->))
-import Util (fromFoldableE)
 
 newtype PanelLayerConfig = PanelLayerConfig {
     roof            :: RoofPlate,

@@ -7,7 +7,6 @@ import Control.Monad.Reader (ask)
 import Control.Plus (empty)
 import Custom.Mesh (TappableMesh, mkTappableMesh)
 import Data.Array (head, init, snoc)
-import Data.Compactable (compact)
 import Data.Default (class Default, def)
 import Data.Lens (Lens', view, (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
@@ -31,7 +30,7 @@ import Effect (Effect)
 import Effect.Class (liftEffect)
 import Effect.Timer (setTimeout)
 import Effect.Unsafe (unsafePerformEffect)
-import FRP.Dynamic (Dynamic, dynEvent, performDynamic, step, subscribeDyn, withLast)
+import FRP.Dynamic (Dynamic, dynEvent, latestEvt, performDynamic, step, subscribeDyn, withLast)
 import FRP.Event (Event, create, keepLatest)
 import FRP.Event.Extra (multicast)
 import Math (pi)
@@ -225,7 +224,10 @@ createRoofNode cfg = do
     -- render panels
     Tuple panelLayerDyn d <- renderPanels cfg content
     
-    let roofTapOnPanelEvt = keepLatest $ view _inactiveRoofTapped <$> compact (dynEvent panelLayerDyn)
+    let -- get the panel tap event on inactive roofs
+        inactTap Nothing  = empty
+        inactTap (Just l) = l ^. _inactiveRoofTapped
+        roofTapOnPanelEvt = latestEvt $ inactTap <$> panelLayerDyn
 
         canEditRoofDyn = (==) RoofEditing <$> modeDyn
         roof           = cfg ^. _roof
