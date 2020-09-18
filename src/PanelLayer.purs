@@ -43,8 +43,8 @@ import Editor.UI.DragInfo (DragInfo, mkDragInfo)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic, dynEvent, gateDyn, sampleDyn, step, subscribeDyn)
-import FRP.Event (Event, create, gate, gateBy, subscribe)
-import FRP.Event.Extra (debounce, debug, foldEffect, fromFoldableE, multicast, performEvent, skip)
+import FRP.Event (Event, create, gate, sampleOn, subscribe)
+import FRP.Event.Extra (debounce, foldEffect, fromFoldableE, multicast, performEvent, skip)
 import Model.ArrayComponent (arrayNumber)
 import Model.Hardware.PanelModel (PanelModel)
 import Model.PanelArray (PanelArray, rotateRow)
@@ -312,10 +312,14 @@ setupPanelLayer cfg layer = do
 
     d <- liftEffect $ subscribeDyn (nlayer ^. _arrayDragging) (not >>> pushCanDragPB)
 
-    -- if tapped panel is in an inactive array
     let loadPanelEvt = POLoadPanels <$> cfg ^. _initPanels
-        actArrEvt = POActivateArray <<< arrayNumber <$> gateBy (\aa p -> aa /= Just (arrayNumber p)) activeArrayEvt panelTapped
-        delPanelEvt = PODeletePanel <<< view _uuid <$> gateBy (\aa p -> aa == Just (arrayNumber p)) activeArrayEvt panelTapped
+        
+        -- panel tap event might activate an array or delete the panel if the array is active
+        actArrOrDelP p arr = if arrayNumber p == arr
+                             then PODeletePanel (p ^. _uuid)
+                             else POActivateArray $ arrayNumber p
+        actArrOrDelPEvt = sampleOn activeArrayEvt (actArrOrDelP <$> panelTapped)
+
         addPanelEvt = POAddPanel <$> newPanelEvt
         rotRowEvt = (\rb -> PORotRowInArr (rb ^. _rowNumber) (rb ^. _arrayNumber)) <$> layer ^. _btnsRenderer <<< _rotTapped
         updArrCfgEvt = POUpdateArrayConfig <$> skip 1 arrCfgEvt
@@ -324,7 +328,7 @@ setupPanelLayer cfg layer = do
         updOrientEvt = POUpdateOrientation <$> dynEvent (cfg ^. _orientation)
 
         -- make sure all edit events only fired in ArrayEditing mode
-        editOpEvt = gateDyn canEditDyn $ dragPBEvt <|> dragPanelEvt <|> actArrEvt <|> delPanelEvt <|>
+        editOpEvt = gateDyn canEditDyn $ dragPBEvt <|> dragPanelEvt <|> actArrOrDelPEvt <|>
                                          addPanelEvt <|> rotRowEvt <|> updArrCfgEvt <|> actRoofEvt <|>
                                          updAlgnEvt <|> updOrientEvt
 
