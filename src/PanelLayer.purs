@@ -44,7 +44,7 @@ import Effect (Effect)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic, dynEvent, gateDyn, sampleDyn, step, subscribeDyn)
 import FRP.Event (Event, create, gate, gateBy, subscribe)
-import FRP.Event.Extra (debounce, foldEffect, fromFoldableE, multicast, performEvent, skip)
+import FRP.Event.Extra (debounce, debug, foldEffect, fromFoldableE, multicast, performEvent, skip)
 import Model.ArrayComponent (arrayNumber)
 import Model.Hardware.PanelModel (PanelModel)
 import Model.PanelArray (PanelArray, rotateRow)
@@ -314,8 +314,8 @@ setupPanelLayer cfg layer = do
 
     -- if tapped panel is in an inactive array
     let loadPanelEvt = POLoadPanels <$> cfg ^. _initPanels
-        actArrEvt = (POActivateArray <<< arrayNumber) <$> gateBy (\aa p -> aa == Just (arrayNumber p)) activeArrayEvt panelTapped
-        delPanelEvt = (PODeletePanel <<< view _uuid) <$> gateBy (\aa p -> aa /= Just (arrayNumber p)) activeArrayEvt panelTapped
+        actArrEvt = POActivateArray <<< arrayNumber <$> gateBy (\aa p -> aa /= Just (arrayNumber p)) activeArrayEvt panelTapped
+        delPanelEvt = PODeletePanel <<< view _uuid <$> gateBy (\aa p -> aa == Just (arrayNumber p)) activeArrayEvt panelTapped
         addPanelEvt = POAddPanel <$> newPanelEvt
         rotRowEvt = (\rb -> PORotRowInArr (rb ^. _rowNumber) (rb ^. _arrayNumber)) <$> layer ^. _btnsRenderer <<< _rotTapped
         updArrCfgEvt = POUpdateArrayConfig <$> skip 1 arrCfgEvt
@@ -335,9 +335,11 @@ setupPanelLayer cfg layer = do
         defState = mkState $ layer ^. _object
         stateEvt = multicast $ foldEffect (flip (applyPanelLayerOp cfg)) opEvt defState
 
+    -- push the current active array in state to activeArrayEvt
+    d1 <- liftEffect $ subscribe (compact $ view _activeArray <$> stateEvt) pushActiveArray
         -- panel tapped when the roof is inactive, let's pipe the tap event to parent
-        resLayer = nlayer # _inactiveRoofTapped .~ multicast (const unit <$> gateDyn roofInactiveDyn panelTapEvt)
-                          # _disposable %~ ((<*) d)
+    let resLayer = nlayer # _inactiveRoofTapped .~ multicast (const unit <$> gateDyn roofInactiveDyn panelTapEvt)
+                          # _disposable %~ ((<*) (d *> d1))
     pure $ Tuple resLayer stateEvt
 
 setupPanelDragging :: PanelLayer -> Event Boolean -> Effect (Tuple PanelLayer (Event PanelLayerOperation))

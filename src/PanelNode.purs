@@ -2,7 +2,7 @@ module Editor.PanelNode where
 
 import Prelude hiding (add)
 
-import Custom.Mesh (mkTapDragMesh)
+import Custom.Mesh (TapDragMesh, mkTapDragMesh)
 import Data.Enum (class BoundedEnum, class Enum)
 import Data.Foldable (traverse_)
 import Data.Function.Memoize (class Tabulate, genericTabulate, memoize)
@@ -18,7 +18,7 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Meter (meterVal)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Editor.Common.Lenses (_dragged, _height, _mesh, _orientation, _rackingType, _tapped, _x, _y)
+import Editor.Common.Lenses (_dragged, _height, _orientation, _rackingType, _tapped, _x, _y)
 import Editor.Rendering.DefMaterials (loadMaterial)
 import Editor.UI.DragInfo (DragInfo, mkDragInfo)
 import Effect (Effect)
@@ -107,7 +107,7 @@ horizontalGeometry = memoize (const $ unsafePerformEffect $ mkBoxGeometry (meter
 
 newtype PanelNode = PanelNode {
     panel       :: Panel,
-    panelObject :: Mesh,
+    panelObject :: TapDragMesh,
     tapped      :: Event Panel,
     dragged     :: Event (DragInfo Panel),
     materials   :: List MeshBasicMaterial
@@ -175,7 +175,7 @@ mkPanelNode arrCfg info panelType p = do
     setName "panel" m
     let node = PanelNode {
                  panel       : p,
-                 panelObject : m ^. _mesh,
+                 panelObject : m,
                  tapped      : const p <$> m ^. _tapped,
                  dragged     : mkDragInfo p <$> m ^. _dragged,
                  materials   : (bodyMat : blackMat : Nil)
@@ -197,7 +197,7 @@ changePanel :: ArrayConfig -> Panel -> PanelNode -> Effect PanelNode
 changePanel arrCfg p node = do
     updateRotation p node
     updatePosition p arrCfg node
-    pure $ node # _panel .~ p
+    pure $ panelUpdated $ node # _panel .~ p
 
 
 moveBy :: Vector3 -> PanelNode -> Effect PanelNode
@@ -207,7 +207,14 @@ moveBy delta node = do
         newPos = Vector.add pos delta
 
     setPosition newPos m
-    pure $ node # _panel %~ addDelta delta
+    pure $ panelUpdated $ node # _panel %~ addDelta delta
+
+-- | update the panelnode's events after update panel value inside.
+panelUpdated :: PanelNode -> PanelNode
+panelUpdated pn = pn # _tapped  .~ (const p <$> m ^. _tapped)
+                     # _dragged .~ (mkDragInfo p <$> m ^. _dragged)
+    where p = pn ^. _panel
+          m = pn ^. _panelObject
 
 -- update panel mesh position based on array config and the corresponding panel model
 updatePosition :: Panel -> ArrayConfig -> PanelNode -> Effect Unit
