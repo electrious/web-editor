@@ -633,7 +633,7 @@ processDraggingPlus cfg st d = if null (allPanels st)
                 let delta   = maybe def (p <-> _) (st ^. _lastDragPos)
                     panel   = unsafePartial $ head $ allPanels st
                     initPos = fromMaybe def $ st ^. _initDragPos
-                tempPs <- tempPanels (st ^. _arrayConfig) panel p initPos
+                tempPs <- tempPanels (st ^. _arrayConfig) panel initPos p
                 pure $ (clearOperations st) # _btnsOperations  .~ singleton (MovePlusButton (d ^. _object) delta)
                                             # _arrayOperations .~ singleton (TempPanels tempPs)
                                             # _lastDragPos     .~ Just p

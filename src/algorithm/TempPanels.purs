@@ -29,7 +29,7 @@ tempPanels cfg p start end = traverse cloneP $ concatMap (\x -> Tuple x <$> ys) 
           numY = floor $ abs deltaY / pH
 
           xDir = if deltaX > 0.0 then 1.0 else (-1.0)
-          yDir = if deltaY > 0.0 then 1.0 else (-1.0)
+          yDir = if deltaY < 0.0 then 1.0 else (-1.0)
 
           cloneP (Tuple x y) = clonePanelTo p x y
 
