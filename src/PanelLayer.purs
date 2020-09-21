@@ -459,7 +459,10 @@ zeroSlope roof ps | isFlat roof = ps
                   | otherwise   = set _slope def <$> ps
 
 loadPanels :: PanelLayerConfig -> PanelLayerState -> List Panel -> Effect PanelLayerState
-loadPanels cfg st Nil = pure st
+loadPanels cfg st Nil = do
+    -- update the layout with no panels at loading
+    newLayout <- updateLayout st Nil
+    pure $ st # _layout .~ newLayout
 loadPanels cfg st ps  = do
     let nps = zeroSlope (cfg ^. _roof) ps
     newLayout <- updateLayout st nps

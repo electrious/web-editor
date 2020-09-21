@@ -12,7 +12,7 @@ import Data.Lens (Lens', view, (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (List(..), concat, concatMap, foldl, fromFoldable, mapWithIndex, sortBy)
-import Data.Map (Map, lookup, values)
+import Data.Map (Map, lookup, singleton, values)
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Meter (meterVal)
@@ -24,7 +24,7 @@ import Editor.Common.Lenses (_centerX, _centerY, _config, _panels, _panelsUpdate
 import Effect (Effect)
 import Global (infinity)
 import Math (abs)
-import Model.PanelArray (PanelArray, mkArrayWithCenter, mkPanelArray, mkPanelArrayMap)
+import Model.PanelArray (PanelArray, mkArrayWithCenter, mkPanelArray, mkPanelArrayMap, simplePanelArray)
 import Model.Roof.ArrayConfig (ArrayConfig, _gapY)
 import Model.Roof.Panel (Orientation, Panel, validatedSlope)
 import Model.RoofComponent (compBBox, compBBoxWithOffset)
@@ -82,7 +82,7 @@ defaultLayout o cfg = do
         tree          : t,
         panels        : Nil,
         config        : cfg,
-        arrays        : Map.empty,
+        arrays        : singleton 0 (simplePanelArray o cfg), -- init an empty array even there's no panels
         panelsUpdated : empty
     }
 
