@@ -42,7 +42,6 @@ import Editor.SceneEvent (isDrag, isDragEnd, isDragStart)
 import Editor.UI.DragInfo (DragInfo, mkDragInfo)
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import Effect.Class.Console (log)
 import FRP.Dynamic (Dynamic, dynEvent, gateDyn, sampleDyn, step, subscribeDyn)
 import FRP.Event (Event, create, gate, sampleOn, subscribe)
 import FRP.Event.Extra (debounce, foldEffect, fromFoldableE, multicast, performEvent, skip)
@@ -637,7 +636,7 @@ processDraggingPlus cfg st d = if null (allPanels st)
                 let delta   = maybe def (p <-> _) (st ^. _lastDragPos)
                     panel   = unsafePartial $ head $ allPanels st
                     initPos = fromMaybe def $ st ^. _initDragPos
-                tempPs <- tempPanels (st ^. _arrayConfig) panel initPos p
+                tempPs <- tempPanels (st ^. _arrayConfig) (st ^. _layout <<< _tree) panel initPos p
                 pure $ (clearOperations st) # _btnsOperations  .~ singleton (MovePlusButton (d ^. _object) delta)
                                             # _arrayOperations .~ singleton (TempPanels tempPs)
                                             # _lastDragPos     .~ Just p
