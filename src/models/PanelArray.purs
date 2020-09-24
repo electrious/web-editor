@@ -4,6 +4,7 @@ import Prelude
 
 import Algorithm.Segment (_segData)
 import Algorithm.SegmentRow (SegmentRow, _segments, groupSegments, mergeSegments)
+import Data.Array as Array
 import Data.Foldable (class Foldable, foldl)
 import Data.Int (toNumber)
 import Data.Lens (view, (%~), (.~), (^.))
@@ -79,12 +80,12 @@ tripleToTuple :: forall a b c. Triple a b c -> Tuple a b
 tripleToTuple (Triple a b _) = Tuple a b
 
 rotateRow :: PanelArray -> Int -> Tuple (List Panel) (List Panel)
-rotateRow arr rowNum = tripleToTuple $ foldl f (Triple Nil Nil (meter 0.0)) (arr ^. _rows)
+rotateRow arr rowNum = tripleToTuple $ foldl f (Triple Nil Nil (meter 0.0)) (Array.sortBy (comparing (view _rowNumber)) $ arr ^. _rows)
     where f (Triple newPs toUpd c) r | r ^. _rowNumber == rowNum = rotate r newPs toUpd c
                                      | r ^. _rowNumber >  rowNum = updateY r newPs toUpd c
                                      | otherwise                 = Triple (newPs <> r ^. _panels) toUpd c
 
-          rotate r newPs toUpd _ = let ps     = sortBy (comparing (view _x)) $ arr ^. _panels
+          rotate r newPs toUpd _ = let ps     = sortBy (comparing (view _x)) $ r ^. _panels
                                        p      = unsafePartial $ fromJust $ head ps
                                        sz     = size p
                                        w      = sz ^. _width
@@ -99,10 +100,10 @@ rotateRow arr rowNum = tripleToTuple $ foldl f (Triple Nil Nil (meter 0.0)) (arr
                                                                                          # _y .~ newY
                                                                                          # _orientation %~ flipOrientation
                                                                             in Triple (newP:nps) (newP:ups) c
-                                   in foldl g (Triple Nil Nil change) $ mapWithIndex Tuple $ r ^. _panels
+                                   in foldl g (Triple newPs toUpd change) $ mapWithIndex Tuple $ r ^. _panels
           updateY r newPs toUpd c = let g (Triple nps ups change) p = let newP = p # _y %~ ((+) change)
                                                                       in Triple (newP:nps) (newP:ups) change
-                                    in foldl g (Triple Nil Nil c) $ r ^. _panels
+                                    in foldl g (Triple newPs toUpd c) $ r ^. _panels
 
 newtype ArrayWithCenter = ArrayWithCenter {
     centerX :: Meter,
