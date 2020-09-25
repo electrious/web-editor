@@ -469,10 +469,7 @@ zeroSlope roof ps | isFlat roof = ps
                   | otherwise   = set _slope def <$> ps
 
 loadPanels :: PanelLayerConfig -> PanelLayerState -> List Panel -> Effect PanelLayerState
-loadPanels cfg st Nil = do
-    -- update the layout with no panels at loading
-    newLayout <- updateLayout cfg st Nil
-    pure $ st # _layout .~ newLayout
+loadPanels cfg st Nil = pure st
 loadPanels cfg st ps  = do
     let nps = zeroSlope (cfg ^. _roof) ps
     newLayout <- updateLayout cfg st nps
@@ -734,8 +731,15 @@ checkAndUpdateBtnOps cfg arrayChanged st = if st ^. _roofActive
             actArr    = fromMaybe 1000000 $ st ^. _activeArray
             arrCnt    = size $ layout ^. _arrays
             newActArr = if arrayChanged && actArr >= arrCnt then findActiveArray layout else actArr
-            arr       = getArrayAt newActArr layout
-        case arr of
+        
+        -- if there's no arrays, then create a temporary layout which will have a single array
+        -- that use the current main orientation
+        l <- if arrCnt == 0
+             then updateLayout cfg st Nil
+             else pure layout
+
+        -- get the active array and update buttons for it
+        case getArrayAt newActArr l of
             Just a -> do btnOps <- btnOpsForArray cfg st a
                          pure $ st # _btnsOperations %~ flip append btnOps
                                    # _activeArray    .~ Just newActArr
