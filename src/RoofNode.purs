@@ -22,7 +22,7 @@ import Editor.ArrayBuilder (ArrayBuilder, _editorMode, performArrayBuilderDyn)
 import Editor.Common.Lenses (_alignment, _center, _id, _mesh, _orientation, _panelType, _roof, _slope, _tapped)
 import Editor.Disposable (class Disposable, dispose)
 import Editor.EditorMode (EditorMode(..))
-import Editor.PanelLayer (PanelLayer, PanelLayerConfig(..), _inactiveRoofTapped, _initPanels, _mainOrientation, _roofActive, createPanelLayer)
+import Editor.PanelLayer (PanelLayer, PanelLayerConfig(..), _inactiveRoofTapped, _initPanels, _mainOrientation, _roofActive, _currentPanels, createPanelLayer)
 import Editor.PanelNode (PanelOpacity(..))
 import Editor.Rendering.PanelRendering (_opacity)
 import Editor.RoofEditor (_deleteRoof, _roofVertices, createRoofEditor)
@@ -70,13 +70,14 @@ instance defaultRoofNodeConfig :: Default RoofNodeConfig where
     }
 
 newtype RoofNode = RoofNode {
-    roofId     :: UUID,
-    roof       :: RoofPlate,
-    roofUpdate :: Event RoofOperation,
-    roofDelete :: Event RoofOperation,
-    tapped     :: Event RoofPlate,
-    roofObject :: Object3D,
-    disposable :: Effect Unit
+    roofId        :: UUID,
+    roof          :: RoofPlate,
+    roofUpdate    :: Event RoofOperation,
+    roofDelete    :: Event RoofOperation,
+    tapped        :: Event RoofPlate,
+    roofObject    :: Object3D,
+    currentPanels :: Event (List Panel),
+    disposable    :: Effect Unit
 }
 
 derive instance newtypeRoofNode :: Newtype RoofNode _
@@ -233,6 +234,10 @@ createRoofNode cfg = do
         roof           = cfg ^. _roof
         rid            = roof ^. _id
         isActive       = cfg ^. _roofActive
+
+        getPsE Nothing  = empty
+        getPsE (Just l) = l ^. _currentPanels
+        curPsEvt = latestEvt $ getPsE <$> panelLayerDyn
     
     -- set the roof node position
     liftEffect do
@@ -259,11 +264,12 @@ createRoofNode cfg = do
         when (not $ testSimplePolygon ps) (void $ setTimeout 1000 (toDel unit))
 
         pure $ RoofNode {
-            roofId     : rid,
-            roof       : roof,
-            roofDelete : multicast $ const (RoofOpDelete rid) <$> delRoofEvt,
-            roofUpdate : multicast newRoof,
-            tapped     : multicast $ const roof <$> (roofTapEvt <|> roofTapOnPanelEvt),
-            roofObject : obj,
-            disposable : sequence_ [d, d1, dispose editor]
+            roofId        : rid,
+            roof          : roof,
+            roofDelete    : multicast $ const (RoofOpDelete rid) <$> delRoofEvt,
+            roofUpdate    : multicast newRoof,
+            tapped        : multicast $ const roof <$> (roofTapEvt <|> roofTapOnPanelEvt),
+            roofObject    : obj,
+            disposable    : sequence_ [d, d1, dispose editor],
+            currentPanels : curPsEvt
         }

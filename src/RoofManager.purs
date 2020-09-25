@@ -6,13 +6,15 @@ import Algorithm.MeshFlatten (flattenRoofPlates)
 import Control.Alt ((<|>))
 import Control.Monad.Reader (ask)
 import Control.Plus (empty)
+import Data.Array as Array
 import Data.Compactable (compact)
 import Data.Default (def)
 import Data.Foldable (class Foldable, foldl, sequence_, traverse_)
 import Data.Lens (Lens', view, (^.), (%~), (.~))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.List (List(..), toUnfoldable)
+import Data.List (List(..), concat, toUnfoldable)
+import Data.List as List
 import Data.Map (Map, delete, fromFoldable, insert, lookup, values)
 import Data.Maybe (Maybe(..), fromMaybe, isNothing)
 import Data.Newtype (class Newtype)
@@ -28,7 +30,7 @@ import Editor.Disposable (class Disposable, dispose)
 import Editor.EditorMode (EditorMode(..))
 import Editor.House (HouseMeshData)
 import Editor.HouseEditor (HouseEditor, _roofPlates, performEditorEvent)
-import Editor.PanelLayer (_initPanels, _mainOrientation, _roofActive)
+import Editor.PanelLayer (_currentPanels, _initPanels, _mainOrientation, _roofActive)
 import Editor.PanelNode (PanelOpacity(..))
 import Editor.Rendering.PanelRendering (_opacity)
 import Editor.RoofNode (RoofNode, RoofNodeConfig, _roofDelete, _roofUpdate, createRoofNode)
@@ -37,10 +39,10 @@ import Effect (Effect)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic, step)
 import FRP.Event (Event, create, fold, keepLatest, subscribe, withLast)
-import FRP.Event.Extra (debounce, delay, multicast, performEvent, skip)
+import FRP.Event.Extra (debounce, delay, mergeArray, multicast, performEvent, skip)
 import Model.Racking.OldRackingSystem (OldRoofRackingData, guessRackingType)
 import Model.Racking.RackingType (RackingType(..))
-import Model.Roof.Panel (Alignment(..), Orientation(..), PanelsDict, panelsDict)
+import Model.Roof.Panel (Alignment(..), Orientation(..), PanelsDict, generalOrientation, panelsDict)
 import Model.Roof.RoofPlate (RoofEdited, RoofOperation(..), RoofPlate, _roofIntId, toRoofEdited)
 import Three.Core.Object3D (class IsObject3D, Object3D, add, mkObject3D, remove, setName)
 
@@ -140,12 +142,23 @@ renderNodes wrapper { last, now } = do
     traverse_ (flip add wrapper) now
     pure now
 
+calcMainOrientation :: forall f. Foldable f => Functor f => f RoofNode -> Event Orientation
+calcMainOrientation nodes = calcOrient <<< concat <<< List.fromFoldable <$> mergeArray (Array.fromFoldable $ view _currentPanels <$> nodes)
+    where calcOrient ps = generalOrientation $ view _orientation <$> ps
+
 -- | render dynamic roofs
-renderRoofs :: forall a. IsObject3D a => a -> Event (Maybe UUID) -> Event RoofDictData -> PanelsDict -> Map Int OldRoofRackingData -> HouseEditor (Event (Array RoofNode))
+renderRoofs :: forall a. IsObject3D a => a
+                                      -> Event (Maybe UUID)
+                                      -> Event RoofDictData
+                                      -> PanelsDict
+                                      -> Map Int OldRoofRackingData
+                                      -> HouseEditor (Tuple (Event (Array RoofNode)) (Effect Unit))
 renderRoofs wrapper activeRoof roofsData panelsDict racks = do
+    { event: mainOrientE, push: pushMainOrient } <- liftEffect create
+
     let rsToRenderArr = dictToUnfoldable <$> compact (view _roofsToRender <$> roofsData)
         
-        mainOrientDyn = step Landscape empty
+        mainOrientDyn = step Landscape mainOrientE
         orientDyn     = step Landscape empty
         alignDyn      = step Grid empty
         opacityDyn    = step Opaque empty
@@ -159,7 +172,12 @@ renderRoofs wrapper activeRoof roofsData panelsDict racks = do
                   # _opacity         .~ opacityDyn
     -- create roofnode for each roof and render them
     nodes <- performEditorEvent $ traverse (mkNode activeRoof panelsDict racks cfg) <$> rsToRenderArr
-    pure $ multicast $ performEvent $ renderNodes wrapper <$> withLast nodes
+    let nodesEvt      = multicast $ performEvent $ renderNodes wrapper <$> withLast nodes
+        mainOrientEvt = keepLatest $ calcMainOrientation <$> nodesEvt
+    
+    d <- liftEffect $ subscribe mainOrientEvt pushMainOrient
+
+    pure $ Tuple nodesEvt d
 
 isRoofEditing :: HouseEditor (Dynamic Boolean)
 isRoofEditing = map ((==) RoofEditing) <<< view _modeDyn <$> ask
@@ -200,7 +218,7 @@ createRoofManager meshData racks = do
     canEditRoofDyn <- isRoofEditing
 
     -- render roofs dynamically
-    renderedNodes <- renderRoofs wrapper activeRoof roofsData panelsDict racks
+    Tuple renderedNodes d <- renderRoofs wrapper activeRoof roofsData panelsDict racks
 
     let deleteRoofOp  = multicast $ keepLatest $ getRoofDelete <$> renderedNodes
         updateRoofOp  = keepLatest $ getRoofUpdate             <$> renderedNodes
@@ -236,5 +254,5 @@ createRoofManager meshData racks = do
     pure $ RoofManager {
         wrapper     : wrapper,
         editedRoofs : multicast $ skip 1 $ debounce (Milliseconds 1000.0) $ getRoofEdited <$> newRoofs,
-        disposable  : sequence_ [d1, d2, dispose recognizer]
+        disposable  : sequence_ [d, d1, d2, dispose recognizer]
     }

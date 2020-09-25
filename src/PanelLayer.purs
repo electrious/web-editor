@@ -98,7 +98,9 @@ newtype PanelLayer = PanelLayer {
     arrayChanged        :: Event Unit,
     serverUpdated       :: Event Unit,
     arrayDragging       :: Dynamic Boolean,
-    inactiveRoofTapped  :: Event Unit
+    inactiveRoofTapped  :: Event Unit,
+
+    currentPanels       :: Event (List Panel)
 }
 
 derive instance newtypePanelLayer :: Newtype PanelLayer _
@@ -118,7 +120,8 @@ defPanelLayerWith obj roof renderer btnsRenderer apiInterpreter = PanelLayer {
     arrayChanged       : empty,
     serverUpdated      : empty,
     arrayDragging      : step false empty,
-    inactiveRoofTapped : empty
+    inactiveRoofTapped : empty,
+    currentPanels      : empty
 }
 
 _renderer :: forall t a r. Newtype t { renderer :: a | r } => Lens' t a
@@ -142,6 +145,8 @@ _arrayDragging = _Newtype <<< prop (SProxy :: SProxy "arrayDragging")
 _inactiveRoofTapped :: forall t a r. Newtype t { inactiveRoofTapped :: a | r } => Lens' t a
 _inactiveRoofTapped = _Newtype <<< prop (SProxy :: SProxy "inactiveRoofTapped")
 
+_currentPanels :: forall t a r. Newtype t { currentPanels :: a | r } => Lens' t a
+_currentPanels = _Newtype <<< prop (SProxy :: SProxy "currentPanels")
 
 -- | internal panel layer state data structure
 newtype PanelLayerState = PanelLayerState {
@@ -265,6 +270,9 @@ createPanelLayer cfg = do
         arrChgEvt  = compact $ view _arrayChanged <$> stateEvt
 
         pArrOpEvt  = PanelOperation <$> pOpEvt
+
+        -- current panels
+        curPsEvt   = view (_layout <<< _panels) <$> stateEvt
     
     d1 <- liftEffect $ subscribe pOpEvt pushPanelOpEvt
     d2 <- liftEffect $ subscribe (arrayOpEvt <|> pArrOpEvt) pushArrOpEvt
@@ -273,6 +281,7 @@ createPanelLayer cfg = do
     pure $ nLayer # _serverUpdated .~ apiInterpreter ^. _finished
                   # _arrayChanged  .~ arrChgEvt
                   # _disposable    %~ ((<*) (d1 *> d2 *> d3))
+                  # _currentPanels .~ curPsEvt
 
 setupPanelRenderer :: Object3D -> Event ArrayOperation -> Dynamic PanelOpacity -> ArrayBuilder PanelRenderer
 setupPanelRenderer parent opEvt opacity = createPanelRenderer $ PanelRendererConfig {

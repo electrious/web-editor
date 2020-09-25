@@ -23,6 +23,7 @@ import Data.Maybe (Maybe(..))
 import Data.Meter (Meter, meter, meterVal)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
+import Data.Tuple (Tuple(..))
 import Data.UUID (UUID, emptyUUID, genUUID, toString)
 import Editor.Common.Lenses (_alignment, _height, _id, _orientation, _slope, _width, _x, _y)
 import Editor.Common.ProtoCodable (class ProtoEncodable, toProto)
@@ -136,6 +137,14 @@ instance protoEncodableOrientation :: ProtoEncodable Orientation OrientationPB w
 flipOrientation :: Orientation -> Orientation
 flipOrientation Landscape = Portrait
 flipOrientation Portrait  = Landscape
+
+-- | get general orientation based on a foldable of orientation values
+generalOrientation :: forall f. Foldable f => f Orientation -> Orientation
+generalOrientation = calcR <<< foldl f (Tuple 0 0)
+    where f (Tuple lv pv) Landscape = Tuple (lv + 1) pv
+          f (Tuple lv pv) Portrait  = Tuple lv (pv + 1)
+
+          calcR (Tuple lv pv) = if lv >= pv then Landscape else Portrait
 
 data Alignment = Grid
                | Brick
