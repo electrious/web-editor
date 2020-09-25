@@ -39,7 +39,7 @@ import Effect (Effect)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic, step)
 import FRP.Event (Event, create, fold, keepLatest, subscribe, withLast)
-import FRP.Event.Extra (debounce, delay, mergeArray, multicast, performEvent, skip)
+import FRP.Event.Extra (debounce, debug, delay, distinct, mergeArray, multicast, performEvent, skip)
 import Model.Racking.OldRackingSystem (OldRoofRackingData, guessRackingType)
 import Model.Racking.RackingType (RackingType(..))
 import Model.Roof.Panel (Alignment(..), Orientation(..), PanelsDict, generalOrientation, panelsDict)
@@ -158,7 +158,7 @@ renderRoofs wrapper activeRoof roofsData panelsDict racks = do
 
     let rsToRenderArr = dictToUnfoldable <$> compact (view _roofsToRender <$> roofsData)
         
-        mainOrientDyn = step Landscape mainOrientE
+        mainOrientDyn = step Landscape $ distinct mainOrientE
         orientDyn     = step Landscape empty
         alignDyn      = step Grid empty
         opacityDyn    = step Opaque empty

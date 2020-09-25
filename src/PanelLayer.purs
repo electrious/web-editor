@@ -42,7 +42,7 @@ import Editor.SceneEvent (isDrag, isDragEnd, isDragStart)
 import Editor.UI.DragInfo (DragInfo, mkDragInfo)
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import FRP.Dynamic (Dynamic, dynEvent, gateDyn, sampleDyn, step, subscribeDyn)
+import FRP.Dynamic (Dynamic, current, dynEvent, gateDyn, sampleDyn, step, subscribeDyn)
 import FRP.Event (Event, create, gate, sampleOn, subscribe)
 import FRP.Event.Extra (debounce, foldEffect, fromFoldableE, multicast, performEvent, skip)
 import Model.ArrayComponent (arrayNumber)
@@ -424,15 +424,16 @@ mkPanelAtPlusBtnPos roof pb = do
                # _orientation .~ pb ^. _orientation
 
 -- | function to update the ArrayLayout data structure 
-updateLayout :: forall f. Foldable f => Functor f => PanelLayerState -> f Panel -> Effect PanelsLayout
-updateLayout st ps = if null ps
-                     then defaultLayout orient cfg
-                     else layoutPanels ps cfg
-    where cfg = st ^. _arrayConfig
-          orient = if cfg ^. _rackingType == BX  -- always use landscape for BX system
-                   then Landscape
-                   else fromMaybe Landscape $ st ^. _orientationToUse
-
+updateLayout :: forall f. Foldable f => Functor f => PanelLayerConfig -> PanelLayerState -> f Panel -> Effect PanelsLayout
+updateLayout lCfg st ps = if null ps
+                          then getOrient >>= flip defaultLayout cfg
+                          else layoutPanels ps cfg
+    where cfg    = st ^. _arrayConfig
+          getOrient = if cfg ^. _rackingType == BX  -- always use landscape for BX system
+                        then pure Landscape
+                        else case st ^. _orientationToUse of
+                            Just o  -> pure o
+                            Nothing -> current $ lCfg ^. _mainOrientation
 
 applyPanelLayerOp :: PanelLayerConfig -> PanelLayerState -> PanelLayerOperation -> Effect PanelLayerState
 applyPanelLayerOp cfg st (POLoadPanels ps)            = loadPanels cfg st ps
@@ -470,11 +471,11 @@ zeroSlope roof ps | isFlat roof = ps
 loadPanels :: PanelLayerConfig -> PanelLayerState -> List Panel -> Effect PanelLayerState
 loadPanels cfg st Nil = do
     -- update the layout with no panels at loading
-    newLayout <- updateLayout st Nil
+    newLayout <- updateLayout cfg st Nil
     pure $ st # _layout .~ newLayout
 loadPanels cfg st ps  = do
     let nps = zeroSlope (cfg ^. _roof) ps
-    newLayout <- updateLayout st nps
+    newLayout <- updateLayout cfg st nps
     pure $ st # _layout .~ newLayout
               # _panelOperations .~ singleton (LoadPanels nps)
 
@@ -488,7 +489,7 @@ addPanel cfg st p = do
         ps    = np : oldPs
 
     -- update layout with new panels
-    newLayout <- updateLayout st ps
+    newLayout <- updateLayout cfg st ps
 
     -- get the updated new panel
     let updatedPs = newLayout ^. _panelsUpdated
@@ -508,7 +509,7 @@ addPanels cfg st ps = do
         newPs = append ps oldPs
 
     -- update layout with new panels
-    newLayout <- updateLayout st newPs
+    newLayout <- updateLayout cfg st newPs
 
     let updPs = newLayout ^. _panelsUpdated
         f ops p = case get (p ^. _uuid) updPs of
@@ -528,7 +529,7 @@ deletePanel :: PanelLayerConfig -> PanelLayerState -> UUID -> Effect PanelLayerS
 deletePanel cfg st pid = do
     let ps = filter ((/=) pid <<< view _uuid) $ allPanels st
     
-    newLayout <- updateLayout st ps
+    newLayout <- updateLayout cfg st ps
     let delPOp = DelPanel pid
         updOps = UpdatePanels $ toUnfoldable (newLayout ^. _panelsUpdated)
     
@@ -558,7 +559,7 @@ updateAlignment cfg st algn = case filter ((/=) algn <<< view _alignment) $ getA
             psOtherArrs = filter ((/=) (arr ^. _arrayNumber) <<< arrayNumber) $ allPanels st
 
         -- update layout with all updated panels
-        newLayout <- updateLayout st $ append toUpd psOtherArrs
+        newLayout <- updateLayout cfg st $ append toUpd psOtherArrs
 
         -- combine all panels that have been changed
         let updated = toUnfoldable $ merge (newLayout ^. _panelsUpdated) (UpdatedPanels.fromFoldable toUpd)
@@ -574,10 +575,11 @@ updateAlignment cfg st algn = case filter ((/=) algn <<< view _alignment) $ getA
 updateOrientation :: PanelLayerConfig -> PanelLayerState -> Orientation -> Effect PanelLayerState
 updateOrientation cfg st o = do
     let nst = (clearOperations st) # _orientationToUse .~ Just o
-    newLayout <- updateLayout nst Nil
+    newLayout <- updateLayout cfg nst Nil
     checkAndUpdateBtnOps cfg true $ nst # _panelOperations .~ singleton DeleteAll
                                         # _layout          .~ newLayout
                                         # _arrayChanged    .~ Just unit
+                                        # _orientationToUse .~ Nothing
 
 
 dragPanel :: PanelLayerConfig -> PanelLayerState -> DragInfo Panel -> Effect PanelLayerState
@@ -617,7 +619,7 @@ endDragging cfg st arr = if not (st ^. _roofActive) || st ^. _activeArray /= Jus
             -- delete panels outside roof or touching other arrays
             toDel   = append outside.yes touched.yes
         -- update layout with left panels and panels in other arrays
-        newLayout <- updateLayout st $ append arrPs.no touched.no
+        newLayout <- updateLayout cfg st $ append arrPs.no touched.no
         -- merge all updated panels
         let updated = merge (newLayout ^. _panelsUpdated) (UpdatePanels.fromFoldable touched.no)
 
@@ -673,7 +675,7 @@ rotateRowInArr cfg st row arr = case getArrayAt arr (st ^. _layout) of
 
             otherArrPs = filter ((/=) arr <<< arrayNumber) $ allPanels st
         -- update layout with new valid panels and panels from other arrays
-        newLayout <- updateLayout st (append touched.no otherArrPs)
+        newLayout <- updateLayout cfg st (append touched.no otherArrPs)
         let updated = merge (newLayout ^. _panelsUpdated) (deletePanels toDelIds $ UpdatedPanels.fromFoldable updatedPs)
 
             delOp = DelPanels toDelIds
@@ -691,11 +693,12 @@ updateArrayConfig cfg st arrCfg = do
         let nst = if rt == BX
                   then (clearOperations st) # _orientationToUse .~ Just Landscape
                   else clearOperations st
-        newLayout <- updateLayout nst Nil
+        newLayout <- updateLayout cfg nst Nil
         checkAndUpdateBtnOps cfg true $ nst # _panelOperations .~ singleton DeleteAll
                                             # _layout          .~ newLayout
                                             # _arrayConfig     .~ arrCfg
                                             # _arrayChanged    .~ Just unit
+                                            # _orientationToUse .~ Nothing
     else pure $ (clearOperations st) # _arrayConfig .~ arrCfg
 
 
