@@ -57,7 +57,7 @@ doTest roofDat panelDat = do
                                    # _premium    .~ Just qCellSolarPanelJPG
                                    # _standard72 .~ Just qCellSolarPanel72PNG
                     apiCfg = def # _auth .~ Just "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJJZCI6IiIsImN0YyI6NCwianRpIjoiNCJ9.d6pG95A4EoAPGhhnN4BsL7QtarpBRCEcta0Uu72SoVU"
-                                 # _baseUrl .~ "https://api.electrious.com/v1"
+                                 # _baseUrl .~ "https://api.electrious.com"
 
                     cfg = def # _elem       .~ elem
                               # _modeDyn    .~ modeDyn

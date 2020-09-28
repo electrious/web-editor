@@ -22,7 +22,7 @@ import Editor.ArrayBuilder (ArrayBuilder, _editorMode, performArrayBuilderDyn)
 import Editor.Common.Lenses (_alignment, _center, _id, _mesh, _orientation, _panelType, _roof, _slope, _tapped)
 import Editor.Disposable (class Disposable, dispose)
 import Editor.EditorMode (EditorMode(..))
-import Editor.PanelLayer (PanelLayer, PanelLayerConfig(..), _inactiveRoofTapped, _initPanels, _mainOrientation, _roofActive, _currentPanels, createPanelLayer)
+import Editor.PanelLayer (PanelLayer, PanelLayerConfig(..), _currentPanels, _inactiveRoofTapped, _initPanels, _mainOrientation, _roofActive, _serverUpdated, createPanelLayer)
 import Editor.PanelNode (PanelOpacity(..))
 import Editor.Rendering.PanelRendering (_opacity)
 import Editor.RoofEditor (_deleteRoof, _roofVertices, createRoofEditor)
@@ -77,6 +77,7 @@ newtype RoofNode = RoofNode {
     tapped        :: Event RoofPlate,
     roofObject    :: Object3D,
     currentPanels :: Event (List Panel),
+    serverUpdated :: Event Unit,
     disposable    :: Effect Unit
 }
 
@@ -213,6 +214,10 @@ renderPanels cfg content = do
     d <- liftEffect $ subscribeDyn (withLast panelLayerDyn) render
     pure $ Tuple panelLayerDyn d
 
+evtInMaybe :: forall a b. (a -> Event b) -> Maybe a -> Event b
+evtInMaybe _ Nothing  = empty
+evtInMaybe f (Just a) = f a
+
 -- | Create RoofNode for a RoofPlate
 createRoofNode :: RoofNodeConfig -> ArrayBuilder RoofNode
 createRoofNode cfg = do
@@ -226,19 +231,13 @@ createRoofNode cfg = do
     Tuple panelLayerDyn d <- renderPanels cfg content
     
     let -- get the panel tap event on inactive roofs
-        inactTap Nothing  = empty
-        inactTap (Just l) = l ^. _inactiveRoofTapped
-        roofTapOnPanelEvt = latestEvt $ inactTap <$> panelLayerDyn
+        roofTapOnPanelEvt = latestEvt $ evtInMaybe (view _inactiveRoofTapped) <$> panelLayerDyn
 
         canEditRoofDyn = (==) RoofEditing <$> modeDyn
         roof           = cfg ^. _roof
         rid            = roof ^. _id
         isActive       = cfg ^. _roofActive
 
-        getPsE Nothing  = empty
-        getPsE (Just l) = l ^. _currentPanels
-        curPsEvt = latestEvt $ getPsE <$> panelLayerDyn
-    
     -- set the roof node position
     liftEffect do
         setupRoofNode obj content roof
@@ -271,5 +270,6 @@ createRoofNode cfg = do
             tapped        : multicast $ const roof <$> (roofTapEvt <|> roofTapOnPanelEvt),
             roofObject    : obj,
             disposable    : sequence_ [d, d1, dispose editor],
-            currentPanels : curPsEvt
+            currentPanels : latestEvt $ evtInMaybe (view _currentPanels) <$> panelLayerDyn,
+            serverUpdated : latestEvt $ evtInMaybe (view _serverUpdated) <$> panelLayerDyn
         }

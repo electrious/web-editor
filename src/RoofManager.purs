@@ -30,7 +30,7 @@ import Editor.Disposable (class Disposable, dispose)
 import Editor.EditorMode (EditorMode(..))
 import Editor.House (HouseMeshData)
 import Editor.HouseEditor (HouseEditor, _roofPlates, performEditorEvent)
-import Editor.PanelLayer (_currentPanels, _initPanels, _mainOrientation, _roofActive)
+import Editor.PanelLayer (_currentPanels, _initPanels, _mainOrientation, _roofActive, _serverUpdated)
 import Editor.PanelNode (PanelOpacity(..))
 import Editor.Rendering.PanelRendering (_opacity)
 import Editor.RoofNode (RoofNode, RoofNodeConfig, _roofDelete, _roofUpdate, createRoofNode)
@@ -97,17 +97,21 @@ doFlatten meshData rd = flattenRoofPlates (meshData ^. _geometry)
                                           (meshData ^. (_mesh <<< _mesh))
                                           (toUnfoldable $ values rd)
 
+-- | accumulate event value in a foldable list of values with the specified retreive function
+foldEvtWith :: forall a b f. Foldable f => Functor f => (a -> Event b) -> f a -> Event b
+foldEvtWith f l = foldl (<|>) empty (f <$> l)
+
 -- | get roofUpdate event from an array of roof nodes
-getRoofUpdate :: Array RoofNode -> Event RoofOperation
-getRoofUpdate ns = foldl (<|>) empty (view _roofUpdate <$> ns)
+getRoofUpdate :: forall f. Foldable f => Functor f => f RoofNode -> Event RoofOperation
+getRoofUpdate = foldEvtWith (view _roofUpdate)
 
 -- | get roofDelete event from an array of roof nodes
-getRoofDelete :: Array RoofNode -> Event RoofOperation
-getRoofDelete ns = foldl (<|>) empty (view _roofDelete <$> ns)
+getRoofDelete :: forall f. Foldable f => Functor f => f RoofNode -> Event RoofOperation
+getRoofDelete = foldEvtWith (view _roofDelete)
 
 -- | get the activated roof id event from an array of roof nodes
-getActivated :: Array RoofNode -> Event UUID
-getActivated ns = foldl (<|>) empty (f <$> ns)
+getActivated :: forall f. Foldable f => Functor f => f RoofNode -> Event UUID
+getActivated = foldEvtWith f
     where f n = const (n ^. _roofId) <$> (n ^. _tapped)
 
 createWrapper :: Effect Object3D
@@ -223,6 +227,7 @@ createRoofManager meshData racks = do
     let deleteRoofOp  = multicast $ keepLatest $ getRoofDelete <$> renderedNodes
         updateRoofOp  = keepLatest $ getRoofUpdate             <$> renderedNodes
         activatedRoof = keepLatest $ getActivated              <$> renderedNodes
+        serverUpdEvt  = keepLatest $ foldEvtWith (view _serverUpdated) <$> renderedNodes
 
         -- event of new roofs that will be updated on any change and
         -- run the roof flatten algorithm whenever there's new roof change
@@ -242,6 +247,9 @@ createRoofManager meshData racks = do
 
     let newActRoof = getActiveRoof meshData activatedRoof deleteRoofOp addedNewRoof
     d2 <- liftEffect $ subscribe newActRoof updateActive
+
+    -- make sure the serverupdate event is subscribed so API calls will be called
+    d3 <- liftEffect $ subscribe serverUpdEvt (const $ pure unit)
     
     -- set default values
     liftEffect do

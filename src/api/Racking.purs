@@ -19,5 +19,5 @@ instance decodeRackingResp :: Decode RackingResp where
 
 
 loadRacking :: Int -> API (Event (F OldRackingSystem))
-loadRacking leadId = map (map getRacking) <$> callAPI GET ("/leads/" <> show leadId <> "/racking") {}
+loadRacking leadId = map (map getRacking) <$> callAPI GET ("/v1/leads/" <> show leadId <> "/racking") {}
     where getRacking (RackingResp r) = r.racking
