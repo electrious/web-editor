@@ -6,8 +6,12 @@ import Data.Array (cons)
 import Data.Default (def)
 import Data.Foldable (sequence_)
 import Data.Int (toNumber)
-import Data.Lens ((^.))
+import Data.Lens (Lens', (^.))
+import Data.Lens.Iso.Newtype (_Newtype)
+import Data.Lens.Record (prop)
+import Data.Maybe (Maybe, fromMaybe)
 import Data.Newtype (class Newtype)
+import Data.Symbol (SProxy(..))
 import Editor.Common.Lenses (_deltaX, _deltaY, _height, _shiftDragged, _width, _zoomed)
 import Editor.Disposable (class Disposable, dispose)
 import Editor.EditorMode (EditorMode(..))
@@ -28,7 +32,7 @@ import Three.Core.Object3D (class IsObject3D, Object3D, add, hasParent, lookAt, 
 import Three.Core.Scene (disposeScene, mkScene)
 import Three.Core.WebGLRenderer (domElement, mkWebGLRenderer, render, setSize)
 import Three.Math.Euler (mkEuler)
-import Three.Math.Vector (length, mkVec3, multiplyScalar, normal, vecX, vecY)
+import Three.Math.Vector (Vector3, length, mkVec3, multiplyScalar, normal, vecX, vecY)
 import Web.DOM (Element)
 import Web.DOM.Element (toNode)
 import Web.DOM.Node (appendChild)
@@ -37,6 +41,7 @@ import Web.HTML.Window (requestAnimationFrame)
 
 -- | internal record that defines all components for threejs related objects
 newtype WebEditor = WebEditor {
+    canvas     :: Element,
     render     :: Effect Unit,
     addContent :: Object3D -> Effect Unit,
     disposable :: Ref (Array (Effect Unit))
@@ -45,6 +50,9 @@ newtype WebEditor = WebEditor {
 derive instance newtypeEditorScene :: Newtype WebEditor _
 instance disposableEditorScene :: Disposable WebEditor where
     dispose (WebEditor { disposable }) = read disposable >>= sequence_
+
+_canvas :: forall t a r. Newtype t { canvas :: a | r } => Lens' t a
+_canvas = _Newtype <<< prop (SProxy :: SProxy "canvas")
 
 addToScene :: Object3D -> WebEditor -> Effect Unit
 addToScene obj (WebEditor s) = s.addContent obj
@@ -96,8 +104,8 @@ moveWithShiftDrag obj drag scale | not (hasParent obj) = pure unit
                                     translateX (vecX lVec * scale / 10.0) obj
                                     translateY (vecY lVec * scale / 10.0) obj
 
-setupOrbitControls :: OrbitControls -> Effect Unit
-setupOrbitControls c = do
+setupOrbitControls :: OrbitControls -> Dynamic (Maybe Vector3) -> Effect (Effect Unit)
+setupOrbitControls c target = do
     setAutoRotate true c
     setAutoRotateSpeed 0.5 c
     enableDamping true c
@@ -107,11 +115,12 @@ setupOrbitControls c = do
     setMaxPolarAngle (radianVal $ degree 50.0) c
     setMinDistance 15.0 c
     setMaxDistance 35.0 c
-    setTarget (mkVec3 0.0 0.0 (-5.0)) c
+    let t = fromMaybe (mkVec3 0.0 0.0 (-5.0)) <$> target
+    subscribeDyn t (flip setTarget c)
 
 -- | internal function to create the threejs scene, camera, light and renderer
-createScene :: Dynamic Size -> Dynamic EditorMode -> Element -> Effect WebEditor
-createScene sizeDyn modeDyn elem = do
+createScene :: Dynamic Size -> Dynamic EditorMode -> Dynamic (Maybe Vector3) -> Element -> Effect WebEditor
+createScene sizeDyn modeDyn targetDyn elem = do
     -- set the default Up direction as z axis in the scene
     setDefaultUp (mkVec3 0.0 0.0 1.0)
 
@@ -128,7 +137,8 @@ createScene sizeDyn modeDyn elem = do
     d1 <- subscribeDyn sizeDyn resized
 
     -- attach the webgl canvas to parent DOM element
-    _ <- appendChild (toNode $ domElement renderer) (toNode elem)
+    let canvas = domElement renderer
+    _ <- appendChild (toNode canvas) (toNode elem)
 
     -- set the camera position and orient it toward the center
     setupCameraPos camera
@@ -137,7 +147,7 @@ createScene sizeDyn modeDyn elem = do
 
     -- setup the orbit controls
     orbitCtrl <- mkOrbitControls camera (domElement renderer)
-    setupOrbitControls orbitCtrl
+    d5 <- setupOrbitControls orbitCtrl targetDyn
 
     let isShowing = (==) Showing <$> modeDyn
         canEdit = not <$> isShowing
@@ -189,8 +199,9 @@ createScene sizeDyn modeDyn elem = do
     let shiftDragEvt = performEvent $ sampleDyn scaleDyn $ moveWithShiftDrag content <$> gateDyn canEdit (inputEvts ^. _shiftDragged) 
     d3 <- subscribe shiftDragEvt (const $ pure unit)
 
-    disposable <- new [d1, d2, d3, d4, disposeScene scene, dispose rcs, OrbitControls.dispose orbitCtrl]
+    disposable <- new [d1, d2, d3, d4, d5, disposeScene scene, dispose rcs, OrbitControls.dispose orbitCtrl]
     pure $ WebEditor {
+        canvas     : canvas,
         render     : renderFunc,
         addContent : addContentFunc,
         disposable : disposable

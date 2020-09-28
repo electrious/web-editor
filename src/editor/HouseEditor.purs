@@ -23,31 +23,33 @@ import Model.Roof.Panel (Panel)
 import Model.Roof.RoofPlate (RoofPlate)
 
 newtype HouseConfig = HouseConfig {
-    leadId        :: Int,
-    houseId       :: Int,
-    roofPlates    :: Array RoofPlate,
-    panels        :: Array Panel,
-    dataServer    :: String,
-    modeDyn       :: Dynamic EditorMode,
-    textureInfo   :: PanelTextureInfo,
-    rotBtnTexture :: String,
-    panelType     :: Dynamic PanelType,
-    apiConfig     :: APIConfig
+    leadId          :: Int,
+    houseId         :: Int,
+    roofPlates      :: Array RoofPlate,
+    panels          :: Array Panel,
+    dataServer      :: String,
+    modeDyn         :: Dynamic EditorMode,
+    textureInfo     :: PanelTextureInfo,
+    rotBtnTexture   :: String,
+    panelType       :: Dynamic PanelType,
+    apiConfig       :: APIConfig,
+    screenshotDelay :: Int
 }
 
 derive instance newtypeHouseConfig :: Newtype HouseConfig _
 instance defaultHouseConfig :: Default HouseConfig where
     def = HouseConfig {
-        leadId        : 0,
-        houseId       : 0,
-        roofPlates    : [],
-        panels        : [],
-        dataServer    : "",
-        modeDyn       : step Showing empty,
-        textureInfo   : def,
-        rotBtnTexture : "",
-        panelType     : step Standard empty,
-        apiConfig     : def
+        leadId          : 0,
+        houseId         : 0,
+        roofPlates      : [],
+        panels          : [],
+        dataServer      : "",
+        modeDyn         : step Showing empty,
+        textureInfo     : def,
+        rotBtnTexture   : "",
+        panelType       : step Standard empty,
+        apiConfig       : def,
+        screenshotDelay : 100
     }
 
 _roofPlates :: Lens' HouseConfig (Array RoofPlate)
@@ -59,6 +61,8 @@ _dataServer = _Newtype <<< prop (SProxy :: SProxy "dataServer")
 _rotBtnTexture :: forall t a r. Newtype t { rotBtnTexture :: a | r } => Lens' t a
 _rotBtnTexture = _Newtype <<< prop (SProxy :: SProxy "rotBtnTexture")
 
+_screenshotDelay :: forall t a r. Newtype t { screenshotDelay :: a | r } => Lens' t a
+_screenshotDelay = _Newtype <<< prop (SProxy :: SProxy "screenshotDelay")
 
 newtype HouseEditor a = HouseEditor (ReaderT HouseConfig Effect a)
 

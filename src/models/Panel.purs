@@ -180,8 +180,6 @@ instance protoEncodableAlignment :: ProtoEncodable Alignment AlignmentPB where
 newtype Panel = Panel {
     id             :: Int,
     uuid           :: UUID,
-    lead_id        :: Int,
-    roofplate_id   :: Int,
     roofplate_uuid :: UUID,
     row_number     :: Int,
     array_number   :: Int,
@@ -224,8 +222,6 @@ instance protoEncodablePanel :: ProtoEncodable Panel PanelPB where
         setUUIDString (toString $ p ^. _uuid) u1
         setUUID u1 pb
 
-        setLeadId (p ^. _leadId) pb
-
         u2 <- mkPBUUID
         setUUIDString (toString $ p ^. _roofUUID) u2
         setRoofplateUUID u2 pb
@@ -245,8 +241,6 @@ instance defaultPanel :: Default Panel where
     def = Panel {
         id             : 0,
         uuid           : emptyUUID,
-        lead_id        : 0,
-        roofplate_id   : 0,
         roofplate_uuid : emptyUUID,
         row_number     : 0,
         array_number   : 0,
@@ -258,12 +252,6 @@ instance defaultPanel :: Default Panel where
     }
 _uuid :: Lens' Panel UUID
 _uuid = _Newtype <<< prop (SProxy :: SProxy "uuid")
-
-_leadId :: Lens' Panel Int
-_leadId = _Newtype <<< prop (SProxy :: SProxy "lead_id")
-
-_roofId :: Lens' Panel Int
-_roofId = _Newtype <<< prop (SProxy :: SProxy "roofplate_id")
 
 _roofUUID :: Lens' Panel UUID
 _roofUUID = _Newtype <<< prop (SProxy :: SProxy "roofplate_uuid")

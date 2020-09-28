@@ -11,7 +11,7 @@ import Data.Lens ((.~), (^.))
 import Data.Maybe (Maybe(..))
 import Data.Traversable (traverse)
 import Editor.Common.Lenses (_apiConfig, _houseId, _leadId, _modeDyn, _panelType, _panels, _textureInfo)
-import Editor.Editor (_roofUpdate, createEditor, loadHouse)
+import Editor.Editor (_roofUpdate, _screenshot, createEditor, loadHouse)
 import Editor.EditorM (_elem, _sizeDyn, runEditorM)
 import Editor.EditorMode (EditorMode(..))
 import Editor.HouseEditor (_dataServer, _roofPlates, _rotBtnTexture, runHouseEditor)
@@ -77,7 +77,9 @@ doTest roofDat panelDat = do
                 res <- traverse (flip runHouseEditor houseCfg <<< loadHouse) editor
 
                 case res of
-                    Just house -> void $ subscribe (house ^. _roofUpdate) logShow
+                    Just house -> do
+                        void $ subscribe (house ^. _roofUpdate) logShow
+                        void $ subscribe (house ^. _screenshot) logShow
                     Nothing -> pure unit
 
                 pure unit
