@@ -26,7 +26,6 @@ import FRP.Event (Event, create, keepLatest)
 import FRP.Event.Extra (delay, performEvent)
 import Model.Roof.RoofPlate (RoofEdited)
 import Three.Core.WebGLRenderer (toDataUrl)
-import Unsafe.Coerce (unsafeCoerce)
 import Web.HTML (window)
 
 -- | createEditor will create the Web Editor instance
@@ -67,29 +66,34 @@ loadHouse editor = do
     cfg <- ask
 
     { event: loadedEvt, push: loadedFunc } <- liftEffect create
+    
+    -- load house model and racking data
+    hmEvt    <- liftEffect $ loadHouseModel (cfg ^. _dataServer) (cfg ^. _leadId)
+    racksEvt <- runAPIInEditor $ loadRacking (cfg ^. _houseId)
 
-    let f hmd roofRackData = do
-            liftEffect $ addToScene (hmd ^. _wrapper) editor
+    -- extract the roof racking map data
+    let roofRackDatEvt = extrRoofRack <$> racksEvt
+        extrRoofRack res = case runExcept res of
+                            Left _ -> empty
+                            Right v -> v ^. _roofRackings
+    
+        buildRoofMgr hmd roofRackData = do
             mgr <- createRoofManager hmd roofRackData
-            liftEffect $ addToScene (mgr ^. _wrapper) editor
-            liftEffect $ addDisposable (dispose mgr) editor
+            liftEffect do
+                addToScene (hmd ^. _wrapper) editor
+                addToScene (mgr ^. _wrapper) editor
+                addDisposable (dispose mgr) editor
             
-            liftEffect $ loadedFunc unit
+                loadedFunc unit
+            
             pure (mgr ^. _editedRoofs)
         
         getScreenshot _ = toDataUrl "image/png" (editor ^. _canvas)
-
-        screenshotEvt = performEvent $ getScreenshot <$> delay (cfg ^. _screenshotDelay) loadedEvt
-    e <- liftEffect $ loadHouseModel (cfg ^. _dataServer) (cfg ^. _leadId)
-    racksEvt <- runAPIInEditor $ loadRacking (cfg ^. _houseId)
-    let roofRackDatEvt = g <$> racksEvt
-        g res = case runExcept res of
-                Left _ -> empty
-                Right v -> v ^. _roofRackings
-    roofUpdEvt <- keepLatest <$> performEditorEvent (f <$> e <*> roofRackDatEvt)
+    
+    roofUpdEvt <- keepLatest <$> performEditorEvent (buildRoofMgr <$> hmEvt <*> roofRackDatEvt)
 
     pure $ House {
         loaded     : loadedEvt,
-        screenshot : screenshotEvt,
+        screenshot : performEvent $ getScreenshot <$> delay (cfg ^. _screenshotDelay) loadedEvt,
         roofUpdate : roofUpdEvt
     }
