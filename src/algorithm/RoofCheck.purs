@@ -11,11 +11,11 @@ import Effect (Effect)
 import Math.Angle (acos, degreeVal)
 import Model.Roof.RoofPlate (RoofPlate, getRoofPolygon)
 import Three.Core.Face3 (normal)
-import Three.Core.Object3D (Object3D, worldToLocal)
+import Three.Core.Object3D (class IsObject3D, worldToLocal)
 import Three.Math.Vector (mkVec2, mkVec3, vecX, vecY, (<.>))
 
 -- | check if there can be a roof at the point under mouse
-couldBeRoof :: forall a. Object3D a -> Array RoofPlate -> SceneMouseMoveEvent -> Effect Boolean
+couldBeRoof :: forall a. IsObject3D a => a -> Array RoofPlate -> SceneMouseMoveEvent -> Effect Boolean
 couldBeRoof house roofs e = do
     let roofPoly = getRoofPolygon <$> roofs
     

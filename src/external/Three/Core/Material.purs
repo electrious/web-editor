@@ -6,26 +6,26 @@ import Effect (Effect)
 import Three.Loader.TextureLoader (Texture)
 import Util (ffi, fpi)
   
-foreign import data JSMaterial :: Type -> Type
+foreign import data Material :: Type
+foreign import data MeshBasicMaterial :: Type
 
-type Material a = JSMaterial a
+foreign import mkMeshBasicMaterial :: Int -> Effect MeshBasicMaterial
+foreign import mkMeshBasicMaterialWithTexture :: Texture -> Effect MeshBasicMaterial
 
-foreign import data JSMeshBasicMaterial :: Type -> Type
+class IsMaterial a
 
-type MeshBasicMaterial a = Material (JSMeshBasicMaterial a)
+instance isMaterialMaterial :: IsMaterial Material
+instance isMaterialMeshBasicMaterial :: IsMaterial MeshBasicMaterial
 
-foreign import mkMeshBasicMaterial :: forall a. Int -> Effect (MeshBasicMaterial a)
-foreign import mkMeshBasicMaterialWithTexture :: forall a. Texture -> Effect (MeshBasicMaterial a)
-
-setTransparent :: forall a. Boolean -> Material a -> Effect Unit
+setTransparent :: forall mat. IsMaterial mat => Boolean -> mat -> Effect Unit
 setTransparent = fpi ["t", "mat", ""] "mat.transparent = t"
 
-setOpacity :: forall a. Number -> Material a -> Effect Unit
+setOpacity :: forall mat. IsMaterial mat => Number -> mat -> Effect Unit
 setOpacity = fpi ["o", "mat", ""] "mat.opacity = o"
 
 foreign import data MaterialCreator :: Type
 
-getMaterial :: forall a. String -> MaterialCreator -> Material a
+getMaterial :: forall mat. IsMaterial mat => String -> MaterialCreator -> mat
 getMaterial = ffi ["mat", "creator"] "creator.materials[mat]"
 
 preload :: MaterialCreator -> Effect Unit

@@ -31,10 +31,13 @@
   },
   "dependencies": {
     "axios": "^0.19.2",
+    "clipper-lib": "^6.4.2",
+    "google-protobuf": "^3.12.2",
     "rbush": "^3.0.1",
     "shamos-hoey": "^1.0.1",
     "three": "^0.110.0",
     "uuid": "^3.3.3",
-    "uuid-validate": "^0.0.3"
+    "uuid-validate": "^0.0.3",
+    "webpb": "https://github.com/electrious/webpb"
   }
 }

@@ -23,6 +23,9 @@ _roofId = _Newtype <<< prop (SProxy :: SProxy "roofId")
 _roofs :: forall t a r. Newtype t { roofs :: a | r } => Lens' t a
 _roofs = _Newtype <<< prop (SProxy :: SProxy "roofs")
 
+_roof :: forall t a r. Newtype t { roof :: a | r } => Lens' t a
+_roof = _Newtype <<< prop (SProxy :: SProxy "roof")
+
 _center :: forall t a r. Newtype t { center :: a | r } => Lens' t a
 _center = _Newtype <<< prop (SProxy :: SProxy "center")
 
@@ -50,17 +53,29 @@ _y = _Newtype <<< prop (SProxy :: SProxy "y")
 _z :: forall t a r. Newtype t { z :: a | r } => Lens' t a
 _z = _Newtype <<< prop (SProxy :: SProxy "z")
 
+_length :: forall t a r. Newtype t { length :: a | r } => Lens' t a
+_length = _Newtype <<< prop (SProxy :: SProxy "length")
+
 _deltaX :: forall t a r. Newtype t { deltaX :: a | r } => Lens' t a
 _deltaX = _Newtype <<< prop (SProxy :: SProxy "deltaX")
 
 _deltaY :: forall t a r. Newtype t { deltaY :: a | r } => Lens' t a
 _deltaY = _Newtype <<< prop (SProxy :: SProxy "deltaY")
 
+_centerX :: forall t a r. Newtype t { centerX :: a | r } => Lens' t a
+_centerX = _Newtype <<< prop (SProxy :: SProxy "centerX")
+
+_centerY :: forall t a r. Newtype t { centerY :: a | r } => Lens' t a
+_centerY = _Newtype <<< prop (SProxy :: SProxy "centerY")
+
 _width :: forall t a r. Newtype t { width :: a | r } => Lens' t a
 _width = _Newtype <<< prop (SProxy :: SProxy "width")
 
 _height :: forall t a r. Newtype t { height :: a | r } => Lens' t a
 _height = _Newtype <<< prop (SProxy :: SProxy "height")
+
+_object :: forall t a r. Newtype t { object :: a | r } => Lens' t a
+_object = _Newtype <<< prop (SProxy :: SProxy "object")
 
 _disposable :: forall t a r. Newtype t { disposable :: a | r } => Lens' t a
 _disposable = _Newtype <<< prop (SProxy :: SProxy "disposable")
@@ -148,3 +163,99 @@ _roofRackings = _Newtype <<< prop (SProxy :: SProxy "roofRackings")
 
 _modeDyn :: forall t a r. Newtype t { modeDyn :: a | r } => Lens' t a
 _modeDyn = _Newtype <<< prop (SProxy :: SProxy "modeDyn")
+
+_arrayNumber :: forall t a r. Newtype t { arrayNumber :: a | r } => Lens' t a
+_arrayNumber = _Newtype <<< prop (SProxy :: SProxy "arrayNumber")
+
+_flashes :: forall t a r. Newtype t { flashes :: a | r } => Lens' t a
+_flashes = _Newtype <<< prop (SProxy :: SProxy "flashes")
+
+_rails :: forall t a r. Newtype t { rails :: a | r } => Lens' t a
+_rails = _Newtype <<< prop (SProxy :: SProxy "rails")
+
+_railsNum :: forall t a r. Newtype t { railsNum :: a | r } => Lens' t a
+_railsNum = _Newtype <<< prop (SProxy :: SProxy "railsNum")
+
+_splices :: forall t a r. Newtype t { splices :: a | r } => Lens' t a 
+_splices = _Newtype <<< prop (SProxy :: SProxy "splices")
+
+_lfeet :: forall t a r. Newtype t { lfeet :: a | r } => Lens' t a 
+_lfeet = _Newtype <<< prop (SProxy :: SProxy "lfeet")
+
+_clamps :: forall t a r. Newtype t { clamps :: a | r } => Lens' t a
+_clamps = _Newtype <<< prop (SProxy :: SProxy "clamps")
+
+_stoppers :: forall t a r. Newtype t { stoppers :: a | r } => Lens' t a 
+_stoppers = _Newtype <<< prop (SProxy :: SProxy "stoppers")
+
+_mounts :: forall t a r. Newtype t { mounts :: a | r } => Lens' t a
+_mounts = _Newtype <<< prop (SProxy :: SProxy "mounts")
+
+_bridges :: forall t a r. Newtype t { bridges :: a | r } => Lens' t a
+_bridges = _Newtype <<< prop (SProxy :: SProxy "bridges")
+
+_skirts :: forall t a r. Newtype t { skirts :: a | r } => Lens' t a
+_skirts = _Newtype <<< prop (SProxy :: SProxy "skirts")
+
+_leftEndCaps :: forall t a r. Newtype t { leftEndCaps :: a | r } => Lens' t a
+_leftEndCaps = _Newtype <<< prop (SProxy :: SProxy "leftEndCaps")
+
+_rightEndCaps :: forall t a r. Newtype t { rightEndCaps :: a | r } => Lens' t a
+_rightEndCaps = _Newtype <<< prop (SProxy :: SProxy "rightEndCaps")
+
+_supportRails :: forall t a r. Newtype t { supportRails :: a | r } => Lens' t a
+_supportRails = _Newtype <<< prop (SProxy :: SProxy "supportRails")
+
+_baseMounts :: forall t a r. Newtype t { baseMounts :: a | r } => Lens' t a
+_baseMounts = _Newtype <<< prop (SProxy :: SProxy "baseMounts")
+
+_tiltLegs :: forall t a r. Newtype t { tiltLegs :: a | r } => Lens' t a 
+_tiltLegs = _Newtype <<< prop (SProxy :: SProxy "tiltLegs")
+
+_chassis :: forall t a r. Newtype t { chassis :: a | r } => Lens' t a
+_chassis = _Newtype <<< prop (SProxy :: SProxy "chassis")
+
+_blocks :: forall t a r. Newtype t { blocks :: a | r } => Lens' t a
+_blocks = _Newtype <<< prop (SProxy :: SProxy "blocks")
+
+_hoods :: forall t a r. Newtype t { hoods :: a | r } => Lens' t a
+_hoods = _Newtype <<< prop (SProxy :: SProxy "hoods")
+
+_item :: forall t a r. Newtype t { item :: a | r } => Lens' t a
+_item = _Newtype <<< prop (SProxy :: SProxy "item")
+
+_minX :: forall t a r. Newtype t { minX :: a | r } => Lens' t a
+_minX = _Newtype <<< prop (SProxy :: SProxy "minX")
+
+_minY :: forall t a r. Newtype t { minY :: a | r } => Lens' t a
+_minY = _Newtype <<< prop (SProxy :: SProxy "minY")
+
+_maxX :: forall t a r. Newtype t { maxX :: a | r } => Lens' t a
+_maxX = _Newtype <<< prop (SProxy :: SProxy "maxX")
+
+_maxY :: forall t a r. Newtype t { maxY :: a | r } => Lens' t a
+_maxY = _Newtype <<< prop (SProxy :: SProxy "maxY")
+
+_panels :: forall t a r. Newtype t { panels :: a | r } => Lens' t a
+_panels = _Newtype <<< prop (SProxy :: SProxy "panels")
+
+_rowNumber :: forall t a r. Newtype t { rowNumber :: a | r } => Lens' t a
+_rowNumber = _Newtype <<< prop (SProxy :: SProxy "rowNumber")
+
+_rows :: forall t a r. Newtype t { rows :: a | r } => Lens' t a
+_rows = _Newtype <<< prop (SProxy :: SProxy "rows")
+
+_config :: forall t a r. Newtype t { config :: a | r } => Lens' t a
+_config = _Newtype <<< prop (SProxy :: SProxy "config")
+
+_panelsUpdated :: forall t a r. Newtype t { panelsUpdated :: a | r } => Lens' t a
+_panelsUpdated = _Newtype <<< prop (SProxy :: SProxy "panelsUpdated")
+
+_button :: forall t a r. Newtype t { button :: a | r } => Lens' t a
+_button = _Newtype <<< prop (SProxy :: SProxy "button")
+
+_name :: forall t a r. Newtype t { name :: a | r } => Lens' t a
+_name = _Newtype <<< prop (SProxy :: SProxy "name")
+
+_apiConfig :: forall t a r. Newtype t { apiConfig :: a | r } => Lens' t a
+_apiConfig = _Newtype <<< prop (SProxy :: SProxy "apiConfig")

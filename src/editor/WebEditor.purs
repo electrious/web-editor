@@ -3,6 +3,7 @@ module Editor.WebEditor where
 import Prelude hiding (add,degree)
 
 import Data.Array (cons)
+import Data.Default (def)
 import Data.Foldable (sequence_)
 import Data.Int (toNumber)
 import Data.Lens (Lens', (^.))
@@ -25,9 +26,9 @@ import FRP.Event.Extra (performEvent)
 import Math.Angle (degree, radianVal)
 import Three.Controls.OrbitControls (OrbitControls, enableDamping, enableZoom, isEnabled, mkOrbitControls, setAutoRotate, setAutoRotateSpeed, setDampingFactor, setEnabled, setMaxDistance, setMaxPolarAngle, setMinDistance, setMinPolarAngle, setTarget, update)
 import Three.Controls.OrbitControls as OrbitControls
-import Three.Core.Camera (PerspectiveCamera, Camera, mkPerspectiveCamera, setAspect, updateProjectionMatrix)
+import Three.Core.Camera (class IsCamera, PerspectiveCamera, mkPerspectiveCamera, setAspect, updateProjectionMatrix)
 import Three.Core.Light (mkAmbientLight, mkDirectionalLight)
-import Three.Core.Object3D (Object3D, add, hasParent, lookAt, mkObject3D, parent, position, rotateOnWorldAxis, rotateZ, setDefaultUp, setName, setPosition, setRotation, translateX, translateY, worldToLocal)
+import Three.Core.Object3D (class IsObject3D, Object3D, add, hasParent, lookAt, mkObject3D, parent, position, rotateOnWorldAxis, rotateZ, setDefaultUp, setName, setPosition, setRotation, translateX, translateY, worldToLocal)
 import Three.Core.Scene (disposeScene, mkScene)
 import Three.Core.WebGLRenderer (domElement, mkWebGLRenderer, render, setSize)
 import Three.Math.Euler (mkEuler)
@@ -39,27 +40,27 @@ import Web.HTML (Window)
 import Web.HTML.Window (requestAnimationFrame)
 
 -- | internal record that defines all components for threejs related objects
-newtype WebEditor a = WebEditor {
+newtype WebEditor = WebEditor {
     canvas     :: Element,
     render     :: Effect Unit,
-    addContent :: Object3D a -> Effect Unit,
+    addContent :: Object3D -> Effect Unit,
     disposable :: Ref (Array (Effect Unit))
 }
 
-derive instance newtypeEditorScene :: Newtype (WebEditor a) _
-instance disposableEditorScene :: Disposable (WebEditor a) where
+derive instance newtypeEditorScene :: Newtype WebEditor _
+instance disposableEditorScene :: Disposable WebEditor where
     dispose (WebEditor { disposable }) = read disposable >>= sequence_
 
 _canvas :: forall t a r. Newtype t { canvas :: a | r } => Lens' t a
 _canvas = _Newtype <<< prop (SProxy :: SProxy "canvas")
 
-addToScene :: forall a. Object3D a -> WebEditor a -> Effect Unit
+addToScene :: Object3D -> WebEditor -> Effect Unit
 addToScene obj (WebEditor s) = s.addContent obj
 
-renderScene :: forall a. WebEditor a -> Effect Unit
+renderScene :: WebEditor -> Effect Unit
 renderScene (WebEditor s) = s.render
 
-addDisposable :: forall a. Effect Unit -> WebEditor a -> Effect Unit
+addDisposable :: Effect Unit -> WebEditor -> Effect Unit
 addDisposable d (WebEditor e) = void $ modify (cons d) e.disposable
 
 capVal :: Number -> Number -> Number -> Number
@@ -67,18 +68,18 @@ capVal bot top v | v < bot = bot
                  | v > top = top
                  | otherwise = v
 
-setupCameraPos :: forall a. Camera a -> Effect Unit
+setupCameraPos :: forall c. IsCamera c => c -> Effect Unit
 setupCameraPos camera = do
     setPosition (mkVec3 0.0 (-40.0) 20.0) camera
-    lookAt (mkVec3 0.0 0.0 0.0) camera
+    lookAt def camera
 
-resetContentPos :: forall a. Object3D a -> Effect Unit
-resetContentPos = setPosition (mkVec3 0.0 0.0 0.0)
+resetContentPos :: forall a. IsObject3D a => a -> Effect Unit
+resetContentPos = setPosition def
 
-resetContentRot :: forall a. Object3D a -> Effect Unit
+resetContentRot :: forall a. IsObject3D a => a -> Effect Unit
 resetContentRot = setRotation (mkEuler 0.0 0.0 0.0)
 
-zoomCamera :: forall a. PerspectiveCamera a -> Number -> Effect Number
+zoomCamera :: PerspectiveCamera -> Number -> Effect Number
 zoomCamera camera zoom = do
     let pos = position camera
         curDist = length pos
@@ -88,18 +89,18 @@ zoomCamera camera zoom = do
     pure newDist
 
 
-rotateContentWithDrag :: forall a. Object3D a -> DragEvent -> Effect Unit
+rotateContentWithDrag :: forall a. IsObject3D a => a -> DragEvent -> Effect Unit
 rotateContentWithDrag obj drag = do
     let dx = drag ^. _deltaX / 360.0
     rotateZ dx obj
     rotateOnWorldAxis (mkVec3 1.0 0.0 0.0) ((drag ^. _deltaY) / 360.0) obj
 
-moveWithShiftDrag :: forall a. Object3D a -> DragEvent -> Number -> Effect Unit
+moveWithShiftDrag :: forall a. IsObject3D a => a -> DragEvent -> Number -> Effect Unit
 moveWithShiftDrag obj drag scale | not (hasParent obj) = pure unit
                                  | otherwise = do
                                     let p = parent obj
                                         vec = mkVec3 (drag ^. _deltaX) (- (drag ^. _deltaY)) 0.0
-                                    lVec <- worldToLocal vec p
+                                    lVec <- worldToLocal vec (p :: Object3D)
                                     translateX (vecX lVec * scale / 10.0) obj
                                     translateY (vecY lVec * scale / 10.0) obj
 
@@ -118,7 +119,7 @@ setupOrbitControls c target = do
     subscribeDyn t (flip setTarget c)
 
 -- | internal function to create the threejs scene, camera, light and renderer
-createScene :: forall a. Dynamic Size -> Dynamic EditorMode -> Dynamic (Maybe Vector3) -> Element -> Effect (WebEditor a)
+createScene :: Dynamic Size -> Dynamic EditorMode -> Dynamic (Maybe Vector3) -> Element -> Effect WebEditor
 createScene sizeDyn modeDyn targetDyn elem = do
     -- set the default Up direction as z axis in the scene
     setDefaultUp (mkVec3 0.0 0.0 1.0)
@@ -207,7 +208,7 @@ createScene sizeDyn modeDyn targetDyn elem = do
     }
 
 -- | renderLoop is the function to render scene repeatedly
-renderLoop :: forall a. WebEditor a -> Window -> Effect Unit
+renderLoop :: WebEditor -> Window -> Effect Unit
 renderLoop scene w = do
     _ <- requestAnimationFrame (renderLoop scene w) w
     renderScene scene

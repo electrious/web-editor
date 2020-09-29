@@ -13,24 +13,26 @@ import Data.Symbol (SProxy(..))
 
 -- texture info needed to render panels
 newtype PanelTextureInfo = PanelTextureInfo {
-    standard   :: Maybe String,
-    premium    :: Maybe String,
-    standard72 :: Maybe String
+    standard            :: Maybe String,
+    premium             :: Maybe String,
+    standard72          :: Maybe String,
+    rotateButtonTexture :: Maybe String
 }
 
 derive instance newtypePanelTextureInfo :: Newtype PanelTextureInfo _
 derive instance genericPanelTextureInfo :: Generic PanelTextureInfo _
 instance defaultPanelTextureInfo :: Default PanelTextureInfo where
-    def = PanelTextureInfo { standard   : Nothing,
-                             premium    : Nothing,
-                             standard72 : Nothing
+    def = PanelTextureInfo { standard            : Nothing,
+                             premium             : Nothing,
+                             standard72          : Nothing,
+                             rotateButtonTexture : Nothing
                            }
 
-_standard :: Lens' PanelTextureInfo (Maybe String)
+_standard :: forall t a r . Newtype t { standard :: a | r } => Lens' t a
 _standard = _Newtype <<< prop (SProxy :: SProxy "standard")
 
-_premium :: Lens' PanelTextureInfo (Maybe String)
+_premium :: forall t a r . Newtype t { premium :: a | r } => Lens' t a
 _premium = _Newtype <<< prop (SProxy :: SProxy "premium")
 
-_standard72 :: Lens' PanelTextureInfo (Maybe String)
+_standard72 :: forall t a r . Newtype t { standard72 :: a | r } => Lens' t a
 _standard72 = _Newtype <<< prop (SProxy :: SProxy "standard72")

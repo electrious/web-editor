@@ -5,7 +5,7 @@ import Prelude
 import Algorithm.RoofCheck (couldBeRoof)
 import Custom.Mesh (TappableMesh, mkTappableMesh)
 import Data.Compactable (compact)
-import Data.Lens (Lens', (^.))
+import Data.Lens (Lens', view, (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..))
@@ -22,28 +22,30 @@ import FRP.Event (Event, sampleOn)
 import FRP.Event.Extra (multicast, performEvent)
 import Model.Roof.RoofPlate (RoofPlate, newRoofPlate)
 import Three.Core.Face3 (normal)
-import Three.Core.Geometry (Geometry, mkCircleGeometry)
-import Three.Core.Material (Material, mkMeshBasicMaterial)
+import Three.Core.Geometry (CircleGeometry, mkCircleGeometry)
+import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial)
 import Three.Core.Mesh (Mesh)
-import Three.Core.Object3D (Object3D, hasParent, localToWorld, lookAt, parent, setName, setPosition, setVisible, worldToLocal)
+import Three.Core.Object3D (class IsObject3D, Object3D, hasParent, localToWorld, lookAt, parent, setName, setPosition, setVisible, toObject3D, worldToLocal)
 import Three.Math.Vector (Vector3, addScaled, (<+>))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | RoofRecognizer will be able to let user add new roof
-newtype RoofRecognizer a = RoofRecognizer {
-    marker       :: Mesh a,
+newtype RoofRecognizer = RoofRecognizer {
+    marker       :: Mesh,
     addedNewRoof :: Event RoofPlate,
     disposable   :: Effect Unit
 }
 
-derive instance newtypeRoofRecognizer :: Newtype (RoofRecognizer a) _
-instance disposeRoofRecognizer :: Disposable (RoofRecognizer a) where
+derive instance newtypeRoofRecognizer :: Newtype RoofRecognizer _
+instance isObject3DRoofRecognizer :: IsObject3D RoofRecognizer where
+    toObject3D = toObject3D <<< view _marker
+instance disposeRoofRecognizer :: Disposable RoofRecognizer where
     dispose r = r ^. _disposable
 
-_marker :: forall a. Lens' (RoofRecognizer a) (Mesh a)
+_marker :: Lens' RoofRecognizer Mesh
 _marker = _Newtype <<< prop (SProxy :: SProxy "marker")
 
-_addedNewRoof :: forall a. Lens' (RoofRecognizer a) (Event RoofPlate)
+_addedNewRoof :: Lens' RoofRecognizer (Event RoofPlate)
 _addedNewRoof = _Newtype <<< prop (SProxy :: SProxy "addedNewRoof")
 
 -- | Candidate point that will allow user to show the adder marker
@@ -52,47 +54,48 @@ type CandidatePoint = {
     faceNormal :: Vector3
 }
 
-adderMarkerMat :: forall mat. Material mat
+adderMarkerMat :: MeshBasicMaterial
 adderMarkerMat = unsafeCoerce $ unsafePerformEffect (mkMeshBasicMaterial 0x2222ff)
 
-adderMarkerGeo :: forall geo. Geometry geo
+adderMarkerGeo :: CircleGeometry
 adderMarkerGeo = unsafeCoerce $ unsafePerformEffect (mkCircleGeometry 1.0 32)
 
-createAdderMarker :: forall a. Effect (TappableMesh a)
+createAdderMarker :: Effect TappableMesh
 createAdderMarker = do
     marker <- mkTappableMesh adderMarkerGeo adderMarkerMat
-    setName "add-roof-marker" $ marker ^. _mesh
+    setName "add-roof-marker" marker
     pure marker
 
 
-showMarker :: forall a. TappableMesh a -> Maybe CandidatePoint -> Effect Unit
-showMarker marker Nothing = setVisible false $ marker ^. _mesh
-showMarker marker (Just p) | not (hasParent $ marker ^. _mesh) = setVisible false $ marker ^. _mesh
+showMarker :: TappableMesh -> Maybe CandidatePoint -> Effect Unit
+showMarker marker Nothing = setVisible false marker
+showMarker marker (Just p) | not (hasParent marker) = setVisible false marker
                            | otherwise = do
-                                 setVisible true $ marker ^. _mesh
+                                 setVisible true marker
                                  -- get the local position of the candidate point
                                  -- and move it along the normal vector a bit.
                                  -- then used as the new position of the marker
                                  let np = addScaled p.position p.faceNormal 0.03
-                                 setPosition np $ marker ^. _mesh
+                                 setPosition np marker
 
                                  -- set the target direction of the marker
                                  let target = p.position <+> p.faceNormal
-                                 targetW <- localToWorld target (parent $ marker ^. _mesh)
-                                 lookAt targetW $ marker ^. _mesh
+                                 targetW <- localToWorld target (parent marker :: Object3D)
+                                 lookAt targetW marker
 
 
 -- | create a roof recognizer
-createRoofRecognizer :: forall a b. Object3D a
+createRoofRecognizer :: forall a. IsObject3D a =>
+                               a
                                -> Event (Array RoofPlate)
                                -> Event SceneMouseMoveEvent
                                -> Dynamic Boolean
-                               -> Effect (RoofRecognizer b)
+                               -> Effect RoofRecognizer
 createRoofRecognizer houseWrapper roofs mouseMove canShow = do
     marker <- createAdderMarker
 
     -- hide the marker by default
-    setVisible false $ marker ^. _mesh
+    setVisible false marker
 
     let getCandidatePoint evt rs = do
             isRoof <- couldBeRoof houseWrapper rs evt

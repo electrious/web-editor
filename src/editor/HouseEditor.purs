@@ -11,10 +11,11 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
+import Editor.Common.Lenses (_apiConfig)
 import Editor.EditorMode (EditorMode(..))
 import Effect (Effect)
 import Effect.Class (class MonadEffect, liftEffect)
-import FRP.Dynamic (Dynamic, current, dynEvent, step)
+import FRP.Dynamic (Dynamic, step)
 import FRP.Event (Event, makeEvent, subscribe)
 import Model.Hardware.PanelTextureInfo (PanelTextureInfo)
 import Model.Hardware.PanelType (PanelType(..))
@@ -29,6 +30,7 @@ newtype HouseConfig = HouseConfig {
     dataServer      :: String,
     modeDyn         :: Dynamic EditorMode,
     textureInfo     :: PanelTextureInfo,
+    rotBtnTexture   :: String,
     panelType       :: Dynamic PanelType,
     apiConfig       :: APIConfig,
     screenshotDelay :: Int
@@ -44,22 +46,20 @@ instance defaultHouseConfig :: Default HouseConfig where
         dataServer      : "",
         modeDyn         : step Showing empty,
         textureInfo     : def,
+        rotBtnTexture   : "",
         panelType       : step Standard empty,
         apiConfig       : def,
-        screenshotDelay :  100
+        screenshotDelay : 100
     }
 
 _roofPlates :: Lens' HouseConfig (Array RoofPlate)
 _roofPlates = _Newtype <<< prop (SProxy :: SProxy "roofPlates")
 
-_panels :: Lens' HouseConfig (Array Panel)
-_panels = _Newtype <<< prop (SProxy :: SProxy "panels")
-
 _dataServer :: Lens' HouseConfig String
 _dataServer = _Newtype <<< prop (SProxy :: SProxy "dataServer")
 
-_apiConfig :: Lens' HouseConfig APIConfig
-_apiConfig = _Newtype <<< prop (SProxy :: SProxy "apiConfig")
+_rotBtnTexture :: forall t a r. Newtype t { rotBtnTexture :: a | r } => Lens' t a
+_rotBtnTexture = _Newtype <<< prop (SProxy :: SProxy "rotBtnTexture")
 
 _screenshotDelay :: forall t a r. Newtype t { screenshotDelay :: a | r } => Lens' t a
 _screenshotDelay = _Newtype <<< prop (SProxy :: SProxy "screenshotDelay")
@@ -82,15 +82,6 @@ performEditorEvent :: forall a. Event (HouseEditor a) -> HouseEditor (Event a)
 performEditorEvent e = do
     cfg <- ask
     pure $ makeEvent \k -> subscribe e (\v -> runHouseEditor v cfg >>= k)
-
-performEditorDyn :: forall a. Dynamic (HouseEditor a) -> HouseEditor (Dynamic a)
-performEditorDyn d = do
-    cfg <- ask
-
-    curV <- liftEffect $ current d
-    def <- liftEffect $ runHouseEditor curV cfg
-    let evt = makeEvent \k -> subscribe (dynEvent d) \v -> runHouseEditor v cfg >>= k
-    pure $ step def evt
 
 runAPIInEditor :: forall a. API a -> HouseEditor a
 runAPIInEditor api = ask >>= view _apiConfig >>> runAPI api >>> liftEffect

@@ -132,12 +132,22 @@ let additions =
       , event-extra =
         { dependencies = [ "event" ]
         , repo = "https://github.com/manyoo/event-extra.git"
-        , version = "v0.1.5"
+        , version = "v0.1.7"
         }
       , axios =
         { dependencies = [ "prelude", "effect", "aff", "foreign-generic" ]
         , repo = "https://github.com/iarthstar/purescript-axios.git"
         , version = "v1.1.2"
+        }
+      , digraph =
+        { dependencies = [ "newtype", "ordered-collections", "pqueue", "lists" ]
+        , repo = "https://github.com/nullobject/purescript-digraph.git"
+        , version = "v2.0.0"
+        }
+      , pqueue =
+        { dependencies = [ "newtype", "ordered-collections", "lists" ]
+        , repo = "https://github.com/nullobject/purescript-pqueue.git"
+        , version = "v2.0.0"
         }
       }
 

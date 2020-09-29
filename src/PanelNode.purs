@@ -2,6 +2,7 @@ module Editor.PanelNode where
 
 import Prelude hiding (add)
 
+import Custom.Mesh (TapDragMesh, mkTapDragMesh)
 import Data.Enum (class BoundedEnum, class Enum)
 import Data.Foldable (traverse_)
 import Data.Function.Memoize (class Tabulate, genericTabulate, memoize)
@@ -9,34 +10,48 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Bounded (genericBottom, genericTop)
 import Data.Generic.Rep.Enum (genericCardinality, genericFromEnum, genericPred, genericSucc, genericToEnum)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Lens (Lens', view, (^.))
+import Data.Lens (Lens', view, (%~), (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
+import Data.List (List(..), (:))
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Meter (meterVal)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Editor.ArrayBuilder (ArrayBuilder, getArrayConfig, getPanelType, getTextureInfo)
-import Editor.Common.Lenses (_height, _orientation, _rackingType, _x, _y)
+import Editor.Common.Lenses (_dragged, _height, _orientation, _rackingType, _tapped, _x, _y)
 import Editor.Rendering.DefMaterials (loadMaterial)
+import Editor.UI.DragInfo (DragInfo, mkDragInfo)
 import Effect (Effect)
-import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
-import FRP.Dynamic (Dynamic, performDynamic)
+import FRP.Event (Event)
 import Math (pi)
 import Math.Angle (radianVal, sin)
 import Model.Hardware.PanelTextureInfo (PanelTextureInfo, _premium, _standard, _standard72)
 import Model.Hardware.PanelType (PanelType(..))
 import Model.Racking.RackingType (RackingType(..))
 import Model.Roof.ArrayConfig (ArrayConfig, _panelLowestZ)
-import Model.Roof.Panel (Orientation(..), Panel, panelLong, panelShort, panelSize, validatedSlope)
-import Three.Core.Geometry (BoxGeometry, Geometry, mkBoxGeometry)
-import Three.Core.Material (MeshBasicMaterial, Material, mkMeshBasicMaterialWithTexture)
+import Model.Roof.Panel (Orientation(..), Panel, addDelta, panelLong, panelShort, validatedSlope)
+import Model.RoofComponent (size)
+import Three.Core.Geometry (class IsGeometry, BoxGeometry, mkBoxGeometry)
+import Three.Core.Material (class IsMaterial, MeshBasicMaterial, mkMeshBasicMaterialWithTexture, setOpacity)
 import Three.Core.Mesh (Mesh, mkMesh)
-import Three.Core.Object3D (Object3D, add, rotateWithEuler, setName, setPosition, setRenderOrder)
+import Three.Core.Object3D (class IsObject3D, add, position, rotateWithEuler, setCastShadow, setName, setPosition, setRenderOrder, toObject3D)
 import Three.Loader.TextureLoader (loadTexture, mkTextureLoader)
 import Three.Math.Euler (mkEuler)
-import Three.Math.Vector (mkVec3)
+import Three.Math.Vector (Vector3, mkVec3)
+import Three.Math.Vector as Vector
+
+data PanelOpacity = Opaque
+                  | Transparent
+derive instance eqPanelOpacity :: Eq PanelOpacity
+
+opacityValue :: PanelOpacity -> Number
+opacityValue Opaque      = 1.0
+opacityValue Transparent = 0.2
+
+isOpaque :: PanelOpacity -> Boolean
+isOpaque Opaque = true
+isOpaque _      = false
 
 -- texture type used for panels
 data PanelTextureType = PremiumTexture
@@ -68,42 +83,50 @@ panelTextureType _ Premium  = PremiumTexture
 panelTextureType _ Standard = StandardTexture
 
 -- create material for panel node with the provided image url
-mkPanelMaterial :: forall a. String -> Effect (MeshBasicMaterial a)
+mkPanelMaterial :: String -> Effect MeshBasicMaterial
 mkPanelMaterial imagePath = mkTextureLoader >>= loadTexture imagePath >>= mkMeshBasicMaterialWithTexture
 
 -- | memoized function to get panel material for the corresponding panel texture type
-getPanelMaterial :: forall a. PanelTextureInfo -> PanelTextureType -> MeshBasicMaterial a
+getPanelMaterial :: PanelTextureInfo -> PanelTextureType -> MeshBasicMaterial
 getPanelMaterial info = memoize (unsafePerformEffect <<< mkPanelMaterial <<< imageUrl)
     where imageUrl PremiumTexture    = fromMaybe "" $ info ^. _premium
           imageUrl StandardTexture   = fromMaybe "" $ info ^. _standard
           imageUrl Standard72Texture = fromMaybe "" $ info ^. _standard72
 
 -- | memoized function to create panel body's geometry
-panelGeometry :: forall a. Unit -> BoxGeometry a
+panelGeometry :: Unit -> BoxGeometry
 panelGeometry = memoize (const $ unsafePerformEffect $ mkBoxGeometry (meterVal panelShort) (meterVal panelLong) 0.04)
 
 -- | memoized function to create panel vertical frame
-verticalGeometry :: forall a. Unit -> BoxGeometry a
+verticalGeometry :: Unit -> BoxGeometry
 verticalGeometry = memoize (const $ unsafePerformEffect $ mkBoxGeometry 0.01 (meterVal panelLong) 0.05)
 
 -- | memoized function to create panel horizontal frame
-horizontalGeometry :: forall a. Unit -> BoxGeometry a
+horizontalGeometry :: Unit -> BoxGeometry
 horizontalGeometry = memoize (const $ unsafePerformEffect $ mkBoxGeometry (meterVal panelShort) 0.01 0.05)
 
-newtype PanelNode a = PanelNode {
-    panelId     :: Int,
-    panelObject :: Object3D a
+newtype PanelNode = PanelNode {
+    panel       :: Panel,
+    panelObject :: TapDragMesh,
+    tapped      :: Event Panel,
+    dragged     :: Event (DragInfo Panel),
+    materials   :: List MeshBasicMaterial
 }
 
-derive instance newtypePanelNode :: Newtype (PanelNode a) _
+derive instance newtypePanelNode :: Newtype PanelNode _
+instance isObject3DPanelNode :: IsObject3D PanelNode where
+    toObject3D = toObject3D <<< view _panelObject
 
-_panelId :: forall a. Lens' (PanelNode a) Int
-_panelId = _Newtype <<< prop (SProxy :: SProxy "panelId")
+_panel :: forall t a r. Newtype t { panel :: a | r } => Lens' t a
+_panel = _Newtype <<< prop (SProxy :: SProxy "panel")
 
-_panelObject :: forall a. Lens' (PanelNode a) (Object3D a)
+_panelObject :: forall t a r. Newtype t { panelObject :: a | r } => Lens' t a
 _panelObject = _Newtype <<< prop (SProxy :: SProxy "panelObject")
 
-mkTopFrame :: forall a geo mat. Geometry geo -> Material mat -> Effect (Mesh a)
+_materials :: forall t a r. Newtype t { materials :: a | r } => Lens' t a
+_materials = _Newtype <<< prop (SProxy :: SProxy "materials")
+
+mkTopFrame :: forall geo mat. IsGeometry geo => IsMaterial mat => geo -> mat -> Effect Mesh
 mkTopFrame geo mat = do
     top <- mkMesh geo mat
     setName "top" top
@@ -111,7 +134,7 @@ mkTopFrame geo mat = do
     setRenderOrder 9 top
     pure top
 
-mkBotFrame :: forall a geo mat. Geometry geo -> Material mat -> Effect (Mesh a)
+mkBotFrame :: forall geo mat. IsGeometry geo => IsMaterial mat => geo -> mat -> Effect Mesh
 mkBotFrame geo mat = do
     bot <- mkMesh geo mat
     setName "bottom" bot
@@ -119,7 +142,7 @@ mkBotFrame geo mat = do
     setRenderOrder 9 bot
     pure bot
 
-mkLeftFrame :: forall a geo mat. Geometry geo -> Material mat -> Effect (Mesh a)
+mkLeftFrame :: forall geo mat. IsGeometry geo => IsMaterial mat => geo -> mat -> Effect Mesh
 mkLeftFrame geo mat = do
     left <- mkMesh geo mat
     setName "left" left
@@ -127,7 +150,7 @@ mkLeftFrame geo mat = do
     setRenderOrder 9 left
     pure left
 
-mkRightFrame :: forall a geo mat. Geometry geo -> Material mat -> Effect (Mesh a)
+mkRightFrame :: forall geo mat. IsGeometry geo => IsMaterial mat => geo -> mat -> Effect Mesh
 mkRightFrame geo mat = do
     right <- mkMesh geo mat
     setName "right" right
@@ -136,12 +159,8 @@ mkRightFrame geo mat = do
     pure right
 
 -- | make a default panel mesh node
-mkPanelMesh :: forall a. Panel -> ArrayBuilder (Dynamic (Mesh a))
-mkPanelMesh p = do
-    arrCfgDyn    <- getArrayConfig
-    info         <- getTextureInfo
-    panelTypeDyn <- getPanelType
-
+mkPanelNode :: ArrayConfig -> PanelTextureInfo -> PanelType -> Panel -> Effect PanelNode
+mkPanelNode arrCfg info panelType p = do
     -- create the panel body first
     let bodyGeo = panelGeometry unit
         vertGeo = verticalGeometry unit
@@ -149,41 +168,69 @@ mkPanelMesh p = do
         -- always use black material for frame around panel
         blackMat = loadMaterial Premium
 
-        rackingTypeDyn = view _rackingType <$> arrCfgDyn
-        bodyMatDyn = getPanelMaterial info <$> (panelTextureType <$> rackingTypeDyn <*> panelTypeDyn)
+        rackingType = arrCfg ^. _rackingType
+        bodyMat = getPanelMaterial info $ panelTextureType rackingType panelType
 
-        mkBody geo mat = do
-            n <- mkMesh geo mat
-            setName "panel-body" n
-            pure n
-        nodeDyn = performDynamic $ mkBody bodyGeo <$> bodyMatDyn    
+    m <- mkTapDragMesh bodyGeo bodyMat
+    setName "panel" m
+    let node = PanelNode {
+                 panel       : p,
+                 panelObject : m,
+                 tapped      : const p <$> m ^. _tapped,
+                 dragged     : mkDragInfo p <$> m ^. _dragged,
+                 materials   : (bodyMat : blackMat : Nil)
+              }
     -- create frames
-    top   <- liftEffect $ mkTopFrame horiGeo blackMat
-    bot   <- liftEffect $ mkBotFrame horiGeo blackMat
-    left  <- liftEffect $ mkLeftFrame vertGeo blackMat
-    right <- liftEffect $ mkRightFrame vertGeo blackMat
+    top   <- mkTopFrame horiGeo blackMat
+    bot   <- mkBotFrame horiGeo blackMat
+    left  <- mkLeftFrame vertGeo blackMat
+    right <- mkRightFrame vertGeo blackMat
 
     -- add frame meshes to panel mesh
-    let addFrame n = traverse_ (flip add n) [top, bot, left, right] *> pure n
-        
-        newNodeDyn = performDynamic $ (addFrame >=> updateRotation p) <$> nodeDyn
-    pure $ performDynamic $ updatePosition p <$> arrCfgDyn <*> newNodeDyn
+    traverse_ (flip add m) [top, bot, left, right]
+    updateRotation p node
+    updatePosition p arrCfg node
+
+    pure node
+
+changePanel :: ArrayConfig -> Panel -> PanelNode -> Effect PanelNode
+changePanel arrCfg p node = do
+    updateRotation p node
+    updatePosition p arrCfg node
+    pure $ panelUpdated $ node # _panel .~ p
+
+
+moveBy :: Vector3 -> PanelNode -> Effect PanelNode
+moveBy delta node = do
+    let m      = node ^. _panelObject
+        pos    = position m
+        newPos = Vector.add pos delta
+
+    setPosition newPos m
+    pure $ panelUpdated $ node # _panel %~ addDelta delta
+
+-- | update the panelnode's events after update panel value inside.
+panelUpdated :: PanelNode -> PanelNode
+panelUpdated pn = pn # _tapped  .~ (const p <$> m ^. _tapped)
+                     # _dragged .~ (mkDragInfo p <$> m ^. _dragged)
+    where p = pn ^. _panel
+          m = pn ^. _panelObject
 
 -- update panel mesh position based on array config and the corresponding panel model
-updatePosition :: forall a. Panel -> ArrayConfig -> Object3D a -> Effect (Object3D a)
-updatePosition p arrCfg m = setPosition pv m *> pure m
+updatePosition :: Panel -> ArrayConfig -> PanelNode -> Effect Unit
+updatePosition p arrCfg = setPosition pv
     where px = meterVal $ p ^. _x
           py = meterVal $ p ^. _y
-          z = meterVal $ arrCfg ^. _panelLowestZ
+          z  = meterVal $ arrCfg ^. _panelLowestZ
           pv = case validatedSlope p of
                   Nothing -> mkVec3 px py z
-                  Just slope -> let s = panelSize p
+                  Just slope -> let s = size p
                                     h = meterVal (s ^. _height) * 0.5 * sin slope
                                 in mkVec3 px py (z + h)
 
 -- update the rotation of the panel mesh
-updateRotation :: forall a. Panel -> Object3D a -> Effect (Object3D a)
-updateRotation p m = rotateWithEuler euler m *> pure m
+updateRotation :: Panel -> PanelNode -> Effect Unit
+updateRotation p = rotateWithEuler euler
     where euler = case validatedSlope p of
                      Nothing -> rotateForNormal $ p ^. _orientation
                      Just slope -> rotateForFlat (p ^. _orientation) slope
@@ -192,3 +239,12 @@ updateRotation p m = rotateWithEuler euler m *> pure m
 
           rotateForFlat Landscape slope = mkEuler 0.0 (- radianVal slope) (pi / 2.0)
           rotateForFlat Portrait  slope = mkEuler (radianVal slope) 0.0 0.0
+
+updateOpacity :: PanelOpacity -> PanelNode -> Effect Unit
+updateOpacity opacity node = traverse_ (setOpacity (opacityValue opacity)) (node ^. _materials)
+
+enableShadows :: Boolean -> PanelNode -> Effect Unit
+enableShadows e node = setCastShadow e node
+
+changeToNormal :: PanelNode -> Effect PanelNode
+changeToNormal node = updateOpacity Opaque node *> pure node

@@ -5,15 +5,17 @@ import Prelude hiding (degree)
 import Data.Default (class Default, def)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Lens (Lens', (.~))
+import Data.Lens (Lens', (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.Meter (Meter, inch, meter)
+import Data.Meter (Meter, inch, meter, meterVal)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Editor.Common.Lenses (_rackingType)
-import Math.Angle (Angle, degree)
+import Editor.Common.Lenses (_height, _rackingType, _width)
+import Math.Angle (Angle, cos, degree)
 import Model.Racking.RackingType (RackingType(..))
+import Model.Roof.Panel (Panel)
+import Model.RoofComponent (size)
 
 newtype ArrayConfig = ArrayConfig {
     rackingType  :: RackingType,
@@ -42,10 +44,10 @@ _panelSlope = _Newtype <<< prop (SProxy :: SProxy "panelSlope")
 _panelLowestZ :: Lens' ArrayConfig Meter
 _panelLowestZ = _Newtype <<< prop (SProxy :: SProxy "panelLowestZ")
 
-_gapX :: Lens' ArrayConfig Meter
+_gapX :: forall t a r. Newtype t { gapX :: a | r } => Lens' t a
 _gapX = _Newtype <<< prop (SProxy :: SProxy "gapX")
 
-_gapY :: Lens' ArrayConfig Meter
+_gapY :: forall t a r. Newtype t { gapY :: a | r } => Lens' t a
 _gapY = _Newtype <<< prop (SProxy :: SProxy "gapY")
 
 fxArrayConfig :: ArrayConfig
@@ -86,3 +88,16 @@ arrayConfigForRack XR10   = xr10ArrayConfig
 arrayConfigForRack XRFlat = xrFlatArrayConfig
 arrayConfigForRack BX     = bxArrayConfig
 arrayConfigForRack GAF    = gafArrayConfig
+
+
+-- distance between center of two nearby rows of panels
+rowDistance :: ArrayConfig -> Panel -> Meter
+rowDistance cfg p = meter $ h * cos s + gapY
+    where s    = cfg ^. _panelSlope
+          gapY = meterVal $ cfg ^. _gapY
+          h    = meterVal $ (size p) ^. _height
+
+colDistance :: ArrayConfig -> Panel -> Meter
+colDistance cfg p = meter $ w + gapX
+    where w    = meterVal $ (size p) ^. _width
+          gapX = meterVal $ cfg ^. _gapX

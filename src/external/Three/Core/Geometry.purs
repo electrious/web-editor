@@ -6,38 +6,41 @@ import Effect (Effect)
 import Three.Math.Vector (Vector2)
 import Util (ffi, fpi)
 
-foreign import data JSGeometry :: Type -> Type
-foreign import data JSBufferGeometry :: Type -> Type
-foreign import data BufferAttribute :: Type
+class IsGeometry geo
+class IsGeometry geo <= IsBufferGeometry geo
 
-type Geometry a = JSGeometry a
-type BufferGeometry a = Geometry (JSBufferGeometry a)
-
-clone :: forall a. Geometry a -> Effect (Geometry a)
+clone :: forall geo. IsGeometry geo => geo -> Effect geo
 clone = ffi ["geo", ""] "geo.clone()"
 
-foreign import data JSBoxGeometry :: Type -> Type
-type BoxGeometry a = Geometry (JSBoxGeometry a)
+foreign import data Geometry :: Type
+instance isGeometryGeometry :: IsGeometry Geometry
 
-foreign import mkBoxGeometry :: forall a. Number -> Number -> Number -> Effect (BoxGeometry a)
+foreign import data BoxGeometry :: Type
+foreign import mkBoxGeometry :: Number -> Number -> Number -> Effect BoxGeometry
+instance isGeometryBoxGeometry :: IsGeometry BoxGeometry
 
-foreign import data JSCircleGeometry :: Type -> Type
-type CircleGeometry a = Geometry (JSCircleGeometry a)
+foreign import data CircleGeometry :: Type
+foreign import mkCircleGeometry :: Number -> Int -> Effect CircleGeometry
+instance isGeometryCircleGeometry :: IsGeometry CircleGeometry
 
-foreign import mkCircleGeometry :: forall a. Number -> Int -> Effect (CircleGeometry a)
+foreign import data CylinderGeometry :: Type
+foreign import mkCylinderGeometry :: Number -> Number -> Effect CylinderGeometry
+instance isGeometryCylinderGeometry :: IsGeometry CylinderGeometry
 
-foreign import data JSShapeGeometry :: Type -> Type
-type ShapeGeometry a = Geometry (JSShapeGeometry a)
-
+foreign import data ShapeGeometry :: Type
 foreign import data Shape :: Type
-
 foreign import mkShape :: Array Vector2 -> Effect Shape
+foreign import mkShapeGeometry :: Shape -> Effect ShapeGeometry
 
-foreign import mkShapeGeometry :: forall a. Shape -> Effect (ShapeGeometry a)
+instance isGeometryShapeGeometry :: IsGeometry ShapeGeometry
 
-foreign import isBufferGeometry :: forall a. Geometry a -> Boolean
+foreign import data BufferGeometry :: Type
+foreign import data BufferAttribute :: Type
 
-getAttribute :: forall a. String -> BufferGeometry a -> BufferAttribute
+instance isGeometryBufferGeometry :: IsGeometry BufferGeometry
+instance isBufferGeometryBufferGeometry :: IsBufferGeometry BufferGeometry
+
+getAttribute :: forall geo. IsBufferGeometry geo => String -> geo -> BufferAttribute
 getAttribute = ffi ["name", "geo"] "geo.getAttribute(name)"
 
 foreign import isBufferAttribute :: BufferAttribute -> Boolean

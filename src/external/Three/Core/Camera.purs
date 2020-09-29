@@ -3,20 +3,26 @@ module Three.Core.Camera where
 import Prelude
 
 import Effect (Effect)
-import Three.Core.Object3D (Object3D)
+import Three.Core.Object3D (class IsObject3D)
+import Unsafe.Coerce (unsafeCoerce)
 import Util (fpi)
 
-foreign import data JSCamera :: Type -> Type
+foreign import data Camera :: Type
+foreign import data PerspectiveCamera :: Type
 
-type Camera a = Object3D (JSCamera a)
+foreign import mkPerspectiveCamera :: Number -> Number -> Number -> Number -> Effect PerspectiveCamera
 
-foreign import data JSPerspectiveCamera :: Type -> Type
-type PerspectiveCamera a = Camera (JSPerspectiveCamera a)
+instance isObject3DCamera :: IsObject3D Camera where
+    toObject3D = unsafeCoerce
+instance isObject3DPerspectiveCamera :: IsObject3D PerspectiveCamera where
+    toObject3D = unsafeCoerce
 
-foreign import mkPerspectiveCamera :: forall a. Number -> Number -> Number -> Number -> Effect (PerspectiveCamera a)
+class IsObject3D a <= IsCamera a
 
-setAspect :: forall a. Number -> PerspectiveCamera a -> Effect Unit
+instance isCameraPerspectiveCamera :: IsCamera PerspectiveCamera
+
+setAspect :: Number -> PerspectiveCamera -> Effect Unit
 setAspect = fpi ["aspect", "c", ""] "c.aspect = aspect"
 
-updateProjectionMatrix :: forall a. PerspectiveCamera a -> Effect Unit
+updateProjectionMatrix :: PerspectiveCamera -> Effect Unit
 updateProjectionMatrix = fpi ["c", ""] "c.updateProjectionMatrix()"

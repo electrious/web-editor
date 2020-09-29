@@ -35,10 +35,10 @@ instance defaultEditorConfig :: Default EditorConfig where
         flyCameraTarget : step Nothing empty
     }
 
-_elem :: Lens' EditorConfig (Maybe Element)
+_elem :: forall t a r. Newtype t { elem :: a | r } => Lens' t a
 _elem = _Newtype <<< prop (SProxy :: SProxy "elem")
 
-_sizeDyn :: Lens' EditorConfig (Dynamic Size)
+_sizeDyn :: forall t a r. Newtype t { sizeDyn :: a | r } => Lens' t a
 _sizeDyn = _Newtype <<< prop (SProxy :: SProxy "sizeDyn")
 
 _flyCameraTarget :: Lens' EditorConfig (Dynamic (Maybe Vector3))

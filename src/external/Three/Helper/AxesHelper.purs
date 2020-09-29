@@ -1,10 +1,11 @@
 module Three.Helper.AxesHelper where
 
 import Effect (Effect)
-import Three.Core.Object3D (Object3D)
+import Three.Core.Object3D (class IsObject3D)
+import Unsafe.Coerce (unsafeCoerce)
 
-foreign import data JSAxesHelper :: Type -> Type
+foreign import data AxesHelper :: Type
+foreign import mkAxesHelper :: Effect AxesHelper
 
-type AxesHelper a = Object3D (JSAxesHelper a)
-
-foreign import mkAxesHelper :: forall a. Effect (AxesHelper a)
+instance isObject3DAxesHelper :: IsObject3D AxesHelper where
+    toObject3D = unsafeCoerce

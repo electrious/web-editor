@@ -3,14 +3,15 @@ module Three.Core.Scene where
 import Prelude
 
 import Effect (Effect)
-import Three.Core.Object3D (Object3D)
+import Three.Core.Object3D (class IsObject3D)
+import Unsafe.Coerce (unsafeCoerce)
 import Util (fpi)
 
-foreign import data JSScene :: Type -> Type
+foreign import data Scene :: Type
+foreign import mkScene :: Effect Scene
 
-type Scene a = Object3D (JSScene a)
+instance isObject3DScene :: IsObject3D Scene where
+    toObject3D = unsafeCoerce
 
-foreign import mkScene :: forall a. Effect (Scene a)
-
-disposeScene :: forall a. Scene a -> Effect Unit
+disposeScene :: Scene -> Effect Unit
 disposeScene = fpi ["s", ""] "s.dispose()"

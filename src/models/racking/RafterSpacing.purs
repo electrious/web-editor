@@ -10,7 +10,14 @@ import Data.Generic.Rep.Enum (genericCardinality, genericFromEnum, genericPred, 
 import Data.Generic.Rep.Show (genericShow)
 import Data.List.NonEmpty (singleton)
 import Data.Maybe (Maybe(..))
+import Editor.Common.ProtoCodable (class ProtoDecodable, class ProtoEncodable)
 import Foreign.Generic (class Decode, class Encode, ForeignError(..), decode, encode)
+
+newtype RafterSpacingPB = RafterSpacingPB Int
+derive newtype instance eqRafterSpacingPB :: Eq RafterSpacingPB
+foreign import rafterSpacingInvalid :: RafterSpacingPB
+foreign import rafterSpacing16 :: RafterSpacingPB
+foreign import rafterSpacing24 :: RafterSpacingPB
 
 data RafterSpacing = RafterSpacing16
                    | RafterSpacing24
@@ -37,3 +44,10 @@ instance decodeRafterSpacing :: Decode RafterSpacing where
                 case toEnum i of
                     Just v -> pure v
                     Nothing -> throwError $ singleton $ ForeignError $ "Can't decode RafterSpacing from: " <> show i
+instance protoDecodableRafterSpacing :: ProtoDecodable RafterSpacing RafterSpacingPB where
+    fromProto v | v == rafterSpacing16 = RafterSpacing16
+                | v == rafterSpacing24 = RafterSpacing24
+                | otherwise            = RafterSpacing16
+instance protoEncodableRafterSpacing :: ProtoEncodable RafterSpacing RafterSpacingPB where
+    toProto RafterSpacing16 = pure rafterSpacing16
+    toProto RafterSpacing24 = pure rafterSpacing24
