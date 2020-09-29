@@ -34,14 +34,14 @@ createEditor = do
     cfg <- ask
 
     let mkEditor elem = do
-            scene <- liftEffect $ createScene (cfg ^. _sizeDyn)
-                                              (cfg ^. _modeDyn)
-                                              (cfg ^. _flyCameraTarget)
-                                              elem
+            scene <- createScene (cfg ^. _sizeDyn)
+                                 (cfg ^. _modeDyn)
+                                 (cfg ^. _flyCameraTarget)
+                                 elem
             -- start the rednerring
-            liftEffect $ window >>= renderLoop scene
+            window >>= renderLoop scene
             pure scene
-    traverse mkEditor (cfg ^. _elem)
+    liftEffect $ traverse mkEditor (cfg ^. _elem)
 
 
 newtype House = House {
@@ -52,13 +52,13 @@ newtype House = House {
 
 derive instance newtypeHouse :: Newtype House _
 
-_loaded :: Lens' House (Event Unit)
+_loaded :: forall t a r. Newtype t { loaded :: a | r } => Lens' t a
 _loaded = _Newtype <<< prop (SProxy :: SProxy "loaded")
 
 _screenshot :: forall t a r. Newtype t { screenshot :: a | r } => Lens' t a
 _screenshot = _Newtype <<< prop (SProxy :: SProxy "screenshot")
 
-_roofUpdate :: Lens' House (Event (Array RoofEdited))
+_roofUpdate :: forall t a r. Newtype t { roofUpdate :: a | r } => Lens' t a
 _roofUpdate = _Newtype <<< prop (SProxy :: SProxy "roofUpdate")
 
 loadHouse :: WebEditor -> HouseEditor House
