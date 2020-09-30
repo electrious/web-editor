@@ -9,12 +9,10 @@ import Data.Default (def)
 import Data.Either (Either(..))
 import Data.Lens ((.~), (^.))
 import Data.Maybe (Maybe(..))
-import Data.Traversable (traverse)
 import Editor.Common.Lenses (_apiConfig, _houseId, _leadId, _modeDyn, _panelType, _panels, _textureInfo)
-import Editor.Editor (_roofUpdate, _screenshot, createEditor, loadHouse)
-import Editor.EditorM (_elem, _sizeDyn, runEditorM)
+import Editor.Editor (_elem, _roofUpdate, _screenshot, _sizeDyn, editHouse)
 import Editor.EditorMode (EditorMode(..))
-import Editor.HouseEditor (_dataServer, _roofPlates, _rotBtnTexture, runHouseEditor)
+import Editor.HouseEditor (_dataServer, _roofPlates, _rotBtnTexture)
 import Editor.SceneEvent (size)
 import Effect (Effect)
 import Effect.Class.Console (logShow)
@@ -63,18 +61,18 @@ doTest roofDat panelDat = do
                               # _modeDyn    .~ modeDyn
                               # _sizeDyn    .~ sizeDyn
                     
-                    houseCfg = def # _modeDyn     .~ modeDyn
-                                   # _houseId     .~ 4
-                                   # _leadId      .~ 296285
-                                   # _roofPlates  .~ roofs
-                                   # _panels      .~ panels
-                                   # _dataServer  .~ serverUrl
-                                   # _panelType   .~ panelType
-                                   # _textureInfo .~ textures
+                    houseCfg = def # _modeDyn       .~ modeDyn
+                                   # _houseId       .~ 4
+                                   # _leadId        .~ 296285
+                                   # _roofPlates    .~ roofs
+                                   # _panels        .~ panels
+                                   # _dataServer    .~ serverUrl
+                                   # _panelType     .~ panelType
+                                   # _textureInfo   .~ textures
                                    # _rotBtnTexture .~ rotateButtonPNG
-                                   # _apiConfig   .~ apiCfg
-                editor <- runEditorM createEditor cfg
-                res <- traverse (flip runHouseEditor houseCfg <<< loadHouse) editor
+                                   # _apiConfig     .~ apiCfg
+
+                res <- editHouse cfg houseCfg
 
                 case res of
                     Just house -> do

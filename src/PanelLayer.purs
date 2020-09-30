@@ -99,6 +99,7 @@ newtype PanelLayer = PanelLayer {
     serverUpdated       :: Event Unit,
     arrayDragging       :: Dynamic Boolean,
     inactiveRoofTapped  :: Event Unit,
+    activeArray         :: Event (Maybe PanelArray),
 
     currentPanels       :: Event (List Panel)
 }
@@ -121,6 +122,7 @@ defPanelLayerWith obj roof renderer btnsRenderer apiInterpreter = PanelLayer {
     serverUpdated      : empty,
     arrayDragging      : step false empty,
     inactiveRoofTapped : empty,
+    activeArray        : empty,
     currentPanels      : empty
 }
 
@@ -282,6 +284,7 @@ createPanelLayer cfg = do
                   # _arrayChanged  .~ arrChgEvt
                   # _disposable    %~ ((<*) (d1 *> d2 *> d3))
                   # _currentPanels .~ curPsEvt
+                  # _activeArray   .~ (getActiveArray <$> stateEvt)
 
 setupPanelRenderer :: Object3D -> Event ArrayOperation -> Dynamic PanelOpacity -> ArrayBuilder PanelRenderer
 setupPanelRenderer parent opEvt opacity = createPanelRenderer $ PanelRendererConfig {
