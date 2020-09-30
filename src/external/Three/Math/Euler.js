@@ -1,7 +1,8 @@
 const three = require('three')
 
 exports.mkEuler = x => y => z => {
-    return new three.Euler(x, y, z)
+    // use 'ZYX' order so all Euler angle rotations are same with SceneKit
+    return new three.Euler(x, y, z, 'ZYX')
 }
 
 exports.clone = e => {
