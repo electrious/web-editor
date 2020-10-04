@@ -44,11 +44,14 @@ import Model.Racking.OldRackingSystem (OldRoofRackingData, guessRackingType)
 import Model.Racking.RackingType (RackingType(..))
 import Model.Roof.Panel (Alignment(..), Orientation(..), PanelsDict, generalOrientation, panelsDict)
 import Model.Roof.RoofPlate (RoofEdited, RoofOperation(..), RoofPlate, _roofIntId, toRoofEdited)
+import Model.RoofSpecific (_value)
 import Three.Core.Object3D (class IsObject3D, Object3D, add, mkObject3D, remove, setName)
 
 newtype RoofManager = RoofManager {
     wrapper     :: Object3D,
     editedRoofs :: Event (Array RoofEdited),
+    alignment   :: Event (Maybe Alignment),
+    orientation :: Event (Maybe Orientation),
     disposable  :: Effect Unit
 }
 
@@ -71,7 +74,7 @@ dictToUnfoldable = toUnfoldable <<< values
 
 -- internal data structure used to manage roofs
 newtype RoofDictData = RoofDictData {
-    roofs :: RoofDict,  -- all roofs manaaged, will be updated on any changes
+    roofs         :: RoofDict,       -- all roofs manaaged, will be updated on any changes
     roofsToRender :: Maybe RoofDict  -- roofs used for rerenderring
 }
 
@@ -174,9 +177,10 @@ renderRoofs wrapper activeRoof roofsData panelsDict racks = do
                   # _alignment       .~ alignDyn
                   # _panelType       .~ panelTypeDyn
                   # _opacity         .~ opacityDyn
+    
     -- create roofnode for each roof and render them
     nodes <- performEditorEvent $ traverse (mkNode activeRoof panelsDict racks cfg) <$> rsToRenderArr
-    let nodesEvt      = multicast $ performEvent $ renderNodes wrapper <$> withLast nodes
+    let nodesEvt      = multicast  $ performEvent $ renderNodes wrapper <$> withLast nodes
         mainOrientEvt = keepLatest $ calcMainOrientation <$> nodesEvt
     
     d <- liftEffect $ subscribe mainOrientEvt pushMainOrient
@@ -224,15 +228,17 @@ createRoofManager meshData racks = do
     -- render roofs dynamically
     Tuple renderedNodes d <- renderRoofs wrapper activeRoof roofsData panelsDict racks
 
-    let deleteRoofOp  = multicast $ keepLatest $ getRoofDelete <$> renderedNodes
-        updateRoofOp  = keepLatest $ getRoofUpdate             <$> renderedNodes
-        activatedRoof = keepLatest $ getActivated              <$> renderedNodes
+    let deleteRoofOp  = multicast  $ keepLatest $ getRoofDelete        <$> renderedNodes
+        updateRoofOp  = keepLatest $ getRoofUpdate                     <$> renderedNodes
+        activatedRoof = keepLatest $ getActivated                      <$> renderedNodes
         serverUpdEvt  = keepLatest $ foldEvtWith (view _serverUpdated) <$> renderedNodes
+        alignEvt      = keepLatest $ foldEvtWith (view _alignment)     <$> renderedNodes
+        orientEvt     = keepLatest $ foldEvtWith (view _orientation)   <$> renderedNodes
 
         -- event of new roofs that will be updated on any change and
         -- run the roof flatten algorithm whenever there's new roof change
         newRoofs  = multicast $ view _roofs <$> roofsData
-        flattened = performEvent $ doFlatten meshData <$>  newRoofs
+        flattened = performEvent $ doFlatten meshData <$> newRoofs
 
     -- recognize new roofs
     recognizer <- liftEffect $ recognizeNewRoofs meshData wrapper newRoofs activeRoofDyn canEditRoofDyn
@@ -262,5 +268,7 @@ createRoofManager meshData racks = do
     pure $ RoofManager {
         wrapper     : wrapper,
         editedRoofs : multicast $ skip 1 $ debounce (Milliseconds 1000.0) $ getRoofEdited <$> newRoofs,
+        alignment   : map (view _value) <$> alignEvt,
+        orientation : map (view _value) <$> orientEvt,
         disposable  : sequence_ [d, d1, d2, dispose recognizer]
     }

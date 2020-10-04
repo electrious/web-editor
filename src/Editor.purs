@@ -1,4 +1,4 @@
-module Editor.Editor (EditorConfig(..), editHouse, House, _loaded, _screenshot, _roofUpdate, _elem, _sizeDyn, _flyCameraTarget) where
+module Editor.Editor (EditorConfig(..), editHouse, House, _loaded, _screenshot, _roofUpdate, _sizeDyn, _flyCameraTarget) where
 
 import Prelude hiding (add)
 
@@ -8,27 +8,28 @@ import Control.Monad.Reader (ask)
 import Control.Plus (empty)
 import Data.Default (class Default)
 import Data.Either (Either(..))
-import Data.Lens (Lens', (^.))
+import Data.Lens (Lens', view, (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Map as Map
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Data.Traversable (traverse)
-import Editor.Common.Lenses (_houseId, _leadId, _modeDyn, _roofRackings, _wrapper)
+import Data.Tuple (Tuple(..))
+import Editor.Common.Lenses (_alignment, _houseId, _leadId, _modeDyn, _orientation, _roofRackings, _wrapper)
 import Editor.Disposable (dispose)
 import Editor.EditorMode (EditorMode(..))
+import Editor.EditorScene (EditorScene, _canvas, addDisposable, addToScene, createScene, renderLoop)
 import Editor.House (loadHouseModel)
 import Editor.HouseEditor (HouseConfig, HouseEditor, _dataServer, _screenshotDelay, performEditorEvent, runAPIInEditor, runHouseEditor)
 import Editor.RoofManager (_editedRoofs, createRoofManager)
 import Editor.SceneEvent (Size, size)
-import Editor.WebEditor (WebEditor, _canvas, addDisposable, addToScene, createScene, renderLoop)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic, step)
 import FRP.Event (Event, create, keepLatest)
 import FRP.Event.Extra (delay, performEvent)
+import Model.Roof.Panel (Alignment, Orientation)
 import Model.Roof.RoofPlate (RoofEdited)
 import Three.Core.WebGLRenderer (toDataUrl)
 import Three.Math.Vector (Vector3)
@@ -36,7 +37,6 @@ import Web.DOM (Element)
 import Web.HTML (window)
 
 newtype EditorConfig = EditorConfig {
-    elem            :: Maybe Element,
     sizeDyn         :: Dynamic Size,
     modeDyn         :: Dynamic EditorMode,
     flyCameraTarget :: Dynamic (Maybe Vector3)
@@ -45,14 +45,10 @@ newtype EditorConfig = EditorConfig {
 derive instance newtypeEditorConfig :: Newtype EditorConfig _
 instance defaultEditorConfig :: Default EditorConfig where
     def = EditorConfig {
-        elem            : Nothing,
         sizeDyn         : step (size 800 600) empty,
         modeDyn         : step Showing empty,
         flyCameraTarget : step Nothing empty
     }
-
-_elem :: forall t a r. Newtype t { elem :: a | r } => Lens' t a
-_elem = _Newtype <<< prop (SProxy :: SProxy "elem")
 
 _sizeDyn :: forall t a r. Newtype t { sizeDyn :: a | r } => Lens' t a
 _sizeDyn = _Newtype <<< prop (SProxy :: SProxy "sizeDyn")
@@ -61,9 +57,8 @@ _flyCameraTarget :: forall t a r. Newtype t { flyCameraTarget :: a | r } => Lens
 _flyCameraTarget = _Newtype <<< prop (SProxy :: SProxy "flyCameraTarget")
 
 -- | editHouse will create the Web Editor instance
-editHouse :: EditorConfig -> HouseConfig -> Effect (Maybe House)
-editHouse cfg houseCfg = traverse mkEditor (cfg ^. _elem)
-    where mkEditor elem = do
+editHouse :: Element -> EditorConfig -> HouseConfig -> Effect (Tuple House (Effect Unit))
+editHouse elem cfg houseCfg = do
             scene <- createScene (cfg ^. _sizeDyn)
                                  (cfg ^. _modeDyn)
                                  (cfg ^. _flyCameraTarget)
@@ -71,12 +66,17 @@ editHouse cfg houseCfg = traverse mkEditor (cfg ^. _elem)
             -- start the rednerring
             window >>= renderLoop scene
             
-            runHouseEditor (loadHouse scene) houseCfg
+            h <- runHouseEditor (loadHouse scene) houseCfg
+            pure $ Tuple h (dispose scene)
 
 newtype House = House {
-    loaded     :: Event Unit,
-    screenshot :: Event String,
-    roofUpdate :: Event (Array RoofEdited)
+    loaded      :: Event Unit,
+    screenshot  :: Event String,
+    roofUpdate  :: Event (Array RoofEdited),
+
+    -- array level state events
+    alignment   :: Event (Maybe Alignment),
+    orientation :: Event (Maybe Orientation)
 }
 
 derive instance newtypeHouse :: Newtype House _
@@ -90,7 +90,7 @@ _screenshot = _Newtype <<< prop (SProxy :: SProxy "screenshot")
 _roofUpdate :: forall t a r. Newtype t { roofUpdate :: a | r } => Lens' t a
 _roofUpdate = _Newtype <<< prop (SProxy :: SProxy "roofUpdate")
 
-loadHouse :: WebEditor -> HouseEditor House
+loadHouse :: EditorScene -> HouseEditor House
 loadHouse editor = do
     cfg <- ask
 
@@ -115,14 +115,18 @@ loadHouse editor = do
             
                 loadedFunc unit
             
-            pure (mgr ^. _editedRoofs)
+            pure mgr
         
         getScreenshot _ = toDataUrl "image/png" (editor ^. _canvas)
     
-    roofUpdEvt <- keepLatest <$> performEditorEvent (buildRoofMgr <$> hmEvt <*> roofRackDatEvt)
+    mgrEvt <- performEditorEvent (buildRoofMgr <$> hmEvt <*> roofRackDatEvt)
+    let roofUpdEvt = keepLatest $ view _editedRoofs <$> mgrEvt
 
     pure $ House {
-        loaded     : loadedEvt,
-        screenshot : performEvent $ getScreenshot <$> delay (cfg ^. _screenshotDelay) loadedEvt,
-        roofUpdate : roofUpdEvt
+        loaded      : loadedEvt,
+        screenshot  : performEvent $ getScreenshot <$> delay (cfg ^. _screenshotDelay) loadedEvt,
+        roofUpdate  : roofUpdEvt,
+
+        alignment   : keepLatest $ view _alignment <$> mgrEvt,
+        orientation : keepLatest $ view _orientation <$> mgrEvt
     }
