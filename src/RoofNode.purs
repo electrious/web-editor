@@ -22,7 +22,7 @@ import Editor.ArrayBuilder (ArrayBuilder, _editorMode, performArrayBuilderDyn)
 import Editor.Common.Lenses (_alignment, _center, _id, _mesh, _orientation, _panelType, _roof, _slope, _tapped)
 import Editor.Disposable (class Disposable, dispose)
 import Editor.EditorMode (EditorMode(..))
-import Editor.PanelLayer (PanelLayer, PanelLayerConfig(..), _currentPanels, _inactiveRoofTapped, _initPanels, _mainOrientation, _roofActive, _serverUpdated, createPanelLayer)
+import Editor.PanelLayer (PanelLayer, PanelLayerConfig(..), _activeArray, _currentPanels, _inactiveRoofTapped, _initPanels, _mainOrientation, _roofActive, _serverUpdated, createPanelLayer)
 import Editor.PanelNode (PanelOpacity(..))
 import Editor.Rendering.PanelRendering (_opacity)
 import Editor.RoofEditor (_deleteRoof, _roofVertices, createRoofEditor)
@@ -30,7 +30,7 @@ import Effect (Effect)
 import Effect.Class (liftEffect)
 import Effect.Timer (setTimeout)
 import Effect.Unsafe (unsafePerformEffect)
-import FRP.Dynamic (Dynamic, dynEvent, latestEvt, performDynamic, step, subscribeDyn, withLast)
+import FRP.Dynamic (Dynamic, dynEvent, gateDyn, latestEvt, performDynamic, step, subscribeDyn, withLast)
 import FRP.Event (Event, create, keepLatest)
 import FRP.Event.Extra (multicast)
 import Math (pi)
@@ -38,6 +38,7 @@ import Math.Angle (degreeVal, radianVal)
 import Model.Hardware.PanelModel (PanelModel)
 import Model.Roof.Panel (Alignment(..), Orientation(..), Panel)
 import Model.Roof.RoofPlate (RoofOperation(..), RoofPlate, _azimuth, _borderPoints, _rotation)
+import Model.RoofSpecific (RoofSpecific, mkRoofSpecific)
 import SimplePolygon (isSimplePolygon)
 import Three.Core.Geometry (mkShape, mkShapeGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial, setOpacity, setTransparent)
@@ -72,12 +73,19 @@ instance defaultRoofNodeConfig :: Default RoofNodeConfig where
 newtype RoofNode = RoofNode {
     roofId        :: UUID,
     roof          :: RoofPlate,
+    -- roof plate editing operation events
     roofUpdate    :: Event RoofOperation,
     roofDelete    :: Event RoofOperation,
     tapped        :: Event RoofPlate,
+
     roofObject    :: Object3D,
+
+    -- array editor events
     currentPanels :: Event (List Panel),
     serverUpdated :: Event Unit,
+    alignment     :: Event (Maybe (RoofSpecific Alignment)),
+    orientation   :: Event (Maybe (RoofSpecific Orientation)),
+
     disposable    :: Effect Unit
 }
 
@@ -262,6 +270,9 @@ createRoofNode cfg = do
 
         when (not $ testSimplePolygon ps) (void $ setTimeout 1000 (toDel unit))
 
+        let actArrEvt = latestEvt $ evtInMaybe (view _activeArray) <$> panelLayerDyn
+            roofSpecActArrEvt = multicast $ map (mkRoofSpecific rid) <$> actArrEvt
+
         pure $ RoofNode {
             roofId        : rid,
             roof          : roof,
@@ -271,5 +282,7 @@ createRoofNode cfg = do
             roofObject    : obj,
             disposable    : sequence_ [d, d1, dispose editor],
             currentPanels : latestEvt $ evtInMaybe (view _currentPanels) <$> panelLayerDyn,
-            serverUpdated : latestEvt $ evtInMaybe (view _serverUpdated) <$> panelLayerDyn
+            serverUpdated : latestEvt $ evtInMaybe (view _serverUpdated) <$> panelLayerDyn,
+            alignment     : gateDyn isActive $ map (map (view _alignment)) <$> roofSpecActArrEvt,
+            orientation   : gateDyn isActive $ map (map (view _orientation)) <$> roofSpecActArrEvt
         }

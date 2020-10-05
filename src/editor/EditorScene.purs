@@ -1,4 +1,4 @@
-module Editor.WebEditor where
+module Editor.EditorScene where
 
 import Prelude hiding (add,degree)
 
@@ -6,7 +6,7 @@ import Data.Array (cons)
 import Data.Default (def)
 import Data.Foldable (sequence_)
 import Data.Int (toNumber)
-import Data.Lens (Lens', (^.))
+import Data.Lens (Lens', view, (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe, fromMaybe)
@@ -40,28 +40,30 @@ import Web.HTML (Window)
 import Web.HTML.Window (requestAnimationFrame)
 
 -- | internal record that defines all components for threejs related objects
-newtype WebEditor = WebEditor {
+newtype EditorScene = EditorScene {
     canvas     :: Element,
     render     :: Effect Unit,
-    addContent :: Object3D -> Effect Unit,
+    content    :: Object3D,
     disposable :: Ref (Array (Effect Unit))
 }
 
-derive instance newtypeEditorScene :: Newtype WebEditor _
-instance disposableEditorScene :: Disposable WebEditor where
-    dispose (WebEditor { disposable }) = read disposable >>= sequence_
+derive instance newtypeEditorScene :: Newtype EditorScene _
+instance disposableEditorScene :: Disposable EditorScene where
+    dispose (EditorScene { disposable }) = read disposable >>= sequence_
+instance isObject3DEditorScene :: IsObject3D EditorScene where
+    toObject3D = view _content
 
 _canvas :: forall t a r. Newtype t { canvas :: a | r } => Lens' t a
 _canvas = _Newtype <<< prop (SProxy :: SProxy "canvas")
 
-addToScene :: Object3D -> WebEditor -> Effect Unit
-addToScene obj (WebEditor s) = s.addContent obj
+_content :: forall t a r. Newtype t { content :: a | r } => Lens' t a
+_content = _Newtype <<< prop (SProxy :: SProxy "content")
 
-renderScene :: WebEditor -> Effect Unit
-renderScene (WebEditor s) = s.render
+renderScene :: EditorScene -> Effect Unit
+renderScene (EditorScene s) = s.render
 
-addDisposable :: Effect Unit -> WebEditor -> Effect Unit
-addDisposable d (WebEditor e) = void $ modify (cons d) e.disposable
+addDisposable :: Effect Unit -> EditorScene -> Effect Unit
+addDisposable d (EditorScene e) = void $ modify (cons d) e.disposable
 
 capVal :: Number -> Number -> Number -> Number
 capVal bot top v | v < bot = bot
@@ -119,7 +121,7 @@ setupOrbitControls c target = do
     subscribeDyn t (flip setTarget c)
 
 -- | internal function to create the threejs scene, camera, light and renderer
-createScene :: Dynamic Size -> Dynamic EditorMode -> Dynamic (Maybe Vector3) -> Element -> Effect WebEditor
+createScene :: Dynamic Size -> Dynamic EditorMode -> Dynamic (Maybe Vector3) -> Element -> Effect EditorScene
 createScene sizeDyn modeDyn targetDyn elem = do
     -- set the default Up direction as z axis in the scene
     setDefaultUp (mkVec3 0.0 0.0 1.0)
@@ -183,8 +185,6 @@ createScene sizeDyn modeDyn targetDyn elem = do
     let renderFunc = do
             render scene camera renderer
             when (isEnabled orbitCtrl) $ update orbitCtrl
-
-        addContentFunc c = add c content
     
         inputEvts = setupInput (domElement renderer)
     
@@ -193,22 +193,21 @@ createScene sizeDyn modeDyn targetDyn elem = do
         scaleDyn = step 1.0 scaleEvt
     rcs <- setupRaycasting camera scene inputEvts sizeDyn
 
-   
     d2 <- subscribe (gateDyn canEdit (rcs ^. _dragEvent)) (rotateContentWithDrag rotWrapper)
 
     let shiftDragEvt = performEvent $ sampleDyn scaleDyn $ moveWithShiftDrag content <$> gateDyn canEdit (inputEvts ^. _shiftDragged) 
     d3 <- subscribe shiftDragEvt (const $ pure unit)
 
     disposable <- new [d1, d2, d3, d4, d5, disposeScene scene, dispose rcs, OrbitControls.dispose orbitCtrl]
-    pure $ WebEditor {
+    pure $ EditorScene {
         canvas     : canvas,
         render     : renderFunc,
-        addContent : addContentFunc,
+        content    : content,
         disposable : disposable
     }
 
 -- | renderLoop is the function to render scene repeatedly
-renderLoop :: WebEditor -> Window -> Effect Unit
+renderLoop :: EditorScene -> Window -> Effect Unit
 renderLoop scene w = do
     _ <- requestAnimationFrame (renderLoop scene w) w
     renderScene scene

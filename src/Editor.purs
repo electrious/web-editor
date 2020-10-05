@@ -1,53 +1,83 @@
-module Editor.Editor (createEditor, loadHouse, House, _loaded, _screenshot, _roofUpdate) where
+module Editor.Editor (EditorConfig(..), editHouse, House, _loaded, _screenshot, _roofUpdate, _sizeDyn, _flyCameraTarget) where
 
 import Prelude hiding (add)
 
 import API.Racking (loadRacking)
 import Control.Monad.Except (runExcept)
 import Control.Monad.Reader (ask)
+import Control.Plus (empty)
+import Data.Default (class Default)
 import Data.Either (Either(..))
-import Data.Lens (Lens', (^.))
+import Data.Lens (Lens', view, (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.Map (empty)
-import Data.Maybe (Maybe)
+import Data.Map as Map
+import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Data.Traversable (traverse)
-import Editor.Common.Lenses (_houseId, _leadId, _modeDyn, _roofRackings, _wrapper)
+import Data.Tuple (Tuple(..))
+import Editor.Common.Lenses (_alignment, _houseId, _leadId, _modeDyn, _orientation, _roofRackings, _wrapper)
 import Editor.Disposable (dispose)
-import Editor.EditorM (EditorM, _elem, _flyCameraTarget, _sizeDyn)
+import Editor.EditorMode (EditorMode(..))
+import Editor.EditorScene (EditorScene, _canvas, addDisposable, createScene, renderLoop)
 import Editor.House (loadHouseModel)
-import Editor.HouseEditor (HouseEditor, _dataServer, _screenshotDelay, performEditorEvent, runAPIInEditor)
+import Editor.HouseEditor (ArrayEditParam, HouseConfig, HouseEditor, _arrayEditParam, _dataServer, _screenshotDelay, performEditorEvent, runAPIInEditor, runHouseEditor)
 import Editor.RoofManager (_editedRoofs, createRoofManager)
-import Editor.WebEditor (WebEditor, _canvas, addDisposable, addToScene, createScene, renderLoop)
+import Editor.SceneEvent (Size, size)
+import Effect (Effect)
 import Effect.Class (liftEffect)
+import FRP.Dynamic (Dynamic, step)
 import FRP.Event (Event, create, keepLatest)
-import FRP.Event.Extra (delay, performEvent)
+import FRP.Event.Extra (delay, multicast, performEvent)
+import Model.Roof.Panel (Alignment, Orientation)
 import Model.Roof.RoofPlate (RoofEdited)
+import Three.Core.Object3D (add)
 import Three.Core.WebGLRenderer (toDataUrl)
+import Three.Math.Vector (Vector3)
+import Web.DOM (Element)
 import Web.HTML (window)
 
--- | createEditor will create the Web Editor instance
-createEditor :: EditorM (Maybe WebEditor)
-createEditor = do
-    cfg <- ask
+newtype EditorConfig = EditorConfig {
+    sizeDyn         :: Dynamic Size,
+    modeDyn         :: Dynamic EditorMode,
+    flyCameraTarget :: Dynamic (Maybe Vector3)
+}
 
-    let mkEditor elem = do
+derive instance newtypeEditorConfig :: Newtype EditorConfig _
+instance defaultEditorConfig :: Default EditorConfig where
+    def = EditorConfig {
+        sizeDyn         : step (size 800 600) empty,
+        modeDyn         : step Showing empty,
+        flyCameraTarget : step Nothing empty
+    }
+
+_sizeDyn :: forall t a r. Newtype t { sizeDyn :: a | r } => Lens' t a
+_sizeDyn = _Newtype <<< prop (SProxy :: SProxy "sizeDyn")
+
+_flyCameraTarget :: forall t a r. Newtype t { flyCameraTarget :: a | r } => Lens' t a
+_flyCameraTarget = _Newtype <<< prop (SProxy :: SProxy "flyCameraTarget")
+
+-- | editHouse will create the Web Editor instance
+editHouse :: Element -> EditorConfig -> HouseConfig -> Effect (Tuple House (Effect Unit))
+editHouse elem cfg houseCfg = do
             scene <- createScene (cfg ^. _sizeDyn)
                                  (cfg ^. _modeDyn)
                                  (cfg ^. _flyCameraTarget)
                                  elem
             -- start the rednerring
             window >>= renderLoop scene
-            pure scene
-    liftEffect $ traverse mkEditor (cfg ^. _elem)
-
+            
+            h <- runHouseEditor (loadHouse scene (houseCfg ^. _arrayEditParam)) houseCfg
+            pure $ Tuple h (dispose scene)
 
 newtype House = House {
-    loaded     :: Event Unit,
-    screenshot :: Event String,
-    roofUpdate :: Event (Array RoofEdited)
+    loaded      :: Event Unit,
+    screenshot  :: Event String,
+    roofUpdate  :: Event (Array RoofEdited),
+
+    -- array level state events
+    alignment   :: Event (Maybe Alignment),
+    orientation :: Event (Maybe Orientation)
 }
 
 derive instance newtypeHouse :: Newtype House _
@@ -61,8 +91,8 @@ _screenshot = _Newtype <<< prop (SProxy :: SProxy "screenshot")
 _roofUpdate :: forall t a r. Newtype t { roofUpdate :: a | r } => Lens' t a
 _roofUpdate = _Newtype <<< prop (SProxy :: SProxy "roofUpdate")
 
-loadHouse :: WebEditor -> HouseEditor House
-loadHouse editor = do
+loadHouse :: EditorScene -> ArrayEditParam -> HouseEditor House
+loadHouse editor param = do
     cfg <- ask
 
     { event: loadedEvt, push: loadedFunc } <- liftEffect create
@@ -74,26 +104,29 @@ loadHouse editor = do
     -- extract the roof racking map data
     let roofRackDatEvt = extrRoofRack <$> racksEvt
         extrRoofRack res = case runExcept res of
-                            Left _ -> empty
+                            Left _ -> Map.empty
                             Right v -> v ^. _roofRackings
     
         buildRoofMgr hmd roofRackData = do
-            mgr <- createRoofManager hmd roofRackData
+            mgr <- createRoofManager param hmd roofRackData
             liftEffect do
-                addToScene (hmd ^. _wrapper) editor
-                addToScene (mgr ^. _wrapper) editor
+                add (hmd ^. _wrapper) editor
+                add (mgr ^. _wrapper) editor
                 addDisposable (dispose mgr) editor
             
                 loadedFunc unit
             
-            pure (mgr ^. _editedRoofs)
+            pure mgr
         
         getScreenshot _ = toDataUrl "image/png" (editor ^. _canvas)
     
-    roofUpdEvt <- keepLatest <$> performEditorEvent (buildRoofMgr <$> hmEvt <*> roofRackDatEvt)
+    mgrEvt <- multicast <$> performEditorEvent (buildRoofMgr <$> hmEvt <*> roofRackDatEvt)
 
     pure $ House {
-        loaded     : loadedEvt,
-        screenshot : performEvent $ getScreenshot <$> delay (cfg ^. _screenshotDelay) loadedEvt,
-        roofUpdate : roofUpdEvt
+        loaded      : loadedEvt,
+        screenshot  : performEvent $ getScreenshot <$> delay (cfg ^. _screenshotDelay) loadedEvt,
+        roofUpdate  : keepLatest $ view _editedRoofs <$> mgrEvt,
+
+        alignment   : keepLatest $ view _alignment   <$> mgrEvt,
+        orientation : keepLatest $ view _orientation <$> mgrEvt
     }
