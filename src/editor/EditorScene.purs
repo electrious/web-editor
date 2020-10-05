@@ -6,7 +6,7 @@ import Data.Array (cons)
 import Data.Default (def)
 import Data.Foldable (sequence_)
 import Data.Int (toNumber)
-import Data.Lens (Lens', (^.))
+import Data.Lens (Lens', view, (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe, fromMaybe)
@@ -43,19 +43,21 @@ import Web.HTML.Window (requestAnimationFrame)
 newtype EditorScene = EditorScene {
     canvas     :: Element,
     render     :: Effect Unit,
-    addContent :: Object3D -> Effect Unit,
+    content    :: Object3D,
     disposable :: Ref (Array (Effect Unit))
 }
 
 derive instance newtypeEditorScene :: Newtype EditorScene _
 instance disposableEditorScene :: Disposable EditorScene where
     dispose (EditorScene { disposable }) = read disposable >>= sequence_
+instance isObject3DEditorScene :: IsObject3D EditorScene where
+    toObject3D = view _content
 
 _canvas :: forall t a r. Newtype t { canvas :: a | r } => Lens' t a
 _canvas = _Newtype <<< prop (SProxy :: SProxy "canvas")
 
-addToScene :: Object3D -> EditorScene -> Effect Unit
-addToScene obj (EditorScene s) = s.addContent obj
+_content :: forall t a r. Newtype t { content :: a | r } => Lens' t a
+_content = _Newtype <<< prop (SProxy :: SProxy "content")
 
 renderScene :: EditorScene -> Effect Unit
 renderScene (EditorScene s) = s.render
@@ -183,8 +185,6 @@ createScene sizeDyn modeDyn targetDyn elem = do
     let renderFunc = do
             render scene camera renderer
             when (isEnabled orbitCtrl) $ update orbitCtrl
-
-        addContentFunc c = add c content
     
         inputEvts = setupInput (domElement renderer)
     
@@ -193,7 +193,6 @@ createScene sizeDyn modeDyn targetDyn elem = do
         scaleDyn = step 1.0 scaleEvt
     rcs <- setupRaycasting camera scene inputEvts sizeDyn
 
-   
     d2 <- subscribe (gateDyn canEdit (rcs ^. _dragEvent)) (rotateContentWithDrag rotWrapper)
 
     let shiftDragEvt = performEvent $ sampleDyn scaleDyn $ moveWithShiftDrag content <$> gateDyn canEdit (inputEvts ^. _shiftDragged) 
@@ -203,7 +202,7 @@ createScene sizeDyn modeDyn targetDyn elem = do
     pure $ EditorScene {
         canvas     : canvas,
         render     : renderFunc,
-        addContent : addContentFunc,
+        content    : content,
         disposable : disposable
     }
 

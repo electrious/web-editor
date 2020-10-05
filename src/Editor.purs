@@ -19,7 +19,7 @@ import Data.Tuple (Tuple(..))
 import Editor.Common.Lenses (_alignment, _houseId, _leadId, _modeDyn, _orientation, _roofRackings, _wrapper)
 import Editor.Disposable (dispose)
 import Editor.EditorMode (EditorMode(..))
-import Editor.EditorScene (EditorScene, _canvas, addDisposable, addToScene, createScene, renderLoop)
+import Editor.EditorScene (EditorScene, _canvas, addDisposable, createScene, renderLoop)
 import Editor.House (loadHouseModel)
 import Editor.HouseEditor (HouseConfig, HouseEditor, _dataServer, _screenshotDelay, performEditorEvent, runAPIInEditor, runHouseEditor)
 import Editor.RoofManager (_editedRoofs, createRoofManager)
@@ -28,9 +28,10 @@ import Effect (Effect)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic, step)
 import FRP.Event (Event, create, keepLatest)
-import FRP.Event.Extra (delay, performEvent)
+import FRP.Event.Extra (delay, multicast, performEvent)
 import Model.Roof.Panel (Alignment, Orientation)
 import Model.Roof.RoofPlate (RoofEdited)
+import Three.Core.Object3D (add)
 import Three.Core.WebGLRenderer (toDataUrl)
 import Three.Math.Vector (Vector3)
 import Web.DOM (Element)
@@ -109,8 +110,8 @@ loadHouse editor = do
         buildRoofMgr hmd roofRackData = do
             mgr <- createRoofManager hmd roofRackData
             liftEffect do
-                addToScene (hmd ^. _wrapper) editor
-                addToScene (mgr ^. _wrapper) editor
+                add (hmd ^. _wrapper) editor
+                add (mgr ^. _wrapper) editor
                 addDisposable (dispose mgr) editor
             
                 loadedFunc unit
@@ -119,7 +120,7 @@ loadHouse editor = do
         
         getScreenshot _ = toDataUrl "image/png" (editor ^. _canvas)
     
-    mgrEvt <- performEditorEvent (buildRoofMgr <$> hmEvt <*> roofRackDatEvt)
+    mgrEvt <- multicast <$> performEditorEvent (buildRoofMgr <$> hmEvt <*> roofRackDatEvt)
     let roofUpdEvt = keepLatest $ view _editedRoofs <$> mgrEvt
 
     pure $ House {
