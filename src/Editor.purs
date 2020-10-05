@@ -21,7 +21,7 @@ import Editor.Disposable (dispose)
 import Editor.EditorMode (EditorMode(..))
 import Editor.EditorScene (EditorScene, _canvas, addDisposable, createScene, renderLoop)
 import Editor.House (loadHouseModel)
-import Editor.HouseEditor (HouseConfig, HouseEditor, _dataServer, _screenshotDelay, performEditorEvent, runAPIInEditor, runHouseEditor)
+import Editor.HouseEditor (ArrayEditParam, HouseConfig, HouseEditor, _arrayEditParam, _dataServer, _screenshotDelay, performEditorEvent, runAPIInEditor, runHouseEditor)
 import Editor.RoofManager (_editedRoofs, createRoofManager)
 import Editor.SceneEvent (Size, size)
 import Effect (Effect)
@@ -67,7 +67,7 @@ editHouse elem cfg houseCfg = do
             -- start the rednerring
             window >>= renderLoop scene
             
-            h <- runHouseEditor (loadHouse scene) houseCfg
+            h <- runHouseEditor (loadHouse scene (houseCfg ^. _arrayEditParam)) houseCfg
             pure $ Tuple h (dispose scene)
 
 newtype House = House {
@@ -91,8 +91,8 @@ _screenshot = _Newtype <<< prop (SProxy :: SProxy "screenshot")
 _roofUpdate :: forall t a r. Newtype t { roofUpdate :: a | r } => Lens' t a
 _roofUpdate = _Newtype <<< prop (SProxy :: SProxy "roofUpdate")
 
-loadHouse :: EditorScene -> HouseEditor House
-loadHouse editor = do
+loadHouse :: EditorScene -> ArrayEditParam -> HouseEditor House
+loadHouse editor param = do
     cfg <- ask
 
     { event: loadedEvt, push: loadedFunc } <- liftEffect create
@@ -108,7 +108,7 @@ loadHouse editor = do
                             Right v -> v ^. _roofRackings
     
         buildRoofMgr hmd roofRackData = do
-            mgr <- createRoofManager hmd roofRackData
+            mgr <- createRoofManager param hmd roofRackData
             liftEffect do
                 add (hmd ^. _wrapper) editor
                 add (mgr ^. _wrapper) editor
@@ -121,13 +121,12 @@ loadHouse editor = do
         getScreenshot _ = toDataUrl "image/png" (editor ^. _canvas)
     
     mgrEvt <- multicast <$> performEditorEvent (buildRoofMgr <$> hmEvt <*> roofRackDatEvt)
-    let roofUpdEvt = keepLatest $ view _editedRoofs <$> mgrEvt
 
     pure $ House {
         loaded      : loadedEvt,
         screenshot  : performEvent $ getScreenshot <$> delay (cfg ^. _screenshotDelay) loadedEvt,
-        roofUpdate  : roofUpdEvt,
+        roofUpdate  : keepLatest $ view _editedRoofs <$> mgrEvt,
 
-        alignment   : keepLatest $ view _alignment <$> mgrEvt,
+        alignment   : keepLatest $ view _alignment   <$> mgrEvt,
         orientation : keepLatest $ view _orientation <$> mgrEvt
     }

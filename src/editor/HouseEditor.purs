@@ -13,14 +13,30 @@ import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Editor.Common.Lenses (_apiConfig)
 import Editor.EditorMode (EditorMode(..))
+import Editor.PanelNode (PanelOpacity)
 import Effect (Effect)
 import Effect.Class (class MonadEffect, liftEffect)
 import FRP.Dynamic (Dynamic, step)
 import FRP.Event (Event, makeEvent, subscribe)
 import Model.Hardware.PanelTextureInfo (PanelTextureInfo)
 import Model.Hardware.PanelType (PanelType(..))
-import Model.Roof.Panel (Panel)
+import Model.Roof.Panel (Alignment, Orientation, Panel)
 import Model.Roof.RoofPlate (RoofPlate)
+
+newtype ArrayEditParam = ArrayEditParam {
+    alignment   :: Event Alignment,
+    orientation :: Event Orientation,
+    opacity     :: Event PanelOpacity
+}
+
+derive instance newtypeArrayEditParam :: Newtype ArrayEditParam _
+
+instance defaultArrayEditParam :: Default ArrayEditParam where
+    def = ArrayEditParam {
+        alignment   : empty,
+        orientation : empty,
+        opacity     : empty
+    }
 
 newtype HouseConfig = HouseConfig {
     leadId          :: Int,
@@ -33,7 +49,9 @@ newtype HouseConfig = HouseConfig {
     rotBtnTexture   :: String,
     panelType       :: Dynamic PanelType,
     apiConfig       :: APIConfig,
-    screenshotDelay :: Int
+    screenshotDelay :: Int,
+
+    arrayEditParam  :: ArrayEditParam
 }
 
 derive instance newtypeHouseConfig :: Newtype HouseConfig _
@@ -49,7 +67,9 @@ instance defaultHouseConfig :: Default HouseConfig where
         rotBtnTexture   : "",
         panelType       : step Standard empty,
         apiConfig       : def,
-        screenshotDelay : 100
+        screenshotDelay : 100,
+
+        arrayEditParam  : def
     }
 
 _roofPlates :: Lens' HouseConfig (Array RoofPlate)
@@ -63,6 +83,9 @@ _rotBtnTexture = _Newtype <<< prop (SProxy :: SProxy "rotBtnTexture")
 
 _screenshotDelay :: forall t a r. Newtype t { screenshotDelay :: a | r } => Lens' t a
 _screenshotDelay = _Newtype <<< prop (SProxy :: SProxy "screenshotDelay")
+
+_arrayEditParam :: forall t a r. Newtype t { arrayEditParam :: a | r } => Lens' t a
+_arrayEditParam = _Newtype <<< prop (SProxy :: SProxy "arrayEditParam")
 
 newtype HouseEditor a = HouseEditor (ReaderT HouseConfig Effect a)
 

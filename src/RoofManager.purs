@@ -29,7 +29,7 @@ import Editor.Common.Lenses (_alignment, _disposable, _geometry, _id, _mesh, _mo
 import Editor.Disposable (class Disposable, dispose)
 import Editor.EditorMode (EditorMode(..))
 import Editor.House (HouseMeshData)
-import Editor.HouseEditor (HouseEditor, _roofPlates, performEditorEvent)
+import Editor.HouseEditor (ArrayEditParam, HouseEditor, _roofPlates, performEditorEvent)
 import Editor.PanelLayer (_currentPanels, _initPanels, _mainOrientation, _roofActive, _serverUpdated)
 import Editor.PanelNode (PanelOpacity(..))
 import Editor.Rendering.PanelRendering (_opacity)
@@ -155,20 +155,21 @@ calcMainOrientation nodes = calcOrient <<< concat <<< List.fromFoldable <$> merg
 
 -- | render dynamic roofs
 renderRoofs :: forall a. IsObject3D a => a
+                                      -> ArrayEditParam
                                       -> Event (Maybe UUID)
                                       -> Event RoofDictData
                                       -> PanelsDict
                                       -> Map Int OldRoofRackingData
                                       -> HouseEditor (Tuple (Event (Array RoofNode)) (Effect Unit))
-renderRoofs wrapper activeRoof roofsData panelsDict racks = do
+renderRoofs wrapper param activeRoof roofsData panelsDict racks = do
     { event: mainOrientE, push: pushMainOrient } <- liftEffect create
 
     let rsToRenderArr = dictToUnfoldable <$> compact (view _roofsToRender <$> roofsData)
         
         mainOrientDyn = step Landscape $ distinct mainOrientE
-        orientDyn     = step Landscape empty
-        alignDyn      = step Grid empty
-        opacityDyn    = step Opaque empty
+        orientDyn     = step Landscape $ param ^. _orientation
+        alignDyn      = step Grid $ param ^. _alignment
+        opacityDyn    = step Opaque $ param ^. _opacity
         panelTypeDyn  = step def empty
 
         -- base config for roof node
@@ -210,8 +211,8 @@ getActiveRoof meshData activated deleteRoofOp addedNewRoof =
                 (delay 1 $ Just <<< view _id <$> addedNewRoof)
 
 -- | create RoofManager for an array of roofs
-createRoofManager :: HouseMeshData -> Map Int OldRoofRackingData -> HouseEditor RoofManager
-createRoofManager meshData racks = do
+createRoofManager :: ArrayEditParam -> HouseMeshData -> Map Int OldRoofRackingData -> HouseEditor RoofManager
+createRoofManager param meshData racks = do
     wrapper <- liftEffect createWrapper
 
     -- create an event stream for the current active id
@@ -226,7 +227,7 @@ createRoofManager meshData racks = do
     canEditRoofDyn <- isRoofEditing
 
     -- render roofs dynamically
-    Tuple renderedNodes d <- renderRoofs wrapper activeRoof roofsData panelsDict racks
+    Tuple renderedNodes d <- renderRoofs wrapper param activeRoof roofsData panelsDict racks
 
     let deleteRoofOp  = multicast  $ keepLatest $ getRoofDelete        <$> renderedNodes
         updateRoofOp  = keepLatest $ getRoofUpdate                     <$> renderedNodes
