@@ -9,11 +9,11 @@ import Data.Default (def)
 import Data.Either (Either(..))
 import Data.Lens ((.~), (^.))
 import Data.Maybe (Maybe(..))
-import Data.Tuple (Tuple(..))
 import Editor.Common.Lenses (_apiConfig, _houseId, _leadId, _modeDyn, _panelType, _panels, _textureInfo)
-import Editor.Editor (_roofUpdate, _screenshot, _sizeDyn, editHouse)
+import Editor.Editor (_sizeDyn, createEditor)
 import Editor.EditorMode (EditorMode(..))
 import Editor.HouseEditor (_dataServer, _roofPlates, _rotBtnTexture)
+import Editor.HouseLoader (_roofUpdate, _screenshot, editHouse)
 import Editor.SceneEvent (size)
 import Effect (Effect)
 import Effect.Class.Console (logShow)
@@ -74,7 +74,9 @@ doTest roofDat panelDat = do
                                        # _rotBtnTexture .~ rotateButtonPNG
                                        # _apiConfig     .~ apiCfg
 
-                    Tuple house dispose <- editHouse el cfg houseCfg
+                    editor <- createEditor el cfg
+
+                    house <- editHouse editor houseCfg
 
                     void $ subscribe (house ^. _roofUpdate) logShow
                     void $ subscribe (house ^. _screenshot) logShow
