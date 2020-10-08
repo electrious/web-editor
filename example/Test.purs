@@ -36,7 +36,7 @@ foreign import qCellSolarPanel72PNG :: String
 foreign import rotateButtonPNG :: String
 
 serverUrl :: String
-serverUrl = "http://data.electrious.com"
+serverUrl = "http://data.electrious.com/v1"
 
 doTest :: Foreign -> Foreign -> Effect Unit
 doTest roofDat panelDat = do
