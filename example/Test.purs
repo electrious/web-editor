@@ -19,6 +19,7 @@ import Effect (Effect)
 import Effect.Class.Console (logShow)
 import FRP.Dynamic (step)
 import FRP.Event (subscribe)
+import FRP.Event.Extra (delay)
 import Foreign (Foreign)
 import Foreign.Generic (decode)
 import Model.Hardware.PanelTextureInfo (_premium, _standard, _standard72)
@@ -50,7 +51,7 @@ doTest roofDat panelDat = do
             Right panels -> case elem of
                 Nothing -> logShow "can't find 'editor' element"
                 Just el -> do
-                    let modeDyn = step ArrayEditing empty
+                    let modeDyn = step RoofEditing $ delay 20000 (pure ArrayEditing)
                         sizeDyn = step (size 800 600) empty
                         panelType = step Standard empty
 
@@ -79,4 +80,4 @@ doTest roofDat panelDat = do
                     house <- editHouse editor houseCfg
 
                     void $ subscribe (house ^. _roofUpdate) logShow
-                    void $ subscribe (house ^. _screenshot) logShow
+                    --void $ subscribe (house ^. _screenshot) logShow

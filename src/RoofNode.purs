@@ -16,9 +16,8 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (sequence_, traverse, traverse_)
-import Data.Tuple (Tuple(..))
 import Data.UUID (UUID)
-import Editor.ArrayBuilder (ArrayBuilder, _editorMode, performArrayBuilderDyn)
+import Editor.ArrayBuilder (ArrayBuilder, _editorMode)
 import Editor.Common.Lenses (_alignment, _center, _id, _mesh, _orientation, _panelType, _roof, _slope, _tapped)
 import Editor.Disposable (class Disposable, dispose)
 import Editor.EditorMode (EditorMode(..))
@@ -30,7 +29,7 @@ import Effect (Effect)
 import Effect.Class (liftEffect)
 import Effect.Timer (setTimeout)
 import Effect.Unsafe (unsafePerformEffect)
-import FRP.Dynamic (Dynamic, dynEvent, gateDyn, latestEvt, performDynamic, step, subscribeDyn, withLast)
+import FRP.Dynamic (Dynamic, dynEvent, gateDyn, performDynamic, step, subscribeDyn, withLast)
 import FRP.Event (Event, create, keepLatest)
 import FRP.Event.Extra (multicast)
 import Math (pi)
@@ -199,28 +198,20 @@ getNewRoof obj roof newVertices = do
     let toParent v = applyMatrix (matrix obj) (mkVec3 (vecX v) (vecY v) 0.0)
     pure $ (RoofOpUpdate <<< flip updateRoofPlate roof <<< map toParent) <$> newVertices
 
-renderPanels :: forall a. IsObject3D a => RoofNodeConfig -> a -> ArrayBuilder (Tuple (Dynamic (Maybe PanelLayer)) (Effect Unit))
+renderPanels :: forall a. IsObject3D a => RoofNodeConfig -> a -> ArrayBuilder PanelLayer
 renderPanels cfg content = do
-    modeDyn <- view _editorMode <$> ask
-    -- don't build the panel layer when it's roof editing mode
-    let builder RoofEditing = pure Nothing
-        builder _ = Just <$> createPanelLayer (PanelLayerConfig {
-            roof            : cfg ^. _roof,
-            roofActive      : cfg ^. _roofActive,
-            mainOrientation : cfg ^. _mainOrientation,
-            orientation     : cfg ^. _orientation,
-            alignment       : cfg ^. _alignment,
-            panelType       : cfg ^. _panelType,
-            initPanels      : cfg ^. _initPanels,
-            opacity         : cfg ^. _opacity
-        })
-
-        render { last, now } = do
-            traverse_ (flip remove content) $ join last
-            traverse_ (flip add content) now
-    panelLayerDyn <- performArrayBuilderDyn $ builder <$> modeDyn
-    d <- liftEffect $ subscribeDyn (withLast panelLayerDyn) render
-    pure $ Tuple panelLayerDyn d
+    l <- createPanelLayer (PanelLayerConfig {
+                                roof            : cfg ^. _roof,
+                                roofActive      : cfg ^. _roofActive,
+                                mainOrientation : cfg ^. _mainOrientation,
+                                orientation     : cfg ^. _orientation,
+                                alignment       : cfg ^. _alignment,
+                                panelType       : cfg ^. _panelType,
+                                initPanels      : cfg ^. _initPanels,
+                                opacity         : cfg ^. _opacity
+                            })
+    liftEffect $ add l content
+    pure l
 
 evtInMaybe :: forall a b. (a -> Event b) -> Maybe a -> Event b
 evtInMaybe _ Nothing  = empty
@@ -236,10 +227,10 @@ createRoofNode cfg = do
     modeDyn <- view _editorMode <$> ask
 
     -- render panels
-    Tuple panelLayerDyn d <- renderPanels cfg content
+    panelLayer <- renderPanels cfg content
     
     let -- get the panel tap event on inactive roofs
-        roofTapOnPanelEvt = latestEvt $ evtInMaybe (view _inactiveRoofTapped) <$> panelLayerDyn
+        roofTapOnPanelEvt = panelLayer ^. _inactiveRoofTapped
 
         canEditRoofDyn = (==) RoofEditing <$> modeDyn
         roof           = cfg ^. _roof
@@ -270,7 +261,7 @@ createRoofNode cfg = do
 
         when (not $ testSimplePolygon ps) (void $ setTimeout 1000 (toDel unit))
 
-        let actArrEvt = latestEvt $ evtInMaybe (view _activeArray) <$> panelLayerDyn
+        let actArrEvt = panelLayer ^. _activeArray
             roofSpecActArrEvt = multicast $ map (mkRoofSpecific rid) <$> actArrEvt
 
         pure $ RoofNode {
@@ -280,9 +271,9 @@ createRoofNode cfg = do
             roofUpdate    : multicast newRoof,
             tapped        : multicast $ const roof <$> (roofTapEvt <|> roofTapOnPanelEvt),
             roofObject    : obj,
-            disposable    : sequence_ [d, d1, dispose editor],
-            currentPanels : latestEvt $ evtInMaybe (view _currentPanels) <$> panelLayerDyn,
-            serverUpdated : latestEvt $ evtInMaybe (view _serverUpdated) <$> panelLayerDyn,
+            disposable    : sequence_ [d1, dispose editor],
+            currentPanels : panelLayer ^. _currentPanels,
+            serverUpdated : panelLayer ^. _serverUpdated,
             alignment     : gateDyn isActive $ map (map (view _alignment)) <$> roofSpecActArrEvt,
             orientation   : gateDyn isActive $ map (map (view _orientation)) <$> roofSpecActArrEvt
         }

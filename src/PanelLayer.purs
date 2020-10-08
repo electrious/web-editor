@@ -247,6 +247,9 @@ createPanelLayer cfg = do
     layer <- liftEffect mkObject3D
     liftEffect $ setName "panel-layer" layer
 
+    modeDyn <- view _editorMode <$> ask
+    d <- liftEffect $ subscribeDyn (((/=) RoofEditing) <$> modeDyn) (flip setVisible layer)
+
     arrCfgDyn <- view _arrayConfig <$> ask
     apiCfg    <- view _apiConfig   <$> ask
     
@@ -282,7 +285,7 @@ createPanelLayer cfg = do
     
     pure $ nLayer # _serverUpdated .~ apiInterpreter ^. _finished
                   # _arrayChanged  .~ arrChgEvt
-                  # _disposable    %~ ((<*) (d1 *> d2 *> d3))
+                  # _disposable    %~ ((<*) (d *> d1 *> d2 *> d3))
                   # _currentPanels .~ curPsEvt
                   # _activeArray   .~ (getActiveArray <$> stateEvt)
 

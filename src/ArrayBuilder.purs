@@ -14,8 +14,7 @@ import Editor.EditorMode (EditorMode)
 import Editor.HouseEditor (HouseEditor, _rotBtnTexture)
 import Editor.UI.RotateButton (rotateBtnTexture)
 import Effect.Class (class MonadEffect, liftEffect)
-import FRP.Dynamic (Dynamic, current, dynEvent, step)
-import FRP.Event (makeEvent, subscribe)
+import FRP.Dynamic (Dynamic)
 import Model.Hardware.PanelTextureInfo (PanelTextureInfo)
 import Model.Hardware.PanelType (PanelType)
 import Model.Racking.RackingType (RackingType)
@@ -81,15 +80,3 @@ getTextureInfo = view _textureInfo <$> ask
 
 getPanelType :: ArrayBuilder (Dynamic PanelType)
 getPanelType = view _panelType <$> ask
-
-performArrayBuilderDyn :: forall a. Dynamic (ArrayBuilder a) -> ArrayBuilder (Dynamic a)
-performArrayBuilderDyn d = do
-    env  <- ask
-    rCfg <- liftRenderingM ask
-    
-    ArrayBuilder curV <- liftEffect $ current d
-    def <- liftEffect $ runRenderingM (runReaderT curV env) rCfg
-    
-    let evt = makeEvent \k -> subscribe (dynEvent d) \(ArrayBuilder v) -> runRenderingM (runReaderT v env) rCfg >>= k
-
-    pure $ step def evt
