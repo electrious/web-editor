@@ -22,7 +22,7 @@ import Data.Time.Duration (Milliseconds(..))
 import Data.Traversable (class Foldable, traverse)
 import Data.Tuple (Tuple(..))
 import Data.UUID (UUID, emptyUUID)
-import Editor.Common.Lenses (_apiConfig, _id, _leadId, _roof)
+import Editor.Common.Lenses (_apiConfig, _id, _houseId, _roof)
 import Editor.PanelOperation (PanelOperation(..))
 import Editor.Rendering.PanelRendering (_operations)
 import FRP.Event (Event, fold, keepLatest, withLast)
@@ -33,6 +33,7 @@ import Model.Roof.RoofPlate (RoofPlate)
 newtype PanelAPIInterpreterConfig = PanelAPIInterpreterConfig {
     apiConfig  :: APIConfig,
     roof       :: RoofPlate,
+    houseId    :: Int,
     clientId   :: UUID,
     operations :: Event PanelOperation
 }
@@ -42,6 +43,7 @@ instance defaultPanelAPIInterpreterConfig :: Default PanelAPIInterpreterConfig w
     def = PanelAPIInterpreterConfig {
         apiConfig  : def,
         roof       : def,
+        houseId    : 0,
         clientId   : emptyUUID,
         operations : Plus.empty
     }
@@ -84,10 +86,10 @@ diff newD oldD = fromFoldable [AddPanels new, DelPanels del, UpdatePanels upd]
 
 mkPanelAPIInterpreter :: PanelAPIInterpreterConfig -> PanelAPIInterpreter
 mkPanelAPIInterpreter cfg = PanelAPIInterpreter { finished: debounce t apiResEvt }
-    where roof   = cfg  ^. _roof
-          leadId = roof ^. _leadId
-          roofId = roof ^. _id
-          apiCfg = cfg  ^. _apiConfig
+    where roof    = cfg  ^. _roof
+          houseId = cfg  ^. _houseId
+          roofId  = roof ^. _id
+          apiCfg  = cfg  ^. _apiConfig
 
           t = Milliseconds 2000.0
 
@@ -98,17 +100,17 @@ mkPanelAPIInterpreter cfg = PanelAPIInterpreter { finished: debounce t apiResEvt
 
           newOpEvt  = calcOp <$> withLast (debounce t newStEvt)
 
-          runOps    = map anyEvt <<< traverse (flip runAPI apiCfg <<< callPanelAPI leadId roofId)
+          runOps    = map anyEvt <<< traverse (flip runAPI apiCfg <<< callPanelAPI houseId roofId)
           apiResEvt = keepLatest $ performEvent $ runOps <$> newOpEvt
 
 callPanelAPI :: Int -> UUID -> PanelOperation -> API (Event Unit)
-callPanelAPI leadId roofId (LoadPanels ps)   = pure Plus.empty
-callPanelAPI leadId roofId (AddPanel p)      = createPanel leadId p
-callPanelAPI leadId roofId (AddPanels ps)    = onlyCallFull ps (toUnfoldable >>> createPanels leadId roofId)
-callPanelAPI leadId roofId (DelPanel pid)    = deletePanels leadId [pid]
-callPanelAPI leadId roofId (DelPanels pids)  = onlyCallFull pids (toUnfoldable >>> deletePanels leadId)
-callPanelAPI leadId roofId DeleteAll         = deletePanelsInRoof leadId roofId
-callPanelAPI leadId roofId (UpdatePanels ps) = onlyCallFull ps (toUnfoldable >>> updatePanels leadId)
+callPanelAPI houseId roofId (LoadPanels ps)   = pure Plus.empty
+callPanelAPI houseId roofId (AddPanel p)      = createPanel houseId p
+callPanelAPI houseId roofId (AddPanels ps)    = onlyCallFull ps (toUnfoldable >>> createPanels houseId roofId)
+callPanelAPI houseId roofId (DelPanel pid)    = deletePanels houseId [pid]
+callPanelAPI houseId roofId (DelPanels pids)  = onlyCallFull pids (toUnfoldable >>> deletePanels houseId)
+callPanelAPI houseId roofId DeleteAll         = deletePanelsInRoof houseId roofId
+callPanelAPI houseId roofId (UpdatePanels ps) = onlyCallFull ps (toUnfoldable >>> updatePanels houseId)
 
 -- only call the provided API function if the param is not null
 onlyCallFull :: forall f a. Foldable f => f a -> (f a -> API (Event Unit)) -> API (Event Unit)

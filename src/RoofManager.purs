@@ -25,7 +25,7 @@ import Data.Tuple (Tuple(..))
 import Data.UUID (UUID)
 import Data.Unfoldable (class Unfoldable)
 import Editor.ArrayBuilder (runArrayBuilder)
-import Editor.Common.Lenses (_alignment, _disposable, _geometry, _id, _mesh, _modeDyn, _mouseMove, _orientation, _panelType, _panels, _roof, _roofId, _roofs, _tapped, _verticeTree, _wrapper)
+import Editor.Common.Lenses (_alignment, _disposable, _geometry, _houseId, _id, _mesh, _modeDyn, _mouseMove, _orientation, _panelType, _panels, _roof, _roofId, _roofs, _tapped, _verticeTree, _wrapper)
 import Editor.Disposable (class Disposable, dispose)
 import Editor.EditorMode (EditorMode(..))
 import Editor.House (HouseMeshData)
@@ -164,6 +164,8 @@ renderRoofs :: forall a. IsObject3D a => a
 renderRoofs wrapper param activeRoof roofsData panelsDict racks = do
     { event: mainOrientE, push: pushMainOrient } <- liftEffect create
 
+    houseId <- view _houseId <$> ask
+
     let rsToRenderArr = dictToUnfoldable <$> compact (view _roofsToRender <$> roofsData)
         
         mainOrientDyn = step Landscape $ distinct mainOrientE
@@ -173,7 +175,8 @@ renderRoofs wrapper param activeRoof roofsData panelsDict racks = do
         panelTypeDyn  = step def empty
 
         -- base config for roof node
-        cfg = def # _mainOrientation .~ mainOrientDyn
+        cfg = def # _houseId         .~ houseId
+                  # _mainOrientation .~ mainOrientDyn
                   # _orientation     .~ orientDyn
                   # _alignment       .~ alignDyn
                   # _panelType       .~ panelTypeDyn

@@ -28,7 +28,7 @@ import Data.Time.Duration (Milliseconds(..))
 import Data.Tuple (Tuple(..))
 import Data.UUID (UUID, genUUID)
 import Editor.ArrayBuilder (ArrayBuilder, _arrayConfig, _editorMode, liftRenderingM)
-import Editor.Common.Lenses (_alignment, _apiConfig, _arrayNumber, _disposable, _dragType, _dragged, _id, _object, _orientation, _panels, _panelsUpdated, _point, _rackingType, _roof, _rowNumber, _rows, _slope, _tapped, _x, _y)
+import Editor.Common.Lenses (_alignment, _apiConfig, _arrayNumber, _disposable, _dragType, _dragged, _houseId, _id, _object, _orientation, _panels, _panelsUpdated, _point, _rackingType, _roof, _rowNumber, _rows, _slope, _tapped, _x, _y)
 import Editor.Disposable (class Disposable)
 import Editor.EditorMode (EditorMode(..))
 import Editor.Input.Commoon (DragType(..))
@@ -64,6 +64,7 @@ import Three.Core.Object3D (class IsObject3D, Object3D, add, mkObject3D, setCast
 import Three.Math.Vector (Vector3, mkVec3, (<->))
 
 newtype PanelLayerConfig = PanelLayerConfig {
+    houseId         :: Int,
     roof            :: RoofPlate,
     roofActive      :: Dynamic Boolean,
     mainOrientation :: Dynamic Orientation, -- project wise orientation used for new array
@@ -265,6 +266,7 @@ createPanelLayer cfg = do
     -- setup the panel API interpreter
     let apiInterpreter = mkPanelAPIInterpreter $ def # _apiConfig  .~ apiCfg
                                                      # _roof       .~ roof
+                                                     # _houseId    .~ (cfg ^. _houseId)
                                                      # _operations .~ panelOpEvt
         panelLayer = defPanelLayerWith layer roof panelRenderer btnsRenderer apiInterpreter
 

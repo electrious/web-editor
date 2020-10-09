@@ -18,7 +18,7 @@ import Data.Symbol (SProxy(..))
 import Data.Traversable (sequence_, traverse, traverse_)
 import Data.UUID (UUID)
 import Editor.ArrayBuilder (ArrayBuilder, _editorMode)
-import Editor.Common.Lenses (_alignment, _center, _id, _mesh, _orientation, _panelType, _roof, _slope, _tapped)
+import Editor.Common.Lenses (_alignment, _center, _houseId, _id, _mesh, _orientation, _panelType, _roof, _slope, _tapped)
 import Editor.Disposable (class Disposable, dispose)
 import Editor.EditorMode (EditorMode(..))
 import Editor.PanelLayer (PanelLayer, PanelLayerConfig(..), _activeArray, _currentPanels, _inactiveRoofTapped, _initPanels, _mainOrientation, _roofActive, _serverUpdated, createPanelLayer)
@@ -46,6 +46,7 @@ import Three.Math.Vector (Vector2, Vector3, applyMatrix, mkVec2, mkVec3, vecX, v
 import Unsafe.Coerce (unsafeCoerce)
 
 newtype RoofNodeConfig = RoofNodeConfig {
+    houseId         :: Int,
     roof            :: RoofPlate,
     roofActive      :: Dynamic Boolean,
     mainOrientation :: Dynamic Orientation,
@@ -59,6 +60,7 @@ newtype RoofNodeConfig = RoofNodeConfig {
 derive instance newtypeRoofNodeConfig :: Newtype RoofNodeConfig _
 instance defaultRoofNodeConfig :: Default RoofNodeConfig where
     def = RoofNodeConfig {
+        houseId         : 0,
         roof            : def,
         roofActive      : step false empty,
         mainOrientation : step Landscape empty,
@@ -201,6 +203,7 @@ getNewRoof obj roof newVertices = do
 renderPanels :: forall a. IsObject3D a => RoofNodeConfig -> a -> ArrayBuilder PanelLayer
 renderPanels cfg content = do
     l <- createPanelLayer (PanelLayerConfig {
+                                houseId         : cfg ^. _houseId,
                                 roof            : cfg ^. _roof,
                                 roofActive      : cfg ^. _roofActive,
                                 mainOrientation : cfg ^. _mainOrientation,
