@@ -36,7 +36,7 @@ foreign import qCellSolarPanel72PNG :: String
 foreign import rotateButtonPNG :: String
 
 serverUrl :: String
-serverUrl = "http://data.electrious.com/v1"
+serverUrl = "http://data.electrious.com"
 
 doTest :: Foreign -> Foreign -> Effect Unit
 doTest roofDat panelDat = do
@@ -59,7 +59,7 @@ doTest roofDat panelDat = do
                                        # _premium    .~ Just qCellSolarPanelJPG
                                        # _standard72 .~ Just qCellSolarPanel72PNG
                         apiCfg = def # _auth .~ Just "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJJZCI6IiIsImN0YyI6NCwianRpIjoiNCJ9.d6pG95A4EoAPGhhnN4BsL7QtarpBRCEcta0Uu72SoVU"
-                                     # _baseUrl .~ "https://api.electrious.com"
+                                     # _baseUrl .~ "https://api.electrious.com/v1"
 
                         cfg = def # _modeDyn    .~ modeDyn
                                   # _sizeDyn    .~ sizeDyn

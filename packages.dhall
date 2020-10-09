@@ -136,8 +136,8 @@ let additions =
         }
       , axios =
         { dependencies = [ "prelude", "effect", "aff", "foreign-generic" ]
-        , repo = "https://github.com/iarthstar/purescript-axios.git"
-        , version = "v1.1.2"
+        , repo = "https://github.com/manyoo/purescript-axios.git"
+        , version = "v1.1.3"
         }
       , digraph =
         { dependencies = [ "newtype", "ordered-collections", "pqueue", "lists" ]

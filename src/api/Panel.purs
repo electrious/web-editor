@@ -3,7 +3,7 @@ module API.Panel where
 import Prelude
 
 import API (API, callAPI')
-import Axios (Method(..))
+import Axios.Types (Method(..))
 import Data.Lens ((^.))
 import Data.UUID (UUID, toString)
 import FRP.Event (Event)
@@ -18,7 +18,7 @@ createPanels leadId roofId ps = callAPI' POST url ps
     where url = "/leads/" <> show leadId <> "/roofplates/" <> toString roofId <> "/panels"
 
 deletePanels :: Int -> Array UUID -> API (Event Unit)
-deletePanels leadId pids = callAPI' DELETE url pids
+deletePanels leadId pids = callAPI' DELETE url { uuids: pids }
     where url = "/leads/" <> show leadId <> "/panels"
 
 deletePanelsInRoof :: Int -> UUID -> API (Event Unit)

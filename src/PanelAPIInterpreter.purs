@@ -7,6 +7,7 @@ import API.Panel (createPanel, createPanels, deletePanels, deletePanelsInRoof, u
 import Control.Plus as Plus
 import Data.Default (class Default, def)
 import Data.Filterable (filter)
+import Data.Foldable (null)
 import Data.Lens (Lens', (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
@@ -18,7 +19,7 @@ import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Time.Duration (Milliseconds(..))
-import Data.Traversable (traverse)
+import Data.Traversable (class Foldable, traverse)
 import Data.Tuple (Tuple(..))
 import Data.UUID (UUID, emptyUUID)
 import Editor.Common.Lenses (_apiConfig, _id, _leadId, _roof)
@@ -103,8 +104,14 @@ mkPanelAPIInterpreter cfg = PanelAPIInterpreter { finished: debounce t apiResEvt
 callPanelAPI :: Int -> UUID -> PanelOperation -> API (Event Unit)
 callPanelAPI leadId roofId (LoadPanels ps)   = pure Plus.empty
 callPanelAPI leadId roofId (AddPanel p)      = createPanel leadId p
-callPanelAPI leadId roofId (AddPanels ps)    = createPanels leadId roofId (toUnfoldable ps)
+callPanelAPI leadId roofId (AddPanels ps)    = onlyCallFull ps (toUnfoldable >>> createPanels leadId roofId)
 callPanelAPI leadId roofId (DelPanel pid)    = deletePanels leadId [pid]
-callPanelAPI leadId roofId (DelPanels pids)  = deletePanels leadId (toUnfoldable pids)
+callPanelAPI leadId roofId (DelPanels pids)  = onlyCallFull pids (toUnfoldable >>> deletePanels leadId)
 callPanelAPI leadId roofId DeleteAll         = deletePanelsInRoof leadId roofId
-callPanelAPI leadId roofId (UpdatePanels ps) = updatePanels leadId (toUnfoldable ps)
+callPanelAPI leadId roofId (UpdatePanels ps) = onlyCallFull ps (toUnfoldable >>> updatePanels leadId)
+
+-- only call the provided API function if the param is not null
+onlyCallFull :: forall f a. Foldable f => f a -> (f a -> API (Event Unit)) -> API (Event Unit)
+onlyCallFull ls f = if null ls
+                    then pure (pure unit)
+                    else f ls

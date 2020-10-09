@@ -2,7 +2,9 @@ module API where
 
 import Prelude
 
-import Axios (Header(..), Method, baseUrl, genericAxios, headers, method)
+import Axios (genericAxios)
+import Axios.Config (baseUrl, headers, method)
+import Axios.Types (Header(..), Method)
 import Control.Monad.Except (runExcept, throwError)
 import Control.Monad.Reader (class MonadAsk, ReaderT, ask, runReaderT)
 import Data.Array as Array

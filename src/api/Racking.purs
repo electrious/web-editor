@@ -3,7 +3,7 @@ module API.Racking where
 import Prelude
 
 import API (API, callAPI)
-import Axios (Method(..))
+import Axios.Types (Method(..))
 import Data.Generic.Rep (class Generic)
 import FRP.Event (Event)
 import Foreign.Generic (class Decode, F, defaultOptions, genericDecode)
