@@ -33,7 +33,7 @@ import Model.Roof.ArrayConfig (ArrayConfig, _panelLowestZ)
 import Model.Roof.Panel (Orientation(..), Panel, addDelta, panelLong, panelShort, validatedSlope)
 import Model.RoofComponent (size)
 import Three.Core.Geometry (class IsGeometry, BoxGeometry, mkBoxGeometry)
-import Three.Core.Material (class IsMaterial, MeshBasicMaterial, mkMeshBasicMaterialWithTexture, setOpacity)
+import Three.Core.Material (class IsMaterial, MeshBasicMaterial, mkMeshBasicMaterialWithTexture, setOpacity, setTransparent)
 import Three.Core.Mesh (Mesh, mkMesh)
 import Three.Core.Object3D (class IsObject3D, add, position, rotateWithEuler, setCastShadow, setName, setPosition, setRenderOrder, toObject3D)
 import Three.Loader.TextureLoader (loadTexture, mkTextureLoader)
@@ -43,7 +43,10 @@ import Three.Math.Vector as Vector
 
 data PanelOpacity = Opaque
                   | Transparent
-derive instance eqPanelOpacity :: Eq PanelOpacity
+derive instance eqPanelPanelOpacity :: Eq PanelOpacity
+derive instance genericPanelOpacity :: Generic PanelOpacity _
+instance showPanelOpacity :: Show PanelOpacity where
+    show = genericShow
 
 opacityValue :: PanelOpacity -> Number
 opacityValue Opaque      = 1.0
@@ -159,8 +162,8 @@ mkRightFrame geo mat = do
     pure right
 
 -- | make a default panel mesh node
-mkPanelNode :: ArrayConfig -> PanelTextureInfo -> PanelType -> Panel -> Effect PanelNode
-mkPanelNode arrCfg info panelType p = do
+mkPanelNode :: ArrayConfig -> PanelTextureInfo -> PanelType -> Panel -> Boolean -> Effect PanelNode
+mkPanelNode arrCfg info panelType p isTemp = do
     -- create the panel body first
     let bodyGeo = panelGeometry unit
         vertGeo = verticalGeometry unit
@@ -190,6 +193,8 @@ mkPanelNode arrCfg info panelType p = do
     traverse_ (flip add m) [top, bot, left, right]
     updateRotation p node
     updatePosition p arrCfg node
+
+    when isTemp $ updateOpacityVal 0.7 node
 
     pure node
 
@@ -241,7 +246,11 @@ updateRotation p = rotateWithEuler euler
           rotateForFlat Portrait  slope = mkEuler (radianVal slope) 0.0 0.0
 
 updateOpacity :: PanelOpacity -> PanelNode -> Effect Unit
-updateOpacity opacity node = traverse_ (setOpacity (opacityValue opacity)) (node ^. _materials)
+updateOpacity opacity node = updateOpacityVal (opacityValue opacity) node
+
+updateOpacityVal :: Number -> PanelNode -> Effect Unit
+updateOpacityVal op node = traverse_ f (node ^. _materials)
+    where f mat = setTransparent true mat *> setOpacity op mat
 
 enableShadows :: Boolean -> PanelNode -> Effect Unit
 enableShadows e node = setCastShadow e node

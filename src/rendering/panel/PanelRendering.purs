@@ -109,7 +109,7 @@ renderPanelNode :: ArrayConfig -> PanelTextureInfo -> PanelType -> PanelOpacity 
 renderPanelNode arrCfg textInfo panelType opacity st p = 
     if (not $ panelRendered p st)
         then do
-            pn <- mkPanelNode arrCfg textInfo panelType p
+            pn <- mkPanelNode arrCfg textInfo panelType p false
             updateOpacity opacity pn
             enableShadows (isOpaque opacity) pn
             add pn (st ^. _parent)
@@ -174,7 +174,7 @@ renderTempPanels textInfo arrCfg panelType ps st = do
 
         updNode (Tuple node p) = changePanel arrCfg p node
         mkNode p = do
-            n <- mkPanelNode arrCfg textInfo panelType p
+            n <- mkPanelNode arrCfg textInfo panelType p true
             add n (st ^. _parent)
             pure n
         delNode n = remove n (st ^. _parent)

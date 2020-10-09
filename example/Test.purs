@@ -12,8 +12,10 @@ import Data.Maybe (Maybe(..))
 import Editor.Common.Lenses (_apiConfig, _houseId, _leadId, _modeDyn, _panelType, _panels, _textureInfo)
 import Editor.Editor (_sizeDyn, createEditor)
 import Editor.EditorMode (EditorMode(..))
-import Editor.HouseEditor (_dataServer, _roofPlates, _rotBtnTexture)
+import Editor.HouseEditor (_arrayEditParam, _dataServer, _roofPlates, _rotBtnTexture)
 import Editor.HouseLoader (_roofUpdate, _screenshot, editHouse)
+import Editor.PanelNode (PanelOpacity(..))
+import Editor.Rendering.PanelRendering (_opacity)
 import Editor.SceneEvent (size)
 import Effect (Effect)
 import Effect.Class.Console (logShow)
@@ -64,6 +66,8 @@ doTest roofDat panelDat = do
                         cfg = def # _modeDyn    .~ modeDyn
                                   # _sizeDyn    .~ sizeDyn
                         
+                        param = def
+
                         houseCfg = def # _modeDyn       .~ modeDyn
                                        # _houseId       .~ 4
                                        # _leadId        .~ 296285
@@ -74,6 +78,7 @@ doTest roofDat panelDat = do
                                        # _textureInfo   .~ textures
                                        # _rotBtnTexture .~ rotateButtonPNG
                                        # _apiConfig     .~ apiCfg
+                                       # _arrayEditParam .~ param
 
                     editor <- createEditor el cfg
 
