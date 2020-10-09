@@ -22,7 +22,6 @@ import Editor.Common.Lenses (_dragged, _height, _mesh, _orientation, _rackingTyp
 import Editor.Rendering.DefMaterials (loadMaterial)
 import Editor.UI.DragInfo (DragInfo, mkDragInfo)
 import Effect (Effect)
-import Effect.Class.Console (logShow)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Event (Event)
 import Math (pi)
@@ -87,13 +86,12 @@ panelTextureType _ Premium  = PremiumTexture
 panelTextureType _ Standard = StandardTexture
 
 -- create material for panel node with the provided image url
-mkPanelMaterial :: Boolean -> String -> Effect MeshBasicMaterial
-mkPanelMaterial isTemp imagePath = logShow "mkPanelMaterial" *> mkTextureLoader >>= loadTexture imagePath >>= mkMeshBasicMaterialWithTexture
+mkPanelMaterial :: String -> Effect MeshBasicMaterial
+mkPanelMaterial imagePath = mkTextureLoader >>= loadTexture imagePath >>= mkMeshBasicMaterialWithTexture
 
 -- | memoized function to get panel material for the corresponding panel texture type
 getPanelMaterial :: Boolean -> String -> MeshBasicMaterial
-getPanelMaterial = memoize2 f
-    where f isTemp imagePath = unsafePerformEffect $ mkPanelMaterial isTemp imagePath
+getPanelMaterial = memoize2 (\_ imagePath -> unsafePerformEffect $ mkPanelMaterial imagePath)
 
 materialUrl :: PanelTextureInfo -> PanelTextureType -> String
 materialUrl info tt = fromMaybe "" $ imageUrl tt
