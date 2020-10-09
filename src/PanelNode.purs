@@ -22,6 +22,7 @@ import Editor.Common.Lenses (_dragged, _height, _orientation, _rackingType, _tap
 import Editor.Rendering.DefMaterials (loadMaterial)
 import Editor.UI.DragInfo (DragInfo, mkDragInfo)
 import Effect (Effect)
+import Effect.Class.Console (logShow)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Event (Event)
 import Math (pi)
@@ -87,14 +88,17 @@ panelTextureType _ Standard = StandardTexture
 
 -- create material for panel node with the provided image url
 mkPanelMaterial :: String -> Effect MeshBasicMaterial
-mkPanelMaterial imagePath = mkTextureLoader >>= loadTexture imagePath >>= mkMeshBasicMaterialWithTexture
+mkPanelMaterial imagePath = logShow "mkPanelMaterial" *> mkTextureLoader >>= loadTexture imagePath >>= mkMeshBasicMaterialWithTexture
 
 -- | memoized function to get panel material for the corresponding panel texture type
-getPanelMaterial :: PanelTextureInfo -> PanelTextureType -> MeshBasicMaterial
-getPanelMaterial info = memoize (unsafePerformEffect <<< mkPanelMaterial <<< imageUrl)
-    where imageUrl PremiumTexture    = fromMaybe "" $ info ^. _premium
-          imageUrl StandardTexture   = fromMaybe "" $ info ^. _standard
-          imageUrl Standard72Texture = fromMaybe "" $ info ^. _standard72
+getPanelMaterial :: String -> MeshBasicMaterial
+getPanelMaterial = memoize (unsafePerformEffect <<< mkPanelMaterial)
+
+materialUrl :: PanelTextureInfo -> PanelTextureType -> String
+materialUrl info tt = fromMaybe "" $ imageUrl tt
+    where imageUrl PremiumTexture    = info ^. _premium
+          imageUrl StandardTexture   = info ^. _standard
+          imageUrl Standard72Texture = info ^. _standard72
 
 -- | memoized function to create panel body's geometry
 panelGeometry :: Unit -> BoxGeometry
@@ -172,7 +176,7 @@ mkPanelNode arrCfg info panelType p isTemp = do
         blackMat = loadMaterial Premium
 
         rackingType = arrCfg ^. _rackingType
-        bodyMat = getPanelMaterial info $ panelTextureType rackingType panelType
+        bodyMat = getPanelMaterial $ materialUrl info $ panelTextureType rackingType panelType
 
     m <- mkTapDragMesh bodyGeo bodyMat
     setName "panel" m
