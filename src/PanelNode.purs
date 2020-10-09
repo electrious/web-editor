@@ -5,7 +5,7 @@ import Prelude hiding (add)
 import Custom.Mesh (TapDragMesh, mkTapDragMesh)
 import Data.Enum (class BoundedEnum, class Enum)
 import Data.Foldable (traverse_)
-import Data.Function.Memoize (class Tabulate, genericTabulate, memoize)
+import Data.Function.Memoize (class Tabulate, genericTabulate, memoize, memoize2)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Bounded (genericBottom, genericTop)
 import Data.Generic.Rep.Enum (genericCardinality, genericFromEnum, genericPred, genericSucc, genericToEnum)
@@ -18,7 +18,7 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Meter (meterVal)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Editor.Common.Lenses (_dragged, _height, _orientation, _rackingType, _tapped, _x, _y)
+import Editor.Common.Lenses (_dragged, _height, _mesh, _orientation, _rackingType, _tapped, _x, _y)
 import Editor.Rendering.DefMaterials (loadMaterial)
 import Editor.UI.DragInfo (DragInfo, mkDragInfo)
 import Effect (Effect)
@@ -35,7 +35,7 @@ import Model.Roof.Panel (Orientation(..), Panel, addDelta, panelLong, panelShort
 import Model.RoofComponent (size)
 import Three.Core.Geometry (class IsGeometry, BoxGeometry, mkBoxGeometry)
 import Three.Core.Material (class IsMaterial, MeshBasicMaterial, mkMeshBasicMaterialWithTexture, setOpacity, setTransparent)
-import Three.Core.Mesh (Mesh, mkMesh)
+import Three.Core.Mesh (Mesh, mkMesh, setMaterial)
 import Three.Core.Object3D (class IsObject3D, add, position, rotateWithEuler, setCastShadow, setName, setPosition, setRenderOrder, toObject3D)
 import Three.Loader.TextureLoader (loadTexture, mkTextureLoader)
 import Three.Math.Euler (mkEuler)
@@ -87,12 +87,13 @@ panelTextureType _ Premium  = PremiumTexture
 panelTextureType _ Standard = StandardTexture
 
 -- create material for panel node with the provided image url
-mkPanelMaterial :: String -> Effect MeshBasicMaterial
-mkPanelMaterial imagePath = logShow "mkPanelMaterial" *> mkTextureLoader >>= loadTexture imagePath >>= mkMeshBasicMaterialWithTexture
+mkPanelMaterial :: Boolean -> String -> Effect MeshBasicMaterial
+mkPanelMaterial isTemp imagePath = logShow "mkPanelMaterial" *> mkTextureLoader >>= loadTexture imagePath >>= mkMeshBasicMaterialWithTexture
 
 -- | memoized function to get panel material for the corresponding panel texture type
-getPanelMaterial :: String -> MeshBasicMaterial
-getPanelMaterial = memoize (unsafePerformEffect <<< mkPanelMaterial)
+getPanelMaterial :: Boolean -> String -> MeshBasicMaterial
+getPanelMaterial = memoize2 f
+    where f isTemp imagePath = unsafePerformEffect $ mkPanelMaterial isTemp imagePath
 
 materialUrl :: PanelTextureInfo -> PanelTextureType -> String
 materialUrl info tt = fromMaybe "" $ imageUrl tt
@@ -117,7 +118,8 @@ newtype PanelNode = PanelNode {
     panelObject :: TapDragMesh,
     tapped      :: Event Panel,
     dragged     :: Event (DragInfo Panel),
-    materials   :: List MeshBasicMaterial
+    materials   :: List MeshBasicMaterial,
+    materialURL :: String
 }
 
 derive instance newtypePanelNode :: Newtype PanelNode _
@@ -132,6 +134,9 @@ _panelObject = _Newtype <<< prop (SProxy :: SProxy "panelObject")
 
 _materials :: forall t a r. Newtype t { materials :: a | r } => Lens' t a
 _materials = _Newtype <<< prop (SProxy :: SProxy "materials")
+
+_materialURL :: forall t a r. Newtype t { materialURL :: a | r } => Lens' t a
+_materialURL = _Newtype <<< prop (SProxy :: SProxy "materialURL")
 
 mkTopFrame :: forall geo mat. IsGeometry geo => IsMaterial mat => geo -> mat -> Effect Mesh
 mkTopFrame geo mat = do
@@ -176,7 +181,9 @@ mkPanelNode arrCfg info panelType p isTemp = do
         blackMat = loadMaterial Premium
 
         rackingType = arrCfg ^. _rackingType
-        bodyMat = getPanelMaterial $ materialUrl info $ panelTextureType rackingType panelType
+        matUrl      = materialUrl info $ panelTextureType rackingType panelType
+        -- use different material for normal and temp panels
+        bodyMat     = getPanelMaterial isTemp matUrl
 
     m <- mkTapDragMesh bodyGeo bodyMat
     setName "panel" m
@@ -185,7 +192,8 @@ mkPanelNode arrCfg info panelType p isTemp = do
                  panelObject : m,
                  tapped      : const p <$> m ^. _tapped,
                  dragged     : mkDragInfo p <$> m ^. _dragged,
-                 materials   : (bodyMat : blackMat : Nil)
+                 materials   : (bodyMat : blackMat : Nil),
+                 materialURL : matUrl
               }
     -- create frames
     top   <- mkTopFrame horiGeo blackMat
@@ -260,4 +268,8 @@ enableShadows :: Boolean -> PanelNode -> Effect Unit
 enableShadows e node = setCastShadow e node
 
 changeToNormal :: PanelNode -> Effect PanelNode
-changeToNormal node = updateOpacity Opaque node *> pure node
+changeToNormal node = do
+    -- change to use the normal panel material
+    setMaterial (getPanelMaterial false $ node ^. _materialURL) (node ^. _panelObject <<< _mesh)
+    updateOpacity Opaque node
+    pure node
