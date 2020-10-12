@@ -29,7 +29,7 @@ import Effect (Effect)
 import Effect.Class (liftEffect)
 import Effect.Timer (setTimeout)
 import Effect.Unsafe (unsafePerformEffect)
-import FRP.Dynamic (Dynamic, dynEvent, gateDyn, performDynamic, step, subscribeDyn, withLast)
+import FRP.Dynamic (Dynamic, dynEvent, performDynamic, step, subscribeDyn, withLast)
 import FRP.Event (Event, create, keepLatest)
 import FRP.Event.Extra (multicast)
 import Math (pi)
@@ -277,6 +277,6 @@ createRoofNode cfg = do
             disposable    : sequence_ [d1, dispose editor],
             currentPanels : panelLayer ^. _currentPanels,
             serverUpdated : panelLayer ^. _serverUpdated,
-            alignment     : gateDyn isActive $ map (map (view _alignment)) <$> roofSpecActArrEvt,
-            orientation   : gateDyn isActive $ map (map (view _orientation)) <$> roofSpecActArrEvt
+            alignment     : map (map (view _alignment)) <$> roofSpecActArrEvt,
+            orientation   : map (map (view _orientation)) <$> roofSpecActArrEvt
         }

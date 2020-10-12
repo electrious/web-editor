@@ -213,6 +213,13 @@ getActiveRoof meshData activated deleteRoofOp addedNewRoof =
                 (delay 1 $ const Nothing <$> deleteRoofOp) <|>
                 (delay 1 $ Just <<< view _id <$> addedNewRoof)
 
+-- helper function that will merge an array of events into a single event.
+-- it will use debounce to make sure all events fired very near in any item of
+-- the array will be calculated only once.
+mergeArrEvt :: forall a b. (a -> Event (Maybe b)) -> Array a -> Event (Maybe b)
+mergeArrEvt f arr = g <$> debounce (Milliseconds 50.0) (mergeArray (f <$> arr))
+    where g = foldl (<|>) Nothing
+
 -- | create RoofManager for an array of roofs
 createRoofManager :: ArrayEditParam -> HouseMeshData -> Map Int OldRoofRackingData -> HouseEditor RoofManager
 createRoofManager param meshData racks = do
@@ -235,9 +242,9 @@ createRoofManager param meshData racks = do
     let deleteRoofOp  = multicast  $ keepLatest $ getRoofDelete        <$> renderedNodes
         updateRoofOp  = keepLatest $ getRoofUpdate                     <$> renderedNodes
         activatedRoof = keepLatest $ getActivated                      <$> renderedNodes
-        serverUpdEvt  = keepLatest $ foldEvtWith (view _serverUpdated) <$> renderedNodes
-        alignEvt      = keepLatest $ foldEvtWith (view _alignment)     <$> renderedNodes
-        orientEvt     = keepLatest $ foldEvtWith (view _orientation)   <$> renderedNodes
+        serverUpdEvt  = multicast $ keepLatest $ foldEvtWith (view _serverUpdated) <$> renderedNodes
+        alignEvt      = multicast $ keepLatest $ mergeArrEvt (view _alignment)     <$> renderedNodes
+        orientEvt     = multicast $ keepLatest $ mergeArrEvt (view _orientation)   <$> renderedNodes
 
         -- event of new roofs that will be updated on any change and
         -- run the roof flatten algorithm whenever there's new roof change

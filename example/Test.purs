@@ -13,15 +13,12 @@ import Editor.Common.Lenses (_apiConfig, _houseId, _leadId, _modeDyn, _panelType
 import Editor.Editor (_sizeDyn, createEditor)
 import Editor.EditorMode (EditorMode(..))
 import Editor.HouseEditor (_arrayEditParam, _dataServer, _roofPlates, _rotBtnTexture)
-import Editor.HouseLoader (_roofUpdate, _screenshot, editHouse)
-import Editor.PanelNode (PanelOpacity(..))
-import Editor.Rendering.PanelRendering (_opacity)
+import Editor.HouseLoader (_roofUpdate, editHouse)
 import Editor.SceneEvent (size)
 import Effect (Effect)
 import Effect.Class.Console (logShow)
 import FRP.Dynamic (step)
 import FRP.Event (subscribe)
-import FRP.Event.Extra (delay)
 import Foreign (Foreign)
 import Foreign.Generic (decode)
 import Model.Hardware.PanelTextureInfo (_premium, _standard, _standard72)
@@ -53,7 +50,7 @@ doTest roofDat panelDat = do
             Right panels -> case elem of
                 Nothing -> logShow "can't find 'editor' element"
                 Just el -> do
-                    let modeDyn = step RoofEditing $ delay 20000 (pure ArrayEditing)
+                    let modeDyn = step ArrayEditing empty
                         sizeDyn = step (size 800 600) empty
                         panelType = step Standard empty
 
@@ -85,4 +82,5 @@ doTest roofDat panelDat = do
                     house <- editHouse editor houseCfg
 
                     void $ subscribe (house ^. _roofUpdate) logShow
+                    --void $ subscribe (house ^. _alignment) logShow
                     --void $ subscribe (house ^. _screenshot) logShow
