@@ -54,12 +54,6 @@ foreign import mkPanelPB :: Effect PanelPB
 
 instance isPBArrayCompPanelPB :: IsPBArrayComp PanelPB
 
-getId :: PanelPB -> Int
-getId = ffi ["p"] "p.getId()"
-
-setId :: Int -> PanelPB -> Effect Unit
-setId = fpi ["i", "p", ""] "p.setId(i)"
-
 getUUID :: PanelPB -> PBUUID
 getUUID = ffi ["p"] "p.getUuid()"
 
@@ -178,7 +172,6 @@ instance protoEncodableAlignment :: ProtoEncodable Alignment AlignmentPB where
     toProto Brick = pure alignmentBrick
 
 newtype Panel = Panel {
-    id             :: Int,
     uuid           :: UUID,
     roofplate_uuid :: UUID,
     roofplate_id   :: Int,  -- roofplate_id is required in update panel API
@@ -218,7 +211,6 @@ instance arrayComponentPanel :: ArrayComponent Panel where
 instance protoEncodablePanel :: ProtoEncodable Panel PanelPB where
     toProto p = do
         pb <- mkPanelPB
-        setId (p ^. _id) pb
         u1 <- mkPBUUID
         setUUIDString (toString $ p ^. _uuid) u1
         setUUID u1 pb
@@ -240,7 +232,6 @@ instance protoEncodablePanel :: ProtoEncodable Panel PanelPB where
         pure pb
 instance defaultPanel :: Default Panel where
     def = Panel {
-        id             : 0,
         uuid           : emptyUUID,
         roofplate_uuid : emptyUUID,
         roofplate_id   : 0,
