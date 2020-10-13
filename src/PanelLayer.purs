@@ -43,8 +43,8 @@ import Editor.UI.DragInfo (DragInfo, mkDragInfo)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic, current, dynEvent, gateDyn, sampleDyn, step, subscribeDyn)
-import FRP.Event (Event, create, gate, sampleOn, subscribe)
-import FRP.Event.Extra (debounce, foldEffect, fromFoldableE, multicast, performEvent, skip)
+import FRP.Event (Event, create, sampleOn, subscribe)
+import FRP.Event.Extra (debounce, debug, foldEffect, fromFoldableE, multicast, performEvent, skip)
 import Model.ArrayComponent (arrayNumber)
 import Model.Hardware.PanelModel (PanelModel)
 import Model.PanelArray (PanelArray, rotateRow)
@@ -59,7 +59,7 @@ import Model.UpdatedPanels as UpdatePanels
 import Model.UpdatedPanels as UpdatedPanels
 import Partial.Unsafe (unsafePartial)
 import Three.Core.Geometry (mkBoxGeometry)
-import Three.Core.Material (mkMeshBasicMaterial, setOpacity)
+import Three.Core.Material (mkMeshBasicMaterial, setOpacity, setTransparent)
 import Three.Core.Object3D (class IsObject3D, Object3D, add, mkObject3D, setCastShadow, setName, setRenderOrder, setVisible, worldToLocal)
 import Three.Math.Vector (Vector3, mkVec3, (<->))
 
@@ -317,15 +317,21 @@ setupPanelLayer cfg layer = do
 
         newPanelEvt     = performEvent $ mkPanelAtPlusBtnPos roof <$> plusTapEvt
 
+    -- add drag helper
+    helper <- liftEffect mkDragHelper
+    liftEffect $ add helper layer
+
     -- read the ArrayConfig event
     arrCfgEvt <- dynEvent <<< view _arrayConfig <$> ask
 
     { event: activeArrayEvt, push: pushActiveArray } <- liftEffect create
 
     { event: canDragPB, push: pushCanDragPB } <- liftEffect create
-    Tuple draggingPb dragPBEvt <- liftEffect $ setupPlusBtnDragging layer canDragPB
-    let canDragArray = not <$> dynEvent draggingPb
-    Tuple nlayer dragPanelEvt <- liftEffect $ setupPanelDragging layer canDragArray
+    let canDragPBDyn = step true canDragPB
+    Tuple draggingPb dragPBEvt <- liftEffect $ setupPlusBtnDragging layer helper canDragPBDyn
+
+    let canDragArray = step true $ not <$> dynEvent draggingPb
+    Tuple nlayer dragPanelEvt <- liftEffect $ setupPanelDragging layer helper canDragArray
 
     d <- liftEffect $ subscribeDyn (nlayer ^. _arrayDragging) (not >>> pushCanDragPB)
 
@@ -363,13 +369,9 @@ setupPanelLayer cfg layer = do
                           # _disposable %~ ((<*) (d *> d1))
     pure $ Tuple resLayer stateEvt
 
-setupPanelDragging :: PanelLayer -> Event Boolean -> Effect (Tuple PanelLayer (Event PanelLayerOperation))
-setupPanelDragging layer canDragArray = do
-    -- add drag helper
-    helper <- mkDragHelper
-    add helper (layer ^. _object)
-
-    let panelDragEvt = gate canDragArray $ layer ^. _renderer <<< _dragged
+setupPanelDragging :: PanelLayer -> DraggableMesh -> Dynamic Boolean -> Effect (Tuple PanelLayer (Event PanelLayerOperation))
+setupPanelDragging layer helper canDragArray = do
+    let panelDragEvt = gateDyn canDragArray $ layer ^. _renderer <<< _dragged
         draggingPanelDyn = step Nothing $ (Just <<< view _object) <$> panelDragEvt
 
         -- let the drag events from drag helper take up the current dragging panel
@@ -389,19 +391,15 @@ setupPanelDragging layer canDragArray = do
     d <- subscribeDyn isDragging (flip setVisible helper)
 
     let nLayer = layer # _arrayDragging .~ isDragging
-                       # _disposable %~ ((<*) d)
+                       # _disposable    %~ ((<*) d)
 
-        evt = PODragPanel <$> (dragStart <|> dragEvt <|> dragEnd)
+        evt = debug $ PODragPanel <$> (dragStart <|> dragEvt <|> dragEnd)
     pure $ Tuple nLayer evt
 
 
-setupPlusBtnDragging :: PanelLayer -> Event Boolean -> Effect (Tuple (Dynamic Boolean) (Event PanelLayerOperation))
-setupPlusBtnDragging layer canDragPlus = do
-    -- add drag helper
-    helper <- mkDragHelper
-    add helper (layer ^. _object)
-
-    let pbDrag = multicast $ gate canDragPlus $ layer ^. _btnsRenderer <<< _plusDragged
+setupPlusBtnDragging :: PanelLayer -> DraggableMesh -> Dynamic Boolean -> Effect (Tuple (Dynamic Boolean) (Event PanelLayerOperation))
+setupPlusBtnDragging layer helper canDragPlus = do
+    let pbDrag = multicast $ gateDyn canDragPlus $ layer ^. _btnsRenderer <<< _plusDragged
         draggingPbDyn = step Nothing $ (Just <<< view _object) <$> pbDrag
 
         -- let the drag events from drag helper take up the current dragging plus button
@@ -416,6 +414,9 @@ setupPlusBtnDragging layer canDragPlus = do
         dragEvt = multicast $ gateDyn isDragging $ filter isDrag dEvt
 
         evt = PODragPlusBtn <$> (dragStart <|> dragEvt <|> dragEnd)
+    
+    -- only enable the helper when user is actually dragging a panel
+    d <- subscribeDyn isDragging (flip setVisible helper)
 
     pure $ Tuple isDragging evt
 
@@ -780,6 +781,7 @@ mkDragHelper :: Effect DraggableMesh
 mkDragHelper = do
     geo <- mkBoxGeometry 1000.0 1000.0 0.02
     mat <- mkMeshBasicMaterial 0xffffff
+    setTransparent true mat
     setOpacity 0.01 mat
 
     m <- mkDraggableMesh geo mat
