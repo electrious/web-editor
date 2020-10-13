@@ -44,15 +44,15 @@ import Effect (Effect)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic, current, dynEvent, gateDyn, sampleDyn, step, subscribeDyn)
 import FRP.Event (Event, create, sampleOn, subscribe)
-import FRP.Event.Extra (debounce, debug, foldEffect, fromFoldableE, multicast, performEvent, skip)
+import FRP.Event.Extra (debounce, foldEffect, fromFoldableE, multicast, performEvent, skip)
 import Model.ArrayComponent (arrayNumber)
 import Model.Hardware.PanelModel (PanelModel)
 import Model.PanelArray (PanelArray, rotateRow)
 import Model.PlusButton (PlusButton)
 import Model.Racking.RackingType (RackingType(..))
 import Model.Roof.ArrayConfig (ArrayConfig)
-import Model.Roof.Panel (Alignment(..), Orientation(..), Panel, _arrNumber, _roofUUID, _uuid, addDelta, panelVertices)
-import Model.Roof.RoofPlate (RoofPlate, isFlat)
+import Model.Roof.Panel (Alignment(..), Orientation(..), Panel, _arrNumber, _roofUUID, _uuid, _roofplateId, addDelta, panelVertices)
+import Model.Roof.RoofPlate (RoofPlate, _roofIntId, isFlat)
 import Model.Roof.RoofPlateTransform (wrapAroundPoints)
 import Model.UpdatedPanels (delete, deletePanels, get, merge, toUnfoldable)
 import Model.UpdatedPanels as UpdatePanels
@@ -425,6 +425,7 @@ mkPanelAtPlusBtnPos roof pb = do
     i <- genUUID
     pure $ def # _uuid        .~ i
                # _roofUUID    .~ roof ^. _id
+               # _roofplateId .~ roof ^. _roofIntId
                # _arrNumber   .~ pb ^. _arrayNumber
                # _x           .~ pb ^. _x
                # _y           .~ pb ^. _y

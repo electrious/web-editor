@@ -11,7 +11,7 @@ import Data.Generic.Rep.Bounded (genericBottom, genericTop)
 import Data.Generic.Rep.Enum (genericCardinality, genericFromEnum, genericPred, genericSucc, genericToEnum)
 import Data.Generic.Rep.Ord (genericCompare)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Lens (Lens', view, (^.), (%~), (.~))
+import Data.Lens (Lens', view, (%~), (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (List(..), (:))
@@ -181,6 +181,7 @@ newtype Panel = Panel {
     id             :: Int,
     uuid           :: UUID,
     roofplate_uuid :: UUID,
+    roofplate_id   :: Int,  -- roofplate_id is required in update panel API
     row_number     :: Int,
     array_number   :: Int,
     x              :: Meter,
@@ -242,6 +243,7 @@ instance defaultPanel :: Default Panel where
         id             : 0,
         uuid           : emptyUUID,
         roofplate_uuid : emptyUUID,
+        roofplate_id   : 0,
         row_number     : 0,
         array_number   : 0,
         x              : meter 0.0,
@@ -255,6 +257,9 @@ _uuid = _Newtype <<< prop (SProxy :: SProxy "uuid")
 
 _roofUUID :: Lens' Panel UUID
 _roofUUID = _Newtype <<< prop (SProxy :: SProxy "roofplate_uuid")
+
+_roofplateId :: Lens' Panel Int
+_roofplateId = _Newtype <<< prop (SProxy :: SProxy "roofplate_id")
 
 _row_number :: Lens' Panel Int
 _row_number = _Newtype <<< prop (SProxy :: SProxy "row_number")

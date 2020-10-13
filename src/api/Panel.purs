@@ -8,13 +8,14 @@ import Data.Lens ((^.))
 import Data.UUID (UUID, toString)
 import Editor.Common.Lenses (_alignment, _orientation, _slope, _x, _y)
 import FRP.Event (Event)
-import Model.Roof.Panel (Panel, _arrNumber, _roofUUID, _row_number, _uuid)
+import Model.Roof.Panel (Panel, _arrNumber, _roofUUID, _roofplateId, _row_number, _uuid)
 
 
 -- delete id field in Panel to be used in create panel APIs
 delPanelId p = {
     uuid           : p ^. _uuid,
     roofplate_uuid : p ^. _roofUUID,
+    roofplate_id   : p ^. _roofplateId,
     row_number     : p ^. _row_number,
     array_number   : p ^. _arrNumber,
     x              : p ^. _x,
