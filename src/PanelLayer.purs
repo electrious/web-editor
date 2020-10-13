@@ -51,7 +51,7 @@ import Model.PanelArray (PanelArray, rotateRow)
 import Model.PlusButton (PlusButton)
 import Model.Racking.RackingType (RackingType(..))
 import Model.Roof.ArrayConfig (ArrayConfig)
-import Model.Roof.Panel (Alignment(..), Orientation(..), Panel, _arrNumber, _roofUUID, _uuid, panelVertices)
+import Model.Roof.Panel (Alignment(..), Orientation(..), Panel, _arrNumber, _roofUUID, _uuid, addDelta, panelVertices)
 import Model.Roof.RoofPlate (RoofPlate, isFlat)
 import Model.Roof.RoofPlateTransform (wrapAroundPoints)
 import Model.UpdatedPanels (delete, deletePanels, get, merge, toUnfoldable)
@@ -393,7 +393,7 @@ setupPanelDragging layer helper canDragArray = do
     let nLayer = layer # _arrayDragging .~ isDragging
                        # _disposable    %~ ((<*) d)
 
-        evt = debug $ PODragPanel <$> (dragStart <|> dragEvt <|> dragEnd)
+        evt = PODragPanel <$> (dragStart <|> dragEvt <|> dragEnd)
     pure $ Tuple nLayer evt
 
 
@@ -598,8 +598,15 @@ startDragging cfg st d = if not (st ^. _roofActive) || st ^. _activeArray /= Jus
                          then pure $ clearOperations st
                          else do
                             p <- worldToLocal (d ^. _point) (st ^. _object)
+                            -- find all panels in the dragged array and put it in tempPanels field
+                            let ps         = allPanels st
+                                arrNum     = d ^. _object <<< _arrNumber
+                                draggingPs = filter ((==) arrNum <<< arrayNumber) ps
                             pure $ (clearOperations st) # _lastDragPos  .~ Just p
                                                         # _arrayChanged .~ Just unit
+                                                        # _tempPanels   .~ draggingPs
+                                                        # _btnsOperations .~ singleton ResetButtons
+
 
 drag :: PanelLayerConfig -> PanelLayerState -> DragInfo Panel -> Effect PanelLayerState
 drag cfg st d = if not (st ^. _roofActive) || st ^. _activeArray /= Just (d ^. _object <<< _arrNumber)
@@ -610,21 +617,23 @@ drag cfg st d = if not (st ^. _roofActive) || st ^. _activeArray /= Just (d ^. _
                         arrNum = d ^. _object <<< _arrNumber
                     pure $ (clearOperations st) # _lastDragPos     .~ Just p
                                                 # _arrayOperations .~ singleton (MoveArray arrNum delta)
+                                                # _tempPanels      %~ map (addDelta delta)
 
 endDragging :: PanelLayerConfig -> PanelLayerState -> Int -> Effect PanelLayerState
 endDragging cfg st arr = if not (st ^. _roofActive) || st ^. _activeArray /= Just arr
     then pure st
     else do
-        let allPs   = allPanels st
-            -- partition all panels into current array panels and other array panels
-            arrPs   = partition ((==) arr <<< arrayNumber) allPs
+        let -- get panels in other arrays that're not dragged
+            allPs      = allPanels st
+            otherArrPs = filter ((/=) arr <<< arrayNumber) allPs
+
             -- check if the current array panels is outside of the roof or touching other arrays
-            outside = panelsOutsideRoof cfg arrPs.yes
+            outside = panelsOutsideRoof cfg (st ^. _tempPanels)
             touched = panelsTouchingOtherArray (st ^. _layout) outside.no
             -- delete panels outside roof or touching other arrays
             toDel   = append outside.yes touched.yes
         -- update layout with left panels and panels in other arrays
-        newLayout <- updateLayout cfg st $ append arrPs.no touched.no
+        newLayout <- updateLayout cfg st $ append otherArrPs touched.no
         -- merge all updated panels
         let updated = merge (newLayout ^. _panelsUpdated) (UpdatePanels.fromFoldable touched.no)
 
@@ -634,6 +643,7 @@ endDragging cfg st arr = if not (st ^. _roofActive) || st ^. _activeArray /= Jus
                                                              # _layout          .~ newLayout
                                                              # _lastDragPos     .~ Nothing
                                                              # _arrayChanged    .~ Just unit
+                                                             # _tempPanels      .~ Nil
 
 
 processDraggingPlus :: PanelLayerConfig -> PanelLayerState -> DragInfo PlusButton -> Effect PanelLayerState
