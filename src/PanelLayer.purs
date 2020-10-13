@@ -518,10 +518,10 @@ addPanels cfg st ps = do
     newLayout <- updateLayout cfg st newPs
 
     let updPs = newLayout ^. _panelsUpdated
-        f ops p = case get (p ^. _uuid) updPs of
-                    Just np -> np : ops
-                    Nothing -> ops
-        nps = foldl f Nil ps
+        f p = case get (p ^. _uuid) updPs of
+                    Just np -> np
+                    Nothing -> p
+        nps = f <$> ps
         updatedPs = deletePanels (view _uuid <$> nps) updPs
 
         newPsOp = AddPanels nps
