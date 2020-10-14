@@ -18,6 +18,7 @@ import Editor.Disposable (dispose)
 import Editor.Editor (Editor, _canvas, addDisposable)
 import Editor.House (loadHouseModel)
 import Editor.HouseEditor (ArrayEditParam, HouseConfig, HouseEditor, _arrayEditParam, _dataServer, _screenshotDelay, performEditorEvent, runAPIInEditor, runHouseEditor)
+import Editor.PanelLayer (_serverUpdated)
 import Editor.RoofManager (_editedRoofs, createRoofManager)
 import Effect (Effect)
 import Effect.Class (liftEffect)
@@ -32,13 +33,14 @@ editHouse :: Editor -> HouseConfig -> Effect House
 editHouse scene houseCfg = runHouseEditor (loadHouse scene (houseCfg ^. _arrayEditParam)) houseCfg
 
 newtype House = House {
-    loaded      :: Event Unit,
-    screenshot  :: Event String,
-    roofUpdate  :: Event (Array RoofEdited),
+    loaded        :: Event Unit,
+    screenshot    :: Event String,
+    roofUpdate    :: Event (Array RoofEdited),
 
     -- array level state events
-    alignment   :: Event (Maybe Alignment),
-    orientation :: Event (Maybe Orientation)
+    alignment     :: Event (Maybe Alignment),
+    orientation   :: Event (Maybe Orientation),
+    serverUpdated :: Event Unit
 }
 
 derive instance newtypeHouse :: Newtype House _
@@ -84,10 +86,11 @@ loadHouse editor param = do
     mgrEvt <- multicast <$> performEditorEvent (buildRoofMgr <$> hmEvt <*> roofRackDatEvt)
 
     pure $ House {
-        loaded      : loadedEvt,
-        screenshot  : performEvent $ getScreenshot <$> delay (cfg ^. _screenshotDelay) loadedEvt,
-        roofUpdate  : keepLatest $ view _editedRoofs <$> mgrEvt,
+        loaded        : loadedEvt,
+        screenshot    : performEvent $ getScreenshot     <$> delay (cfg ^. _screenshotDelay) loadedEvt,
+        roofUpdate    : keepLatest $ view _editedRoofs   <$> mgrEvt,
 
-        alignment   : keepLatest $ view _alignment   <$> mgrEvt,
-        orientation : keepLatest $ view _orientation <$> mgrEvt
+        alignment     : keepLatest $ view _alignment     <$> mgrEvt,
+        orientation   : keepLatest $ view _orientation   <$> mgrEvt,
+        serverUpdated : keepLatest $ view _serverUpdated <$> mgrEvt
     }

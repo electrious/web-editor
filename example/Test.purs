@@ -82,5 +82,6 @@ doTest roofDat panelDat = do
                     house <- editHouse editor houseCfg
 
                     void $ subscribe (house ^. _roofUpdate) logShow
+                    --void $ subscribe (house ^. _serverUpdated) logShow
                     --void $ subscribe (house ^. _alignment) logShow
                     --void $ subscribe (house ^. _screenshot) logShow

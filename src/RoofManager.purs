@@ -48,11 +48,12 @@ import Model.RoofSpecific (_value)
 import Three.Core.Object3D (class IsObject3D, Object3D, add, mkObject3D, remove, setName)
 
 newtype RoofManager = RoofManager {
-    wrapper     :: Object3D,
-    editedRoofs :: Event (Array RoofEdited),
-    alignment   :: Event (Maybe Alignment),
-    orientation :: Event (Maybe Orientation),
-    disposable  :: Effect Unit
+    wrapper       :: Object3D,
+    editedRoofs   :: Event (Array RoofEdited),
+    alignment     :: Event (Maybe Alignment),
+    orientation   :: Event (Maybe Orientation),
+    serverUpdated :: Event Unit,
+    disposable    :: Effect Unit
 }
 
 derive instance newtypeRoofManager :: Newtype RoofManager _
@@ -277,9 +278,10 @@ createRoofManager param meshData racks = do
 
     -- skipe the first roof in teh editedRoofs event, because it's the default data
     pure $ RoofManager {
-        wrapper     : wrapper,
-        editedRoofs : multicast $ skip 1 $ debounce (Milliseconds 1000.0) $ getRoofEdited <$> newRoofs,
-        alignment   : map (view _value) <$> alignEvt,
-        orientation : map (view _value) <$> orientEvt,
-        disposable  : sequence_ [d, d1, d2, dispose recognizer]
+        wrapper       : wrapper,
+        editedRoofs   : multicast $ skip 1 $ debounce (Milliseconds 1000.0) $ getRoofEdited <$> newRoofs,
+        alignment     : map (view _value) <$> alignEvt,
+        orientation   : map (view _value) <$> orientEvt,
+        serverUpdated : serverUpdEvt,
+        disposable    : sequence_ [d, d1, d2, dispose recognizer]
     }
