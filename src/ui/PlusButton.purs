@@ -4,7 +4,7 @@ import Prelude hiding (add)
 
 import Custom.Mesh (mkTapDragMesh)
 import Data.Function.Memoize (memoize)
-import Data.Lens (Lens, Lens', view, (^.), (%~))
+import Data.Lens (Lens', view, (%~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..))

@@ -10,7 +10,7 @@ import Data.Generic.Rep.Enum (genericCardinality, genericFromEnum, genericPred, 
 import Data.Generic.Rep.Show (genericShow)
 import Data.List.NonEmpty (singleton)
 import Data.Maybe (Maybe(..))
-import Editor.Common.ProtoCodable (class ProtoDecodable, class ProtoEncodable, toProto)
+import Editor.Common.ProtoCodable (class ProtoDecodable, class ProtoEncodable)
 import Foreign.Generic (class Decode, class Encode, ForeignError(..), decode, encode)
 
 newtype MountSpacingPB = MountSpacingPB Int

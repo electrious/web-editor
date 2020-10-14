@@ -96,9 +96,9 @@ rotateRow arr rowNum = tripleToTuple $ foldl f (Triple Nil Nil (meter 0.0)) (Arr
                                        baseX  = p ^. _x - w2
                                        baseY  = p ^. _y - h2
                                        newY   = baseY + w2
-                                       g (Triple nps ups c) (Tuple idx p) = let newP = p # _x .~ baseX + h2 + meter (meterVal (arr ^. _config ^. _gapX + h) * toNumber idx)
-                                                                                         # _y .~ newY
-                                                                                         # _orientation %~ flipOrientation
+                                       g (Triple nps ups c) (Tuple idx panel) = let newP = panel # _x .~ baseX + h2 + meter (meterVal (arr ^. _config ^. _gapX + h) * toNumber idx)
+                                                                                                 # _y .~ newY
+                                                                                                 # _orientation %~ flipOrientation
                                                                             in Triple (newP:nps) (newP:ups) c
                                    in foldl g (Triple newPs toUpd change) $ mapWithIndex Tuple $ r ^. _panels
           updateY r newPs toUpd c = let g (Triple nps ups change) p = let newP = p # _y %~ ((+) change)

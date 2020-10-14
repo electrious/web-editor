@@ -18,7 +18,7 @@ import Three.Core.Geometry (class IsGeometry)
 import Three.Core.Material (class IsMaterial)
 import Three.Core.Mesh (Mesh, mkMesh)
 import Three.Core.Object3D (class IsObject3D, Object3D, hasParent, parent, toObject3D, worldToLocal)
-import Three.Math.Vector (Vector3, mkVec3, (<->))
+import Three.Math.Vector (Vector3, (<->))
 
 newtype TappableMesh = TappableMesh {
     mesh   :: Mesh,

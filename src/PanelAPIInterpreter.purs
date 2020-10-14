@@ -63,14 +63,13 @@ _finished = _Newtype <<< prop (SProxy :: SProxy "finished")
 
 -- apply panel operations to internal panel dicts
 applyOp :: PanelOperation -> PanelDict -> PanelDict
-applyOp (LoadPanels ps) m   = foldl (\m p -> insert (p ^. _uuid) p m) m ps
+applyOp (LoadPanels ps) m   = foldl (\d p -> insert (p ^. _uuid) p d) m ps
 applyOp (AddPanel p) m      = insert (p ^. _uuid) p m
-applyOp (AddPanels ps) m    = foldl (\m p -> insert (p ^. _uuid) p m) m ps
+applyOp (AddPanels ps) m    = foldl (\d p -> insert (p ^. _uuid) p d) m ps
 applyOp (DelPanel pid) m    = delete pid m
 applyOp (DelPanels pids) m  = foldl (flip delete) m pids
 applyOp DeleteAll m         = empty
-applyOp (UpdatePanels ps) m = foldl (\m p -> update (const $ Just p) (p ^. _uuid) m) m ps
-
+applyOp (UpdatePanels ps) m = foldl (\d p -> update (const $ Just p) (p ^. _uuid) d) m ps
 
 -- calculate diff between two PanelsDict and return the least needed PanelOperations
 diff :: PanelDict -> PanelDict -> List PanelOperation

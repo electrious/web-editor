@@ -35,7 +35,7 @@ alignPanelRows algn rows = foldl f Nil rowNums
           updateAlign p  = p # _alignment .~ algn
 
           f upd rowNum = case lookup rowNum rowDict of
-            Just row -> if odd rowNum
-                        then append upd $ updateOffset <$> row ^. _panels
-                        else append upd $ updateAlign <$> row ^. _panels
-            Nothing  -> upd
+            Just r  -> if odd rowNum
+                        then append upd $ updateOffset <$> r ^. _panels
+                        else append upd $ updateAlign <$> r ^. _panels
+            Nothing -> upd
