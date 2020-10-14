@@ -11,7 +11,7 @@ import Control.Plus (empty)
 import Custom.Mesh (DraggableMesh, mkDraggableMesh)
 import Data.Default (def)
 import Data.Filterable (compact, filter)
-import Data.Foldable (class Foldable, any, foldl, null)
+import Data.Foldable (class Foldable, any, null)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Lens (Lens', set, view, (%~), (.~), (^.))
@@ -99,6 +99,7 @@ newtype PanelLayer = PanelLayer {
     arrayChanged        :: Event Unit,
     serverUpdated       :: Event Unit,
     arrayDragging       :: Dynamic Boolean,
+    plusDragging        :: Dynamic Boolean,
     inactiveRoofTapped  :: Event Unit,
     activeArray         :: Event (Maybe PanelArray),
 
@@ -122,6 +123,7 @@ defPanelLayerWith obj roof renderer btnsRenderer apiInterpreter = PanelLayer {
     arrayChanged       : empty,
     serverUpdated      : empty,
     arrayDragging      : step false empty,
+    plusDragging       : step false empty,
     inactiveRoofTapped : empty,
     activeArray        : empty,
     currentPanels      : empty
@@ -144,6 +146,9 @@ _serverUpdated = _Newtype <<< prop (SProxy :: SProxy "serverUpdated")
 
 _arrayDragging :: forall t a r. Newtype t { arrayDragging :: a | r } => Lens' t a
 _arrayDragging = _Newtype <<< prop (SProxy :: SProxy "arrayDragging")
+
+_plusDragging :: forall t a r. Newtype t { plusDragging :: a | r } => Lens' t a
+_plusDragging = _Newtype <<< prop (SProxy :: SProxy "plusDragging")
 
 _inactiveRoofTapped :: forall t a r. Newtype t { inactiveRoofTapped :: a | r } => Lens' t a
 _inactiveRoofTapped = _Newtype <<< prop (SProxy :: SProxy "inactiveRoofTapped")
@@ -328,10 +333,10 @@ setupPanelLayer cfg layer = do
 
     { event: canDragPB, push: pushCanDragPB } <- liftEffect create
     let canDragPBDyn = step true canDragPB
-    Tuple draggingPb dragPBEvt <- liftEffect $ setupPlusBtnDragging layer helper canDragPBDyn
+    Tuple mlayer dragPBEvt <- liftEffect $ setupPlusBtnDragging layer helper canDragPBDyn
 
-    let canDragArray = step true $ not <$> dynEvent draggingPb
-    Tuple nlayer dragPanelEvt <- liftEffect $ setupPanelDragging layer helper canDragArray
+    let canDragArray = step true $ not <$> dynEvent (mlayer ^. _plusDragging)
+    Tuple nlayer dragPanelEvt <- liftEffect $ setupPanelDragging mlayer helper canDragArray
 
     d <- liftEffect $ subscribeDyn (nlayer ^. _arrayDragging) (not >>> pushCanDragPB)
 
@@ -343,11 +348,11 @@ setupPanelLayer cfg layer = do
                              else POActivateArray $ arrayNumber p
         actArrOrDelPEvt = sampleOn activeArrayEvt (actArrOrDelP <$> panelTapped)
 
-        addPanelEvt = POAddPanel <$> newPanelEvt
-        rotRowEvt = (\rb -> PORotRowInArr (rb ^. _rowNumber) (rb ^. _arrayNumber)) <$> layer ^. _btnsRenderer <<< _rotTapped
+        addPanelEvt  = POAddPanel          <$> newPanelEvt
+        rotRowEvt    = (\rb ->  PORotRowInArr (rb ^. _rowNumber) (rb ^. _arrayNumber)) <$> layer ^. _btnsRenderer <<< _rotTapped
         updArrCfgEvt = POUpdateArrayConfig <$> skip 1 arrCfgEvt
-        actRoofEvt = POActivateRoof <$> dynEvent (cfg ^. _roofActive)
-        updAlgnEvt = POUpdateAlignment <$> dynEvent (cfg ^. _alignment)
+        actRoofEvt   = POActivateRoof      <$> dynEvent (cfg ^. _roofActive)
+        updAlgnEvt   = POUpdateAlignment   <$> dynEvent (cfg ^. _alignment)
         updOrientEvt = POUpdateOrientation <$> dynEvent (cfg ^. _orientation)
 
         -- make sure all edit events only fired in ArrayEditing mode
@@ -397,13 +402,13 @@ setupPanelDragging layer helper canDragArray = do
     pure $ Tuple nLayer evt
 
 
-setupPlusBtnDragging :: PanelLayer -> DraggableMesh -> Dynamic Boolean -> Effect (Tuple (Dynamic Boolean) (Event PanelLayerOperation))
+setupPlusBtnDragging :: PanelLayer -> DraggableMesh -> Dynamic Boolean -> Effect (Tuple PanelLayer (Event PanelLayerOperation))
 setupPlusBtnDragging layer helper canDragPlus = do
     let pbDrag = multicast $ gateDyn canDragPlus $ layer ^. _btnsRenderer <<< _plusDragged
         draggingPbDyn = step Nothing $ (Just <<< view _object) <$> pbDrag
 
         -- let the drag events from drag helper take up the current dragging plus button
-        helperDragEvt = multicast $ compact $ sampleDyn draggingPbDyn $ (\d p -> flip mkDragInfo d <$> p) <$> helper ^. _dragged
+        helperDragEvt = compact $ sampleDyn draggingPbDyn $ (\d p -> flip mkDragInfo d <$> p) <$> helper ^. _dragged
 
         dEvt = multicast $ pbDrag <|> helperDragEvt
 
@@ -411,14 +416,16 @@ setupPlusBtnDragging layer helper canDragPlus = do
         dragEnd = multicast $ debounce (Milliseconds 100.0) $ filter isDragEnd dEvt
 
         isDragging = step false $ (const true <$> dragStart) <|> (const false <$> dragEnd)
-        dragEvt = multicast $ gateDyn isDragging $ filter isDrag dEvt
-
-        evt = PODragPlusBtn <$> (dragStart <|> dragEvt <|> dragEnd)
+        dragEvt = gateDyn isDragging $ filter isDrag dEvt
     
     -- only enable the helper when user is actually dragging a panel
     d <- subscribeDyn isDragging (flip setVisible helper)
 
-    pure $ Tuple isDragging evt
+    let nLayer = layer # _plusDragging .~ isDragging
+                       # _disposable   %~ ((<*) d)
+
+        evt = PODragPlusBtn <$> (dragStart <|> dragEvt <|> dragEnd)
+    pure $ Tuple nLayer evt
 
 mkPanelAtPlusBtnPos :: RoofPlate -> PlusButton -> Effect Panel
 mkPanelAtPlusBtnPos roof pb = do
@@ -603,9 +610,9 @@ startDragging cfg st d = if not (st ^. _roofActive) || st ^. _activeArray /= Jus
                             let ps         = allPanels st
                                 arrNum     = d ^. _object <<< _arrNumber
                                 draggingPs = filter ((==) arrNum <<< arrayNumber) ps
-                            pure $ (clearOperations st) # _lastDragPos  .~ Just p
-                                                        # _arrayChanged .~ Just unit
-                                                        # _tempPanels   .~ draggingPs
+                            pure $ (clearOperations st) # _lastDragPos    .~ Just p
+                                                        # _arrayChanged   .~ Just unit
+                                                        # _tempPanels     .~ draggingPs
                                                         # _btnsOperations .~ singleton ResetButtons
 
 
@@ -621,8 +628,9 @@ drag cfg st d = if not (st ^. _roofActive) || st ^. _activeArray /= Just (d ^. _
                                                 # _tempPanels      %~ map (addDelta delta)
 
 endDragging :: PanelLayerConfig -> PanelLayerState -> Int -> Effect PanelLayerState
-endDragging cfg st arr = if not (st ^. _roofActive) || st ^. _activeArray /= Just arr
-    then pure st
+endDragging cfg st arr = if not (st ^. _roofActive) || st ^. _activeArray /= Just arr || null (st ^. _tempPanels)
+    then checkAndUpdateBtnOps cfg false $ (clearOperations st) # _lastDragPos  .~ Nothing
+                                                               # _tempPanels   .~ Nil
     else do
         let -- get panels in other arrays that're not dragged
             allPs      = allPanels st
