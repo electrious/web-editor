@@ -1,0 +1,1 @@
+exports.epsilon = Number.EPSILON
