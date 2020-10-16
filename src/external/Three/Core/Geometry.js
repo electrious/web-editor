@@ -1,5 +1,9 @@
 const three = require('three')
 
+exports.mkGeometry = _ => {
+    return new three.Geometry()
+}
+
 exports.mkBoxGeometry = width => height => depth => _ => {
     return new three.BoxGeometry(width, height, depth)
 }

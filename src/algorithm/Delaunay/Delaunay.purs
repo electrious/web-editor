@@ -4,8 +4,10 @@ import Prelude
 
 import Algorithm.Delaunay.Triangle (Edge, Triangle, _rsqr, _vertex1, _vertex2, epsilon, mkTriangle, triangleEdges)
 import Algorithm.Delaunay.Vertex (class Vertex, vertX, vertY)
+import Data.Array as Arr
 import Data.Lens ((^.))
 import Data.List (List(..), (:), foldl, sortBy)
+import Data.List as List
 import Data.Set as Set
 import Data.Triple (Triple(..))
 import Data.Tuple (Tuple(..))
@@ -13,10 +15,10 @@ import Editor.Common.Lenses (_x, _y)
 
 -- | triangulate will create new triangles based on a list of old triangles
 -- and new vertices.
-triangulate :: forall v. Vertex v => Ord v => List (Triangle v) -> List v -> List (Triangle v)
-triangulate old verts = allTris $ foldl addVertex (Tuple Nil old) vs
+triangulate :: forall v. Vertex v => Ord v => Array (Triangle v) -> Array v -> Array (Triangle v)
+triangulate old verts = allTris $ foldl addVertex (Tuple Nil (List.fromFoldable old)) vs
     where vs = sortBy (comparing vertX) $ Set.toUnfoldable $ Set.fromFoldable verts
-          allTris (Tuple completed open) = completed <> open
+          allTris (Tuple completed open) = Arr.fromFoldable $ completed <> open
 
 -- add one vertex to the computed/open triangles list
 -- For each open triangle, check to see if the current point is

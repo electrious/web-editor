@@ -3,7 +3,8 @@ module Three.Core.Geometry where
 import Prelude
 
 import Effect (Effect)
-import Three.Math.Vector (Vector2)
+import Three.Core.Face3 (Face3)
+import Three.Math.Vector (Vector2, Vector3)
 import Util (ffi, fpi)
 
 class IsGeometry geo
@@ -14,6 +15,26 @@ clone = ffi ["geo", ""] "geo.clone()"
 
 foreign import data Geometry :: Type
 instance isGeometryGeometry :: IsGeometry Geometry
+
+foreign import mkGeometry :: Effect Geometry
+
+setVertices :: forall geo. IsGeometry geo => Array Vector3 -> geo -> Effect Unit
+setVertices = fpi ["vs", "geo", ""] "geo.vertices = vs"
+
+setVerticesNeedUpdate :: forall geo. IsGeometry geo => Boolean -> geo -> Effect Unit
+setVerticesNeedUpdate = fpi ["u", "geo", ""] "geo.verticesNeedUpdate = u"
+
+setFaces :: forall geo. IsGeometry geo => Array Face3 -> geo -> Effect Unit
+setFaces = fpi ["fs", "geo", ""] "geo.faces = fs"
+
+setElementsNeedUpdate :: forall geo. IsGeometry geo => Boolean -> geo -> Effect Unit
+setElementsNeedUpdate = fpi ["u", "geo", ""] "geo.elementsNeedUpdate = u"
+
+setUVs :: forall geo. IsGeometry geo => Array Vector2 -> geo -> Effect Unit
+setUVs = fpi ["uvs", "geo", ""] "geo.faceVertexUvs = [uvs]"
+
+setUVsNeedUpdate :: forall geo. IsGeometry geo => Boolean -> geo -> Effect Unit
+setUVsNeedUpdate = fpi ["u", "geo", ""] "geo.uvsNeedUpdate = u"
 
 foreign import data BoxGeometry :: Type
 foreign import mkBoxGeometry :: Number -> Number -> Number -> Effect BoxGeometry
