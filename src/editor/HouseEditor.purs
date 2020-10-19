@@ -3,15 +3,15 @@ module Editor.HouseEditor where
 import Prelude
 
 import API (API, APIConfig, runAPI)
-import Control.Monad.Reader (class MonadAsk, class MonadReader, ReaderT, ask, runReaderT)
+import Control.Monad.Reader (class MonadAsk, class MonadReader, ReaderT, ask, runReaderT, withReaderT)
 import Control.Plus (empty)
 import Data.Default (class Default, def)
-import Data.Lens (Lens', view)
+import Data.Lens (Lens', view, (.~))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Editor.Common.Lenses (_apiConfig)
+import Editor.Common.Lenses (_apiConfig, _panels)
 import Editor.EditorMode (EditorMode(..))
 import Editor.PanelNode (PanelOpacity)
 import Effect (Effect)
@@ -108,3 +108,8 @@ performEditorEvent e = do
 
 runAPIInEditor :: forall a. API a -> HouseEditor a
 runAPIInEditor api = ask >>= view _apiConfig >>> runAPI api >>> liftEffect
+
+withUpdatedRoofAndPanels :: forall a. Array RoofPlate -> Array Panel -> HouseEditor a -> HouseEditor a
+withUpdatedRoofAndPanels rs ps (HouseEditor e) = HouseEditor $ withReaderT f e
+    where f cfg = cfg # _roofPlates .~ rs
+                      # _panels     .~ ps

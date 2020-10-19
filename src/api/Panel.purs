@@ -4,11 +4,26 @@ import Prelude
 
 import API (API, callAPI')
 import Axios.Types (Method(..))
+import Data.Generic.Rep (class Generic)
 import Data.Lens ((^.))
 import Data.UUID (UUID, toString)
 import FRP.Event (Event)
+import Foreign.Generic (class Decode, defaultOptions, genericDecode)
 import Model.Roof.Panel (Panel, _roofUUID)
 
+
+newtype PanelsResult = PanelsResult {
+    panels :: Array Panel
+}
+
+derive instance genericPanelsResult :: Generic PanelsResult _
+instance decodePanelsResult :: Decode PanelsResult where
+    decode = genericDecode (defaultOptions { unwrapSingleConstructors = true })
+
+loadPanels :: Int -> API (Event (Array Panel))
+loadPanels i = map f <$> callAPI' GET url {}
+    where url = "/leads/" <> show i <> "/panels"
+          f (PanelsResult r) = r.panels
 
 createPanel :: Int -> Panel -> API (Event Unit)
 createPanel leadId p = callAPI' POST url p

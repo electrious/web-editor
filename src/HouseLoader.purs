@@ -2,7 +2,9 @@ module Editor.HouseLoader (editHouse, House, _loaded, _screenshot, _roofUpdate) 
 
 import Prelude hiding (add)
 
+import API.Panel (loadPanels)
 import API.Racking (loadRacking)
+import API.Roofplate (getRoofplates)
 import Control.Monad.Except (runExcept)
 import Control.Monad.Reader (ask)
 import Data.Either (Either(..))
@@ -17,7 +19,7 @@ import Editor.Common.Lenses (_alignment, _houseId, _leadId, _orientation, _roofR
 import Editor.Disposable (dispose)
 import Editor.Editor (Editor, _canvas, addDisposable)
 import Editor.House (loadHouseModel)
-import Editor.HouseEditor (ArrayEditParam, HouseConfig, HouseEditor, _arrayEditParam, _dataServer, _screenshotDelay, performEditorEvent, runAPIInEditor, runHouseEditor)
+import Editor.HouseEditor (ArrayEditParam, HouseConfig, HouseEditor, _arrayEditParam, _dataServer, _screenshotDelay, performEditorEvent, runAPIInEditor, runHouseEditor, withUpdatedRoofAndPanels)
 import Editor.PanelLayer (_serverUpdated)
 import Editor.RoofManager (_editedRoofs, createRoofManager)
 import Effect (Effect)
@@ -62,6 +64,8 @@ loadHouse editor param = do
     
     -- load house model and racking data
     hmEvt    <- liftEffect $ loadHouseModel (cfg ^. _dataServer) (cfg ^. _leadId)
+    roofsEvt <- runAPIInEditor $ getRoofplates (cfg ^. _houseId)
+    panelsEvt <- runAPIInEditor $ loadPanels (cfg ^. _houseId)
     racksEvt <- runAPIInEditor $ loadRacking (cfg ^. _houseId)
 
     -- extract the roof racking map data
@@ -70,8 +74,8 @@ loadHouse editor param = do
                             Left _ -> Map.empty
                             Right v -> v ^. _roofRackings
     
-        buildRoofMgr hmd roofRackData = do
-            mgr <- createRoofManager param hmd roofRackData
+        buildRoofMgr hmd roofsDat panelsDat roofRackData = do
+            mgr <- withUpdatedRoofAndPanels roofsDat panelsDat $ createRoofManager param hmd roofRackData
             liftEffect do
                 add (hmd ^. _wrapper) editor
                 add (mgr ^. _wrapper) editor
@@ -83,7 +87,7 @@ loadHouse editor param = do
         
         getScreenshot _ = toDataUrl "image/png" (editor ^. _canvas)
     
-    mgrEvt <- multicast <$> performEditorEvent (buildRoofMgr <$> hmEvt <*> roofRackDatEvt)
+    mgrEvt <- multicast <$> performEditorEvent (buildRoofMgr <$> hmEvt <*> roofsEvt <*> panelsEvt <*> roofRackDatEvt)
 
     pure $ House {
         loaded        : loadedEvt,
