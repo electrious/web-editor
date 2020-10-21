@@ -25,11 +25,11 @@ import Data.Tuple (Tuple(..))
 import Data.UUID (UUID)
 import Data.Unfoldable (class Unfoldable)
 import Editor.ArrayBuilder (runArrayBuilder)
-import Editor.Common.Lenses (_alignment, _disposable, _geometry, _houseId, _id, _mesh, _modeDyn, _mouseMove, _orientation, _panelType, _panels, _roof, _roofId, _roofs, _tapped, _verticeTree, _wrapper)
+import Editor.Common.Lenses (_alignment, _disposable, _geometry, _houseId, _id, _mesh, _modeDyn, _mouseMove, _orientation, _panelType, _roof, _roofId, _roofs, _tapped, _verticeTree, _wrapper)
 import Editor.Disposable (class Disposable, dispose)
 import Editor.EditorMode (EditorMode(..))
 import Editor.House (HouseMeshData)
-import Editor.HouseEditor (ArrayEditParam, HouseEditor, _roofPlates, performEditorEvent)
+import Editor.HouseEditor (ArrayEditParam, HouseEditor, performEditorEvent)
 import Editor.PanelLayer (_currentPanels, _initPanels, _mainOrientation, _roofActive, _serverUpdated)
 import Editor.PanelNode (PanelOpacity(..))
 import Editor.Rendering.PanelRendering (_opacity)
@@ -42,7 +42,7 @@ import FRP.Event (Event, create, fold, keepLatest, subscribe, withLast)
 import FRP.Event.Extra (debounce, delay, distinct, mergeArray, multicast, performEvent, skip)
 import Model.Racking.OldRackingSystem (OldRoofRackingData, guessRackingType)
 import Model.Racking.RackingType (RackingType(..))
-import Model.Roof.Panel (Alignment(..), Orientation(..), PanelsDict, generalOrientation, panelsDict)
+import Model.Roof.Panel (Alignment(..), Orientation(..), Panel, PanelsDict, generalOrientation, panelsDict)
 import Model.Roof.RoofPlate (RoofEdited, RoofOperation(..), RoofPlate, _roofIntId, toRoofEdited)
 import Model.RoofSpecific (_value)
 import Three.Core.Object3D (class IsObject3D, Object3D, add, mkObject3D, remove, setName)
@@ -222,8 +222,8 @@ mergeArrEvt f arr = g <$> debounce (Milliseconds 50.0) (mergeArray (f <$> arr))
     where g = foldl (<|>) Nothing
 
 -- | create RoofManager for an array of roofs
-createRoofManager :: ArrayEditParam -> HouseMeshData -> Map Int OldRoofRackingData -> HouseEditor RoofManager
-createRoofManager param meshData racks = do
+createRoofManager :: ArrayEditParam -> HouseMeshData -> Array RoofPlate -> Array Panel -> Map Int OldRoofRackingData -> HouseEditor RoofManager
+createRoofManager param meshData roofs panels racks = do
     wrapper <- liftEffect createWrapper
 
     -- create an event stream for the current active id
@@ -233,12 +233,12 @@ createRoofManager param meshData racks = do
     let activeRoofDyn = step Nothing activeRoof
 
     -- get the default roof plates as a dict
-    defRoofDict    <- roofDict <<< view _roofPlates <$> ask
-    panelsDict     <- panelsDict <<< view _panels <$> ask
+    let defRoofDict = roofDict roofs
+        psDict      = panelsDict panels
     canEditRoofDyn <- isRoofEditing
 
     -- render roofs dynamically
-    Tuple renderedNodes d <- renderRoofs wrapper param activeRoof roofsData panelsDict racks
+    Tuple renderedNodes d <- renderRoofs wrapper param activeRoof roofsData psDict racks
 
     let deleteRoofOp  = multicast  $ keepLatest $ getRoofDelete        <$> renderedNodes
         updateRoofOp  = keepLatest $ getRoofUpdate                     <$> renderedNodes

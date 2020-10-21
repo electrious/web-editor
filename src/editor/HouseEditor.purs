@@ -3,15 +3,15 @@ module Editor.HouseEditor where
 import Prelude
 
 import API (API, APIConfig, runAPI)
-import Control.Monad.Reader (class MonadAsk, class MonadReader, ReaderT, ask, runReaderT, withReaderT)
+import Control.Monad.Reader (class MonadAsk, class MonadReader, ReaderT, ask, runReaderT)
 import Control.Plus (empty)
 import Data.Default (class Default, def)
-import Data.Lens (Lens', view, (.~))
+import Data.Lens (Lens', view)
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Editor.Common.Lenses (_apiConfig, _panels)
+import Editor.Common.Lenses (_apiConfig)
 import Editor.EditorMode (EditorMode(..))
 import Editor.PanelNode (PanelOpacity)
 import Effect (Effect)
@@ -20,8 +20,7 @@ import FRP.Dynamic (Dynamic, step)
 import FRP.Event (Event, makeEvent, subscribe)
 import Model.Hardware.PanelTextureInfo (PanelTextureInfo)
 import Model.Hardware.PanelType (PanelType(..))
-import Model.Roof.Panel (Alignment, Orientation, Panel)
-import Model.Roof.RoofPlate (RoofPlate)
+import Model.Roof.Panel (Alignment, Orientation)
 
 newtype ArrayEditParam = ArrayEditParam {
     alignment   :: Event Alignment,
@@ -41,8 +40,6 @@ instance defaultArrayEditParam :: Default ArrayEditParam where
 newtype HouseConfig = HouseConfig {
     leadId          :: Int,
     houseId         :: Int,
-    roofPlates      :: Array RoofPlate,
-    panels          :: Array Panel,
     dataServer      :: String,
     modeDyn         :: Dynamic EditorMode,
     textureInfo     :: PanelTextureInfo,
@@ -59,8 +56,6 @@ instance defaultHouseConfig :: Default HouseConfig where
     def = HouseConfig {
         leadId          : 0,
         houseId         : 0,
-        roofPlates      : [],
-        panels          : [],
         dataServer      : "",
         modeDyn         : step Showing empty,
         textureInfo     : def,
@@ -71,9 +66,6 @@ instance defaultHouseConfig :: Default HouseConfig where
 
         arrayEditParam  : def
     }
-
-_roofPlates :: Lens' HouseConfig (Array RoofPlate)
-_roofPlates = _Newtype <<< prop (SProxy :: SProxy "roofPlates")
 
 _dataServer :: Lens' HouseConfig String
 _dataServer = _Newtype <<< prop (SProxy :: SProxy "dataServer")
@@ -108,8 +100,3 @@ performEditorEvent e = do
 
 runAPIInEditor :: forall a. API a -> HouseEditor a
 runAPIInEditor api = ask >>= view _apiConfig >>> runAPI api >>> liftEffect
-
-withUpdatedRoofAndPanels :: forall a. Array RoofPlate -> Array Panel -> HouseEditor a -> HouseEditor a
-withUpdatedRoofAndPanels rs ps (HouseEditor e) = HouseEditor $ withReaderT f e
-    where f cfg = cfg # _roofPlates .~ rs
-                      # _panels     .~ ps
