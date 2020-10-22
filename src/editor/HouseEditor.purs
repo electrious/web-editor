@@ -25,7 +25,8 @@ import Model.Roof.Panel (Alignment, Orientation)
 newtype ArrayEditParam = ArrayEditParam {
     alignment   :: Event Alignment,
     orientation :: Event Orientation,
-    opacity     :: Event PanelOpacity
+    opacity     :: Event PanelOpacity,
+    heatmap     :: Event Boolean
 }
 
 derive instance newtypeArrayEditParam :: Newtype ArrayEditParam _
@@ -34,8 +35,12 @@ instance defaultArrayEditParam :: Default ArrayEditParam where
     def = ArrayEditParam {
         alignment   : empty,
         orientation : empty,
-        opacity     : empty
+        opacity     : empty,
+        heatmap     : empty
     }
+
+_heatmap :: forall t a r. Newtype t { heatmap :: a | r } => Lens' t a
+_heatmap = _Newtype <<< prop (SProxy :: SProxy "heatmap")
 
 newtype HouseConfig = HouseConfig {
     leadId          :: Int,
@@ -44,6 +49,7 @@ newtype HouseConfig = HouseConfig {
     modeDyn         :: Dynamic EditorMode,
     textureInfo     :: PanelTextureInfo,
     rotBtnTexture   :: String,
+    heatmapTexture  :: String,
     panelType       :: Dynamic PanelType,
     apiConfig       :: APIConfig,
     screenshotDelay :: Int,
@@ -60,6 +66,7 @@ instance defaultHouseConfig :: Default HouseConfig where
         modeDyn         : step Showing empty,
         textureInfo     : def,
         rotBtnTexture   : "",
+        heatmapTexture  : "",
         panelType       : step Standard empty,
         apiConfig       : def,
         screenshotDelay : 100,
@@ -72,6 +79,9 @@ _dataServer = _Newtype <<< prop (SProxy :: SProxy "dataServer")
 
 _rotBtnTexture :: forall t a r. Newtype t { rotBtnTexture :: a | r } => Lens' t a
 _rotBtnTexture = _Newtype <<< prop (SProxy :: SProxy "rotBtnTexture")
+
+_heatmapTexture :: forall t a r. Newtype t { heatmapTexture :: a | r } => Lens' t a
+_heatmapTexture = _Newtype <<< prop (SProxy :: SProxy "heatmapTexture")
 
 _screenshotDelay :: forall t a r. Newtype t { screenshotDelay :: a | r } => Lens' t a
 _screenshotDelay = _Newtype <<< prop (SProxy :: SProxy "screenshotDelay")

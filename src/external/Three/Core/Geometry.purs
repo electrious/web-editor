@@ -18,11 +18,17 @@ instance isGeometryGeometry :: IsGeometry Geometry
 
 foreign import mkGeometry :: Effect Geometry
 
+vertices :: forall geo. IsGeometry geo => geo -> Array Vector3
+vertices = ffi ["geo"] "geo.vertices"
+
 setVertices :: forall geo. IsGeometry geo => Array Vector3 -> geo -> Effect Unit
 setVertices = fpi ["vs", "geo", ""] "geo.vertices = vs"
 
 setVerticesNeedUpdate :: forall geo. IsGeometry geo => Boolean -> geo -> Effect Unit
 setVerticesNeedUpdate = fpi ["u", "geo", ""] "geo.verticesNeedUpdate = u"
+
+faces :: forall geo. IsGeometry geo => geo -> Array Face3
+faces = ffi ["geo"] "geo.faces"
 
 setFaces :: forall geo. IsGeometry geo => Array Face3 -> geo -> Effect Unit
 setFaces = fpi ["fs", "geo", ""] "geo.faces = fs"

@@ -17,12 +17,11 @@ import Math.Angle (radianVal, sin)
 import Model.Roof.Panel (validatedSlope)
 import Model.RoofComponent (size)
 import Model.RotateButton (RotateButton)
-import Rendering.Renderable (class Renderable, _rotateButtonTexture)
+import Rendering.Renderable (class Renderable, _rotateButtonMaterial)
 import Three.Core.Geometry (BoxGeometry, mkBoxGeometry)
-import Three.Core.Material (mkMeshBasicMaterialWithTexture, setTransparent)
+import Three.Core.Material (setTransparent)
 import Three.Core.Mesh (Mesh)
 import Three.Core.Object3D (class IsObject3D, setCastShadow, setName, setPosition, setRotation, toObject3D)
-import Three.Loader.TextureLoader (Texture, loadTexture, mkTextureLoader)
 import Three.Math.Euler (mkEuler)
 import Three.Math.Vector (mkVec3)
 
@@ -38,16 +37,9 @@ instance isObject3DRotateButtonNode :: IsObject3D RotateButtonNode where
 rotateBtnGeo :: Unit -> BoxGeometry
 rotateBtnGeo = memoize $ const $ unsafePerformEffect $ mkBoxGeometry 1.0 1.0 0.001
 
-rotateBtnTexture :: String -> Texture
-rotateBtnTexture = memoize \imgPath -> unsafePerformEffect do
-    loader <- mkTextureLoader
-    loadTexture imgPath loader
-
-
 instance renderableRotateButton :: Renderable RotateButton RotateButtonNode where
     render rb = do
-        texture <- view _rotateButtonTexture <$> ask
-        mat <- liftEffect $ mkMeshBasicMaterialWithTexture texture
+        mat <- view _rotateButtonMaterial <$> ask
         liftEffect $ setTransparent true mat
         btn <- liftEffect $ mkTappableMesh (rotateBtnGeo unit) mat
         

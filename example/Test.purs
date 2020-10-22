@@ -10,7 +10,7 @@ import Data.Maybe (Maybe(..))
 import Editor.Common.Lenses (_apiConfig, _houseId, _leadId, _modeDyn, _panelType, _textureInfo)
 import Editor.Editor (_sizeDyn, createEditor)
 import Editor.EditorMode (EditorMode(..))
-import Editor.HouseEditor (_arrayEditParam, _dataServer, _rotBtnTexture)
+import Editor.HouseEditor (_arrayEditParam, _dataServer, _heatmapTexture, _rotBtnTexture)
 import Editor.HouseLoader (_roofUpdate, editHouse)
 import Editor.SceneEvent (size)
 import Effect (Effect)
@@ -29,6 +29,7 @@ foreign import solarModuleJPG :: String
 foreign import qCellSolarPanelJPG :: String
 foreign import qCellSolarPanel72PNG :: String
 foreign import rotateButtonPNG :: String
+foreign import heatmapGradientPNG :: String
 
 serverUrl :: String
 serverUrl = "http://data.electrious.com"
@@ -57,14 +58,15 @@ doTest = do
                 
                 param = def
 
-                houseCfg = def # _modeDyn       .~ modeDyn
-                               # _houseId       .~ 4
-                               # _leadId        .~ 296285
-                               # _dataServer    .~ serverUrl
-                               # _panelType     .~ panelType
-                               # _textureInfo   .~ textures
-                               # _rotBtnTexture .~ rotateButtonPNG
-                               # _apiConfig     .~ apiCfg
+                houseCfg = def # _modeDyn        .~ modeDyn
+                               # _houseId        .~ 4
+                               # _leadId         .~ 296285
+                               # _dataServer     .~ serverUrl
+                               # _panelType      .~ panelType
+                               # _textureInfo    .~ textures
+                               # _rotBtnTexture  .~ rotateButtonPNG
+                               # _heatmapTexture .~ heatmapGradientPNG
+                               # _apiConfig      .~ apiCfg
                                # _arrayEditParam .~ param
 
             editor <- createEditor el cfg

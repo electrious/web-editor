@@ -11,17 +11,21 @@ import Data.Symbol (SProxy(..))
 import Effect (Effect)
 import Effect.Class (class MonadEffect)
 import Math.Angle (Angle)
+import Three.Core.Material (MeshBasicMaterial)
 import Three.Core.Object3D (class IsObject3D)
-import Three.Loader.TextureLoader (Texture)
 
 newtype RendererConfig = RendererConfig {
-    rotateButtonTexture :: Texture
+    heatmapMaterial      :: MeshBasicMaterial,
+    rotateButtonMaterial :: MeshBasicMaterial
 }
 
 derive instance newtypeRendererConfig :: Newtype RendererConfig _
 
-_rotateButtonTexture :: forall t a r. Newtype t { rotateButtonTexture :: a | r } => Lens' t a
-_rotateButtonTexture = _Newtype <<< prop (SProxy :: SProxy "rotateButtonTexture")
+_heatmapMaterial :: forall t a r. Newtype t { heatmapMaterial :: a | r } => Lens' t a
+_heatmapMaterial = _Newtype <<< prop (SProxy :: SProxy "heatmapMaterial")
+
+_rotateButtonMaterial :: forall t a r. Newtype t { rotateButtonMaterial :: a | r } => Lens' t a
+_rotateButtonMaterial = _Newtype <<< prop (SProxy :: SProxy "rotateButtonMaterial")
 
 
 newtype RenderingM a = RenderingM (ReaderT RendererConfig Effect a)
