@@ -6,8 +6,9 @@ import Algorithm.Delaunay.Triangle (Edge, Triangle, _rsqr, _vertex1, _vertex2, e
 import Algorithm.Delaunay.Vertex (class Vertex, vertX, vertY)
 import Data.Array as Arr
 import Data.Lens ((^.))
-import Data.List (List(..), (:), foldl, sortBy)
+import Data.List (List(..), foldl, reverse, sortBy, (:))
 import Data.List as List
+import Data.Maybe (Maybe(..))
 import Data.Set as Set
 import Data.Triple (Triple(..))
 import Data.Tuple (Tuple(..))
@@ -31,10 +32,13 @@ addVertex (Tuple completed open) v = Tuple newComp (newOpen <> newTris)
 
 -- delete duplicated edges in a list
 dedup :: forall a. Eq a => List a -> List a
-dedup Nil = Nil
-dedup l@(a : Nil) = l
-dedup (a : b : as) | a == b    = dedup (b : as)
-                   | otherwise = a : (dedup (b : as))
+dedup = g <<< foldl f (Tuple Nil Nothing)
+    where f (Tuple nl Nothing) a = Tuple nl (Just a)
+          f (Tuple nl (Just ov)) a = if ov == a
+                                     then Tuple nl (Just ov)
+                                     else Tuple (ov : nl) (Just a)
+          g (Tuple nl Nothing) = reverse nl
+          g (Tuple nl (Just ov)) = reverse (ov : nl)
 
 -- create new triangle based on a vertex and an edge.
 mkNewTriangle :: forall v. Vertex v => v -> Edge v -> Triangle v
