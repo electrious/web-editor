@@ -36,7 +36,7 @@ setFaces = fpi ["fs", "geo", ""] "geo.faces = fs"
 setElementsNeedUpdate :: forall geo. IsGeometry geo => Boolean -> geo -> Effect Unit
 setElementsNeedUpdate = fpi ["u", "geo", ""] "geo.elementsNeedUpdate = u"
 
-setUVs :: forall geo. IsGeometry geo => Array Vector2 -> geo -> Effect Unit
+setUVs :: forall geo. IsGeometry geo => Array (Array Vector2) -> geo -> Effect Unit
 setUVs = fpi ["uvs", "geo", ""] "geo.faceVertexUvs = [uvs]"
 
 setUVsNeedUpdate :: forall geo. IsGeometry geo => Boolean -> geo -> Effect Unit
