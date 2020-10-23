@@ -19,7 +19,7 @@ import Data.Symbol (SProxy(..))
 import Data.Traversable (sequence_, traverse, traverse_)
 import Data.UUID (UUID)
 import Editor.ArrayBuilder (ArrayBuilder, _editorMode, liftRenderingM)
-import Editor.Common.Lenses (_alignment, _center, _houseId, _id, _mesh, _orientation, _panelType, _roof, _slope, _tapped)
+import Editor.Common.Lenses (_alignment, _center, _houseId, _id, _mesh, _orientation, _panelType, _position, _roof, _slope, _tapped)
 import Editor.Disposable (class Disposable, dispose)
 import Editor.EditorMode (EditorMode(..))
 import Editor.PanelLayer (PanelLayer, PanelLayerConfig(..), _activeArray, _currentPanels, _inactiveRoofTapped, _initPanels, _mainOrientation, _roofActive, _serverUpdated, createPanelLayer)
@@ -37,9 +37,9 @@ import Math (pi)
 import Math.Angle (degreeVal, radianVal)
 import Model.Hardware.PanelModel (PanelModel)
 import Model.Roof.Panel (Alignment(..), Orientation(..), Panel)
-import Model.Roof.RoofPlate (RoofOperation(..), RoofPlate, _azimuth, _borderPoints, _rotation, _unifiedPoints)
+import Model.Roof.RoofPlate (RoofOperation(..), RoofPlate(..), _azimuth, _borderPoints, _rotation, _unifiedPoints)
 import Model.RoofSpecific (RoofSpecific, mkRoofSpecific)
-import Model.ShadePoint (shadePointFrom)
+import Model.ShadePoint (ShadePoint(..), shadePointFrom)
 import Rendering.Renderable (_heatmapMaterial)
 import SimplePolygon (isSimplePolygon)
 import Three.Core.Geometry (ShapeGeometry, faces, mkShape, mkShapeGeometry, vertices)
@@ -196,6 +196,14 @@ getBorderPoints obj roof = traverse toLocal $ fromMaybe [] (init $ roof ^. _bord
               np <- worldToLocal p obj
               pure $ mkVec2 (vecX np) (vecY np)
 
+-- convert all unifiedPoints to local coordinate and create ShadePoint values from them
+getShadePoints :: forall a. IsObject3D a => a -> RoofPlate -> Effect (Array ShadePoint)
+getShadePoints obj roof = traverse mkShade $ fromMaybe [] (roof ^. _unifiedPoints)
+    where mkShade up = do
+              let p = shadePointFrom up
+              np <- worldToLocal (p ^. _position) obj
+              pure $ p # _position .~ np
+
 renderMesh :: forall a b. IsObject3D a => IsObject3D b => a -> { last :: Maybe b, now :: b } -> Effect Unit
 renderMesh obj {last, now} = do
     traverse_ (flip remove obj) last
@@ -227,16 +235,16 @@ evtInMaybe _ Nothing  = empty
 evtInMaybe f (Just a) = f a
 
 
-createHeatmapMesh :: RoofPlate -> MeshBasicMaterial -> TappableMesh -> Effect Mesh
-createHeatmapMesh roof mat m = do
+createHeatmapMesh :: RoofPlate -> Object3D -> MeshBasicMaterial -> TappableMesh -> Effect Mesh
+createHeatmapMesh roof roofNode mat m = do
     let geo :: ShapeGeometry
         geo     = geometry (m ^. _mesh)
         verts   = vertices geo
         tris    = faces geo
     
-        shadePs = shadePointFrom <$> fromMaybe [] (roof ^. _unifiedPoints)
-    
+    shadePs <- getShadePoints roofNode roof
     newGeo <- createNewGeometry verts tris shadePs
+
     mkMesh newGeo mat
 
 -- | Create RoofNode for a RoofPlate
@@ -272,7 +280,7 @@ createRoofNode cfg = do
         let vertices = step ps (editor ^. _roofVertices)
             meshDyn = performDynamic (createRoofMesh <$> vertices <*> isActive <*> canEditRoofDyn)
 
-            hmMeshDyn = performDynamic (createHeatmapMesh roof hmMat <$> meshDyn)
+            hmMeshDyn = performDynamic (createHeatmapMesh roof obj hmMat <$> meshDyn)
             
             roofTapEvt = const unit <$> keepLatest (view _tapped <$> dynEvent meshDyn)
         -- add/remove mesh to the obj

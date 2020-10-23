@@ -46,7 +46,7 @@ function sortVertIndex(vertices) {
     }
 
     return idx.sort((i, j) => {
-        return vertices[i].x < vertices[j].x
+        return vertices[i].x - vertices[j].x
     })
 }
 
@@ -70,22 +70,21 @@ exports.triangulate = old => vertices => {
         // it's edges to an edge list.
         
         for (var j = open.length - 1; j >= 0; j--) {
-            let circle = open[j]
+            const circle = open[j]
             
             // If this point is to the right of this triangle's circumcircle,
             // then this triangle should never get checked again. Remove it
             // from the open list, add it to the closed list, and skip.
-            let dx = v.x - circle.x
+            const dx = v.x - circle.x
             
             if (dx > 0 && dx * dx > circle.rsqr) {
-                let o = open[j]
                 open.splice(j, 1)
-                completed.push(o)
+                completed.push(circle)
                 continue
             }
             
             // If we're outside the circumcircle, skip this triangle.
-            let dy = v.y - circle.y
+            const dy = v.y - circle.y
             
             if (dx * dx + dy * dy - circle.rsqr > Number.EPSILON) {
                 continue
