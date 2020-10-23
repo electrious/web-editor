@@ -30,16 +30,16 @@ import Effect (Effect)
 import Effect.Class (liftEffect)
 import Effect.Timer (setTimeout)
 import Effect.Unsafe (unsafePerformEffect)
-import FRP.Dynamic (Dynamic, dynEvent, performDynamic, step, subscribeDyn, withLast)
+import FRP.Dynamic (Dynamic, current, dynEvent, performDynamic, step, subscribeDyn, withLast)
 import FRP.Event (Event, create, keepLatest)
 import FRP.Event.Extra (multicast)
 import Math (pi)
 import Math.Angle (degreeVal, radianVal)
 import Model.Hardware.PanelModel (PanelModel)
 import Model.Roof.Panel (Alignment(..), Orientation(..), Panel)
-import Model.Roof.RoofPlate (RoofOperation(..), RoofPlate(..), _azimuth, _borderPoints, _rotation, _unifiedPoints)
+import Model.Roof.RoofPlate (RoofOperation(..), RoofPlate, _azimuth, _borderPoints, _rotation, _unifiedPoints)
 import Model.RoofSpecific (RoofSpecific, mkRoofSpecific)
-import Model.ShadePoint (ShadePoint(..), shadePointFrom)
+import Model.ShadePoint (ShadePoint, shadePointFrom)
 import Rendering.Renderable (_heatmapMaterial)
 import SimplePolygon (isSimplePolygon)
 import Three.Core.Geometry (ShapeGeometry, faces, mkShape, mkShapeGeometry, vertices)
@@ -279,13 +279,14 @@ createRoofNode cfg = do
 
         let vertices = step ps (editor ^. _roofVertices)
             meshDyn = performDynamic (createRoofMesh <$> vertices <*> isActive <*> canEditRoofDyn)
-
-            hmMeshDyn = performDynamic (createHeatmapMesh roof obj hmMat <$> meshDyn)
-            
             roofTapEvt = const unit <$> keepLatest (view _tapped <$> dynEvent meshDyn)
+
+        -- create heatmap mesh and add to roofnode
+        hmMesh <- createHeatmapMesh roof obj hmMat =<< current meshDyn
+        add hmMesh obj
+
         -- add/remove mesh to the obj
         d1 <- subscribeDyn (withLast meshDyn) (renderMesh obj)
-        d2 <- subscribeDyn (withLast hmMeshDyn) (renderMesh obj)
 
         newRoof <- getNewRoof obj roof (editor ^. _roofVertices)
 
@@ -305,7 +306,7 @@ createRoofNode cfg = do
             roofUpdate    : multicast newRoof,
             tapped        : multicast $ const roof <$> (roofTapEvt <|> roofTapOnPanelEvt),
             roofObject    : obj,
-            disposable    : sequence_ [d1, d2, dispose editor],
+            disposable    : sequence_ [d1, dispose editor],
             currentPanels : panelLayer ^. _currentPanels,
             serverUpdated : panelLayer ^. _serverUpdated,
             alignment     : map (map (view _alignment)) <$> roofSpecActArrEvt,
