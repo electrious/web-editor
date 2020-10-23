@@ -10,13 +10,14 @@ import Data.Maybe (Maybe(..))
 import Editor.Common.Lenses (_apiConfig, _houseId, _leadId, _modeDyn, _panelType, _textureInfo)
 import Editor.Editor (_sizeDyn, createEditor)
 import Editor.EditorMode (EditorMode(..))
-import Editor.HouseEditor (_arrayEditParam, _dataServer, _heatmapTexture, _rotBtnTexture)
+import Editor.HouseEditor (_arrayEditParam, _dataServer, _heatmap, _heatmapTexture, _rotBtnTexture)
 import Editor.HouseLoader (_roofUpdate, editHouse)
 import Editor.SceneEvent (size)
 import Effect (Effect)
 import Effect.Class.Console (logShow)
 import FRP.Dynamic (step)
 import FRP.Event (subscribe)
+import FRP.Event.Extra (delay)
 import Model.Hardware.PanelTextureInfo (_premium, _standard, _standard72)
 import Model.Hardware.PanelType (PanelType(..))
 import Web.DOM.NonElementParentNode (getElementById)
@@ -56,7 +57,7 @@ doTest = do
                 cfg = def # _modeDyn .~ modeDyn
                           # _sizeDyn .~ sizeDyn
                 
-                param = def
+                param = def # _heatmap .~ delay 10000 (pure true)
 
                 houseCfg = def # _modeDyn        .~ modeDyn
                                # _houseId        .~ 4

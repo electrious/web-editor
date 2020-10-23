@@ -29,7 +29,7 @@ import Editor.Common.Lenses (_alignment, _disposable, _geometry, _houseId, _id, 
 import Editor.Disposable (class Disposable, dispose)
 import Editor.EditorMode (EditorMode(..))
 import Editor.House (HouseMeshData)
-import Editor.HouseEditor (ArrayEditParam, HouseEditor, performEditorEvent)
+import Editor.HouseEditor (ArrayEditParam, HouseEditor, _heatmap, performEditorEvent)
 import Editor.PanelLayer (_currentPanels, _initPanels, _mainOrientation, _roofActive, _serverUpdated)
 import Editor.PanelNode (PanelOpacity(..))
 import Editor.Rendering.PanelRendering (_opacity)
@@ -182,6 +182,7 @@ renderRoofs wrapper param activeRoof roofsData panelsDict racks = do
                   # _alignment       .~ alignDyn
                   # _panelType       .~ panelTypeDyn
                   # _opacity         .~ opacityDyn
+                  # _heatmap         .~ (param ^. _heatmap)
     
     -- create roofnode for each roof and render them
     nodes <- performEditorEvent $ traverse (mkNode activeRoof panelsDict racks cfg) <$> rsToRenderArr

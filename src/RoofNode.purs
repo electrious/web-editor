@@ -22,6 +22,7 @@ import Editor.ArrayBuilder (ArrayBuilder, _editorMode, liftRenderingM)
 import Editor.Common.Lenses (_alignment, _center, _houseId, _id, _mesh, _orientation, _panelType, _position, _roof, _slope, _tapped)
 import Editor.Disposable (class Disposable, dispose)
 import Editor.EditorMode (EditorMode(..))
+import Editor.HouseEditor (_heatmap)
 import Editor.PanelLayer (PanelLayer, PanelLayerConfig(..), _activeArray, _currentPanels, _inactiveRoofTapped, _initPanels, _mainOrientation, _roofActive, _serverUpdated, createPanelLayer)
 import Editor.PanelNode (PanelOpacity(..))
 import Editor.Rendering.PanelRendering (_opacity)
@@ -31,7 +32,7 @@ import Effect.Class (liftEffect)
 import Effect.Timer (setTimeout)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, current, dynEvent, performDynamic, step, subscribeDyn, withLast)
-import FRP.Event (Event, create, keepLatest)
+import FRP.Event (Event, create, keepLatest, subscribe)
 import FRP.Event.Extra (multicast)
 import Math (pi)
 import Math.Angle (degreeVal, radianVal)
@@ -45,7 +46,7 @@ import SimplePolygon (isSimplePolygon)
 import Three.Core.Geometry (ShapeGeometry, faces, mkShape, mkShapeGeometry, vertices)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial, setOpacity, setTransparent)
 import Three.Core.Mesh (Mesh, geometry, mkMesh)
-import Three.Core.Object3D (class IsObject3D, Object3D, add, matrix, mkObject3D, remove, rotateX, rotateZ, setName, setPosition, updateMatrix, updateMatrixWorld, worldToLocal)
+import Three.Core.Object3D (class IsObject3D, Object3D, add, matrix, mkObject3D, remove, rotateX, rotateZ, setName, setPosition, setVisible, updateMatrix, updateMatrixWorld, worldToLocal)
 import Three.Math.Vector (Vector2, Vector3, applyMatrix, mkVec2, mkVec3, vecX, vecY, vecZ)
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -245,7 +246,9 @@ createHeatmapMesh roof roofNode mat m = do
     shadePs <- getShadePoints roofNode roof
     newGeo <- createNewGeometry verts tris shadePs
 
-    mkMesh newGeo mat
+    mesh <- mkMesh newGeo mat
+    setVisible false mesh
+    pure mesh
 
 -- | Create RoofNode for a RoofPlate
 createRoofNode :: RoofNodeConfig -> ArrayBuilder RoofNode
@@ -287,6 +290,7 @@ createRoofNode cfg = do
 
         -- add/remove mesh to the obj
         d1 <- subscribeDyn (withLast meshDyn) (renderMesh obj)
+        d2 <- subscribe (cfg ^. _heatmap) (flip setVisible hmMesh)
 
         newRoof <- getNewRoof obj roof (editor ^. _roofVertices)
 
@@ -306,7 +310,7 @@ createRoofNode cfg = do
             roofUpdate    : multicast newRoof,
             tapped        : multicast $ const roof <$> (roofTapEvt <|> roofTapOnPanelEvt),
             roofObject    : obj,
-            disposable    : sequence_ [d1, dispose editor],
+            disposable    : sequence_ [d1, d2, dispose editor],
             currentPanels : panelLayer ^. _currentPanels,
             serverUpdated : panelLayer ^. _serverUpdated,
             alignment     : map (map (view _alignment)) <$> roofSpecActArrEvt,
