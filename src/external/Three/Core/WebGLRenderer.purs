@@ -5,7 +5,6 @@ import Prelude
 import Effect (Effect)
 import Three.Core.Camera (class IsCamera)
 import Three.Core.Scene (Scene)
-import Util (ffi, fpi)
 import Web.DOM (Element)
 
 foreign import data WebGLRenderer :: Type
@@ -13,11 +12,8 @@ foreign import data WebGLRenderer :: Type
 foreign import mkWebGLRenderer :: Effect WebGLRenderer
 foreign import toDataUrl :: String -> Element -> Effect String
 
-setSize :: Int -> Int -> WebGLRenderer -> Effect Unit
-setSize = fpi ["w", "h", "r", ""] "r.setSize(w, h)"
+foreign import setSize :: Int -> Int -> WebGLRenderer -> Effect Unit
 
-domElement :: WebGLRenderer -> Element
-domElement = ffi ["r"] "r.domElement"
+foreign import domElement :: WebGLRenderer -> Element
 
-render :: forall c. IsCamera c => Scene -> c -> WebGLRenderer -> Effect Unit
-render = fpi ["scene", "camera", "r", ""] "r.render(scene, camera)"
+foreign import render :: forall c. IsCamera c => Scene -> c -> WebGLRenderer -> Effect Unit

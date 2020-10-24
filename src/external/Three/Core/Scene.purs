@@ -13,5 +13,4 @@ foreign import mkScene :: Effect Scene
 instance isObject3DScene :: IsObject3D Scene where
     toObject3D = unsafeCoerce
 
-disposeScene :: Scene -> Effect Unit
-disposeScene = fpi ["s", ""] "s.dispose()"
+foreign import disposeScene :: Scene -> Effect Unit

@@ -7,3 +7,19 @@ exports.mkMesh = _ => _ => geo => mat => _ => {
 exports.isMesh = m => {
     return m instanceof three.Mesh
 }
+
+exports.geometry = _ => mesh => {
+    return mesh.geometry
+}
+
+exports.bufferGeometry = _ => mesh => {
+    return mesh.geometry
+}
+
+exports.setBufferGeometry = _ => geo => mesh => _ => {
+    mesh.geometry = geo
+}
+
+exports.setMaterial = _ => mat => mesh => _ => [
+    mesh.material = mat
+]

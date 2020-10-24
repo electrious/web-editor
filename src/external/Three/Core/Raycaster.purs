@@ -15,24 +15,18 @@ foreign import data Intersection :: Type
 foreign import mkRaycaster :: Effect Raycaster
 
 -- | Updates the ray with a new origin and direction.
-setFromCamera :: forall c. IsCamera c => Raycaster -> Vector2 -> c -> Effect Unit
-setFromCamera = fpi ["r", "coords", "camera", ""] "r.setFromCamera(coords, camera)"
+foreign import setFromCamera :: forall c. IsCamera c => Raycaster -> Vector2 -> c -> Effect Unit
 
-intersectObject :: forall a. IsObject3D a => Raycaster -> a -> Boolean -> Effect (Array Intersection)
-intersectObject = ffi ["r", "obj", "rec", ""] "r.intersectObject(obj, rec)"
+foreign import intersectObject :: forall a. IsObject3D a => Raycaster -> a -> Boolean -> Effect (Array Intersection)
 
 -- | distance between the origin of the ray and the intersection
-distance :: Intersection -> Number
-distance = ffi ["obj"] "obj.distance"
+foreign import distance :: Intersection -> Number
 
 -- | point of intersection, in world coordinates
-point :: Intersection -> Vector3
-point = ffi ["obj"] "obj.point"
+foreign import point :: Intersection -> Vector3
 
 -- | intersected face
-face :: Intersection -> Face3
-face = ffi ["obj"] "obj.face"
+foreign import face :: Intersection -> Face3
 
 -- | the intersected object
-object :: Intersection -> Object3D
-object = ffi ["obj"] "obj.object"
+foreign import object :: Intersection -> Object3D
