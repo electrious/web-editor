@@ -8,12 +8,36 @@ exports.mkVec3 = x => y => z => {
     return new three.Vector3(x, y, z)
 }
 
+exports.vecX = _ => v => {
+    return v.x
+}
+
+exports.vecY = _ => v => {
+    return v.y
+}
+
+exports.vecZ = _ => v => {
+    return v.z
+}
+
 exports.clone = _ => v => {
     return v.clone()
 }
 
 exports.vEq = v1 => v2 => {
     return v1.equals(v2)
+}
+
+exports.length = _ => v => {
+    return v.length()
+}
+
+exports.dist = _ => v1 => v2 => {
+    return v1.distanceTo(v2)
+}
+
+exports.dot = _ => v1 => v2 => {
+    return v1.dot(v2)
 }
 
 exports.cross = _ => v1 => v2 => {

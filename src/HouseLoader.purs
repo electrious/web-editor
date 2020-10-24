@@ -4,7 +4,7 @@ import Prelude hiding (add)
 
 import API.Panel (loadPanels)
 import API.Racking (loadRacking)
-import API.Roofplate (getRoofplates)
+import API.Roofplate (loadRoofplates)
 import Control.Monad.Except (runExcept)
 import Control.Monad.Reader (ask)
 import Data.Either (Either(..))
@@ -19,7 +19,7 @@ import Editor.Common.Lenses (_alignment, _houseId, _leadId, _orientation, _roofR
 import Editor.Disposable (dispose)
 import Editor.Editor (Editor, _canvas, addDisposable)
 import Editor.House (loadHouseModel)
-import Editor.HouseEditor (ArrayEditParam, HouseConfig, HouseEditor, _arrayEditParam, _dataServer, _screenshotDelay, performEditorEvent, runAPIInEditor, runHouseEditor, withUpdatedRoofAndPanels)
+import Editor.HouseEditor (ArrayEditParam, HouseConfig, HouseEditor, _arrayEditParam, _dataServer, _screenshotDelay, performEditorEvent, runAPIInEditor, runHouseEditor)
 import Editor.PanelLayer (_serverUpdated)
 import Editor.RoofManager (_editedRoofs, createRoofManager)
 import Effect (Effect)
@@ -62,11 +62,12 @@ loadHouse editor param = do
 
     { event: loadedEvt, push: loadedFunc } <- liftEffect create
     
-    -- load house model and racking data
-    hmEvt    <- liftEffect $ loadHouseModel (cfg ^. _dataServer) (cfg ^. _leadId)
-    roofsEvt <- runAPIInEditor $ getRoofplates (cfg ^. _houseId)
-    panelsEvt <- runAPIInEditor $ loadPanels (cfg ^. _houseId)
-    racksEvt <- runAPIInEditor $ loadRacking (cfg ^. _houseId)
+    -- load house model, roofs, panels and racking data
+    let houseId = cfg ^. _houseId
+    hmEvt     <- liftEffect $ loadHouseModel (cfg ^. _dataServer) (cfg ^. _leadId)
+    roofsEvt  <- runAPIInEditor $ loadRoofplates houseId
+    panelsEvt <- runAPIInEditor $ loadPanels houseId
+    racksEvt  <- runAPIInEditor $ loadRacking houseId
 
     -- extract the roof racking map data
     let roofRackDatEvt = extrRoofRack <$> racksEvt
@@ -75,7 +76,7 @@ loadHouse editor param = do
                             Right v -> v ^. _roofRackings
     
         buildRoofMgr hmd roofsDat panelsDat roofRackData = do
-            mgr <- withUpdatedRoofAndPanels roofsDat panelsDat $ createRoofManager param hmd roofRackData
+            mgr <- createRoofManager param hmd roofsDat panelsDat roofRackData
             liftEffect do
                 add (hmd ^. _wrapper) editor
                 add (mgr ^. _wrapper) editor

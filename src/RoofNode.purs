@@ -2,6 +2,7 @@ module Editor.RoofNode where
 
 import Prelude hiding (add)
 
+import Algorithm.HeatmapMesh (createNewGeometry)
 import Control.Alt ((<|>))
 import Control.Monad.Reader (ask)
 import Control.Plus (empty)
@@ -17,10 +18,11 @@ import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (sequence_, traverse, traverse_)
 import Data.UUID (UUID)
-import Editor.ArrayBuilder (ArrayBuilder, _editorMode)
-import Editor.Common.Lenses (_alignment, _center, _houseId, _id, _mesh, _orientation, _panelType, _roof, _slope, _tapped)
+import Editor.ArrayBuilder (ArrayBuilder, _editorMode, liftRenderingM)
+import Editor.Common.Lenses (_alignment, _center, _houseId, _id, _mesh, _orientation, _panelType, _position, _roof, _slope, _tapped)
 import Editor.Disposable (class Disposable, dispose)
 import Editor.EditorMode (EditorMode(..))
+import Editor.HouseEditor (_heatmap)
 import Editor.PanelLayer (PanelLayer, PanelLayerConfig(..), _activeArray, _currentPanels, _inactiveRoofTapped, _initPanels, _mainOrientation, _roofActive, _serverUpdated, createPanelLayer)
 import Editor.PanelNode (PanelOpacity(..))
 import Editor.Rendering.PanelRendering (_opacity)
@@ -29,19 +31,22 @@ import Effect (Effect)
 import Effect.Class (liftEffect)
 import Effect.Timer (setTimeout)
 import Effect.Unsafe (unsafePerformEffect)
-import FRP.Dynamic (Dynamic, dynEvent, performDynamic, step, subscribeDyn, withLast)
-import FRP.Event (Event, create, keepLatest)
+import FRP.Dynamic (Dynamic, current, dynEvent, performDynamic, step, subscribeDyn, withLast)
+import FRP.Event (Event, create, keepLatest, subscribe)
 import FRP.Event.Extra (multicast)
 import Math (pi)
 import Math.Angle (degreeVal, radianVal)
 import Model.Hardware.PanelModel (PanelModel)
 import Model.Roof.Panel (Alignment(..), Orientation(..), Panel)
-import Model.Roof.RoofPlate (RoofOperation(..), RoofPlate, _azimuth, _borderPoints, _rotation)
+import Model.Roof.RoofPlate (RoofOperation(..), RoofPlate, _azimuth, _borderPoints, _rotation, _unifiedPoints)
 import Model.RoofSpecific (RoofSpecific, mkRoofSpecific)
+import Model.ShadePoint (ShadePoint, shadePointFrom)
+import Rendering.Renderable (_heatmapMaterial)
 import SimplePolygon (isSimplePolygon)
-import Three.Core.Geometry (mkShape, mkShapeGeometry)
+import Three.Core.Geometry (ShapeGeometry, faces, mkShape, mkShapeGeometry, vertices)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial, setOpacity, setTransparent)
-import Three.Core.Object3D (class IsObject3D, Object3D, add, matrix, mkObject3D, remove, rotateX, rotateZ, setName, setPosition, updateMatrix, updateMatrixWorld, worldToLocal)
+import Three.Core.Mesh (Mesh, geometry, mkMesh)
+import Three.Core.Object3D (class IsObject3D, Object3D, add, matrix, mkObject3D, remove, rotateX, rotateZ, setName, setPosition, setVisible, updateMatrix, updateMatrixWorld, worldToLocal)
 import Three.Math.Vector (Vector2, Vector3, applyMatrix, mkVec2, mkVec3, vecX, vecY, vecZ)
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -54,6 +59,7 @@ newtype RoofNodeConfig = RoofNodeConfig {
     alignment       :: Dynamic Alignment,
     panelType       :: Dynamic PanelModel,
     opacity         :: Dynamic PanelOpacity,
+    heatmap         :: Event Boolean,
     initPanels      :: Event (List Panel)
 }
 
@@ -68,6 +74,7 @@ instance defaultRoofNodeConfig :: Default RoofNodeConfig where
         alignment       : step Grid empty,
         panelType       : step def empty,
         opacity         : step Opaque empty,
+        heatmap         : empty,
         initPanels      : empty
     }
 
@@ -190,10 +197,18 @@ getBorderPoints obj roof = traverse toLocal $ fromMaybe [] (init $ roof ^. _bord
               np <- worldToLocal p obj
               pure $ mkVec2 (vecX np) (vecY np)
 
-renderMesh :: forall a. IsObject3D a => a -> { last :: Maybe TappableMesh, now :: TappableMesh } -> Effect Unit
+-- convert all unifiedPoints to local coordinate and create ShadePoint values from them
+getShadePoints :: forall a. IsObject3D a => a -> RoofPlate -> Effect (Array ShadePoint)
+getShadePoints obj roof = traverse mkShade $ fromMaybe [] (roof ^. _unifiedPoints)
+    where mkShade up = do
+              let p = shadePointFrom up
+              np <- worldToLocal (p ^. _position) obj
+              pure $ p # _position .~ np
+
+renderMesh :: forall a b. IsObject3D a => IsObject3D b => a -> { last :: Maybe b, now :: b } -> Effect Unit
 renderMesh obj {last, now} = do
-    traverse_ (flip remove obj <<< view _mesh) last
-    add (now ^. _mesh) obj
+    traverse_ (flip remove obj) last
+    add now obj
 
 getNewRoof :: forall a. IsObject3D a => a -> RoofPlate -> Event (Array Vector2) -> Effect (Event RoofOperation)
 getNewRoof obj roof newVertices = do
@@ -220,6 +235,21 @@ evtInMaybe :: forall a b. (a -> Event b) -> Maybe a -> Event b
 evtInMaybe _ Nothing  = empty
 evtInMaybe f (Just a) = f a
 
+
+createHeatmapMesh :: RoofPlate -> Object3D -> MeshBasicMaterial -> TappableMesh -> Effect Mesh
+createHeatmapMesh roof roofNode mat m = do
+    let geo :: ShapeGeometry
+        geo     = geometry (m ^. _mesh)
+        verts   = vertices geo
+        tris    = faces geo
+    
+    shadePs <- getShadePoints roofNode roof
+    newGeo <- createNewGeometry verts tris shadePs
+
+    mesh <- mkMesh newGeo mat
+    setVisible false mesh
+    pure mesh
+
 -- | Create RoofNode for a RoofPlate
 createRoofNode :: RoofNodeConfig -> ArrayBuilder RoofNode
 createRoofNode cfg = do
@@ -228,6 +258,7 @@ createRoofNode cfg = do
     liftEffect $ add content obj
 
     modeDyn <- view _editorMode <$> ask
+    hmMat   <- view _heatmapMaterial <$> liftRenderingM ask
 
     -- render panels
     panelLayer <- renderPanels cfg content
@@ -251,11 +282,16 @@ createRoofNode cfg = do
 
         let vertices = step ps (editor ^. _roofVertices)
             meshDyn = performDynamic (createRoofMesh <$> vertices <*> isActive <*> canEditRoofDyn)
-            
             roofTapEvt = const unit <$> keepLatest (view _tapped <$> dynEvent meshDyn)
+
+        -- create heatmap mesh and add to roofnode
+        hmMesh <- createHeatmapMesh roof obj hmMat =<< current meshDyn
+        add hmMesh obj
+
         -- add/remove mesh to the obj
         d1 <- subscribeDyn (withLast meshDyn) (renderMesh obj)
-        
+        d2 <- subscribe (cfg ^. _heatmap) (flip setVisible hmMesh)
+
         newRoof <- getNewRoof obj roof (editor ^. _roofVertices)
 
         -- create a stream for delete event if the current roof is not simple polygon
@@ -274,7 +310,7 @@ createRoofNode cfg = do
             roofUpdate    : multicast newRoof,
             tapped        : multicast $ const roof <$> (roofTapEvt <|> roofTapOnPanelEvt),
             roofObject    : obj,
-            disposable    : sequence_ [d1, dispose editor],
+            disposable    : sequence_ [d1, d2, dispose editor],
             currentPanels : panelLayer ^. _currentPanels,
             serverUpdated : panelLayer ^. _serverUpdated,
             alignment     : map (map (view _alignment)) <$> roofSpecActArrEvt,

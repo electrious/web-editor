@@ -1,4 +1,4 @@
-module API.Roofplate (getRoofplates) where
+module API.Roofplate (loadRoofplates) where
 
 import Prelude
 
@@ -17,7 +17,7 @@ derive instance genericRoofPlatesResult :: Generic RoofPlatesResult _
 instance decodeRoofPlatesResult :: Decode RoofPlatesResult where
     decode = genericDecode (defaultOptions { unwrapSingleConstructors = true })
 
-getRoofplates :: Int -> API (Event (Array RoofPlate))
-getRoofplates i = map f <$> callAPI' GET url {}
+loadRoofplates :: Int -> API (Event (Array RoofPlate))
+loadRoofplates i = map f <$> callAPI' GET url {}
     where url = "/leads/" <> show i <> "/roofplates"
           f (RoofPlatesResult r) = r.roofplates

@@ -5,36 +5,27 @@ import Prelude
 import Effect (Effect)
 import Three.Core.Face3 (Face3)
 import Three.Math.Vector (Vector2, Vector3)
-import Util (ffi, fpi)
 
 class IsGeometry geo
 class IsGeometry geo <= IsBufferGeometry geo
 
-clone :: forall geo. IsGeometry geo => geo -> Effect geo
-clone = ffi ["geo", ""] "geo.clone()"
+foreign import clone :: forall geo. IsGeometry geo => geo -> Effect geo
 
 foreign import data Geometry :: Type
 instance isGeometryGeometry :: IsGeometry Geometry
 
 foreign import mkGeometry :: Effect Geometry
 
-setVertices :: forall geo. IsGeometry geo => Array Vector3 -> geo -> Effect Unit
-setVertices = fpi ["vs", "geo", ""] "geo.vertices = vs"
+foreign import vertices :: forall geo. IsGeometry geo => geo -> Array Vector3
+foreign import setVertices :: forall geo. IsGeometry geo => Array Vector3 -> geo -> Effect Unit
+foreign import setVerticesNeedUpdate :: forall geo. IsGeometry geo => Boolean -> geo -> Effect Unit
 
-setVerticesNeedUpdate :: forall geo. IsGeometry geo => Boolean -> geo -> Effect Unit
-setVerticesNeedUpdate = fpi ["u", "geo", ""] "geo.verticesNeedUpdate = u"
+foreign import faces :: forall geo. IsGeometry geo => geo -> Array Face3
+foreign import setFaces :: forall geo. IsGeometry geo => Array Face3 -> geo -> Effect Unit
+foreign import setElementsNeedUpdate :: forall geo. IsGeometry geo => Boolean -> geo -> Effect Unit
 
-setFaces :: forall geo. IsGeometry geo => Array Face3 -> geo -> Effect Unit
-setFaces = fpi ["fs", "geo", ""] "geo.faces = fs"
-
-setElementsNeedUpdate :: forall geo. IsGeometry geo => Boolean -> geo -> Effect Unit
-setElementsNeedUpdate = fpi ["u", "geo", ""] "geo.elementsNeedUpdate = u"
-
-setUVs :: forall geo. IsGeometry geo => Array Vector2 -> geo -> Effect Unit
-setUVs = fpi ["uvs", "geo", ""] "geo.faceVertexUvs = [uvs]"
-
-setUVsNeedUpdate :: forall geo. IsGeometry geo => Boolean -> geo -> Effect Unit
-setUVsNeedUpdate = fpi ["u", "geo", ""] "geo.uvsNeedUpdate = u"
+foreign import setUVs :: forall geo. IsGeometry geo => Array (Array Vector2) -> geo -> Effect Unit
+foreign import setUVsNeedUpdate :: forall geo. IsGeometry geo => Boolean -> geo -> Effect Unit
 
 foreign import data BoxGeometry :: Type
 foreign import mkBoxGeometry :: Number -> Number -> Number -> Effect BoxGeometry
@@ -61,25 +52,14 @@ foreign import data BufferAttribute :: Type
 instance isGeometryBufferGeometry :: IsGeometry BufferGeometry
 instance isBufferGeometryBufferGeometry :: IsBufferGeometry BufferGeometry
 
-getAttribute :: forall geo. IsBufferGeometry geo => String -> geo -> BufferAttribute
-getAttribute = ffi ["name", "geo"] "geo.getAttribute(name)"
-
+foreign import getAttribute :: forall geo. IsBufferGeometry geo => String -> geo -> BufferAttribute
 foreign import isBufferAttribute :: BufferAttribute -> Boolean
 
-setXYZ :: Int -> Number -> Number -> Number -> BufferAttribute -> Effect Unit
-setXYZ = fpi ["idx", "x", "y", "z", "attr", ""] "attr.setXYZ(idx, x, y, z)"
+foreign import setXYZ :: Int -> Number -> Number -> Number -> BufferAttribute -> Effect Unit
 
-setNeedsUpdate :: Boolean -> BufferAttribute -> Effect Unit
-setNeedsUpdate = fpi ["u", "attr", ""] "attr.needsUpdate = u"
+foreign import setNeedsUpdate :: Boolean -> BufferAttribute -> Effect Unit
 
-count :: BufferAttribute -> Int
-count = ffi ["attr"] "attr.count"
-
-getX :: Int -> BufferAttribute -> Number
-getX = ffi ["idx", "attr"] "attr.getX(idx)"
-
-getY :: Int -> BufferAttribute -> Number
-getY = ffi ["idx", "attr"] "attr.getY(idx)"
-
-getZ :: Int -> BufferAttribute -> Number
-getZ = ffi ["idx", "attr"] "attr.getZ(idx)"
+foreign import count :: BufferAttribute -> Int
+foreign import getX :: Int -> BufferAttribute -> Number
+foreign import getY :: Int -> BufferAttribute -> Number
+foreign import getZ :: Int -> BufferAttribute -> Number

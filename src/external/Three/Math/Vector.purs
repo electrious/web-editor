@@ -30,14 +30,9 @@ class HasX a
 class HasY a
 class HasZ a
 
-vecX :: forall a. HasX a => a -> Number
-vecX = ffi ["vec"] "vec.x"
-
-vecY :: forall a. HasY a => a -> Number
-vecY = ffi ["vec"] "vec.y"
-
-vecZ :: forall a. HasZ a => a -> Number
-vecZ = ffi ["vec"] "vec.z"
+foreign import vecX :: forall a. HasX a => a -> Number
+foreign import vecY :: forall a. HasY a => a -> Number
+foreign import vecZ :: forall a. HasZ a => a -> Number
 
 instance hasXVec2 :: HasX Vector2
 instance hasYVec2 :: HasY Vector2
@@ -54,15 +49,9 @@ instance showVec3 :: Show Vector3 where
 
 class Vector a
 
-dot :: forall a. Vector a => a -> a -> Number
-dot = ffi ["v1", "v2"] "v1.dot(v2)"
-
-length :: forall a. Vector a => a -> Number
-length = ffi ["v"] "v.length()"
-
-dist :: forall a. Vector a => a -> a -> Number
-dist = ffi ["v1", "v2"] "v1.distanceTo(v2)"
-
+foreign import dot            :: forall a. Vector a => a -> a      -> Number
+foreign import length         :: forall a. Vector a => a -> Number
+foreign import dist           :: forall a. Vector a => a -> a      -> Number
 foreign import clone          :: forall a. Vector a => a -> a
 foreign import cross          :: forall a. Vector a => a -> a      -> a
 foreign import add            :: forall a. Vector a => a -> a      -> a

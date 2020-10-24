@@ -11,8 +11,7 @@ import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Editor.Common.Lenses (_apiConfig, _modeDyn, _panelType, _textureInfo)
 import Editor.EditorMode (EditorMode)
-import Editor.HouseEditor (HouseEditor, _rotBtnTexture)
-import Editor.UI.RotateButton (rotateBtnTexture)
+import Editor.HouseEditor (HouseEditor, _heatmapTexture, _rotBtnTexture)
 import Effect.Class (class MonadEffect, liftEffect)
 import FRP.Dynamic (Dynamic)
 import Model.Hardware.PanelTextureInfo (PanelTextureInfo)
@@ -20,6 +19,7 @@ import Model.Hardware.PanelType (PanelType)
 import Model.Racking.RackingType (RackingType)
 import Model.Roof.ArrayConfig (ArrayConfig, arrayConfigForRack)
 import Rendering.Renderable (RendererConfig(..), RenderingM, runRenderingM)
+import Rendering.TextureLoader (loadMaterialFromUrl)
 
 -- data used to provide env info for ArrayBuilder monad
 newtype ArrayBuilderEnv = ArrayBuilderEnv {
@@ -56,6 +56,7 @@ liftRenderingM r = ArrayBuilder $ lift r
 runArrayBuilder :: forall a. Dynamic RackingType -> ArrayBuilder a -> HouseEditor a
 runArrayBuilder rtDyn (ArrayBuilder b) = do
     texture <- view _textureInfo   <$> ask
+    hmText  <- view _heatmapTexture <$> ask
     btnText <- view _rotBtnTexture <$> ask
     pt      <- view _panelType     <$> ask
     modeDyn <- view _modeDyn       <$> ask
@@ -68,7 +69,8 @@ runArrayBuilder rtDyn (ArrayBuilder b) = do
                 apiConfig   : apiCfg
              }
         rCfg = RendererConfig {
-            rotateButtonTexture: rotateBtnTexture btnText
+            heatmapMaterial      : loadMaterialFromUrl hmText,
+            rotateButtonMaterial : loadMaterialFromUrl btnText
         }
     liftEffect $ runRenderingM (runReaderT b env) rCfg
 

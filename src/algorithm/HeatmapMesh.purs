@@ -3,7 +3,7 @@ module Algorithm.HeatmapMesh where
 import Prelude
 
 import Algorithm.Delaunay.Delaunay (triangulate)
-import Algorithm.Delaunay.Triangle (Triangle, _vertex1, _vertex2, _vertex3, mkTriangle)
+import Algorithm.Delaunay.Triangle (Triangle, mkTriangle, triVertex1, triVertex2, triVertex3)
 import Algorithm.Delaunay.Vertex (class Vertex)
 import Data.Array (foldl, length, (!!))
 import Data.Compactable (compact)
@@ -114,12 +114,17 @@ createNewGeometry polygon faces shadePs = do
         getIndex iv | iv ^. _vertType == VertPolygon = iv ^. _index
                     | otherwise                      = iv ^. _index + polyVertNum
         -- convert newly generated triangles into Face3 array
-        mkFace tri = let v1 = tri ^. _vertex1
-                         v2 = tri ^. _vertex2
-                         v3 = tri ^. _vertex3
+        mkFace tri = let v1 = triVertex1 tri
+                         v2 = triVertex2 tri
+                         v3 = triVertex3 tri
                      in mkFace3 (getIndex v1) (getIndex v2) (getIndex v3)
     newFaces <- traverse mkFace newTris
         
+    -- calculate faceVertexUV correctly based on face and uvs
+    let uvs = heatmapUVs shades
+        mkFaceUVs f = compact [uvs !! indexA f, uvs !! indexB f, uvs !! indexC f]
+        faceUVs = mkFaceUVs <$> newFaces
+
     geo <- mkGeometry
     
     setVertices meshVerts geo
@@ -128,7 +133,7 @@ createNewGeometry polygon faces shadePs = do
     setFaces newFaces geo
     setElementsNeedUpdate true geo
 
-    setUVs (heatmapUVs shades) geo
+    setUVs faceUVs geo
     setUVsNeedUpdate true geo
 
     pure geo
