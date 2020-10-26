@@ -39,30 +39,16 @@ function dedup(e) {
     return e
 }
 
-function sortVertIndex(vertices) {
-    var idx = []
-    for (var i = 0; i < vertices.length; i++) {
-        idx.push(i)
-    }
-
-    return idx.sort((i, j) => {
-        return vertices[i].x - vertices[j].x
-    })
-}
-
 exports.triangulate = old => vertices => {
     var open = old
     var completed = []
     var edges = []
     
-    // Make an array of indices into the vertex array, sorted by the
-    // vertices' x-position.
-    let indices = sortVertIndex(vertices)
+    // vertices sorted by the x position
+    const vertSorted = vertices.sort((v1, v2) => { return v1.x - v2.x })
     
     // Incrementally add each vertex to the mesh.
-    for (const i of indices) {
-        let v = vertices[i]
-        
+    for (const v of vertSorted) {
         edges = []
         
         // For each open triangle, check to see if the current point is
@@ -76,17 +62,16 @@ exports.triangulate = old => vertices => {
             // then this triangle should never get checked again. Remove it
             // from the open list, add it to the closed list, and skip.
             const dx = v.x - circle.x
-            
+            const dy = v.y - circle.y
+
             if (dx > 0 && dx * dx > circle.rsqr) {
                 open.splice(j, 1)
                 completed.push(circle)
                 continue
             }
             
-            // If we're outside the circumcircle, skip this triangle.
-            const dy = v.y - circle.y
-            
-            if (dx * dx + dy * dy - circle.rsqr > Number.EPSILON) {
+            // If we're outside the circumcircle, skip this triangle.            
+            if (dx * dx + dy * dy > circle.rsqr) {
                 continue
             }
             
