@@ -8,7 +8,6 @@ import Data.Newtype (class Newtype)
 import Editor.Common.Lenses (_item)
 import Effect (Effect)
 import Effect.Unsafe (unsafePerformEffect)
-import Util (ffi, fpi)
 
 newtype BBox a = BBox {
     minX :: Number,
@@ -34,14 +33,9 @@ foreign import mkRBush :: forall a. Effect (RBush a)
 instance defaultRBush :: Default (RBush a) where
     def = unsafePerformEffect mkRBush
 
-load :: forall a. Array (BBox a) -> RBush a -> Effect Unit
-load = fpi ["items", "tree", ""] "tree.load(items)"
-
-insert :: forall a. BBox a -> RBush a -> Effect Unit
-insert = fpi ["item", "tree", ""] "tree.insert(item)"
-
-doSearch :: forall a b. BBox a -> RBush b -> Array (BBox b)
-doSearch = ffi ["box", "tree"] "tree.search(box)"
+foreign import load :: forall a. Array (BBox a) -> RBush a -> Effect Unit
+foreign import insert :: forall a. BBox a -> RBush a -> Effect Unit
+foreign import doSearch :: forall a b. BBox a -> RBush b -> Array (BBox b)
 
 search :: forall a b. BBox a -> RBush b -> Array b
 search b t = (_ ^. _item) <$> doSearch b t

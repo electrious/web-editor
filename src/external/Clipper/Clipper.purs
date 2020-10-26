@@ -5,7 +5,6 @@ import Prelude
 import Data.Int (round)
 import Effect (Effect)
 import Three.Math.Vector (class HasX, class HasY, vecX, vecY)
-import Util (ffi, fpi)
 
 foreign import data IntPoint :: Type
 foreign import mkIntPoint :: Int -> Int -> IntPoint
@@ -46,14 +45,9 @@ foreign import data Clipper :: Type
 foreign import mkClipper :: Effect Clipper
 
 
-addPath :: Path -> PolyType -> Boolean -> Clipper -> Effect Unit
-addPath = fpi ["path", "polyType", "closed", "clipper", ""] "clipper.AddPath(path, polyType, closed)"
-
-addPaths :: Paths -> PolyType -> Boolean -> Clipper -> Effect Unit
-addPaths = fpi ["paths", "polyType", "closed", "clipper", ""] "clipper.AddPaths(paths, polyType, closed)"
-
-clear :: Clipper -> Effect Unit
-clear = fpi ["clipper", ""] "clipper.Clear()"
+foreign import addPath :: Path -> PolyType -> Boolean -> Clipper -> Effect Unit
+foreign import addPaths :: Paths -> PolyType -> Boolean -> Clipper -> Effect Unit
+foreign import clear :: Clipper -> Effect Unit
 
 foreign import area :: Path -> Number
 foreign import cleanPolygon :: Path -> Int -> Effect Path

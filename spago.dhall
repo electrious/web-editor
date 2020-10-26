@@ -7,7 +7,6 @@ You can edit this file as you like.
   [ "axios"
   , "console"
   , "digraph"
-  , "easy-ffi"
   , "effect"
   , "event"
   , "event-extra"

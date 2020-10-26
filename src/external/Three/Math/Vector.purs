@@ -4,7 +4,6 @@ import Prelude hiding (add,sub)
 
 import Data.Default (class Default)
 import Three.Math.Matrix (Matrix4)
-import Util (ffi)
 
 foreign import data Vector2 :: Type
 foreign import data Vector3 :: Type
@@ -40,11 +39,13 @@ instance hasXVec3 :: HasX Vector3
 instance hasYVec3 :: HasY Vector3
 instance hasZVec3 :: HasZ Vector3
 
-instance showVec2 :: Show Vector2 where
-  show = ffi ["vec"] "'(' + vec.x + ', ' + vec.y + ')'"
+foreign import showVec2 :: Vector2 -> String
+instance showVector2 :: Show Vector2 where
+  show = showVec2
 
-instance showVec3 :: Show Vector3 where
-  show = ffi ["vec"] "'(' + vec.x + ', ' + vec.y + ', ' + vec.z + ')'"
+foreign import showVec3 :: Vector3 -> String
+instance showVector3 :: Show Vector3 where
+  show = showVec3
 
 
 class Vector a

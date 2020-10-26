@@ -20,6 +20,14 @@ exports.vecZ = _ => v => {
     return v.z
 }
 
+exports.showVec2 = v => {
+    return '(' + v.x + ', ' + v.y + ')'
+}
+
+exports.showVec3 = v => {
+    return '(' + v.x + ', ' + v.y + ', ' + v.z + ')'
+}
+
 exports.clone = _ => v => {
     return v.clone()
 }

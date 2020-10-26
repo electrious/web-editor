@@ -124,12 +124,7 @@ let upstream =
 let overrides = {=}
 
 let additions =
-      { easy-ffi =
-        { dependencies = [ "prelude" ]
-        , repo = "https://github.com/pelotom/purescript-easy-ffi.git"
-        , version = "master"
-        }
-      , event-extra =
+      { event-extra =
         { dependencies = [ "event" ]
         , repo = "https://github.com/manyoo/event-extra.git"
         , version = "v0.1.7"

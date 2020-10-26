@@ -6,7 +6,6 @@ import Effect (Effect)
 import Three.Math.Euler (Euler)
 import Three.Math.Matrix (Matrix4)
 import Three.Math.Vector (Vector3)
-import Util (ffi, fpi)
 
 foreign import data Object3D :: Type
 

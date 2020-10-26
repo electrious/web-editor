@@ -6,17 +6,14 @@ import Data.Lens (Lens', (.~))
 import Data.Traversable (class Traversable, traverse)
 import Data.UUID (UUID, genUUID)
 import Effect (Effect)
-import Util (ffi, fpi)
+
 
 foreign import data PBUUID :: Type
 
 foreign import mkPBUUID :: Effect PBUUID
 
-getUUIDString :: PBUUID -> String
-getUUIDString = ffi ["u"] "u.getUuid()"
-
-setUUIDString :: String -> PBUUID -> Effect Unit
-setUUIDString = fpi ["v", "u", ""] "u.setUuid(v)"
+foreign import getUUIDString :: PBUUID -> String
+foreign import setUUIDString :: String -> PBUUID -> Effect Unit
 
 class HasUUID a where
     idLens :: Lens' a UUID

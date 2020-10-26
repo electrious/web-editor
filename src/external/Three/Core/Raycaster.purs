@@ -7,7 +7,6 @@ import Three.Core.Camera (class IsCamera)
 import Three.Core.Face3 (Face3)
 import Three.Core.Object3D (class IsObject3D, Object3D)
 import Three.Math.Vector (Vector2, Vector3)
-import Util (fpi, ffi)
 
 foreign import data Raycaster :: Type
 foreign import data Intersection :: Type

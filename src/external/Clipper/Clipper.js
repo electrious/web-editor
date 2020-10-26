@@ -21,6 +21,18 @@ exports.pftNonZero = clipper.PolyFillType.pftNonZero
 exports.pftPositive = clipper.PolyFillType.pftPositive
 exports.pftNegative = clipper.PolyFillType.pftNegative
 
+exports.addPath = path => polyType => closed => clipper => _ => {
+    clipper.AddPath(path, polyType, closed)
+}
+
+exports.addPaths = paths => polyType => closed => clipper => _ => {
+    clipper.AddPaths(paths, polyType, closed)
+}
+
+exports.clear = clipper => _ => {
+    clipper.Clear()
+}
+
 exports.area = poly => {
     return clipper.Clipper.Area(poly)
 }
