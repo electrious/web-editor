@@ -12,18 +12,13 @@ import Data.UUID (UUID, emptyUUID, parseUUID)
 import Editor.Common.ProtoCodable (class ProtoDecodable, fromProto)
 import Effect (Effect)
 import Model.Racking.RoofRackingData (RoofRackingData, RoofRackingResultPB)
-import Util (ffi, fpi)
 import Model.MapPB (MapPB, fromMapPB)
 
 foreign import data RackingSystemPB :: Type
 foreign import mkRackingSystemPB :: Effect RackingSystemPB
 
-getRoofRackings :: RackingSystemPB -> MapPB String RoofRackingResultPB
-getRoofRackings = ffi ["r"] "r.getRoofRackings()"
-
-setRoofRackings :: MapPB String RoofRackingResultPB -> RackingSystemPB -> Effect Unit
-setRoofRackings = fpi ["rr", "r", ""] "r.setRoofRackings(rr)"
-
+foreign import getRoofRackings :: RackingSystemPB -> MapPB String RoofRackingResultPB
+foreign import setRoofRackings :: MapPB String RoofRackingResultPB -> RackingSystemPB -> Effect Unit
 
 newtype RackingSystem = RackingSystem {
     roofRackings :: Map UUID RoofRackingData

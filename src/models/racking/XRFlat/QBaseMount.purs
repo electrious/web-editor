@@ -15,7 +15,6 @@ import Effect (Effect)
 import Model.ArrayComponent (class ArrayComponent)
 import Model.Class (class HasPBUUID, class IsPBArrayComp, getArrayNumber, getUUID, getX, getY, getZ)
 import Model.RoofComponent (class RoofComponent)
-import Util (ffi, fpi)
 
 foreign import data QBaseMountPB :: Type
 foreign import mkQBaseMountPB :: Effect QBaseMountPB
@@ -23,11 +22,8 @@ foreign import mkQBaseMountPB :: Effect QBaseMountPB
 instance hasPBUUIDQBaseMountPB :: HasPBUUID QBaseMountPB
 instance isPBArrayCompQBaseMountPB :: IsPBArrayComp QBaseMountPB
 
-getHeight :: QBaseMountPB -> Number
-getHeight = ffi ["q"] "q.getHeight()"
-
-setHeight :: Number -> QBaseMountPB -> Effect Unit
-setHeight = fpi ["h", "q", ""] "q.setHeight(h)"
+foreign import getHeight :: QBaseMountPB -> Number
+foreign import setHeight :: Number -> QBaseMountPB -> Effect Unit
 
 newtype QBaseMount = QBaseMount {
     id          :: UUID,

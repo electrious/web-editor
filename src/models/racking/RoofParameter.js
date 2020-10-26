@@ -13,6 +13,49 @@ exports.paramTypeXRFlat = RoofParameter.ParamTypeCase.XR_FLAT_PARAM
 exports.paramTypeBX = RoofParameter.ParamTypeCase.BX_PARAM
 exports.paramTypeGAF = RoofParameter.ParamTypeCase.GAF_PARAM
 
+exports.getParamTypeCase = r => {
+    return r.getParamTypeCase()
+}
+
+exports.getXRParameter = r => {
+    return r.getXrParam()
+}
+
+exports.setXRParameter = x => r => _ => {
+    r.setXrParam(x)
+}
+
+exports.getFXParameter = r => {
+    return r.getFxParam()
+}
+
+exports.setFXParameter = x => r => _ => {
+    r.setFxParam(x)
+}
+
+exports.getXRFlatParameter = r => {
+    return r.getXrFlatParam()
+}
+
+exports.setXRFlatParameter = x => r => _ => {
+    r.setXrFlatParam(x)
+}
+
+exports.getBXParameter = r => {
+    return r.getBxParam()
+}
+
+exports.setBXParameter = x => r => _ => {
+    r.setBxParam(x)
+}
+
+exports.getGAFParameter = r => {
+    return r.getGafParam()
+}
+
+exports.setGAFParameter = x => r => _ => {
+    r.setGafParam(x)
+}
 
 exports.toTagged = obj => {
     let k = Object.keys(obj)[0]

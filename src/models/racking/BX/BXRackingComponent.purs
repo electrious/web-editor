@@ -10,24 +10,16 @@ import Effect (Effect)
 import Model.Racking.BX.Block (Block, BlockPB)
 import Model.Racking.BX.Chassis (Chassis, ChassisPB)
 import Model.Racking.Class (class HasArrayNumber, getArrayNumber)
-import Util (ffi, fpi)
 
 foreign import data BallastComponentPB :: Type
 foreign import mkBallastComponentPB :: Effect BallastComponentPB
 
 instance hasArrayNumberBallastComponentPB :: HasArrayNumber BallastComponentPB
 
-getChassis :: BallastComponentPB -> Array ChassisPB
-getChassis = ffi ["b"] "b.getChassisList()"
-
-setChassis :: Array ChassisPB -> BallastComponentPB -> Effect Unit
-setChassis = fpi ["cs", "b", ""] "b.setChassisList(cs)"
-
-getBlocks :: BallastComponentPB -> Array BlockPB
-getBlocks = ffi ["b"] "b.getBlocksList()"
-
-setBlocks :: Array BlockPB -> BallastComponentPB -> Effect Unit
-setBlocks = fpi ["bs", "b", ""] "b.setBlocksList(bs)"
+foreign import getChassis :: BallastComponentPB -> Array ChassisPB
+foreign import setChassis :: Array ChassisPB -> BallastComponentPB -> Effect Unit
+foreign import getBlocks :: BallastComponentPB -> Array BlockPB
+foreign import setBlocks :: Array BlockPB -> BallastComponentPB -> Effect Unit
 
 
 newtype BXRackingComponent = BXRackingComponent {

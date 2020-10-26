@@ -8,26 +8,18 @@ import Editor.Common.ProtoCodable (fromProto, toProto)
 import Effect (Effect)
 import FRP.Event (Event, makeEvent)
 import Model.Racking.RackingSystem (RackingSystem, RackingSystemPB)
-import Util (ffi, fpi)
 
 foreign import data DoRackRequestPB :: Type
 foreign import mkDoRackRequestPB :: Effect DoRackRequestPB
 
-getRequest :: DoRackRequestPB -> RackRequestPB
-getRequest = ffi ["r"] "r.getRequest()"
-
-setRequest :: RackRequestPB -> DoRackRequestPB -> Effect Unit
-setRequest = fpi ["rq", "r", ""] "r.setRequest(rq)"
+foreign import getRequest :: DoRackRequestPB -> RackRequestPB
+foreign import setRequest :: RackRequestPB -> DoRackRequestPB -> Effect Unit
 
 foreign import data DoRackResponsePB :: Type
 foreign import mkDoRackResponsePB :: Effect DoRackResponsePB
 
-getRacking :: DoRackResponsePB -> RackingSystemPB
-getRacking = ffi ["r"] "r.getRacking()"
-
-setRacking :: RackingSystemPB -> DoRackResponsePB -> Effect Unit
-setRacking = fpi ["rs", "r", ""] "r.setRacking(rs)"
-
+foreign import getRacking :: DoRackResponsePB -> RackingSystemPB
+foreign import setRacking :: RackingSystemPB -> DoRackResponsePB -> Effect Unit
 
 foreign import data RackingAPIClient :: Type
 foreign import mkRackingAPIClient :: String -> Effect RackingAPIClient

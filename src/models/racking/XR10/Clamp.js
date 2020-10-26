@@ -7,3 +7,11 @@ exports.mkClampPB = _ => {
 exports.clampKindInvalid = Clamp.Kind.KIND_INVALID
 exports.clampKindMiddle = Clamp.Kind.KIND_MIDDLE
 exports.clampKindEnd = Clamp.Kind.KIND_END
+
+exports.getKind = c => {
+    return c.getKind()
+}
+
+exports.setKind = k => c => _ => {
+    c.setKind(k)
+}

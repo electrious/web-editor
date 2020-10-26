@@ -12,7 +12,6 @@ import Model.Racking.FX.FXRoofParameter (FXParameterPB, FXRoofParameter)
 import Model.Racking.GAF.GAFRoofParameter (GAFParameterPB, GAFRoofParameter)
 import Model.Racking.XR.XRRoofParameter (XRParameterPB, XRRoofParameter)
 import Model.Racking.XRFlat.XRFlatRoofParameter (XRFlatParameterPB, XRFlatRoofParameter)
-import Util (ffi, fpi)
 
 foreign import data RoofParameterPB :: Type
 foreign import mkRoofParameterPB :: Effect RoofParameterPB
@@ -26,38 +25,17 @@ foreign import paramTypeXRFlat :: ParamTypeCasePB
 foreign import paramTypeBX     :: ParamTypeCasePB
 foreign import paramTypeGAF    :: ParamTypeCasePB
 
-getParamTypeCase :: RoofParameterPB -> ParamTypeCasePB
-getParamTypeCase = ffi ["r"] "r.getParamTypeCase()"
-
-getXRParameter :: RoofParameterPB -> XRParameterPB
-getXRParameter = ffi ["r"] "r.getXrParam()"
-
-setXRParameter :: XRParameterPB -> RoofParameterPB -> Effect Unit
-setXRParameter = fpi ["x", "r", ""] "r.setXrParam(x)"
-
-getFXParameter :: RoofParameterPB -> FXParameterPB
-getFXParameter = ffi ["r"] "r.getFxParam()"
-
-setFXParameter :: FXParameterPB -> RoofParameterPB -> Effect Unit
-setFXParameter = fpi ["x", "r", ""] "r.setFxParam(x)"
-
-getXRFlatParameter :: RoofParameterPB -> XRFlatParameterPB
-getXRFlatParameter = ffi ["r"] "r.getXrFlatParam()"
-
-setXRFlatParameter :: XRFlatParameterPB -> RoofParameterPB -> Effect Unit
-setXRFlatParameter = fpi ["x", "r", ""] "r.setXrFlatParam(x)"
-
-getBXParameter :: RoofParameterPB -> BXParameterPB
-getBXParameter = ffi ["r"] "r.getBxParam()"
-
-setBXParameter :: BXParameterPB -> RoofParameterPB -> Effect Unit
-setBXParameter = fpi ["x", "r", ""] "r.setBxParam(x)"
-
-getGAFParameter :: RoofParameterPB -> GAFParameterPB
-getGAFParameter = ffi ["r"] "r.getGafParam()"
-
-setGAFParameter :: GAFParameterPB -> RoofParameterPB -> Effect Unit
-setGAFParameter = fpi ["x", "r", ""] "r.setGafParam(x)"
+foreign import getParamTypeCase :: RoofParameterPB -> ParamTypeCasePB
+foreign import getXRParameter :: RoofParameterPB -> XRParameterPB
+foreign import setXRParameter :: XRParameterPB -> RoofParameterPB -> Effect Unit
+foreign import getFXParameter :: RoofParameterPB -> FXParameterPB
+foreign import setFXParameter :: FXParameterPB -> RoofParameterPB -> Effect Unit
+foreign import getXRFlatParameter :: RoofParameterPB -> XRFlatParameterPB
+foreign import setXRFlatParameter :: XRFlatParameterPB -> RoofParameterPB -> Effect Unit
+foreign import getBXParameter :: RoofParameterPB -> BXParameterPB
+foreign import setBXParameter :: BXParameterPB -> RoofParameterPB -> Effect Unit
+foreign import getGAFParameter :: RoofParameterPB -> GAFParameterPB
+foreign import setGAFParameter :: GAFParameterPB -> RoofParameterPB -> Effect Unit
 
 foreign import toTagged :: Foreign -> Foreign
 

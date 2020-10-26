@@ -16,7 +16,6 @@ import Model.Racking.Rafter (Rafter, RafterPB)
 import Model.Racking.RoofParameter (RoofParameter, RoofParameterPB)
 import Model.Racking.XR10.XRRackingComponent (RailComponentPB, XRRackingComponent, XRRackingNumbers)
 import Model.Racking.XRFlat.XRFlatRackingComponent (RailFlatComponentPB, XRFlatRackingComponent, XRFlatRackingNumbers)
-import Util (ffi, fpi)
 import Model.MapPB (MapPB, fromMapPB)
 
 foreign import data ComponentPB :: Type
@@ -31,39 +30,17 @@ foreign import rdTypeRailFlat :: RdTypeCase
 foreign import rdTypeBallast  :: RdTypeCase
 foreign import rdTypeGAF      :: RdTypeCase
 
-getRdTypeCase :: ComponentPB -> RdTypeCase
-getRdTypeCase = ffi ["c"] "c.getRdTypeCase()"
-
-getRail :: ComponentPB -> RailComponentPB
-getRail = ffi ["c"] "c.getRail()"
-
-setRail :: RailComponentPB -> ComponentPB -> Effect Unit
-setRail = fpi ["r", "c", ""] "c.setRail(r)"
-
-getRailFree :: ComponentPB -> RailFreeComponentPB
-getRailFree = ffi ["c"] "c.getRailFree()"
-
-setRailFree :: RailFreeComponentPB -> ComponentPB -> Effect Unit
-setRailFree = fpi ["r", "c", ""] "c.setRailFree(r)"
-
-getRailFlat :: ComponentPB -> RailFlatComponentPB
-getRailFlat = ffi ["c"] "c.getRailFlat()"
-
-setRailFlat :: RailFlatComponentPB -> ComponentPB -> Effect Unit
-setRailFlat = fpi ["r", "c", ""] "c.setRailFlat(r)"
-
-getBallast :: ComponentPB -> BallastComponentPB
-getBallast = ffi ["c"] "c.getBallast()"
-
-setBallast :: BallastComponentPB -> ComponentPB -> Effect Unit
-setBallast = fpi ["b", "c", ""] "c.setBallast(b)"
-
-getGAF :: ComponentPB -> GAFComponentPB
-getGAF = ffi ["c"] "c.getGaf()"
-
-setGAF :: GAFComponentPB -> ComponentPB -> Effect Unit
-setGAF = fpi ["g", "c", ""] "c.setGaf(g)"
-
+foreign import getRdTypeCase :: ComponentPB -> RdTypeCase
+foreign import getRail :: ComponentPB -> RailComponentPB
+foreign import setRail :: RailComponentPB -> ComponentPB -> Effect Unit
+foreign import getRailFree :: ComponentPB -> RailFreeComponentPB
+foreign import setRailFree :: RailFreeComponentPB -> ComponentPB -> Effect Unit
+foreign import getRailFlat :: ComponentPB -> RailFlatComponentPB
+foreign import setRailFlat :: RailFlatComponentPB -> ComponentPB -> Effect Unit
+foreign import getBallast :: ComponentPB -> BallastComponentPB
+foreign import setBallast :: BallastComponentPB -> ComponentPB -> Effect Unit
+foreign import getGAF :: ComponentPB -> GAFComponentPB
+foreign import setGAF :: GAFComponentPB -> ComponentPB -> Effect Unit
 
 data RackingComp = FX FXRackingComponent
                  | XR XRRackingComponent
@@ -97,29 +74,14 @@ instance showRackingCompNumbers :: Show RackingCompNumbers where
 foreign import data RoofRackingResultPB :: Type
 foreign import mkRoofRackingResultPB :: Effect RoofRackingResultPB
 
-getKind :: RoofRackingResultPB -> RackingKind
-getKind = ffi ["r"] "r.getKind()"
-
-setKind :: RackingKind -> RoofRackingResultPB -> Effect Unit
-setKind = fpi ["k", "r", ""] "r.setKind(k)"
-
-getRafters :: RoofRackingResultPB -> Array RafterPB
-getRafters = ffi ["r"] "r.getRaftersList()"
-
-setRafters :: Array RafterPB -> RoofRackingResultPB -> Effect Unit
-setRafters = ffi ["rs", "r", ""] "r.setRaftersList(rs)"
-
-getParams :: RoofRackingResultPB -> RoofParameterPB
-getParams = ffi ["r"] "r.getParams()"
-
-setParams :: RoofParameterPB -> RoofRackingResultPB -> Effect Unit
-setParams = fpi ["p", "r", ""] "r.setParams(p)"
-
-getComponents :: RoofRackingResultPB -> MapPB Int ComponentPB
-getComponents = ffi ["r"] "r.getComponents()"
-
-setComponents :: MapPB Int ComponentPB -> RoofRackingResultPB -> Effect Unit
-setComponents = fpi ["c", "r", ""] "r.setComponents(c)"
+foreign import getKind :: RoofRackingResultPB -> RackingKind
+foreign import setKind :: RackingKind -> RoofRackingResultPB -> Effect Unit
+foreign import getRafters :: RoofRackingResultPB -> Array RafterPB
+foreign import setRafters :: Array RafterPB -> RoofRackingResultPB -> Effect Unit
+foreign import getParams :: RoofRackingResultPB -> RoofParameterPB
+foreign import setParams :: RoofParameterPB -> RoofRackingResultPB -> Effect Unit
+foreign import getComponents :: RoofRackingResultPB -> MapPB Int ComponentPB
+foreign import setComponents :: MapPB Int ComponentPB -> RoofRackingResultPB -> Effect Unit
 
 
 newtype RoofRackingData = RoofRackingData {

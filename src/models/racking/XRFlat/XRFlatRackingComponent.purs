@@ -15,8 +15,6 @@ import Model.Racking.XR10.Stopper (Stopper)
 import Model.Racking.XRFlat.QBaseMount (QBaseMount, QBaseMountPB)
 import Model.Racking.XRFlat.SupportRail (SupportRail, SupportRailPB)
 import Model.Racking.XRFlat.TiltLeg (TiltLeg, TiltLegPB)
-import Util (ffi, fpi)
-
 
 foreign import data RailFlatComponentPB :: Type
 foreign import mkRailFlatComponentPB :: Effect RailFlatComponentPB
@@ -27,23 +25,12 @@ instance hasSplicesRailFlatComponentPB :: HasSplices RailFlatComponentPB
 instance hasClampsRailFlatComponentPB :: HasClamps RailFlatComponentPB
 instance hasStoppersRailFlatComponentPB :: HasStoppers RailFlatComponentPB
 
-getSupportRails :: RailFlatComponentPB -> Array SupportRailPB
-getSupportRails = ffi ["r"] "r.getSupportRailsList()"
-
-setSupportRails :: Array SupportRailPB -> RailFlatComponentPB -> Effect Unit
-setSupportRails = fpi ["ss", "r", ""] "r.setSupportRailsList(ss)"
-
-getQBaseMounts :: RailFlatComponentPB -> Array QBaseMountPB
-getQBaseMounts = ffi ["r"] "r.getQbaseMountsList()"
-
-setQBaseMounts :: Array QBaseMountPB -> RailFlatComponentPB -> Effect Unit
-setQBaseMounts = fpi ["qs", "r", ""] "r.setQbaseMountsList(qs)"
-
-getTiltLegs :: RailFlatComponentPB -> Array TiltLegPB
-getTiltLegs = ffi ["r"] "r.getTiltLegsList()"
-
-setTiltLegs :: Array TiltLegPB -> RailFlatComponentPB -> Effect Unit
-setTiltLegs = fpi ["ts", "r", ""] "r.setTiltLegsList(ts)"
+foreign import getSupportRails :: RailFlatComponentPB -> Array SupportRailPB
+foreign import setSupportRails :: Array SupportRailPB -> RailFlatComponentPB -> Effect Unit
+foreign import getQBaseMounts :: RailFlatComponentPB -> Array QBaseMountPB
+foreign import setQBaseMounts :: Array QBaseMountPB -> RailFlatComponentPB -> Effect Unit
+foreign import getTiltLegs :: RailFlatComponentPB -> Array TiltLegPB
+foreign import setTiltLegs :: Array TiltLegPB -> RailFlatComponentPB -> Effect Unit
 
 
 newtype XRFlatRackingComponent = XRFlatRackingComponent {

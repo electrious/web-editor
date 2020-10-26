@@ -9,17 +9,12 @@ import Editor.Common.ProtoCodable (class ProtoDecodable, class ProtoEncodable, f
 import Effect (Effect)
 import Foreign.Generic (class Decode, class Encode, defaultOptions, genericDecode, genericEncode)
 import Model.Racking.BX.Chassis (ChassisKind, ChassisType)
-import Util (ffi, fpi)
-
 
 foreign import data BXParameterPB :: Type
 foreign import mkBXParameterPB :: Effect BXParameterPB
 
-getChassisKind :: BXParameterPB -> ChassisKind
-getChassisKind = ffi ["b"] "b.getChassisKind"
-
-setChassisKind :: ChassisKind -> BXParameterPB -> Effect Unit
-setChassisKind = fpi ["c", "b", ""] "b.setChassisKind(c)"
+foreign import getChassisKind :: BXParameterPB -> ChassisKind
+foreign import setChassisKind :: ChassisKind -> BXParameterPB -> Effect Unit
 
 newtype BXRoofParameter = BXRoofParameter {
     chassisType :: ChassisType

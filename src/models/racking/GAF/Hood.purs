@@ -15,7 +15,6 @@ import Effect (Effect)
 import Model.ArrayComponent (class ArrayComponent)
 import Model.Class (class HasLength, class HasPBUUID, class IsPBArrayComp, getArrayNumber, getLength, getUUID, getX, getY, getZ)
 import Model.RoofComponent (class RoofComponent)
-import Util (ffi, fpi)
 
 newtype HoodKind = HoodKind Int
 derive newtype instance eqHoodKind :: Eq HoodKind
@@ -30,11 +29,8 @@ instance hasPBUUIDHoodPB :: HasPBUUID HoodPB
 instance isPBArrayCompHoodPB :: IsPBArrayComp HoodPB
 instance hasLengthHoodPB :: HasLength HoodPB
 
-getKind :: HoodPB -> HoodKind
-getKind = ffi ["h"] "h.getKind()"
-
-setKind :: HoodKind -> HoodPB -> Effect Unit
-setKind = fpi ["k", "h", ""] "h.setKind(k)"
+foreign import getKind :: HoodPB -> HoodKind
+foreign import setKind :: HoodKind -> HoodPB -> Effect Unit
 
 data HoodType = HoodTop
               | HoodBottom

@@ -19,7 +19,6 @@ import Model.ArrayComponent (class ArrayComponent)
 import Model.Class (class HasPBUUID, class IsPBArrayComp, getArrayNumber, getUUID, getX, getY, getZ)
 import Model.RoofComponent (class RoofComponent)
 import Model.UUID (PBUUID)
-import Util (ffi, fpi)
 
 foreign import data MountPB :: Type
 foreign import mkMountPB :: Effect MountPB
@@ -27,17 +26,10 @@ foreign import mkMountPB :: Effect MountPB
 instance hasPBUUIdMountPB :: HasPBUUID MountPB
 instance isPBArrayCompMountPB :: IsPBArrayComp MountPB
 
-getFlash :: MountPB -> PBUUID
-getFlash = ffi ["m"] "m.getFlash()"
-
-setFlash :: PBUUID -> MountPB -> Effect Unit
-setFlash = fpi ["f", "m", ""] "m.setFlash(f)"
-
-getClampX :: MountPB -> Number
-getClampX = ffi ["m"] "m.getClampX()"
-
-setClampX :: Number -> MountPB -> Effect Unit
-setClampX = fpi ["x", "m", ""] "m.setClampX(x)"
+foreign import getFlash :: MountPB -> PBUUID
+foreign import setFlash :: PBUUID -> MountPB -> Effect Unit
+foreign import getClampX :: MountPB -> Number
+foreign import setClampX :: Number -> MountPB -> Effect Unit
 
 mountRadius :: Meter
 mountRadius = inch 5.0

@@ -9,19 +9,14 @@ import Editor.Common.ProtoCodable (class ProtoDecodable, fromProto)
 import Effect (Effect)
 import Model.Racking.Class (class HasArrayNumber, getArrayNumber)
 import Model.Racking.GAF.Hood (Hood, HoodPB)
-import Util (ffi, fpi)
 
 foreign import data GAFComponentPB :: Type
 foreign import mkGAFComponentPB :: Effect GAFComponentPB
 
 instance hasArrayNumberGAFComponentPG :: HasArrayNumber GAFComponentPB
 
-getHoods :: GAFComponentPB -> Array HoodPB
-getHoods = ffi ["g"] "g.getHoodsList()"
-
-setHoods :: Array HoodPB -> GAFComponentPB -> Effect Unit
-setHoods = fpi ["hs", "g", ""] "g.setHoodsList(hs)"
-
+foreign import getHoods :: GAFComponentPB -> Array HoodPB
+foreign import setHoods :: Array HoodPB -> GAFComponentPB -> Effect Unit
 
 newtype GAFRackingComponent = GAFRackingComponent {
     arrayNumber :: Int,

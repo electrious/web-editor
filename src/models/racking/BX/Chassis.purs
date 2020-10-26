@@ -22,7 +22,6 @@ import Foreign.Generic (class Decode, class Encode, ForeignError(..), decode, en
 import Model.ArrayComponent (class ArrayComponent)
 import Model.Class (class HasLength, class HasPBUUID, class IsPBArrayComp, getArrayNumber, getUUID, getX, getY, getZ)
 import Model.RoofComponent (class RoofComponent)
-import Util (ffi, fpi)
 
 newtype ChassisKind = ChassisKind Int
 derive newtype instance eqChassisKind :: Eq ChassisKind
@@ -37,17 +36,10 @@ instance hasPBUUIDChassisPB :: HasPBUUID ChassisPB
 instance isPBArrayCompChassisPB :: IsPBArrayComp ChassisPB
 instance hasLengthChassisPB :: HasLength ChassisPB
 
-getTilt :: ChassisPB -> Number
-getTilt = ffi ["c"] "c.getTilt()"
-
-setTilt :: Number -> ChassisPB -> Effect Unit
-setTilt = fpi ["t", "c", ""] "c.setTilt(t)"
-
-getKind :: ChassisPB -> ChassisKind
-getKind = ffi ["c"] "c.getKind()"
-
-setKind :: ChassisKind -> ChassisPB -> Effect Unit
-setKind = fpi ["k", "c", ""] "c.setKind(k)"
+foreign import getTilt :: ChassisPB -> Number
+foreign import setTilt :: Number -> ChassisPB -> Effect Unit
+foreign import getKind :: ChassisPB -> ChassisKind
+foreign import setKind :: ChassisKind -> ChassisPB -> Effect Unit
 
 data ChassisType = ChassisTilt5
                  | ChassisTilt10

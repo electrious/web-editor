@@ -21,7 +21,7 @@ exports.jsSetReceiveShadow = r => o => _ => {
 }
 
 exports.jsChildren = _ => o => {
-    return o.childrena
+    return o.children
 }
 
 exports.jsHasParent = o => {

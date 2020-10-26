@@ -17,7 +17,6 @@ import Model.Class (class HasPBUUID, class HasPos, class IsPBArrayComp, getArray
 import Model.Racking.Common (RackPos)
 import Model.RoofComponent (class RoofComponent)
 import Model.UUID (PBUUID)
-import Util (ffi, fpi)
 
 foreign import data EndCapPB :: Type
 foreign import mkEndCapPB :: Effect EndCapPB
@@ -26,11 +25,8 @@ instance hasPBUUIdEndCapPB :: HasPBUUID EndCapPB
 instance isPBArrayCompEndCapPB :: IsPBArrayComp EndCapPB
 instance hasPosEndCapPB :: HasPos EndCapPB
 
-getSkirt :: EndCapPB -> PBUUID
-getSkirt = ffi ["e"] "e.getSkirt()"
-
-setSkirt :: PBUUID -> EndCapPB -> Effect Unit
-setSkirt = fpi ["s", "e", ""] "e.setSkirt(s)"
+foreign import getSkirt :: EndCapPB -> PBUUID
+foreign import setSkirt :: PBUUID -> EndCapPB -> Effect Unit
 
 newtype EndCap = EndCap {
     id          :: UUID,

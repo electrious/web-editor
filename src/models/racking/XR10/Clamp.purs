@@ -19,7 +19,6 @@ import Model.ArrayComponent (class ArrayComponent)
 import Model.Class (class HasPBUUID, class HasPos, class IsPBArrayComp, getArrayNumber, getPos, getUUID, getX, getY, getZ)
 import Model.Racking.Common (RackPos)
 import Model.RoofComponent (class RoofComponent)
-import Util (ffi, fpi)
 
 newtype ClampKindPB = ClampKindPB Int
 derive newtype instance eqClampKindPB :: Eq ClampKindPB
@@ -35,12 +34,8 @@ instance hasPBUUIDClampPB :: HasPBUUID ClampPB
 instance isPBArrayCompClampPB :: IsPBArrayComp ClampPB
 instance hasPosClampPB :: HasPos ClampPB
 
-getKind :: ClampPB -> ClampKindPB
-getKind = ffi ["r"] "r.getKind()"
-
-setKind :: ClampKindPB -> ClampPB -> Effect Unit
-setKind = fpi ["k", "r", ""] "r.setKind(k)"
-
+foreign import getKind :: ClampPB -> ClampKindPB
+foreign import setKind :: ClampKindPB -> ClampPB -> Effect Unit
 
 data ClampType = Middle | End
 

@@ -59,6 +59,10 @@ exports.pointInPolygon = pt => path => {
     return clipper.Clipper.PointInPolygon(pt, path) != 0
 }
 
+exports.reversePath = p => {
+    return p.reverse()
+}
+
 exports.reversePaths = ps => {
     clipper.Clipper.ReversePaths(ps)
     return ps

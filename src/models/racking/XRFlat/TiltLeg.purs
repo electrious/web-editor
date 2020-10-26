@@ -19,7 +19,6 @@ import Math.Angle (Angle, degree)
 import Model.ArrayComponent (class ArrayComponent)
 import Model.Class (class HasLength, class HasPBUUID, class IsPBArrayComp, getArrayNumber, getLength, getUUID, getX, getY, getZ)
 import Model.RoofComponent (class RoofComponent)
-import Util (ffi, fpi)
 
 newtype TiltLegKind = TiltLegKind Int
 derive newtype instance eqTiltLegKind :: Eq TiltLegKind
@@ -34,17 +33,10 @@ instance hasPBUUIDTiltLegPB :: HasPBUUID TiltLegPB
 instance isPBArrayCompTiltLegPB :: IsPBArrayComp TiltLegPB
 instance hasLengthTiltLegPB :: HasLength TiltLegPB
 
-getTilt :: TiltLegPB -> Number
-getTilt = ffi ["t"] "t.getTilt()"
-
-setTilt :: Number -> TiltLegPB -> Effect Unit
-setTilt = fpi ["l", "t", ""] "t.setTilt(l)"
-
-getKind :: TiltLegPB -> TiltLegKind
-getKind = ffi ["t"] "t.getKind()"
-
-setKind :: TiltLegKind -> TiltLegPB -> Effect Unit
-setKind = fpi ["k", "t", ""] "t.setKind(k)"
+foreign import getTilt :: TiltLegPB -> Number
+foreign import setTilt :: Number -> TiltLegPB -> Effect Unit
+foreign import getKind :: TiltLegPB -> TiltLegKind
+foreign import setKind :: TiltLegKind -> TiltLegPB -> Effect Unit
 
 data TiltLegType = South | North
 

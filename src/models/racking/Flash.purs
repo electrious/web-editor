@@ -16,7 +16,6 @@ import Model.ArrayComponent (class ArrayComponent)
 import Model.Class (class HasPBUUID, class IsPBArrayComp, getArrayNumber, getUUID, getX, getY, getZ)
 import Model.RoofComponent (class RoofComponent)
 import Model.UUID (PBUUID)
-import Util (ffi, fpi)
 
 foreign import data FlashPB :: Type
 foreign import mkFlashPB :: Effect FlashPB
@@ -24,17 +23,10 @@ foreign import mkFlashPB :: Effect FlashPB
 instance hasPBUUIDFlashPB :: HasPBUUID FlashPB
 instance isPBArrayCompFlashPB :: IsPBArrayComp FlashPB
 
-getRafterId :: FlashPB -> PBUUID
-getRafterId = ffi ["r"] "r.getRafterId()"
-
-setRafterId :: PBUUID -> FlashPB -> Effect Unit
-setRafterId = fpi ["u", "r", ""] "r.setRafterId(u)"
-
-getClampTarget :: FlashPB -> Number
-getClampTarget = ffi ["r"] "r.getClampTarget()"
-
-setClampTarget :: Number -> FlashPB -> Effect Unit
-setClampTarget = fpi ["t", "r", ""] "r.setClampTarget(t)"
+foreign import getRafterId :: FlashPB -> PBUUID
+foreign import setRafterId :: PBUUID -> FlashPB -> Effect Unit
+foreign import getClampTarget :: FlashPB -> Number
+foreign import setClampTarget :: Number -> FlashPB -> Effect Unit
 
 newtype Flash = Flash {
     id          :: UUID,

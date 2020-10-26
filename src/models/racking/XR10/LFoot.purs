@@ -16,7 +16,6 @@ import Model.ArrayComponent (class ArrayComponent)
 import Model.Class (class HasPBUUID, class IsPBArrayComp, getArrayNumber, getUUID, getX, getY, getZ)
 import Model.RoofComponent (class RoofComponent)
 import Model.UUID (PBUUID)
-import Util (ffi, fpi)
 
 foreign import data LFootPB :: Type
 foreign import mkLFootPB :: Effect LFootPB
@@ -24,11 +23,8 @@ foreign import mkLFootPB :: Effect LFootPB
 instance hasPBUUIDLFootPB :: HasPBUUID LFootPB
 instance isPBArrayCompLFootPB :: IsPBArrayComp LFootPB
 
-getFlashId :: LFootPB -> PBUUID
-getFlashId = ffi ["r"] "r.getFlash()"
-
-setFlashId :: PBUUID -> LFootPB -> Effect Unit
-setFlashId = fpi ["u", "r", ""] "r.setFlash(u)"
+foreign import getFlashId :: LFootPB -> PBUUID
+foreign import setFlashId :: PBUUID -> LFootPB -> Effect Unit
 
 newtype LFoot = LFoot {
     id          :: UUID,

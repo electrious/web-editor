@@ -14,7 +14,6 @@ import Model.Racking.XR10.LFoot (LFoot, LFootPB)
 import Model.Racking.XR10.Rail (Rail)
 import Model.Racking.XR10.Splice (Splice)
 import Model.Racking.XR10.Stopper (Stopper)
-import Util (ffi, fpi)
 
 foreign import data RailComponentPB :: Type
 foreign import mkRailComponentPB :: Effect RailComponentPB
@@ -26,11 +25,9 @@ instance hasSplicesRailComponentPB     :: HasSplices RailComponentPB
 instance hasClampsRailComponentPB      :: HasClamps RailComponentPB
 instance hasStoppersRailComponentPB    :: HasStoppers RailComponentPB
 
-getLFeet :: RailComponentPB -> Array LFootPB
-getLFeet = ffi ["r"] "r.getLfeetList()"
+foreign import getLFeet :: RailComponentPB -> Array LFootPB
+foreign import setLFeet :: Array LFootPB -> RailComponentPB -> Effect Unit
 
-setLFeet :: Array LFootPB -> RailComponentPB -> Effect Unit
-setLFeet = fpi ["l", "r", ""] "r.setLfeetList(l)"
 
 newtype XRRackingComponent = XRRackingComponent {
     arrayNumber :: Int,

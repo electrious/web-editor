@@ -35,7 +35,6 @@ import Model.Class (class IsPBArrayComp, setArrayNumber, setX, setY)
 import Model.RoofComponent (class RoofComponent, compX, compY, size)
 import Model.UUID (PBUUID, mkPBUUID, setUUIDString)
 import Three.Math.Vector (Vector3, mkVec3, vecX, vecY)
-import Util (ffi, fpi)
 
 newtype OrientationPB = OrientationPB Int
 derive newtype instance eqOrientationPB :: Eq OrientationPB
@@ -54,48 +53,20 @@ foreign import mkPanelPB :: Effect PanelPB
 
 instance isPBArrayCompPanelPB :: IsPBArrayComp PanelPB
 
-getUUID :: PanelPB -> PBUUID
-getUUID = ffi ["p"] "p.getUuid()"
-
-setUUID :: PBUUID -> PanelPB -> Effect Unit
-setUUID = fpi ["u", "p", ""] "p.setUuid(u)"
-
-getLeadId :: PanelPB -> Int
-getLeadId = ffi ["p"] "p.getLeadId()"
-
-setLeadId :: Int -> PanelPB -> Effect Unit
-setLeadId = fpi ["i", "p", ""] "p.setLeadId(i)"
-
-getRoofplateUUID :: PanelPB -> PBUUID
-getRoofplateUUID = ffi ["p"] "p.getRoofplateUuid()"
-
-setRoofplateUUID :: PBUUID -> PanelPB -> Effect Unit
-setRoofplateUUID = fpi ["u", "p", ""] "p.setRoofplateUuid(u)"
-
-getRowNumber :: PanelPB -> Int
-getRowNumber = ffi ["p"] "p.getRowNumber()"
-
-setRowNumber :: Int -> PanelPB -> Effect Unit
-setRowNumber = fpi ["r", "p", ""] "p.setRowNumber(r)"
-
-getSlope :: PanelPB -> Number
-getSlope = ffi ["p"] "p.getSlope()"
-
-setSlope :: Number -> PanelPB -> Effect Unit
-setSlope = fpi ["s", "p", ""] "p.setSlope(s)"
-
-getOrientation :: PanelPB -> OrientationPB
-getOrientation = ffi ["p"] "p.getOrientation()"
-
-setOrientation :: OrientationPB -> PanelPB -> Effect Unit
-setOrientation = fpi ["o", "p", ""] "p.setOrientation(o)"
-
-getAlignment :: PanelPB -> AlignmentPB
-getAlignment = ffi ["p"] "p.getAlignment()"
-
-setAlignment :: AlignmentPB -> PanelPB -> Effect Unit
-setAlignment = fpi ["a", "p", ""] "p.setAlignment(a)"
-
+foreign import getUUID :: PanelPB -> PBUUID
+foreign import setUUID :: PBUUID -> PanelPB -> Effect Unit
+foreign import getLeadId :: PanelPB -> Int
+foreign import setLeadId :: Int -> PanelPB -> Effect Unit
+foreign import getRoofplateUUID :: PanelPB -> PBUUID
+foreign import setRoofplateUUID :: PBUUID -> PanelPB -> Effect Unit
+foreign import getRowNumber :: PanelPB -> Int
+foreign import setRowNumber :: Int -> PanelPB -> Effect Unit
+foreign import getSlope :: PanelPB -> Number
+foreign import setSlope :: Number -> PanelPB -> Effect Unit
+foreign import getOrientation :: PanelPB -> OrientationPB
+foreign import setOrientation :: OrientationPB -> PanelPB -> Effect Unit
+foreign import getAlignment :: PanelPB -> AlignmentPB
+foreign import setAlignment :: AlignmentPB -> PanelPB -> Effect Unit
 
 data Orientation = Landscape
                  | Portrait

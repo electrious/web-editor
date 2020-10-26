@@ -5,3 +5,11 @@ const {
 exports.mkGAFComponentPB = _ => {
     return new GAFComponent()
 }
+
+exports.getHoods = r => {
+    return r.getHoodsList()
+}
+
+exports.setHoods = hs => r => _ => {
+    r.setHoodsList(hs)
+}

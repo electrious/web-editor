@@ -20,9 +20,7 @@ vec2IntPoint v = mkIntPoint x y
 type Path = Array IntPoint
 type Paths = Array Path
 
-reversePath :: Path -> Path
-reversePath = ffi ["p"] "p.reverse()"
-
+foreign import reversePath :: Path -> Path
 foreign import reversePaths :: Paths -> Paths
 
 foreign import data PolyType :: Type

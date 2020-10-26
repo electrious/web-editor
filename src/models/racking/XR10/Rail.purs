@@ -16,7 +16,6 @@ import Model.ArrayComponent (class ArrayComponent)
 import Model.Class (class HasLength, class HasPBUUID, class IsPBArrayComp, getArrayNumber, getLength, getUUID, getX, getY, getZ)
 import Model.RoofComponent (class RoofComponent)
 import Model.UUID (PBUUID)
-import Util (ffi, fpi)
 
 foreign import data RailPB :: Type
 foreign import mkRailPB :: Effect RailPB
@@ -25,12 +24,8 @@ instance hasPBUUIDRailPB :: HasPBUUID RailPB
 instance isPBArrayCompRailPB :: IsPBArrayComp RailPB
 instance hasLengthRailPB :: HasLength RailPB
 
-getPanels :: RailPB -> Array PBUUID
-getPanels = ffi ["r"] "r.getPanelsList()"
-
-setPanels :: Array PBUUID -> RailPB -> Effect Unit
-setPanels = fpi ["a", "r", ""] "r.setPanelsList(a)"
-
+foreign import getPanels :: RailPB -> Array PBUUID
+foreign import setPanels :: Array PBUUID -> RailPB -> Effect Unit
 
 railLength :: Meter
 railLength = feetInch 14.0 0.0

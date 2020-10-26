@@ -18,3 +18,19 @@ exports.mkDoRackRequestPB = _ => {
 exports.mkDoRackResponsePB = _ => {
     return new DoRackResponse()
 }
+
+exports.getRequest = r => {
+    return r.getRequest()
+}
+
+exports.setRequest = rq => r => _ => {
+    r.setRequest(rq)
+}
+
+exports.getRacking = r => {
+    return r.getRacking()
+}
+
+exports.setRacking = rs => r => _ => {
+    r.setRacking(rs)
+}

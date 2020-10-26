@@ -30,7 +30,6 @@ import Three.Core.Face3 (Face3)
 import Three.Core.Object3D (class IsObject3D)
 import Three.Core.Raycaster (Intersection, distance, face, intersectObject, mkRaycaster, object, point, setFromCamera)
 import Three.Math.Vector (Vector2, Vector3, mkVec2, mkVec3)
-import Util (ffi, fpi)
 
 newtype Size = Size {
     width  :: Int,
@@ -95,46 +94,24 @@ mkDragEndable evt = evt <|> compact (f <$> e)
 
 -- | Convert an Object3D to be tappable by attaching a callback
 -- function for tap events.
-makeTappable :: forall a. IsObject3D a => a -> (SceneTapEvent -> Effect Unit) -> Effect Unit
-makeTappable = fpi ["obj", "cb", ""] "obj.tapped = cb"
-
-stopTappable :: forall a. IsObject3D a => a -> Effect Unit
-stopTappable = fpi ["obj", ""] "obj.tapped = undefined"
-
-isTappable :: forall a. IsObject3D a => a -> Boolean
-isTappable = ffi ["obj"] "obj.tapped !== undefined"
-
-sendTapEvent :: forall a. IsObject3D a => a -> SceneTapEvent -> Effect Unit
-sendTapEvent = fpi ["obj", "evt", ""] "obj.tapped(evt)()"
-
+foreign import makeTappable :: forall a. IsObject3D a => a -> (SceneTapEvent -> Effect Unit) -> Effect Unit
+foreign import stopTappable :: forall a. IsObject3D a => a -> Effect Unit
+foreign import isTappable :: forall a. IsObject3D a => a -> Boolean
+foreign import sendTapEvent :: forall a. IsObject3D a => a -> SceneTapEvent -> Effect Unit
 
 -- | Convert an Object3D to be MouseMovable by attaching a callback
 -- function for mouseMove events.
-makeMouseMove :: forall a. IsObject3D a => a -> (SceneMouseMoveEvent -> Effect Unit) -> Effect Unit
-makeMouseMove = fpi ["obj", "cb", ""] "obj.mouseMove = cb"
-
-stopMouseMove :: forall a. IsObject3D a => a -> Effect Unit
-stopMouseMove = fpi ["obj", ""] "obj.mouseMove = undefined"
-
-isMouseMove :: forall a. IsObject3D a => a -> Boolean
-isMouseMove = ffi ["obj"] "obj.mouseMove !== undefined"
-
-sendMouseMoveEvent :: forall a. IsObject3D a => a -> SceneMouseMoveEvent -> Effect Unit
-sendMouseMoveEvent = fpi ["obj", "evt", ""] "obj.mouseMove(evt)()"
+foreign import makeMouseMove :: forall a. IsObject3D a => a -> (SceneMouseMoveEvent -> Effect Unit) -> Effect Unit
+foreign import stopMouseMove :: forall a. IsObject3D a => a -> Effect Unit
+foreign import isMouseMove :: forall a. IsObject3D a => a -> Boolean
+foreign import sendMouseMoveEvent :: forall a. IsObject3D a => a -> SceneMouseMoveEvent -> Effect Unit
 
 -- | Convert an Object3D to be Draggable by attaching a callback
 -- function for drag events.
-makeDraggable :: forall a. IsObject3D a => a -> (SceneDragEvent -> Effect Unit) -> Effect Unit
-makeDraggable = fpi ["obj", "cb", ""] "obj.dragged = cb"
-
-stopDraggable :: forall a. IsObject3D a => a -> Effect Unit
-stopDraggable = fpi ["obj", ""] "obj.dragged = undefined"
-
-isDraggable :: forall a. IsObject3D a => a -> Boolean
-isDraggable = ffi ["obj"] "obj.dragged !== undefined"
-
-sendDragEvent :: forall a. IsObject3D a => a -> SceneDragEvent -> Effect Unit
-sendDragEvent = fpi ["obj", "evt", ""] "obj.dragged(evt)()"
+foreign import makeDraggable :: forall a. IsObject3D a => a -> (SceneDragEvent -> Effect Unit) -> Effect Unit
+foreign import stopDraggable :: forall a. IsObject3D a => a -> Effect Unit
+foreign import isDraggable :: forall a. IsObject3D a => a -> Boolean
+foreign import sendDragEvent :: forall a. IsObject3D a => a -> SceneDragEvent -> Effect Unit
 
 -- | convert mouse/touch position to values between -1 and 1
 calcPosition :: forall t r. Newtype t { x :: Number, y :: Number | r} => Size -> t -> Vector2

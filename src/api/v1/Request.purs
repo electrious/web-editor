@@ -12,22 +12,14 @@ import Effect (Effect)
 import Model.MapPB (MapPB, toMapPB)
 import Model.Racking.RoofParameter (RoofParameter, RoofParameterPB)
 import Model.Roof.Panel (Panel, PanelPB)
-import Util (ffi, fpi)
 
 foreign import data RackRequestPB :: Type
 foreign import mkRackRequestPB :: Effect RackRequestPB
 
-getParams :: RackRequestPB -> MapPB String RoofParameterPB
-getParams = ffi ["r"] "r.getParams()"
-
-setParams :: MapPB String RoofParameterPB -> RackRequestPB -> Effect Unit
-setParams = fpi ["p", "r", ""] "r.setParams(p)"
-
-getPanels :: RackRequestPB -> Array PanelPB
-getPanels = ffi ["r"] "r.getPanelsList()"
-
-setPanels :: Array PanelPB -> RackRequestPB -> Effect Unit
-setPanels = fpi ["ps", "r", ""] "r.setPanelsList(ps)"
+foreign import getParams :: RackRequestPB -> MapPB String RoofParameterPB
+foreign import setParams :: MapPB String RoofParameterPB -> RackRequestPB -> Effect Unit
+foreign import getPanels :: RackRequestPB -> Array PanelPB
+foreign import setPanels :: Array PanelPB -> RackRequestPB -> Effect Unit
 
 newtype RackRequest = RackRequest {
     parameters :: Map String RoofParameter,

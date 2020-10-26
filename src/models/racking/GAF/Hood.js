@@ -7,3 +7,11 @@ exports.mkHoodPB = _ => {
 exports.hoodKindInvalid = Kind.KIND_INVALID
 exports.hoodKindTop = Kind.KIND_TOP
 exports.hoodKindBottom = Kind.KIND_BOTTOM
+
+exports.getKind = h => {
+    return h.getKind()
+}
+
+exports.setKind = k => h => _ => {
+    h.setHind(k)
+}

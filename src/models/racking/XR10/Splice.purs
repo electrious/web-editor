@@ -16,8 +16,6 @@ import Model.ArrayComponent (class ArrayComponent)
 import Model.Class (class HasPBUUID, class IsPBArrayComp, getArrayNumber, getUUID, getX, getY, getZ)
 import Model.RoofComponent (class RoofComponent)
 import Model.UUID (PBUUID)
-import Util (ffi, fpi)
-
 
 foreign import data SplicePB :: Type
 foreign import mkSplicePB :: Effect SplicePB
@@ -25,12 +23,8 @@ foreign import mkSplicePB :: Effect SplicePB
 instance hasPBUUIDSplicePB :: HasPBUUID SplicePB
 instance isPBArrayCompSplicePB :: IsPBArrayComp SplicePB
 
-getRails :: SplicePB -> Array PBUUID
-getRails = ffi ["r"] "r.getRailsList()"
-
-setRails :: Array PBUUID -> SplicePB -> Effect Unit
-setRails = fpi ["a", "r", ""] "r.setRailsList(a)"
-
+foreign import getRails :: SplicePB -> Array PBUUID
+foreign import setRails :: Array PBUUID -> SplicePB -> Effect Unit
 
 newtype Splice = Splice {
     id          :: UUID,

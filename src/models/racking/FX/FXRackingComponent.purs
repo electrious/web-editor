@@ -13,7 +13,6 @@ import Model.Racking.FX.EndCap (EndCap, EndCapPB)
 import Model.Racking.FX.Mount (Mount, MountPB)
 import Model.Racking.FX.Skirt (Skirt, SkirtPB)
 import Model.Racking.Flash (Flash)
-import Util (ffi, fpi)
 
 foreign import data RailFreeComponentPB :: Type
 foreign import mkRailFreeComponentPB :: Effect RailFreeComponentPB
@@ -21,35 +20,16 @@ foreign import mkRailFreeComponentPB :: Effect RailFreeComponentPB
 instance hasArrayNumberRailFreeComponentPB :: HasArrayNumber RailFreeComponentPB
 instance hasFlashesRailFreeComponentPB :: HasFlashes RailFreeComponentPB
 
-getMounts :: RailFreeComponentPB -> Array MountPB
-getMounts = ffi ["r"] "r.getMountsList()"
-
-setMounts :: Array MountPB -> RailFreeComponentPB -> Effect Unit
-setMounts = fpi ["ms", "r", ""] "r.setMountsList(ms)"
-
-getBridges :: RailFreeComponentPB -> Array BridgePB
-getBridges = ffi ["r"] "r.getBrigdesList()"
-
-setBridges :: Array BridgePB -> RailFreeComponentPB -> Effect Unit
-setBridges = fpi ["bs", "r", ""] "r.setBridgesList(bs)"
-
-getSkirts :: RailFreeComponentPB -> Array SkirtPB
-getSkirts = ffi ["r"] "r.getSkirtsList()"
-
-setSkirts :: Array SkirtPB -> RailFreeComponentPB -> Effect Unit
-setSkirts = fpi ["ss", "r", ""] "r.setSkirtsList(ss)"
-
-getLeftCaps :: RailFreeComponentPB -> Array EndCapPB
-getLeftCaps = ffi ["r"] "r.getLeftCapsList()"
-
-setLeftCaps :: Array EndCapPB -> RailFreeComponentPB -> Effect Unit
-setLeftCaps = fpi ["cs", "r", ""] "r.setLeftCapsList(cs)"
-
-getRightCaps :: RailFreeComponentPB -> Array EndCapPB
-getRightCaps = ffi ["r"] "r.getRightCapsList()"
-
-setRightCaps :: Array EndCapPB -> RailFreeComponentPB -> Effect Unit
-setRightCaps = fpi ["cs", "r", ""] "r.setRightCapsList(cs)"
+foreign import getMounts :: RailFreeComponentPB -> Array MountPB
+foreign import setMounts :: Array MountPB -> RailFreeComponentPB -> Effect Unit
+foreign import getBridges :: RailFreeComponentPB -> Array BridgePB
+foreign import setBridges :: Array BridgePB -> RailFreeComponentPB -> Effect Unit
+foreign import getSkirts :: RailFreeComponentPB -> Array SkirtPB
+foreign import setSkirts :: Array SkirtPB -> RailFreeComponentPB -> Effect Unit
+foreign import getLeftCaps :: RailFreeComponentPB -> Array EndCapPB
+foreign import setLeftCaps :: Array EndCapPB -> RailFreeComponentPB -> Effect Unit
+foreign import getRightCaps :: RailFreeComponentPB -> Array EndCapPB
+foreign import setRightCaps :: Array EndCapPB -> RailFreeComponentPB -> Effect Unit
 
 newtype FXRackingComponent = FXRackingComponent {
     arrayNumber  :: Int,

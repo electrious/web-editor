@@ -9,7 +9,6 @@ import Data.Lens ((^.), (.~))
 import Data.Newtype (class Newtype)
 import Editor.Common.Lenses (_dragType, _x, _y)
 import Math (sqrt)
-import Util (ffi)
 import Web.UIEvent.MouseEvent (MouseEvent)
 
 
@@ -38,11 +37,8 @@ mouseTap :: MouseEvent -> TapEvent
 mouseTap e = def # _x .~ offsetX e
                  # _y .~ offsetY e
 
-offsetX :: MouseEvent -> Number
-offsetX = ffi ["mouseEvt"] "mouseEvt.offsetX"
-
-offsetY :: MouseEvent -> Number
-offsetY = ffi ["mouseEvt"] "mouseEvt.offsetY"
+foreign import offsetX :: MouseEvent -> Number
+foreign import offsetY :: MouseEvent -> Number
 
 data DragType = DragStart
               | Drag
