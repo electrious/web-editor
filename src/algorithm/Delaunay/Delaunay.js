@@ -45,10 +45,10 @@ exports.triangulate = old => vertices => {
     var edges = []
     
     // vertices sorted by the x position
-    const vertSorted = vertices.sort((v1, v2) => { return v1.x - v2.x })
+    //const vertSorted = vertices.sort((v1, v2) => { return v1.x - v2.x })
     
     // Incrementally add each vertex to the mesh.
-    for (const v of vertSorted) {
+    for (const v of vertices) {
         edges = []
         
         // For each open triangle, check to see if the current point is
@@ -63,12 +63,12 @@ exports.triangulate = old => vertices => {
             // from the open list, add it to the closed list, and skip.
             const dx = v.x - circle.x
             const dy = v.y - circle.y
-
+/*
             if (dx > 0 && dx * dx > circle.rsqr) {
                 open.splice(j, 1)
                 completed.push(circle)
                 continue
-            }
+            }*/
             
             // If we're outside the circumcircle, skip this triangle.            
             if (dx * dx + dy * dy > circle.rsqr) {
