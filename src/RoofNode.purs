@@ -250,6 +250,10 @@ createHeatmapMesh roof roofNode mat m = do
     setVisible false mesh
     pure mesh
 
+canShowHeatmap :: EditorMode -> Boolean -> Boolean
+canShowHeatmap ArrayEditing s = s
+canShowHeatmap _ _            = false
+
 -- | Create RoofNode for a RoofPlate
 createRoofNode :: RoofNodeConfig -> ArrayBuilder RoofNode
 createRoofNode cfg = do
@@ -290,7 +294,9 @@ createRoofNode cfg = do
 
         -- add/remove mesh to the obj
         d1 <- subscribeDyn (withLast meshDyn) (renderMesh obj)
-        d2 <- subscribe (cfg ^. _heatmap) (flip setVisible hmMesh)
+
+        let canShowHeatmapDyn = canShowHeatmap <$> modeDyn <*> (step false $ cfg ^. _heatmap)
+        d2 <- subscribeDyn canShowHeatmapDyn (flip setVisible hmMesh)
 
         newRoof <- getNewRoof obj roof (editor ^. _roofVertices)
 
