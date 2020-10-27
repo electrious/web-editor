@@ -20,6 +20,7 @@ import Model.Racking.RackingType (RackingType)
 import Model.Roof.ArrayConfig (ArrayConfig, arrayConfigForRack)
 import Rendering.Renderable (RendererConfig(..), RenderingM, runRenderingM)
 import Rendering.TextureLoader (loadMaterialFromUrl)
+import Three.Core.Material (doubleSide, setSide)
 
 -- data used to provide env info for ArrayBuilder monad
 newtype ArrayBuilderEnv = ArrayBuilderEnv {
@@ -68,8 +69,13 @@ runArrayBuilder rtDyn (ArrayBuilder b) = do
                 editorMode  : modeDyn,
                 apiConfig   : apiCfg
              }
-        rCfg = RendererConfig {
-            heatmapMaterial      : loadMaterialFromUrl hmText,
+        hmMat = loadMaterialFromUrl hmText
+    
+    -- make heatmap material double side rendering
+    liftEffect $ setSide doubleSide hmMat
+
+    let rCfg = RendererConfig {
+            heatmapMaterial      : hmMat,
             rotateButtonMaterial : loadMaterialFromUrl btnText
         }
     liftEffect $ runRenderingM (runReaderT b env) rCfg

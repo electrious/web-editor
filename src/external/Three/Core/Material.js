@@ -1,4 +1,3 @@
-
 let three = require('three')
 
 exports.mkMeshBasicMaterial = c => _ => {
@@ -15,6 +14,14 @@ exports.setTransparent = _ => t => mat => _ => {
 
 exports.setOpacity = _ => o => mat => _ => {
     mat.opacity = o
+}
+
+exports.frontSide  = three.FrontSide
+exports.backSide   = three.BackSide
+exports.doubleSide = three.DoubleSide
+
+exports.setSide = _ => s => mat => _ => {
+    mat.side = s
 }
 
 exports.getMaterial = _ => mat => creator => {

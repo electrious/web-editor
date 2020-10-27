@@ -20,6 +20,13 @@ foreign import setTransparent :: forall mat. IsMaterial mat => Boolean -> mat ->
 
 foreign import setOpacity :: forall mat. IsMaterial mat => Number -> mat -> Effect Unit
 
+foreign import data Side :: Type
+foreign import frontSide :: Side
+foreign import backSide :: Side
+foreign import doubleSide :: Side
+
+foreign import setSide :: forall mat. IsMaterial mat => Side -> mat -> Effect Unit
+
 foreign import data MaterialCreator :: Type
 
 foreign import getMaterial :: forall mat. IsMaterial mat => String -> MaterialCreator -> mat
