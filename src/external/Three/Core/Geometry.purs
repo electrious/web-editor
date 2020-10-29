@@ -46,6 +46,11 @@ foreign import mkShapeGeometry :: Shape -> Effect ShapeGeometry
 
 instance isGeometryShapeGeometry :: IsGeometry ShapeGeometry
 
+foreign import data PlaneGeometry :: Type
+foreign import mkPlaneGeometry :: Number -> Number -> Int -> Int -> Effect PlaneGeometry
+
+instance isGeometryPlaneGeometry :: IsGeometry PlaneGeometry
+
 foreign import data BufferGeometry :: Type
 foreign import data BufferAttribute :: Type
 

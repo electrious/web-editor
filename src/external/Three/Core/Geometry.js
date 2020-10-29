@@ -60,6 +60,10 @@ exports.mkShapeGeometry = shp => _ => {
     return new three.ShapeGeometry(shp)
 }
 
+exports.mkPlaneGeometry = w => h => wSegs => hSegs => _ => {
+    return new three.PlaneGeometry(w, h, wSegs, hSegs)
+}
+
 exports.isBufferAttribute = attr => {
     return attr instanceof three.BufferAttribute
 }
