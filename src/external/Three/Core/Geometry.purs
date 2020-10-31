@@ -4,6 +4,7 @@ import Prelude
 
 import Effect (Effect)
 import Three.Core.Face3 (Face3)
+import Three.Math.Color (Color)
 import Three.Math.Vector (Vector2, Vector3)
 
 class IsGeometry geo
@@ -50,6 +51,11 @@ foreign import data PlaneGeometry :: Type
 foreign import mkPlaneGeometry :: Number -> Number -> Int -> Int -> Effect PlaneGeometry
 
 instance isGeometryPlaneGeometry :: IsGeometry PlaneGeometry
+
+foreign import data LineGeometry :: Type
+foreign import mkLineGeometry :: Effect LineGeometry
+foreign import setLinePositions :: Array Vector2 -> LineGeometry -> Effect Unit
+foreign import setLineColors :: Array Color -> LineGeometry -> Effect Unit
 
 foreign import data BufferGeometry :: Type
 foreign import data BufferAttribute :: Type

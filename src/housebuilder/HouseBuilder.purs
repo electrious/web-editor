@@ -20,10 +20,10 @@ import Three.Core.Material (mkMeshBasicMaterial, mkMeshBasicMaterialWithTexture)
 import Three.Core.Object3D (add, mkObject3D, setName)
 
 -- represent the state of the builder
-data BuilderMode = AddGutter
-                 | AddRidge
-                 | LiftRidge
-                 | LiftHouse
+data BuilderMode = AddGutter  -- Add gutter points and lines
+                 | AddRidge   -- Add ridge points and lines
+                 | LiftRidge  -- lift ridges to the right height
+                 | LiftHouse  -- lift house to the right height
 
 derive instance genericBuilderMode :: Generic BuilderMode _
 derive instance eqBuilderMode :: Eq BuilderMode
@@ -49,12 +49,12 @@ _image = _Newtype <<< prop (SProxy :: SProxy "image")
 -- HouseBuilder is the main Monad where house builder functionalities happen
 newtype HouseBuilder a = HouseBuilder (ReaderT HouseBuilderConfig Effect a)
 
-derive newtype instance functorHouseBuilder :: Functor HouseBuilder
-derive newtype instance applyHouseBuilder :: Apply HouseBuilder
+derive newtype instance functorHouseBuilder     :: Functor HouseBuilder
+derive newtype instance applyHouseBuilder       :: Apply HouseBuilder
 derive newtype instance applicativeHouseBuilder :: Applicative HouseBuilder
-derive newtype instance bindHouseBuilder :: Bind HouseBuilder
-derive newtype instance monadHouseBuilder :: Monad HouseBuilder
-derive newtype instance monadAskHouseBuilder :: MonadAsk HouseBuilderConfig HouseBuilder
+derive newtype instance bindHouseBuilder        :: Bind HouseBuilder
+derive newtype instance monadHouseBuilder       :: Monad HouseBuilder
+derive newtype instance monadAskHouseBuilder    :: MonadAsk HouseBuilderConfig HouseBuilder
 derive newtype instance monadReaderHouseBuilder :: MonadReader HouseBuilderConfig HouseBuilder
 derive newtype instance monadEFfectHouseBuilder :: MonadEffect HouseBuilder
 

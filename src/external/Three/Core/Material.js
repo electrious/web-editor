@@ -8,6 +8,10 @@ exports.mkMeshBasicMaterialWithTexture = t => _ => {
     return new three.MeshBasicMaterial({ map: t })
 }
 
+exports.mkLineBasicMaterial = c => w => _ => {
+    return new three.LineBasicMaterial({ color: c, linewidth: w })
+}
+
 exports.setTransparent = _ => t => mat => _ => {
     mat.transparent = t
 }

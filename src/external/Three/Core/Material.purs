@@ -7,9 +7,13 @@ import Three.Loader.TextureLoader (Texture)
   
 foreign import data Material :: Type
 foreign import data MeshBasicMaterial :: Type
+foreign import data LineBasicMaterial :: Type
 
 foreign import mkMeshBasicMaterial :: Int -> Effect MeshBasicMaterial
 foreign import mkMeshBasicMaterialWithTexture :: Texture -> Effect MeshBasicMaterial
+
+-- create LineBasicMaterial with color and line width
+foreign import mkLineBasicMaterial :: Int -> Number -> Effect LineBasicMaterial
 
 class IsMaterial a
 

@@ -1,4 +1,5 @@
 const three = require('three')
+const line = require('three/examples/jsm/lines/LineGeometry')
 
 exports.clone = _ => g => _ => {
     return g.clone()
@@ -62,6 +63,18 @@ exports.mkShapeGeometry = shp => _ => {
 
 exports.mkPlaneGeometry = w => h => wSegs => hSegs => _ => {
     return new three.PlaneGeometry(w, h, wSegs, hSegs)
+}
+
+exports.mkLineGeometry = _ => {
+    return new line.LineGeometry()
+}
+
+exports.setLinePositions = pos => line => _ => {
+    line.setPositions(pos)
+}
+
+exports.setLineColors = cls => line => _ => {
+    line.setColors(cls)
 }
 
 exports.isBufferAttribute = attr => {
