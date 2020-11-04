@@ -20,7 +20,8 @@ import FRP.Dynamic (Dynamic, step)
 import FRP.Event (Event, makeEvent, subscribe)
 import Model.Hardware.PanelTextureInfo (PanelTextureInfo)
 import Model.Hardware.PanelType (PanelType(..))
-import Model.Roof.Panel (Alignment, Orientation)
+import Model.Roof.Panel (Alignment, Orientation, Panel)
+import Model.Roof.RoofPlate (RoofPlate)
 
 newtype ArrayEditParam = ArrayEditParam {
     alignment   :: Event Alignment,
@@ -45,6 +46,8 @@ _heatmap = _Newtype <<< prop (SProxy :: SProxy "heatmap")
 newtype HouseConfig = HouseConfig {
     leadId          :: Int,
     houseId         :: Int,
+    roofplates      :: Array RoofPlate,
+    panels          :: Array Panel,
     dataServer      :: String,
     modeDyn         :: Dynamic EditorMode,
     textureInfo     :: PanelTextureInfo,
@@ -62,6 +65,8 @@ instance defaultHouseConfig :: Default HouseConfig where
     def = HouseConfig {
         leadId          : 0,
         houseId         : 0,
+        roofplates      : [],
+        panels          : [],
         dataServer      : "",
         modeDyn         : step Showing empty,
         textureInfo     : def,
@@ -73,6 +78,9 @@ instance defaultHouseConfig :: Default HouseConfig where
 
         arrayEditParam  : def
     }
+
+_roofplates :: forall t a r. Newtype t { roofplates :: a | r } => Lens' t a
+_roofplates = _Newtype <<< prop (SProxy :: SProxy "roofplates")
 
 _dataServer :: Lens' HouseConfig String
 _dataServer = _Newtype <<< prop (SProxy :: SProxy "dataServer")

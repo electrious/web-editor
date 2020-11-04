@@ -15,11 +15,11 @@ import Data.Map as Map
 import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Editor.Common.Lenses (_alignment, _houseId, _leadId, _orientation, _roofRackings, _wrapper)
+import Editor.Common.Lenses (_alignment, _houseId, _leadId, _orientation, _panels, _roofRackings, _wrapper)
 import Editor.Disposable (dispose)
 import Editor.Editor (Editor, _canvas, addDisposable)
 import Editor.House (loadHouseModel)
-import Editor.HouseEditor (ArrayEditParam, HouseConfig, HouseEditor, _arrayEditParam, _dataServer, _screenshotDelay, performEditorEvent, runAPIInEditor, runHouseEditor)
+import Editor.HouseEditor (ArrayEditParam, HouseConfig, HouseEditor, _arrayEditParam, _dataServer, _roofplates, _screenshotDelay, performEditorEvent, runAPIInEditor, runHouseEditor)
 import Editor.PanelLayer (_serverUpdated)
 import Editor.RoofManager (_editedRoofs, createRoofManager)
 import Effect (Effect)
@@ -63,10 +63,17 @@ loadHouse editor param = do
     { event: loadedEvt, push: loadedFunc } <- liftEffect create
     
     -- load house model, roofs, panels and racking data
-    let houseId = cfg ^. _houseId
+    let houseId   = cfg ^. _houseId
+        defRoofs  = cfg ^. _roofplates
+        defPanels = cfg ^. _panels
+
     hmEvt     <- liftEffect $ loadHouseModel (cfg ^. _dataServer) (cfg ^. _leadId)
-    roofsEvt  <- runAPIInEditor $ loadRoofplates houseId
-    panelsEvt <- runAPIInEditor $ loadPanels houseId
+    roofsEvt  <- if defRoofs == []
+                 then runAPIInEditor $ loadRoofplates houseId
+                 else pure $ pure defRoofs
+    panelsEvt <- if defPanels == []
+                 then runAPIInEditor $ loadPanels houseId
+                 else pure $ pure defPanels
     racksEvt  <- runAPIInEditor $ loadRacking houseId
 
     -- extract the roof racking map data
