@@ -39,3 +39,6 @@ _point1 = _Newtype <<< prop (SProxy :: SProxy "point1")
 
 _point2 :: forall t a r. Newtype t { point2 :: a | r } => Lens' t a
 _point2 = _Newtype <<< prop (SProxy :: SProxy "point2")
+
+mkRidge :: RidgeType -> HousePoint -> HousePoint -> Ridge
+mkRidge t p1 p2 = Ridge { ridgeType : t, point1 : p1, point2 : p2 }

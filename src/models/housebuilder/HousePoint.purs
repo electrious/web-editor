@@ -13,3 +13,9 @@ derive instance genericHousePoint :: Generic HousePoint _
 derive instance eqHousePoint :: Eq HousePoint
 instance showHousePoint :: Show HousePoint where
     show = genericShow
+
+gutterPoint :: Vector3 -> HousePoint
+gutterPoint = GutterPoint
+
+ridgePoint :: Vector3 -> HousePoint
+ridgePoint = RidgePoint
