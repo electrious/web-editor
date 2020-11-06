@@ -9,7 +9,7 @@ import Data.Lens (Lens', view, (^.), (%~), (.~))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (List, (:))
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Editor.Common.Lenses (_object, _position)
@@ -116,10 +116,14 @@ mkGutter p1 p2 = mkRidge Gutter hp1 hp2
 predictPoint :: GEState -> Vector3 -> GEState
 predictPoint st p = case st ^. _lastLockedPoint of
     Nothing -> st # _predictedPoint .~ Just (mkGutterPoint GPPredicted p)
-    Just lp -> predictWithLocked st lp p
+    Just lp -> predictFrom st lp p
 
-predictWithLocked :: GEState -> GutterPoint -> Vector3 -> GEState
-predictWithLocked st lp p = st
+-- predict the next point based on the mouse position, find the best gutter
+-- line from the last checked point.
+predictFrom :: GEState -> GutterPoint -> Vector3 -> GEState
+predictFrom st lp p = let np = fromMaybe p $ alignPredGtter (st ^. _lockedGutters) (lp ^. _position) p
+                          
+    
 
 -- materials used in gutter editor
 loadMat :: Int -> MeshBasicMaterial
