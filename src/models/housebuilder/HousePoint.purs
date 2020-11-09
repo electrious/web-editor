@@ -19,3 +19,7 @@ gutterPoint = GutterPoint
 
 ridgePoint :: Vector3 -> HousePoint
 ridgePoint = RidgePoint
+
+pointPos :: HousePoint -> Vector3
+pointPos (GutterPoint p) = p
+pointPos (RidgePoint p) = p

@@ -122,12 +122,15 @@ predictPoint st p = case st ^. _lastLockedPoint of
 -- line from the last checked point.
 predictFrom :: GEState -> GutterPoint -> Vector3 -> GEState
 predictFrom st lp p = let np = fromMaybe p $ alignPredGtter (st ^. _lockedGutters) (lp ^. _position) p
-                          
-    
+                      in st
+
+alignPredGtter :: List Ridge -> Vector3 -> Vector3 -> Maybe Vector3
+alignPredGtter gutters lp p = let lines = ridgeLine <$> gutters
+                                                                
 
 -- materials used in gutter editor
 loadMat :: Int -> MeshBasicMaterial
-loadMat = memoize (\clr -> unsafePerformEffect $ mkMeshBasicMaterial clr)
+loadMat = memoize (unsafePerformEffect <<< mkMeshdBasicMaterial)
 
 greenMat :: MeshBasicMaterial
 greenMat = loadMat 0x00ff00

@@ -4,12 +4,13 @@ import Prelude
 
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Lens (Lens')
+import Data.Lens (Lens', (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Model.HouseEditor.HousePoint (HousePoint)
+import Math.Line (Line, mkLine)
+import Model.HouseEditor.HousePoint (HousePoint, pointPos)
 
 data RidgeType = TopRidge   -- Ridge connects two RidgePoints
                | SideRidge  -- Ridge connects a RidgePoint and a GutterPoint
@@ -42,3 +43,8 @@ _point2 = _Newtype <<< prop (SProxy :: SProxy "point2")
 
 mkRidge :: RidgeType -> HousePoint -> HousePoint -> Ridge
 mkRidge t p1 p2 = Ridge { ridgeType : t, point1 : p1, point2 : p2 }
+
+ridgeLine :: Ridge -> Line
+ridgeLine r = mkLine v1 v2
+    where v1 = pointPos $ r ^. _point1
+          v2 = pointPos $ r ^. _point2
