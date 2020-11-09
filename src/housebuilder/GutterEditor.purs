@@ -8,13 +8,14 @@ import Data.Generic.Rep.Show (genericShow)
 import Data.Lens (Lens', view, (^.), (%~), (.~))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.List (List, (:))
+import Data.List (List, foldl, (:))
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Editor.Common.Lenses (_object, _position)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Event (Event)
+import Math.Line (mkLine)
 import Model.HouseBuilder.Ridge (Ridge, RidgeType(..), mkRidge)
 import Model.HouseEditor.HousePoint (gutterPoint)
 import Three.Core.Geometry (CircleGeometry, mkCircleGeometry)
@@ -125,8 +126,11 @@ predictFrom st lp p = let np = fromMaybe p $ alignPredGtter (st ^. _lockedGutter
                       in st
 
 alignPredGtter :: List Ridge -> Vector3 -> Vector3 -> Maybe Vector3
-alignPredGtter gutters lp p = let lines = ridgeLine <$> gutters
-                                                                
+alignPredGtter gutters lp p =
+    let lines = ridgeLine <$> gutters
+        tl = mkLine lp p  -- target line
+        cl = foldl f tl lines
+
 
 -- materials used in gutter editor
 loadMat :: Int -> MeshBasicMaterial
