@@ -56,6 +56,7 @@ foreign import dist           :: forall a. Vector a => a -> a      -> Number
 foreign import clone          :: forall a. Vector a => a -> a
 foreign import cross          :: forall a. Vector a => a -> a      -> a
 foreign import add            :: forall a. Vector a => a -> a      -> a
+
 foreign import addScaled      :: forall a. Vector a => a -> a      -> Number -> a
 foreign import sub            :: forall a. Vector a => a -> a      -> a
 foreign import multiplyScalar :: forall a. Vector a => a -> Number -> a

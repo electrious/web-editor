@@ -2,21 +2,23 @@ module HouseBuilder.GutterEditor where
 
 import Prelude
 
+import Data.Filterable (filter)
 import Data.Function.Memoize (memoize)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Lens (Lens', view, (^.), (%~), (.~))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.List (List, foldl, (:))
+import Data.List (List, (:))
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Editor.Common.Lenses (_object, _position)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Event (Event)
-import Math.Line (mkLine)
-import Model.HouseBuilder.Ridge (Ridge, RidgeType(..), mkRidge)
+import Math.Angle (degree)
+import Math.Line (linesAngle, mkLine, mostParaLine, projPointWithLine)
+import Model.HouseBuilder.Ridge (Ridge, RidgeType(..), mkRidge, ridgeLine)
 import Model.HouseEditor.HousePoint (gutterPoint)
 import Three.Core.Geometry (CircleGeometry, mkCircleGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial)
@@ -122,19 +124,22 @@ predictPoint st p = case st ^. _lastLockedPoint of
 -- predict the next point based on the mouse position, find the best gutter
 -- line from the last checked point.
 predictFrom :: GEState -> GutterPoint -> Vector3 -> GEState
-predictFrom st lp p = let np = fromMaybe p $ alignPredGtter (st ^. _lockedGutters) (lp ^. _position) p
+predictFrom st lp p = let np = fromMaybe p $ alignPredGutter (st ^. _lockedGutters) (lp ^. _position) p
                       in st
 
-alignPredGtter :: List Ridge -> Vector3 -> Vector3 -> Maybe Vector3
-alignPredGtter gutters lp p =
-    let lines = ridgeLine <$> gutters
-        tl = mkLine lp p  -- target line
-        cl = foldl f tl lines
 
+-- align the predicted gutter with existing gutters as much as possible
+alignPredGutter :: List Ridge -> Vector3 -> Vector3 -> Maybe Vector3
+alignPredGutter gutters lp p =
+    let lines = ridgeLine <$> gutters
+        tl    = mkLine lp p  -- target line
+        -- find the line with smallest angle between it and the target line
+        f l   = linesAngle l tl < degree 5.0
+    in map (projPointWithLine lp p) $ filter f $ mostParaLine tl lines
 
 -- materials used in gutter editor
 loadMat :: Int -> MeshBasicMaterial
-loadMat = memoize (unsafePerformEffect <<< mkMeshdBasicMaterial)
+loadMat = memoize (unsafePerformEffect <<< mkMeshBasicMaterial)
 
 greenMat :: MeshBasicMaterial
 greenMat = loadMat 0x00ff00
