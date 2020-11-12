@@ -125,7 +125,9 @@ predictPoint st p = case st ^. _lastLockedPoint of
 -- line from the last checked point.
 predictFrom :: GEState -> GutterPoint -> Vector3 -> GEState
 predictFrom st lp p = let np = fromMaybe p $ alignPredGutter (st ^. _lockedGutters) (lp ^. _position) p
-                      in st
+                          gtPt = mkGutterPoint GPPredicted np
+                      in st # _predictedPoint  .~ Just gtPt
+                            # _predictedGutter .~ Just (mkGutter lp gtPt)
 
 
 -- align the predicted gutter with existing gutters as much as possible
