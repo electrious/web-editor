@@ -54,7 +54,7 @@ instance isGeometryPlaneGeometry :: IsGeometry PlaneGeometry
 
 foreign import data LineGeometry :: Type
 foreign import mkLineGeometry :: Effect LineGeometry
-foreign import setLinePositions :: Array Vector2 -> LineGeometry -> Effect Unit
+foreign import setLinePositions :: Array Vector3 -> LineGeometry -> Effect Unit
 foreign import setLineColors :: Array Color -> LineGeometry -> Effect Unit
 
 foreign import data BufferGeometry :: Type

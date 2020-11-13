@@ -1,6 +1,6 @@
 module HouseBuilder.GutterEditor where
 
-import Prelude
+import Prelude hiding (degree)
 
 import Data.Filterable (filter)
 import Data.Function.Memoize (memoize)
@@ -14,15 +14,18 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Editor.Common.Lenses (_object, _position)
+import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Event (Event)
+import HouseBuilder.Rendering.Materials (blueMat, greenMat)
 import Math.Angle (degree)
 import Math.Line (linesAngle, mkLine, mostParaLine, projPointWithLine)
 import Model.HouseBuilder.Ridge (Ridge, RidgeType(..), mkRidge, ridgeLine)
 import Model.HouseEditor.HousePoint (gutterPoint)
+import Rendering.Renderable (class Renderable)
 import Three.Core.Geometry (CircleGeometry, mkCircleGeometry)
-import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial)
-import Three.Core.Object3D (class IsObject3D, Object3D)
+import Three.Core.Mesh (Mesh, mkMesh)
+import Three.Core.Object3D (class IsObject3D, Object3D, setName, setPosition)
 import Three.Math.Vector (Vector3)
 
 newtype GutterEditor = GutterEditor {
@@ -61,6 +64,19 @@ _pointType = _Newtype <<< prop (SProxy :: SProxy "pointType")
 
 mkGutterPoint :: GutterPointType -> Vector3 -> GutterPoint
 mkGutterPoint t p = GutterPoint { pointType : t, position : p }
+
+-- make GutterPoint instance of Renderable
+instance renderableGutterPoint :: Renderable GutterPoint Mesh where
+    render gp = liftEffect do
+        let geo = getMarkerGeo unit
+            m = if gp ^. _pointType == GPPredicted
+                then greenMat
+                else blueMat
+        mesh <- mkMesh geo m
+        setName "gutter-point" mesh
+        setPosition (gp ^. _position) mesh
+        
+        pure mesh
 
 -- GutterEditor State
 newtype GEState = GEState {
@@ -139,15 +155,6 @@ alignPredGutter gutters lp p =
         f l   = linesAngle l tl < degree 5.0
     in map (projPointWithLine lp p) $ filter f $ mostParaLine tl lines
 
--- materials used in gutter editor
-loadMat :: Int -> MeshBasicMaterial
-loadMat = memoize (unsafePerformEffect <<< mkMeshBasicMaterial)
-
-greenMat :: MeshBasicMaterial
-greenMat = loadMat 0x00ff00
-
-blueMat :: MeshBasicMaterial
-blueMat = loadMat 0x0000ff
 
 getMarkerGeo :: Unit -> CircleGeometry
 getMarkerGeo = memoize (\_ -> unsafePerformEffect $ mkCircleGeometry 0.6 32)

@@ -22,7 +22,7 @@ foreign import setMaterial :: forall mat. IsMaterial mat => mat -> Mesh -> Effec
 
 
 foreign import data Line2 :: Type
-foreign import mkLine2 :: LineGeometry -> LineBasicMaterial -> Line2
+foreign import mkLine2 :: LineGeometry -> LineBasicMaterial -> Effect Line2
 foreign import computeLineDistances :: Line2 -> Effect Unit
 instance isObject3DLine2 :: IsObject3D Line2 where
     toObject3D = unsafeCoerce
