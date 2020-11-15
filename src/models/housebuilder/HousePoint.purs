@@ -4,6 +4,12 @@ import Prelude
 
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
+import Data.Lens (Lens', (^.))
+import Data.Lens.Iso.Newtype (_Newtype)
+import Data.Lens.Record (prop)
+import Data.Newtype (class Newtype)
+import Data.Symbol (SProxy(..))
+import Editor.Common.Lenses (_position)
 import Three.Math.Vector (Vector3)
 
 data GutterPointType = GPPredicted  -- a predicted point that might be used for next gutter point
@@ -16,25 +22,34 @@ instance showGutterPointType :: Show GutterPointType where
     show = genericShow
 
 
-data HousePoint = GutterPoint GutterPointType Vector3
-                | RidgePoint Vector3
+newtype GutterPoint = GutterPoint {
+    pointType :: GutterPointType,
+    position  :: Vector3
+    }
+derive instance newtypeGutterPoint :: Newtype GutterPoint _
+derive instance eqGutterPoint :: Eq GutterPoint
 
-derive instance genericHousePoint :: Generic HousePoint _
+_pointType :: forall t a r. Newtype t { pointType :: a | r } => Lens' t a
+_pointType = _Newtype <<< prop (SProxy :: SProxy "pointType")
+
+gutterPoint :: GutterPointType -> Vector3 -> GutterPoint
+gutterPoint t p = GutterPoint { pointType : t, position : p }
+
+
+newtype RidgePoint = RidgePoint {
+    position :: Vector3
+    }
+derive instance newtypeRidgePoint :: Newtype RidgePoint _
+derive instance eqwRidgePoint :: Eq RidgePoint
+
+ridgePoint :: Vector3 -> RidgePoint
+ridgePoint p = RidgePoint { position : p }
+
+data HousePoint = HousePointGutter GutterPoint
+                | HousePointRidge RidgePoint
+
 derive instance eqHousePoint :: Eq HousePoint
-instance showHousePoint :: Show HousePoint where
-    show = genericShow
-
-gutterPoint :: GutterPointType -> Vector3 -> HousePoint
-gutterPoint t p = GutterPoint t p
-
-ridgePoint :: Vector3 -> HousePoint
-ridgePoint = RidgePoint
 
 pointPos :: HousePoint -> Vector3
-pointPos (GutterPoint _ p) = p
-pointPos (RidgePoint p) = p
-
-setGutterType :: GutterPointType -> HousePoint -> HousePoint
-setGutterType t (GutterPoint _ p) = GutterPoint t p
-setGutterType _ p@(RidgePoint _)  = p
-
+pointPos (HousePointGutter p) = p ^. _position
+pointPos (HousePointRidge p)  = p ^. _position

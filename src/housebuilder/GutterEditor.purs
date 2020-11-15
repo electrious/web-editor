@@ -11,13 +11,13 @@ import Data.List (List, (:))
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Editor.Common.Lenses (_object)
+import Editor.Common.Lenses (_object, _position)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Event (Event)
 import Math.Angle (degree)
 import Math.Line (linesAngle, mkLine, mostParaLine, projPointWithLine)
 import Model.HouseBuilder.Ridge (Ridge, RidgeType(..), mkRidge, ridgeLine)
-import Model.HouseEditor.HousePoint (GutterPointType(..), HousePoint, gutterPoint, pointPos, setGutterType)
+import Model.HouseEditor.HousePoint (GutterPoint, GutterPointType(..), HousePoint(..), _pointType, gutterPoint)
 import Three.Core.Geometry (CircleGeometry, mkCircleGeometry)
 import Three.Core.Object3D (class IsObject3D, Object3D)
 import Three.Math.Vector (Vector3)
@@ -37,10 +37,10 @@ _gutters = _Newtype <<< prop (SProxy :: SProxy "gutters")
 
 -- GutterEditor State
 newtype GEState = GEState {
-    lockedPoints    :: List HousePoint,
+    lockedPoints    :: List GutterPoint,
     lockedGutters   :: List Ridge,
-    lastLockedPoint :: Maybe HousePoint,
-    predictedPoint  :: Maybe HousePoint,
+    lastLockedPoint :: Maybe GutterPoint,
+    predictedPoint  :: Maybe GutterPoint,
     predictedGutter :: Maybe Ridge
 }
 
@@ -62,7 +62,7 @@ _predictedGutter :: forall t a r. Newtype t { predictedGutter :: a | r } => Lens
 _predictedGutter = _Newtype <<< prop (SProxy :: SProxy "predictedGutter")
 
 -- gutter editor operations
-data GEOperation = GEOLockPoint          -- convert predicted point to locked point
+data GEOperation = GEOLockPoint             -- convert predicted point to locked point
                  | GEOPredictPoint Vector3  -- predict the next point to use based on current mouse position
 
 -- update editor state with operations
@@ -74,7 +74,7 @@ applyOp st (GEOPredictPoint p) = predictPoint st p
 lockNewPoint :: GEState -> GEState
 lockNewPoint st = case st ^. _predictedPoint of
     Nothing -> st
-    Just pp -> let np = setGutterType GPLocked pp
+    Just pp -> let np = pp # _pointType .~ GPLocked
                    f Nothing  l = l
                    f (Just v) l = v : l
                in st # _lastLockedPoint .~ Just np
@@ -83,10 +83,10 @@ lockNewPoint st = case st ^. _predictedPoint of
                      # _predictedPoint  .~ Nothing
                      # _predictedGutter .~ Nothing
 
-mkGutter :: HousePoint -> HousePoint -> Ridge
-mkGutter p1 p2 = mkRidge Gutter hp1 hp2
-    where hp1 = gutterPoint GPPredicted $ pointPos p1
-          hp2 = gutterPoint GPPredicted $ pointPos p2
+mkGutter :: GutterPoint -> GutterPoint -> Ridge
+mkGutter p1 p2 = mkRidge Gutter (HousePointGutter hp1) (HousePointGutter hp2)
+    where hp1 = gutterPoint GPPredicted $ p1 ^. _position
+          hp2 = gutterPoint GPPredicted $ p2 ^. _position
 
 -- predict the next gutter point to use based on the current mouse position
 predictPoint :: GEState -> Vector3 -> GEState
@@ -96,8 +96,8 @@ predictPoint st p = case st ^. _lastLockedPoint of
 
 -- predict the next point based on the mouse position, find the best gutter
 -- line from the last checked point.
-predictFrom :: GEState -> HousePoint -> Vector3 -> GEState
-predictFrom st lp p = let np = fromMaybe p $ alignPredGutter (st ^. _lockedGutters) (pointPos lp) p
+predictFrom :: GEState -> GutterPoint -> Vector3 -> GEState
+predictFrom st lp p = let np = fromMaybe p $ alignPredGutter (st ^. _lockedGutters) (lp ^. _position) p
                           gtPt = gutterPoint GPPredicted np
                       in st # _predictedPoint  .~ Just gtPt
                             # _predictedGutter .~ Just (mkGutter lp gtPt)
