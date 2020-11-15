@@ -4,8 +4,6 @@ import Prelude hiding (degree)
 
 import Data.Filterable (filter)
 import Data.Function.Memoize (memoize)
-import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Show (genericShow)
 import Data.Lens (Lens', view, (^.), (%~), (.~))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
@@ -13,19 +11,15 @@ import Data.List (List, (:))
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Editor.Common.Lenses (_object, _position)
-import Effect.Class (liftEffect)
+import Editor.Common.Lenses (_object)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Event (Event)
-import HouseBuilder.Rendering.Materials (blueMat, greenMat)
 import Math.Angle (degree)
 import Math.Line (linesAngle, mkLine, mostParaLine, projPointWithLine)
 import Model.HouseBuilder.Ridge (Ridge, RidgeType(..), mkRidge, ridgeLine)
-import Model.HouseEditor.HousePoint (gutterPoint)
-import Rendering.Renderable (class Renderable)
+import Model.HouseEditor.HousePoint (GutterPointType(..), HousePoint, gutterPoint, pointPos, setGutterType)
 import Three.Core.Geometry (CircleGeometry, mkCircleGeometry)
-import Three.Core.Mesh (Mesh, mkMesh)
-import Three.Core.Object3D (class IsObject3D, Object3D, setName, setPosition)
+import Three.Core.Object3D (class IsObject3D, Object3D)
 import Three.Math.Vector (Vector3)
 
 newtype GutterEditor = GutterEditor {
@@ -40,50 +34,13 @@ instance isObject3DGutterEditor :: IsObject3D GutterEditor where
 _gutters :: forall t a r. Newtype t { gutters :: a | r } => Lens' t a
 _gutters = _Newtype <<< prop (SProxy :: SProxy "gutters")
 
-data GutterPointType = GPPredicted  -- a predicted point that might be used for next gutter point
-                     | GPLocked     -- an already locked point
-                     | GPReused     -- a locked point that user might want to reuse
-
-derive instance genericGutterPointType :: Generic GutterPointType _
-derive instance eqGutterPointType :: Eq GutterPointType
-instance showGutterPointType :: Show GutterPointType where
-    show = genericShow
-
-newtype GutterPoint = GutterPoint {
-    pointType :: GutterPointType,
-    position  :: Vector3
-}
-
-derive instance newtypeGutterPoint :: Newtype GutterPoint _
-derive instance genericGutterPoint :: Generic GutterPoint _
-instance showGutterPoint :: Show GutterPoint where
-    show = genericShow
-
-_pointType :: forall t a r. Newtype t { pointType :: a | r } => Lens' t a
-_pointType = _Newtype <<< prop (SProxy :: SProxy "pointType")
-
-mkGutterPoint :: GutterPointType -> Vector3 -> GutterPoint
-mkGutterPoint t p = GutterPoint { pointType : t, position : p }
-
--- make GutterPoint instance of Renderable
-instance renderableGutterPoint :: Renderable GutterPoint Mesh where
-    render gp = liftEffect do
-        let geo = getMarkerGeo unit
-            m = if gp ^. _pointType == GPPredicted
-                then greenMat
-                else blueMat
-        mesh <- mkMesh geo m
-        setName "gutter-point" mesh
-        setPosition (gp ^. _position) mesh
-        
-        pure mesh
 
 -- GutterEditor State
 newtype GEState = GEState {
-    lockedPoints    :: List GutterPoint,
+    lockedPoints    :: List HousePoint,
     lockedGutters   :: List Ridge,
-    lastLockedPoint :: Maybe GutterPoint,
-    predictedPoint  :: Maybe GutterPoint,
+    lastLockedPoint :: Maybe HousePoint,
+    predictedPoint  :: Maybe HousePoint,
     predictedGutter :: Maybe Ridge
 }
 
@@ -117,7 +74,7 @@ applyOp st (GEOPredictPoint p) = predictPoint st p
 lockNewPoint :: GEState -> GEState
 lockNewPoint st = case st ^. _predictedPoint of
     Nothing -> st
-    Just pp -> let np = pp # _pointType .~ GPLocked
+    Just pp -> let np = setGutterType GPLocked pp
                    f Nothing  l = l
                    f (Just v) l = v : l
                in st # _lastLockedPoint .~ Just np
@@ -126,22 +83,22 @@ lockNewPoint st = case st ^. _predictedPoint of
                      # _predictedPoint  .~ Nothing
                      # _predictedGutter .~ Nothing
 
-mkGutter :: GutterPoint -> GutterPoint -> Ridge
+mkGutter :: HousePoint -> HousePoint -> Ridge
 mkGutter p1 p2 = mkRidge Gutter hp1 hp2
-    where hp1 = gutterPoint $ p1 ^. _position
-          hp2 = gutterPoint $ p2 ^. _position
+    where hp1 = gutterPoint GPPredicted $ pointPos p1
+          hp2 = gutterPoint GPPredicted $ pointPos p2
 
 -- predict the next gutter point to use based on the current mouse position
 predictPoint :: GEState -> Vector3 -> GEState
 predictPoint st p = case st ^. _lastLockedPoint of
-    Nothing -> st # _predictedPoint .~ Just (mkGutterPoint GPPredicted p)
+    Nothing -> st # _predictedPoint .~ Just (gutterPoint GPPredicted p)
     Just lp -> predictFrom st lp p
 
 -- predict the next point based on the mouse position, find the best gutter
 -- line from the last checked point.
-predictFrom :: GEState -> GutterPoint -> Vector3 -> GEState
-predictFrom st lp p = let np = fromMaybe p $ alignPredGutter (st ^. _lockedGutters) (lp ^. _position) p
-                          gtPt = mkGutterPoint GPPredicted np
+predictFrom :: GEState -> HousePoint -> Vector3 -> GEState
+predictFrom st lp p = let np = fromMaybe p $ alignPredGutter (st ^. _lockedGutters) (pointPos lp) p
+                          gtPt = gutterPoint GPPredicted np
                       in st # _predictedPoint  .~ Just gtPt
                             # _predictedGutter .~ Just (mkGutter lp gtPt)
 
@@ -158,4 +115,3 @@ alignPredGutter gutters lp p =
 
 getMarkerGeo :: Unit -> CircleGeometry
 getMarkerGeo = memoize (\_ -> unsafePerformEffect $ mkCircleGeometry 0.6 32)
-

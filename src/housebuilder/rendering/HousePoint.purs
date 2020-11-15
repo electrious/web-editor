@@ -15,7 +15,7 @@ import Three.Core.Object3D (setName, setPosition)
 newtype HousePointRenderable = HousePointRenderable HousePoint
 instance renderableHousePoint :: Renderable HousePointRenderable Mesh where
     render (HousePointRenderable hp) = liftEffect do
-        let getMat (GutterPoint _) = blueMat
+        let getMat (GutterPoint _ _) = blueMat
             getMat (RidgePoint _)  = greenMat
 
         mesh <- mkMesh (geoForPoint unit) (getMat hp)
