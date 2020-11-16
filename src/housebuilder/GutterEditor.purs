@@ -3,7 +3,6 @@ module HouseBuilder.GutterEditor where
 import Prelude hiding (degree)
 
 import Data.Filterable (filter)
-import Data.Function.Memoize (memoize)
 import Data.Lens (Lens', view, (^.), (%~), (.~))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
@@ -12,13 +11,11 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Editor.Common.Lenses (_object, _position)
-import Effect.Unsafe (unsafePerformEffect)
 import FRP.Event (Event)
 import Math.Angle (degree)
 import Math.Line (linesAngle, mkLine, mostParaLine, projPointWithLine)
 import Model.HouseBuilder.Ridge (Ridge, RidgeType(..), mkRidge, ridgeLine)
 import Model.HouseEditor.HousePoint (GutterPoint, GutterPointType(..), HousePoint(..), _pointType, gutterPoint)
-import Three.Core.Geometry (CircleGeometry, mkCircleGeometry)
 import Three.Core.Object3D (class IsObject3D, Object3D)
 import Three.Math.Vector (Vector3)
 
@@ -111,7 +108,3 @@ alignPredGutter gutters lp p =
         -- find the line with smallest angle between it and the target line
         f l   = linesAngle l tl < degree 5.0
     in map (projPointWithLine lp p) $ filter f $ mostParaLine tl lines
-
-
-getMarkerGeo :: Unit -> CircleGeometry
-getMarkerGeo = memoize (\_ -> unsafePerformEffect $ mkCircleGeometry 0.6 32)
