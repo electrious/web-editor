@@ -2,7 +2,7 @@ module Rendering.Renderable where
 
 import Prelude
 
-import Control.Monad.Reader (class MonadAsk, class MonadReader, ReaderT, runReaderT)
+import Control.Monad.Reader (class MonadAsk, class MonadReader, ReaderT, ask, runReaderT)
 import Data.Lens (Lens')
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
@@ -10,6 +10,8 @@ import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Effect (Effect)
 import Effect.Class (class MonadEffect)
+import FRP.Event (Event)
+import FRP.Event.Extra (performEvent)
 import Math.Angle (Angle)
 import Three.Core.Material (MeshBasicMaterial)
 import Three.Core.Object3D (class IsObject3D)
@@ -42,6 +44,11 @@ derive newtype instance monadReaderRenderingM :: MonadReader RendererConfig Rend
 runRenderingM :: forall a. RenderingM a -> RendererConfig -> Effect a
 runRenderingM (RenderingM r) = runReaderT r
 
+-- perform RenderingM actions in an Event
+performRenderingMEvt :: forall a. Event (RenderingM a) -> RenderingM (Event a)
+performRenderingMEvt e = do
+    cfg <- ask
+    pure $ performEvent $ (flip runRenderingM cfg) <$> e
 
 class IsObject3D b <= Renderable a b where
     render :: a -> RenderingM b

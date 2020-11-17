@@ -2,8 +2,6 @@ module Model.HouseEditor.HousePoint where
 
 import Prelude
 
-import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Show (genericShow)
 import Data.Lens (Lens', (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
@@ -16,11 +14,7 @@ data GutterPointType = GPPredicted  -- a predicted point that might be used for 
                      | GPLocked     -- an already locked point
                      | GPReused     -- a locked point that user might want to reuse
 
-derive instance genericGutterPointType :: Generic GutterPointType _
 derive instance eqGutterPointType :: Eq GutterPointType
-instance showGutterPointType :: Show GutterPointType where
-    show = genericShow
-
 
 newtype GutterPoint = GutterPoint {
     pointType :: GutterPointType,

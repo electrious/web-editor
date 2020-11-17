@@ -2,21 +2,25 @@ module HouseBuilder.GutterEditor where
 
 import Prelude hiding (degree)
 
+import Control.Plus (empty)
+import Data.Default (class Default, def)
 import Data.Filterable (filter)
 import Data.Lens (Lens', view, (^.), (%~), (.~))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.List (List, (:))
+import Data.List (List(..), (:))
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Editor.Common.Lenses (_object, _position)
-import FRP.Event (Event)
+import Effect.Class (liftEffect)
+import FRP.Event (Event, create, fold)
 import Math.Angle (degree)
 import Math.Line (linesAngle, mkLine, mostParaLine, projPointWithLine)
 import Model.HouseBuilder.Ridge (Ridge, RidgeType(..), mkRidge, ridgeLine)
 import Model.HouseEditor.HousePoint (GutterPoint, GutterPointType(..), HousePoint(..), _pointType, gutterPoint)
-import Three.Core.Object3D (class IsObject3D, Object3D)
+import Rendering.Renderable (RenderingM, performRenderingMEvt)
+import Three.Core.Object3D (class IsObject3D, Object3D, mkObject3D)
 import Three.Math.Vector (Vector3)
 
 newtype GutterEditor = GutterEditor {
@@ -42,6 +46,14 @@ newtype GEState = GEState {
 }
 
 derive instance newtypeGEState :: Newtype GEState _
+instance defaultGEState :: Default GEState where
+    def = GEState {
+        lockedPoints    : Nil,
+        lockedGutters   : Nil,
+        lastLockedPoint : Nothing,
+        predictedPoint  : Nothing,
+        predictedGutter : Nothing
+    }
 
 _lockedPoints :: forall t a r. Newtype t { lockedPoints :: a | r } => Lens' t a
 _lockedPoints = _Newtype <<< prop (SProxy :: SProxy "lockedPoints")
@@ -63,9 +75,9 @@ data GEOperation = GEOLockPoint             -- convert predicted point to locked
                  | GEOPredictPoint Vector3  -- predict the next point to use based on current mouse position
 
 -- update editor state with operations
-applyOp :: GEState -> GEOperation -> GEState
-applyOp st GEOLockPoint        = lockNewPoint st
-applyOp st (GEOPredictPoint p) = predictPoint st p
+applyOp :: GEOperation -> GEState -> GEState
+applyOp GEOLockPoint st        = lockNewPoint st
+applyOp (GEOPredictPoint p) st = predictPoint st p
 
 -- lock the predicted point if it exists.
 lockNewPoint :: GEState -> GEState
@@ -108,3 +120,23 @@ alignPredGutter gutters lp p =
         -- find the line with smallest angle between it and the target line
         f l   = linesAngle l tl < degree 5.0
     in map (projPointWithLine lp p) $ filter f $ mostParaLine tl lines
+
+
+-- render the current GutterEditor state
+renderGutters :: Object3D -> GEState -> RenderingM (Event Unit)
+renderGutters editor st = pure empty
+
+-- create the GutterEditor instance
+mkGutterEditor :: RenderingM GutterEditor
+mkGutterEditor = do
+    editor <- liftEffect mkObject3D
+
+    { event: opEvt, push: pushOpEvt } <- liftEffect create
+    let stEvt = fold applyOp opEvt def
+
+    resEvt <- performRenderingMEvt $ (renderGutters editor) <$> stEvt
+
+    pure $ GutterEditor {
+        object  : editor,
+        gutters : empty
+    }
