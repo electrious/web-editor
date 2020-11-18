@@ -1,4 +1,4 @@
-module Editor.RoofEditor where
+module Editor.PolygonEditor where
 
 import Prelude hiding (add)
 
@@ -17,7 +17,7 @@ import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (sequence, sequence_, sum, traverse, traverse_)
 import Data.Tuple (Tuple(..), fst, snd)
-import Editor.Common.Lenses (_disposable, _index, _mesh, _point, _position, _tapped)
+import Editor.Common.Lenses (_disposable, _index, _isDragging, _mesh, _point, _position, _tapped)
 import Editor.Disposable (class Disposable, dispose)
 import Editor.SceneEvent (SceneTapEvent)
 import Effect (Effect)
@@ -28,34 +28,32 @@ import FRP.Event.Extra (foldEffect, mergeArray, multicast, performEvent)
 import Three.Core.Geometry (CircleGeometry, Geometry, mkCircleGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial)
 import Three.Core.Object3D (class IsObject3D, add, remove, setName, setPosition, setVisible, toObject3D)
-import Three.Math.Vector (Vector2, Vector3, dist, mkVec2, mkVec3, vecX, vecY)
-import UI.DraggableObject (DraggableObject, _isDragging, createDraggableObject)
-import Unsafe.Coerce (unsafeCoerce)
+import Three.Math.Vector (Vector2, Vector3, dist, mkVec2, mkVec3, toVec2, vecX, vecY)
+import UI.DraggableObject (DraggableObject, createDraggableObject)
 
-toVec2 :: Vector3 -> Vector2
-toVec2 v = mkVec2 (vecX v) (vecY v)
+-----------------------------------------------------------
+-- Red markers for vertices
+type RedMarker = DraggableObject
+
+-- create a red marker 
+mkRedMarker :: Event Boolean -> Event (Maybe Int) -> Tuple Vector2 Int -> Effect RedMarker
+mkRedMarker polyActive actMarker (Tuple pos idx) = do
+    let f act Nothing       = act
+        f act (Just actIdx) = act && actIdx == idx
+
+        isActive = multicast $ lift2 f polyActive actMarker
+    
+    m <- createDraggableObject isActive idx pos (Nothing :: Maybe Geometry) Nothing
+    setName "red-marker" m
+    pure m
 
 
--- | create red markers for vertices
-mkRedMarkers :: Event Boolean
-             -> Event (Maybe Int)
-             -> Array Vector2
-             -> Effect (Array DraggableObject)
-mkRedMarkers roofActive activeMarker ps = traverse mkMarker psIdx
-    where psIdx = zip ps (range 0 (length ps - 1))
-          mkMarker (Tuple pos idx) = do
-              -- determine whether the current marker should be active or not
-              let f act Nothing = act
-                  f act (Just actIdx) = act && actIdx == idx
-              
-                  isActive = multicast $ lift2 f roofActive activeMarker
-              m <- createDraggableObject isActive idx pos (Nothing :: Maybe Geometry) Nothing
-              setName "red-marker" m
-              pure m
-
+-- create red markers for an array of vertices
+mkRedMarkers :: Event Boolean -> Event (Maybe Int) -> Array Vector2 -> Effect (Array RedMarker)
+mkRedMarkers polyActive actMarker ps = traverse (mkRedMarker polyActive actMarker) $ zip ps (range 0 (length ps - 1))
 
 -- | get red markers' active status event
-getRedMarkerActiveStatus :: Event (Array DraggableObject) -> Event (Maybe Int)
+getRedMarkerActiveStatus :: Event (Array RedMarker) -> Event (Maybe Int)
 getRedMarkerActiveStatus ms = statusForDragging <|> statusForNewMarker
     where g idx m = (\d -> if d then Just idx else Nothing) <$> m ^. _isDragging
           h objs = foldl (<|>) empty (mapWithIndex g objs)
@@ -64,25 +62,30 @@ getRedMarkerActiveStatus ms = statusForDragging <|> statusForNewMarker
           statusForNewMarker = const Nothing <$> ms
 
 -- | delete old marker objects and add new ones.
-attachObjs :: forall a. IsObject3D a => a -> Array DraggableObject -> Array DraggableObject -> Effect (Array DraggableObject)
+attachObjs :: forall a. IsObject3D a => a -> Array RedMarker -> Array RedMarker -> Effect (Array RedMarker)
 attachObjs parent newObjs objs = do
     traverse_ (\o -> remove o parent *> dispose o) objs
     traverse_ (flip add parent) newObjs
     pure newObjs
 
-roofDeleteMaterial :: MeshBasicMaterial
-roofDeleteMaterial = unsafeCoerce $ unsafePerformEffect (mkMeshBasicMaterial 0xffaa22)
 
-roofDeleteGeometry :: CircleGeometry
-roofDeleteGeometry = unsafeCoerce $ unsafePerformEffect (mkCircleGeometry 0.6 32)
+-----------------------------------------------------------
+-- Marker to delete the current polygon
+polyDelMat :: MeshBasicMaterial
+polyDelMat = unsafePerformEffect (mkMeshBasicMaterial 0xffaa22)
 
--- | create the roof delete marker button
-createRoofDeleteMarker :: Effect TappableMesh
-createRoofDeleteMarker = do
-    m <- mkTappableMesh roofDeleteGeometry roofDeleteMaterial
+polyDelGeo :: CircleGeometry
+polyDelGeo = unsafePerformEffect (mkCircleGeometry 0.6 32)
+
+-- | create the polygon delete marker button
+mkPolyDelMarker :: Effect TappableMesh
+mkPolyDelMarker = do
+    m <- mkTappableMesh polyDelGeo polyDelMat
     setName "delete-marker" m
     pure m
 
+
+-----------------------------------------------------------
 -- | internal object for green marker point data
 newtype GreenMarkerPoint = GreenMarkerPoint {
     position :: Vector2,
@@ -102,21 +105,17 @@ instance isObject3DGreenMarker :: IsObject3D GreenMarker where
 
 -- | create material and geometry for the green marker.
 greenMaterial :: MeshBasicMaterial
-greenMaterial = unsafeCoerce $ unsafePerformEffect (mkMeshBasicMaterial 0x22ff22)
+greenMaterial = unsafePerformEffect (mkMeshBasicMaterial 0x22ff22)
 
 greenGeometry :: CircleGeometry
-greenGeometry = unsafeCoerce $ unsafePerformEffect (mkCircleGeometry 0.3 32)
-
-mkGreenMarkerMesh :: Vector2 -> Effect TappableMesh
-mkGreenMarkerMesh p = do
-    m <- mkTappableMesh greenGeometry greenMaterial
-    setName "green-marker" m
-    setPosition (mkVec3 (vecX p) (vecY p) 0.01) m
-    pure m
+greenGeometry = unsafePerformEffect (mkCircleGeometry 0.3 32)
 
 mkGreenMarker :: GreenMarkerPoint -> Effect GreenMarker
 mkGreenMarker p = do
-    m <- mkGreenMarkerMesh $ p ^. _position
+    m <- mkTappableMesh greenGeometry greenMaterial
+    setName "green-marker" m
+    let pos = p ^. _position
+    setPosition (mkVec3 (vecX pos) (vecY pos) 0.01) m
     pure $ GreenMarker { mesh: m, point: p }
 
 -- | given a list of vertices position, calculate all middle points
@@ -177,7 +176,7 @@ mkGreenMarkers parent active vertices = keepLatest $ getTapForAll <$> markers
           getTapForAll ms = foldl (<|>) empty (getTap <$> ms)
 
 
--- | calculate the center based on roof vertices
+-- | calculate the center based on polygon vertices
 verticesCenter :: Array Vector2 -> Vector3
 verticesCenter [] = mkVec3 0.0 0.0 0.01
 verticesCenter vs = mkVec3 (tx / l) (ty / l) 0.01
@@ -186,21 +185,21 @@ verticesCenter vs = mkVec3 (tx / l) (ty / l) 0.01
           l = toNumber (length vs)
 
 
-newtype RoofEditor = RoofEditor {
-    roofVertices :: Event (Array Vector2),
-    deleteRoof   :: Event SceneTapEvent,
-    disposable   :: Effect Unit
+newtype PolyEditor = PolyEditor {
+    vertices   :: Event (Array Vector2),
+    delete     :: Event SceneTapEvent,
+    disposable :: Effect Unit
 }
 
-derive instance newtypeRoofEditor :: Newtype RoofEditor _
-instance disposableRoofEditor :: Disposable RoofEditor where
+derive instance newtypePolyEditor :: Newtype PolyEditor _
+instance disposablePolyEditor :: Disposable PolyEditor where
     dispose e = e ^. _disposable
 
-_roofVertices :: Lens' RoofEditor (Event (Array Vector2))
-_roofVertices = _Newtype <<< prop (SProxy :: SProxy "roofVertices")
+_vertices :: forall t a r. Newtype t { vertices :: a | r } => Lens' t a
+_vertices = _Newtype <<< prop (SProxy :: SProxy "vertices")
 
-_deleteRoof :: Lens' RoofEditor (Event SceneTapEvent)
-_deleteRoof = _Newtype <<< prop (SProxy :: SProxy "deleteRoof")
+_delete :: forall t a r. Newtype t { delete :: a | r } => Lens' t a
+_delete = _Newtype <<< prop (SProxy :: SProxy "delete")
 
 -- get new positions after dragging
 getPosition :: Array DraggableObject -> Event (Array Vector2)
@@ -215,13 +214,13 @@ getDelEvt os = foldl (<|>) empty (f <$> os)
 delMarker :: Int -> Array Vector2 -> Array Vector2
 delMarker idx ps = fromMaybe [] (deleteAt idx ps)
 
--- | create roof editor
-createRoofEditor :: forall a. IsObject3D a => a -> Dynamic Boolean -> Array Vector2 -> Effect RoofEditor
-createRoofEditor parent active ps = do
-    -- internal event for maintaining the roof active status
-    { event: roofActive, push: setRoofActive } <- create
-    -- pipe the 'active' param event into internal roofActive event
-    d1 <- subscribeDyn active setRoofActive
+-- | create polygon editor
+createPolyEditor :: forall a. IsObject3D a => a -> Dynamic Boolean -> Array Vector2 -> Effect PolyEditor
+createPolyEditor parent active ps = do
+    -- internal event for maintaining the polygon active status
+    { event: polyActive, push: setPolyActive } <- create
+    -- pipe the 'active' param event into internal polyActive event
+    d1 <- subscribeDyn active setPolyActive
 
     -- event for new list of vertices
     { event: vertices, push: updateVertList } <- create
@@ -229,7 +228,7 @@ createRoofEditor parent active ps = do
     { event: activeMarker, push: setActiveMarker } <- create
 
     -- create new markers and attach them to the parent object
-    let markerObjs = performEvent $ mkRedMarkers roofActive activeMarker <$> vertices
+    let markerObjs = performEvent $ mkRedMarkers polyActive activeMarker <$> vertices
         markers = multicast $ foldEffect (attachObjs parent) markerObjs []
 
         -- event for active red marker
@@ -242,7 +241,7 @@ createRoofEditor parent active ps = do
         -- merge new vertices after dragging and vertices after adding/deleting
         newVertices = multicast $ vertices <|> vertsAfterDrag
     
-        greenActive = multicast $ lift2 (\ra am -> ra && am == Nothing) roofActive activeMarker
+        greenActive = multicast $ lift2 (\ra am -> ra && am == Nothing) polyActive activeMarker
         -- create green markers for adding new vertices
         toAddEvt = mkGreenMarkers parent greenActive newVertices
         addVert p pns = insertAt (p ^. _index) (p ^. _position) pns
@@ -256,25 +255,25 @@ createRoofEditor parent active ps = do
     -- update the real vertex list after adding/deleting
     d3 <- subscribe (vertsAfterAdd <|> vertsAfterDel) \vs -> do
             updateVertList vs
-            setRoofActive true
+            setPolyActive true
     
-    -- create the roof delete button
-    roofDel <- createRoofDeleteMarker
-    add roofDel parent
+    -- create the polygon delete button
+    polyDel <- mkPolyDelMarker
+    add polyDel parent
 
-    -- update roof delete button position
-    d4 <- subscribe (verticesCenter <$> newVertices) (flip setPosition roofDel)
+    -- update polygon delete button position
+    d4 <- subscribe (verticesCenter <$> newVertices) (flip setPosition polyDel)
 
-    -- Show the roof delete button when roof's active
-    d5 <- subscribe roofActive (flip setVisible roofDel)
+    -- Show the polygon delete button when polygon's active
+    d5 <- subscribe polyActive (flip setVisible polyDel)
 
     -- set the default vertices
     updateVertList ps
-    -- disable roof by default
-    setRoofActive false
+    -- disable polygon by default
+    setPolyActive false
 
-    pure $ RoofEditor {
-        roofVertices : newVertices,
-        deleteRoof   : roofDel ^. _tapped,
-        disposable   : sequence_ [d1, d2, d3, d4, d5]
+    pure $ PolyEditor {
+        vertices   : newVertices,
+        delete     : polyDel ^. _tapped,
+        disposable : sequence_ [d1, d2, d3, d4, d5]
     }

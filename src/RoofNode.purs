@@ -25,14 +25,14 @@ import Editor.EditorMode (EditorMode(..))
 import Editor.HouseEditor (_heatmap)
 import Editor.PanelLayer (PanelLayer, PanelLayerConfig(..), _activeArray, _currentPanels, _inactiveRoofTapped, _initPanels, _mainOrientation, _roofActive, _serverUpdated, createPanelLayer)
 import Editor.PanelNode (PanelOpacity(..))
+import Editor.PolygonEditor (_delete, _vertices, createPolyEditor)
 import Editor.Rendering.PanelRendering (_opacity)
-import Editor.RoofEditor (_deleteRoof, _roofVertices, createRoofEditor)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import Effect.Timer (setTimeout)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, current, dynEvent, performDynamic, step, subscribeDyn, withLast)
-import FRP.Event (Event, create, keepLatest, subscribe)
+import FRP.Event (Event, create, keepLatest)
 import FRP.Event.Extra (multicast)
 import Math (pi)
 import Math.Angle (degreeVal, radianVal)
@@ -282,9 +282,9 @@ createRoofNode cfg = do
 
         -- create the vertex markers editor
         let canEdit = (&&) <$> isActive <*> canEditRoofDyn
-        editor <- createRoofEditor obj canEdit ps
+        editor <- createPolyEditor obj canEdit ps
 
-        let vertices = step ps (editor ^. _roofVertices)
+        let vertices = step ps (editor ^. _vertices)
             meshDyn = performDynamic (createRoofMesh <$> vertices <*> isActive <*> canEditRoofDyn)
             roofTapEvt = const unit <$> keepLatest (view _tapped <$> dynEvent meshDyn)
 
@@ -298,11 +298,11 @@ createRoofNode cfg = do
         let canShowHeatmapDyn = canShowHeatmap <$> modeDyn <*> (step false $ cfg ^. _heatmap)
         d2 <- subscribeDyn canShowHeatmapDyn (flip setVisible hmMesh)
 
-        newRoof <- getNewRoof obj roof (editor ^. _roofVertices)
+        newRoof <- getNewRoof obj roof (editor ^. _vertices)
 
         -- create a stream for delete event if the current roof is not simple polygon
         { event: delEvt, push: toDel } <- create
-        let delRoofEvt = delEvt <|> (const unit <$> editor ^. _deleteRoof)
+        let delRoofEvt = delEvt <|> (const unit <$> editor ^. _delete)
 
         when (not $ testSimplePolygon ps) (void $ setTimeout 1000 (toDel unit))
 

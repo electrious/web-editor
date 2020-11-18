@@ -17,11 +17,10 @@ import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple(..), snd)
 import Editor.Common.Lenses (_center, _normal)
-import Editor.RoofEditor (toVec2)
 import Math (abs, atan, sqrt)
 import Math.Angle (Angle, cos, degree, degreeVal, radian, sin)
 import Model.Roof.RoofPlate (Polygon, RoofPlate, _borderPoints, _coefs, _rotation, getRoofPolygon)
-import Three.Math.Vector (Vector3, cross, length, mkVec3, normal, vecX, vecY, vecZ, (<**>), (<+>), (<->), (<.>))
+import Three.Math.Vector (Vector3, cross, length, mkVec3, normal, toVec2, vecX, vecY, vecZ, (<**>), (<+>), (<->), (<.>))
 
 -- data type representing the right and top vectors for a roof plate
 newtype RoofPlateTransform = RoofPlateTransform {
