@@ -25,6 +25,7 @@ import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, subscribeDyn)
 import FRP.Event (Event, create, keepLatest, sampleOn, subscribe)
 import FRP.Event.Extra (foldEffect, mergeArray, multicast, performEvent)
+import Model.Hardware.PanelModel (_isActive)
 import Three.Core.Geometry (CircleGeometry, Geometry, mkCircleGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial)
 import Three.Core.Object3D (class IsObject3D, add, remove, setName, setPosition, setVisible, toObject3D)
@@ -32,29 +33,44 @@ import Three.Math.Vector (Vector2, Vector3, dist, mkVec2, mkVec3, toVec2, vecX, 
 import UI.DraggableObject (DraggableObject, createDraggableObject)
 
 -----------------------------------------------------------
--- Red markers for vertices
-type RedMarker = DraggableObject
+-- vertex marker
+newtype VertMarker = VertMarker {
+    position :: Vector2,
+    index    :: Int,
+    isActive :: Event Boolean
+}
 
--- create a red marker 
-mkRedMarker :: Event Boolean -> Event (Maybe Int) -> Tuple Vector2 Int -> Effect RedMarker
-mkRedMarker polyActive actMarker (Tuple pos idx) = do
-    let f act Nothing       = act
-        f act (Just actIdx) = act && actIdx == idx
+derive instance newtypeVertMarker :: Newtype VertMarker _
 
-        isActive = multicast $ lift2 f polyActive actMarker
-    
-    m <- createDraggableObject isActive idx pos (Nothing :: Maybe Geometry) Nothing
-    setName "red-marker" m
-    pure m
+renderVertMarker :: VertMarker -> Effect DraggableObject
+renderVertMarker m = do
+    mesh <- createDraggableObject (m ^. _isActive)
+                                    (m ^. _index)
+                                    (m ^. _position)
+                                    (Nothing :: Maybe Geometry)
+                                    Nothing
+    setName "vertex-marker" mesh
+    pure mesh
 
+-- create a vertex marker 
+mkVertMarker :: Event Boolean -> Event (Maybe Int) -> Tuple Vector2 Int -> VertMarker
+mkVertMarker polyActive actMarker (Tuple pos idx) = VertMarker {
+                                                        position : pos,
+                                                        index    : idx,
+                                                        isActive : isActive
+                                                    }
+    where f act Nothing       = act
+          f act (Just actIdx) = act && actIdx == idx
 
--- create red markers for an array of vertices
-mkRedMarkers :: Event Boolean -> Event (Maybe Int) -> Array Vector2 -> Effect (Array RedMarker)
-mkRedMarkers polyActive actMarker ps = traverse (mkRedMarker polyActive actMarker) $ zip ps (range 0 (length ps - 1))
+          isActive = multicast $ lift2 f polyActive actMarker
 
--- | get red markers' active status event
-getRedMarkerActiveStatus :: Event (Array RedMarker) -> Event (Maybe Int)
-getRedMarkerActiveStatus ms = statusForDragging <|> statusForNewMarker
+-- create vertex markers for an array of vertices
+mkVertMarkers :: Event Boolean -> Event (Maybe Int) -> Array Vector2 -> Array VertMarker
+mkVertMarkers polyActive actMarker ps = mkVertMarker polyActive actMarker <$> zip ps (range 0 (length ps - 1))
+
+-- | get vertex markers' active status event
+getVertMarkerActiveStatus :: Event (Array DraggableObject) -> Event (Maybe Int)
+getVertMarkerActiveStatus ms = statusForDragging <|> statusForNewMarker
     where g idx m = (\d -> if d then Just idx else Nothing) <$> m ^. _isDragging
           h objs = foldl (<|>) empty (mapWithIndex g objs)
 
@@ -62,12 +78,18 @@ getRedMarkerActiveStatus ms = statusForDragging <|> statusForNewMarker
           statusForNewMarker = const Nothing <$> ms
 
 -- | delete old marker objects and add new ones.
-attachObjs :: forall a. IsObject3D a => a -> Array RedMarker -> Array RedMarker -> Effect (Array RedMarker)
+attachObjs :: forall a. IsObject3D a => a -> Array DraggableObject -> Array DraggableObject -> Effect (Array DraggableObject)
 attachObjs parent newObjs objs = do
     traverse_ (\o -> remove o parent *> dispose o) objs
     traverse_ (flip add parent) newObjs
     pure newObjs
 
+
+-- create new markers and attach them to the parent object
+setupVertMarkers :: forall p. IsObject3D p => p -> Event Boolean -> Event (Maybe Int) -> Event (Array Vector2) -> Event (Array DraggableObject)
+setupVertMarkers parent polyActive activeMarker vertices = multicast $ foldEffect (attachObjs parent) markerObjs []
+    where vertMarkers = mkVertMarkers polyActive activeMarker    <$> vertices
+          markerObjs  = performEvent $ traverse renderVertMarker <$> vertMarkers
 
 -----------------------------------------------------------
 -- Marker to delete the current polygon
@@ -86,52 +108,52 @@ mkPolyDelMarker = do
 
 
 -----------------------------------------------------------
--- | internal object for green marker point data
-newtype GreenMarkerPoint = GreenMarkerPoint {
+-- | internal object for middle marker point data
+newtype MidMarkerPoint = MidMarkerPoint {
     position :: Vector2,
     index    :: Int
 }
 
-derive instance newtypeGreenMarkerPoint :: Newtype GreenMarkerPoint _
+derive instance newtypeMidMarkerPoint :: Newtype MidMarkerPoint _
 
-newtype GreenMarker = GreenMarker {
+newtype MidMarker = MidMarker {
     mesh  :: TappableMesh,
-    point :: GreenMarkerPoint
+    point :: MidMarkerPoint
 }
 
-derive instance newtypeGreenMarker :: Newtype GreenMarker _
-instance isObject3DGreenMarker :: IsObject3D GreenMarker where
+derive instance newtypeMidMarker :: Newtype MidMarker _
+instance isObject3DMidMarker :: IsObject3D MidMarker where
     toObject3D = toObject3D <<< view _mesh
 
--- | create material and geometry for the green marker.
-greenMaterial :: MeshBasicMaterial
-greenMaterial = unsafePerformEffect (mkMeshBasicMaterial 0x22ff22)
+-- | create material and geometry for the middle marker.
+midMaterial :: MeshBasicMaterial
+midMaterial = unsafePerformEffect (mkMeshBasicMaterial 0x22ff22)
 
-greenGeometry :: CircleGeometry
-greenGeometry = unsafePerformEffect (mkCircleGeometry 0.3 32)
+midGeometry :: CircleGeometry
+midGeometry = unsafePerformEffect (mkCircleGeometry 0.3 32)
 
-mkGreenMarker :: GreenMarkerPoint -> Effect GreenMarker
-mkGreenMarker p = do
-    m <- mkTappableMesh greenGeometry greenMaterial
-    setName "green-marker" m
+mkMidMarker :: MidMarkerPoint -> Effect MidMarker
+mkMidMarker p = do
+    m <- mkTappableMesh midGeometry midMaterial
+    setName "mid-marker" m
     let pos = p ^. _position
     setPosition (mkVec3 (vecX pos) (vecY pos) 0.01) m
-    pure $ GreenMarker { mesh: m, point: p }
+    pure $ MidMarker { mesh: m, point: p }
 
 -- | given a list of vertices position, calculate all middle points
-greenMarkerPositions :: Array Vector2 -> Array GreenMarkerPoint
-greenMarkerPositions [] = []
-greenMarkerPositions [a] = []
-greenMarkerPositions vertices = h <$> filter g d
+midMarkerPositions :: Array Vector2 -> Array MidMarkerPoint
+midMarkerPositions [] = []
+midMarkerPositions [a] = []
+midMarkerPositions vertices = h <$> filter g d
     where -- take all vertices and their indices
           v1List = mapWithIndex Tuple vertices
           -- a new list with the head put to end
           v2List = fromMaybe [] $ lift2 snoc (tail vertices) (head vertices)
 
-          f :: Tuple Int Vector2 -> Vector2 -> { dist :: Number, point :: GreenMarkerPoint }
+          f :: Tuple Int Vector2 -> Vector2 -> { dist :: Number, point :: MidMarkerPoint }
           f v v2 = let idx = fst v
                        v1 = snd v
-                       point = GreenMarkerPoint {
+                       point = MidMarkerPoint {
                                  position : mkVec2 ((vecX v1 + vecX v2) / 2.0) ((vecY v1 + vecY v2) / 2.0),
                                  index    : idx + 1
                                }
@@ -141,22 +163,22 @@ greenMarkerPositions vertices = h <$> filter g d
           g r = r.dist > 1.0
           h r = r.point
 
-setActive :: Array GreenMarker -> Boolean -> Effect Unit
+setActive :: Array MidMarker -> Boolean -> Effect Unit
 setActive ms active = traverse_ (\m -> setVisible active m) ms
 
-updatePos :: GreenMarker -> GreenMarkerPoint -> Effect GreenMarker
+updatePos :: MidMarker -> MidMarkerPoint -> Effect MidMarker
 updatePos o p = do
     let pos = p ^. _position
     setPosition (mkVec3 (vecX pos) (vecY pos) 0.01) o
-    pure $ GreenMarker { mesh: o ^. _mesh, point: p }
+    pure $ MidMarker { mesh: o ^. _mesh, point: p }
 
--- function to create/delete/update green marker objects based on new
--- list of GreenMarkerPoint
-updateMarkers :: forall a. IsObject3D a => a -> Array GreenMarkerPoint -> Array GreenMarker -> Effect (Array GreenMarker)
+-- function to create/delete/update mid marker objects based on new
+-- list of MidMarkerPoint
+updateMarkers :: forall a. IsObject3D a => a -> Array MidMarkerPoint -> Array MidMarker -> Effect (Array MidMarker)
 updateMarkers parent ps oldObjs | length ps == length oldObjs = sequence (zipWith updatePos oldObjs ps)
                                 | length ps > length oldObjs = do
                                         updObjs <- sequence (zipWith updatePos oldObjs (take (length oldObjs) ps))
-                                        newObjs <- sequence (mkGreenMarker <$> takeEnd (length ps - length oldObjs) ps)
+                                        newObjs <- sequence (mkMidMarker <$> takeEnd (length ps - length oldObjs) ps)
                                         traverse_ (flip add parent) newObjs
                                         pure (updObjs <> newObjs)
                                 | length ps < length oldObjs = do
@@ -166,9 +188,9 @@ updateMarkers parent ps oldObjs | length ps == length oldObjs = sequence (zipWit
                                         pure updObjs
                                 | otherwise = pure oldObjs
 
-mkGreenMarkers :: forall a. IsObject3D a => a -> Event Boolean -> Event (Array Vector2) -> Event GreenMarkerPoint
-mkGreenMarkers parent active vertices = keepLatest $ getTapForAll <$> markers
-    where mPosList = greenMarkerPositions <$> vertices
+mkMidMarkers :: forall a. IsObject3D a => a -> Event Boolean -> Event (Array Vector2) -> Event MidMarkerPoint
+mkMidMarkers parent active vertices = keepLatest $ getTapForAll <$> markers
+    where mPosList = midMarkerPositions <$> vertices
           markers = multicast $ foldEffect (updateMarkers parent) mPosList []
           res = performEvent $ lift2 setActive markers active
 
@@ -227,28 +249,24 @@ createPolyEditor parent active ps = do
     -- internal event for currently active marker
     { event: activeMarker, push: setActiveMarker } <- create
 
-    -- create new markers and attach them to the parent object
-    let markerObjs = performEvent $ mkRedMarkers polyActive activeMarker <$> vertices
-        markers = multicast $ foldEffect (attachObjs parent) markerObjs []
-
-        -- event for active red marker
-        actMarker = getRedMarkerActiveStatus markers
-    d2 <- subscribe actMarker setActiveMarker
+    let vertMarkers = setupVertMarkers parent polyActive activeMarker vertices
+    -- event for active vertex marker
+    d2 <- subscribe (getVertMarkerActiveStatus vertMarkers) setActiveMarker
 
     -- get new positions after dragging
-    let vertsAfterDrag = keepLatest $ getPosition <$> markers
+    let vertsAfterDrag = keepLatest $ getPosition <$> vertMarkers
 
         -- merge new vertices after dragging and vertices after adding/deleting
         newVertices = multicast $ vertices <|> vertsAfterDrag
     
-        greenActive = multicast $ lift2 (\ra am -> ra && am == Nothing) polyActive activeMarker
-        -- create green markers for adding new vertices
-        toAddEvt = mkGreenMarkers parent greenActive newVertices
+        midActive = multicast $ lift2 (\pa am -> pa && am == Nothing) polyActive activeMarker
+        -- create mid markers for adding new vertices
+        toAddEvt = mkMidMarkers parent midActive newVertices
         addVert p pns = insertAt (p ^. _index) (p ^. _position) pns
         vertsAfterAdd = compact (sampleOn newVertices $ addVert <$> toAddEvt)
 
         -- get delete event of tapping on a marker
-        delEvts = keepLatest (getDelEvt <$> markers)
+        delEvts = keepLatest $ getDelEvt <$> vertMarkers
         -- calculate new vertices after deleting a vertex
         vertsAfterDel = sampleOn newVertices (delMarker <$> delEvts)
     
