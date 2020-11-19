@@ -19,6 +19,7 @@ import Data.Traversable (sequence, sequence_, sum, traverse, traverse_)
 import Data.Tuple (Tuple(..), fst, snd)
 import Editor.Common.Lenses (_disposable, _index, _isDragging, _mesh, _point, _position, _tapped)
 import Editor.Disposable (class Disposable, dispose)
+import Editor.Polygon (Polygon(..))
 import Editor.SceneEvent (SceneTapEvent)
 import Effect (Effect)
 import Effect.Unsafe (unsafePerformEffect)
@@ -65,8 +66,8 @@ mkVertMarker polyActive actMarker (Tuple pos idx) = VertMarker {
           isActive = multicast $ lift2 f polyActive actMarker
 
 -- create vertex markers for an array of vertices
-mkVertMarkers :: Event Boolean -> Event (Maybe Int) -> Array Vector2 -> Array VertMarker
-mkVertMarkers polyActive actMarker ps = mkVertMarker polyActive actMarker <$> zip ps (range 0 (length ps - 1))
+mkVertMarkers :: Event Boolean -> Event (Maybe Int) -> Polygon -> Array VertMarker
+mkVertMarkers polyActive actMarker (Polygon ps) = mkVertMarker polyActive actMarker <$> zip ps (range 0 (length ps - 1))
 
 -- | get vertex markers' active status event
 getVertMarkerActiveStatus :: Event (Array DraggableObject) -> Event (Maybe Int)
@@ -86,9 +87,9 @@ attachObjs parent newObjs objs = do
 
 
 -- create new markers and attach them to the parent object
-setupVertMarkers :: forall p. IsObject3D p => p -> Event Boolean -> Event (Maybe Int) -> Event (Array Vector2) -> Event (Array DraggableObject)
-setupVertMarkers parent polyActive activeMarker vertices = multicast $ foldEffect (attachObjs parent) markerObjs []
-    where vertMarkers = mkVertMarkers polyActive activeMarker    <$> vertices
+setupVertMarkers :: forall p. IsObject3D p => p -> Event Boolean -> Event (Maybe Int) -> Event Polygon -> Event (Array DraggableObject)
+setupVertMarkers parent polyActive activeMarker polyEvt = multicast $ foldEffect (attachObjs parent) markerObjs []
+    where vertMarkers = mkVertMarkers polyActive activeMarker    <$> polyEvt
           markerObjs  = performEvent $ traverse renderVertMarker <$> vertMarkers
 
 -----------------------------------------------------------
@@ -141,10 +142,10 @@ mkMidMarker p = do
     pure $ MidMarker { mesh: m, point: p }
 
 -- | given a list of vertices position, calculate all middle points
-midMarkerPositions :: Array Vector2 -> Array MidMarkerPoint
-midMarkerPositions [] = []
-midMarkerPositions [a] = []
-midMarkerPositions vertices = h <$> filter g d
+midMarkerPositions :: Polygon -> Array MidMarkerPoint
+midMarkerPositions (Polygon []) = []
+midMarkerPositions (Polygon [a]) = []
+midMarkerPositions (Polygon vertices) = h <$> filter g d
     where -- take all vertices and their indices
           v1List = mapWithIndex Tuple vertices
           -- a new list with the head put to end
@@ -188,9 +189,9 @@ updateMarkers parent ps oldObjs | length ps == length oldObjs = sequence (zipWit
                                         pure updObjs
                                 | otherwise = pure oldObjs
 
-mkMidMarkers :: forall a. IsObject3D a => a -> Event Boolean -> Event (Array Vector2) -> Event MidMarkerPoint
-mkMidMarkers parent active vertices = keepLatest $ getTapForAll <$> markers
-    where mPosList = midMarkerPositions <$> vertices
+mkMidMarkers :: forall a. IsObject3D a => a -> Event Boolean -> Event Polygon -> Event MidMarkerPoint
+mkMidMarkers parent active polyEvt = keepLatest $ getTapForAll <$> markers
+    where mPosList = midMarkerPositions <$> polyEvt
           markers = multicast $ foldEffect (updateMarkers parent) mPosList []
           res = performEvent $ lift2 setActive markers active
 
@@ -198,17 +199,17 @@ mkMidMarkers parent active vertices = keepLatest $ getTapForAll <$> markers
           getTapForAll ms = foldl (<|>) empty (getTap <$> ms)
 
 
--- | calculate the center based on polygon vertices
-verticesCenter :: Array Vector2 -> Vector3
-verticesCenter [] = mkVec3 0.0 0.0 0.01
-verticesCenter vs = mkVec3 (tx / l) (ty / l) 0.01
+-- | calculate the center based on polygon
+polyCenter :: Polygon -> Vector3
+polyCenter (Polygon []) = mkVec3 0.0 0.0 0.01
+polyCenter (Polygon vs) = mkVec3 (tx / l) (ty / l) 0.01
     where tx = sum (vecX <$> vs)
           ty = sum (vecY <$> vs)
           l = toNumber (length vs)
 
 
 newtype PolyEditor = PolyEditor {
-    vertices   :: Event (Array Vector2),
+    polygon    :: Event Polygon,
     delete     :: Event SceneTapEvent,
     disposable :: Effect Unit
 }
@@ -217,15 +218,12 @@ derive instance newtypePolyEditor :: Newtype PolyEditor _
 instance disposablePolyEditor :: Disposable PolyEditor where
     dispose e = e ^. _disposable
 
-_vertices :: forall t a r. Newtype t { vertices :: a | r } => Lens' t a
-_vertices = _Newtype <<< prop (SProxy :: SProxy "vertices")
-
 _delete :: forall t a r. Newtype t { delete :: a | r } => Lens' t a
 _delete = _Newtype <<< prop (SProxy :: SProxy "delete")
 
 -- get new positions after dragging
-getPosition :: Array DraggableObject -> Event (Array Vector2)
-getPosition os = mergeArray (f <$> os)
+getPosition :: Array DraggableObject -> Event Polygon
+getPosition os = Polygon <$> mergeArray (f <$> os)
     where f o = g <$> o ^. _position
           g p = toVec2 p
 
@@ -233,23 +231,23 @@ getDelEvt :: Array DraggableObject -> Event Int
 getDelEvt os = foldl (<|>) empty (f <$> os)
     where f o = o ^. _tapped
 
-delMarker :: Int -> Array Vector2 -> Array Vector2
-delMarker idx ps = fromMaybe [] (deleteAt idx ps)
+delMarker :: Int -> Polygon -> Polygon
+delMarker idx (Polygon ps) = Polygon $ fromMaybe [] (deleteAt idx ps)
 
 -- | create polygon editor
-createPolyEditor :: forall a. IsObject3D a => a -> Dynamic Boolean -> Array Vector2 -> Effect PolyEditor
-createPolyEditor parent active ps = do
+createPolyEditor :: forall a. IsObject3D a => a -> Dynamic Boolean -> Polygon -> Effect PolyEditor
+createPolyEditor parent active poly = do
     -- internal event for maintaining the polygon active status
     { event: polyActive, push: setPolyActive } <- create
     -- pipe the 'active' param event into internal polyActive event
     d1 <- subscribeDyn active setPolyActive
 
     -- event for new list of vertices
-    { event: vertices, push: updateVertList } <- create
+    { event: polyEvt, push: updatePoly } <- create
     -- internal event for currently active marker
     { event: activeMarker, push: setActiveMarker } <- create
 
-    let vertMarkers = setupVertMarkers parent polyActive activeMarker vertices
+    let vertMarkers = setupVertMarkers parent polyActive activeMarker polyEvt
     -- event for active vertex marker
     d2 <- subscribe (getVertMarkerActiveStatus vertMarkers) setActiveMarker
 
@@ -257,22 +255,22 @@ createPolyEditor parent active ps = do
     let vertsAfterDrag = keepLatest $ getPosition <$> vertMarkers
 
         -- merge new vertices after dragging and vertices after adding/deleting
-        newVertices = multicast $ vertices <|> vertsAfterDrag
+        newPolyEvt = multicast $ polyEvt <|> vertsAfterDrag
     
         midActive = multicast $ lift2 (\pa am -> pa && am == Nothing) polyActive activeMarker
         -- create mid markers for adding new vertices
-        toAddEvt = mkMidMarkers parent midActive newVertices
-        addVert p pns = insertAt (p ^. _index) (p ^. _position) pns
-        vertsAfterAdd = compact (sampleOn newVertices $ addVert <$> toAddEvt)
+        toAddEvt = mkMidMarkers parent midActive newPolyEvt
+        addVert p (Polygon pns) = Polygon <$> insertAt (p ^. _index) (p ^. _position) pns
+        vertsAfterAdd = compact (sampleOn newPolyEvt $ addVert <$> toAddEvt)
 
         -- get delete event of tapping on a marker
         delEvts = keepLatest $ getDelEvt <$> vertMarkers
         -- calculate new vertices after deleting a vertex
-        vertsAfterDel = sampleOn newVertices (delMarker <$> delEvts)
+        vertsAfterDel = sampleOn newPolyEvt (delMarker <$> delEvts)
     
     -- update the real vertex list after adding/deleting
     d3 <- subscribe (vertsAfterAdd <|> vertsAfterDel) \vs -> do
-            updateVertList vs
+            updatePoly vs
             setPolyActive true
     
     -- create the polygon delete button
@@ -280,18 +278,18 @@ createPolyEditor parent active ps = do
     add polyDel parent
 
     -- update polygon delete button position
-    d4 <- subscribe (verticesCenter <$> newVertices) (flip setPosition polyDel)
+    d4 <- subscribe (polyCenter <$> newPolyEvt) (flip setPosition polyDel)
 
     -- Show the polygon delete button when polygon's active
     d5 <- subscribe polyActive (flip setVisible polyDel)
 
     -- set the default vertices
-    updateVertList ps
+    updatePoly poly
     -- disable polygon by default
     setPolyActive false
 
     pure $ PolyEditor {
-        vertices   : newVertices,
+        polygon    : newPolyEvt,
         delete     : polyDel ^. _tapped,
         disposable : sequence_ [d1, d2, d3, d4, d5]
     }
