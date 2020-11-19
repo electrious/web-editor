@@ -74,7 +74,7 @@ getVertMarkerActiveStatus ms = statusForDragging <|> statusForNewMarker
     where g idx m = (\d -> if d then Just idx else Nothing) <$> m ^. _isDragging
           h objs = foldl (<|>) empty (mapWithIndex g objs)
 
-          statusForDragging = keepLatest (h <$> ms)
+          statusForDragging  = keepLatest $ h <$> ms
           statusForNewMarker = const Nothing <$> ms
 
 -- | delete old marker objects and add new ones.
