@@ -14,9 +14,10 @@ import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Tuple (fst, snd)
 import Editor.Common.Lenses (_center, _index, _item, _maxX, _maxY, _minX, _minY, _normal, _polygon, _position)
+import Model.Polygon (Polygon(..))
 import Effect (Effect)
 import Math.Angle (degreeVal)
-import Model.Roof.RoofPlate (Polygon, RoofPlate, angleBetween, getRoofPolygon)
+import Model.Roof.RoofPlate (RoofPlate, angleBetween, getRoofPolygon)
 import RBush.RBush (BBox, RBush, load, mkRBush, search)
 import Three.Core.Geometry (class IsBufferGeometry, clone, getAttribute, isBufferAttribute, setNeedsUpdate, setXYZ)
 import Three.Core.Mesh (Mesh, setBufferGeometry)
@@ -69,12 +70,12 @@ buildRTree vertices normals = do
 
 -- | get the bounding box of a polygon
 polygonBBox :: Polygon -> BBox Unit
-polygonBBox polygon = def # _minX .~ fromMaybe 0.0 (minimum xs)
-                          # _minY .~ fromMaybe 0.0 (minimum ys)
-                          # _maxX .~ fromMaybe 0.0 (maximum xs)
-                          # _maxY .~ fromMaybe 0.0 (maximum ys)
-    where xs = vecX <$> polygon
-          ys = vecY <$> polygon
+polygonBBox (Polygon vs) = def # _minX .~ fromMaybe 0.0 (minimum xs)
+                               # _minY .~ fromMaybe 0.0 (minimum ys)
+                               # _maxX .~ fromMaybe 0.0 (maximum xs)
+                               # _maxY .~ fromMaybe 0.0 (maximum ys)
+    where xs = vecX <$> vs
+          ys = vecY <$> vs
 
 newtype RoofFlattener = RoofFlattener {
     normal  :: Vector3,

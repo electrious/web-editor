@@ -17,6 +17,7 @@ import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.UUID (UUID, emptyUUID, genUUID, parseUUID, toString)
 import Editor.Common.Lenses (_alignment, _center, _id, _leadId, _normal, _orientation, _slope)
+import Model.Polygon (Polygon(..))
 import Effect (Effect)
 import Foreign.Generic (class Decode, class Encode, decode, defaultOptions, encode, genericDecode, genericEncode)
 import Math as Math
@@ -203,12 +204,9 @@ toJSRoofPlate r = JSRoofPlate {
     rotation_override : degreeVal $ r ^. _rotation
 }
 
--- | 2D polygon for roof plate projection on ground
-type Polygon = Array Vector2
-
 -- | get the 2D polygon for a roof plate
 getRoofPolygon :: RoofPlate -> Polygon
-getRoofPolygon r = f <$> r ^. _borderPoints
+getRoofPolygon r = Polygon $ f <$> r ^. _borderPoints
     where f v = mkVec2 (vecX v) (vecY v)
 
 -- | helper function to calculate angle between two Vector3
