@@ -54,7 +54,7 @@ doTest roofDat panelDat = do
             Right (panels :: Array Panel) -> case elem of
                 Nothing -> logShow "can't find 'editor' element"
                 Just el -> do
-                    let modeDyn   = step ArrayEditing empty
+                    let modeDyn   = step RoofEditing empty
                         sizeDyn   = step (size 800 600) empty
                         panelType = step Standard empty
 
