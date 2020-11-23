@@ -2,6 +2,7 @@ module Rendering.CacheRenderer where
 
 import Prelude
 
+import Control.Monad.Reader (class MonadAsk, class MonadReader, ReaderT, ask)
 import Control.Monad.State (class MonadState, StateT, lift)
 import Data.Default (class Default)
 import Data.Lens (Lens')
@@ -10,9 +11,10 @@ import Data.Lens.Record (prop)
 import Data.List (List(..))
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Effect.Class (class MonadEffect)
-import Rendering.Renderable (class Renderable, RenderingM, render)
-import Three.Core.Object3D (class IsObject3D)
+import Effect.Class (class MonadEffect, liftEffect)
+import Rendering.Renderable (class Renderable, RenderingM)
+import Rendering.Renderable as R
+import Three.Core.Object3D (class IsObject3D, add)
 
 
 newtype Cache a = Cache {
@@ -30,18 +32,27 @@ _idle :: forall t a r. Newtype t { idle :: a | r } => Lens' t a
 _idle = _Newtype <<< prop (SProxy :: SProxy "idle")
 
 
-newtype CacheRenderingM c a = CacheRenderingM (StateT (Cache c) RenderingM a)
+-- | ReRenderable will be ab able to update rendered node with new value
+class Renderable v n <= ReRenderable v n where
+    updateNode :: n -> v -> RenderingM Unit
 
-derive newtype instance functorCacheRenderingM     :: Functor (CacheRenderingM c)
-derive newtype instance applyCacheRenderingM       :: Apply (CacheRenderingM c)
-derive newtype instance applicativeRenderingM      :: Applicative (CacheRenderingM c)
-derive newtype instance bindCacheRenderingM        :: Bind (CacheRenderingM c)
-derive newtype instance monadCacheRenderingM       :: Monad (CacheRenderingM c)
-derive newtype instance monadStateCacheRenderingM  :: MonadState (Cache c) (CacheRenderingM c)
-derive newtype instance monadEffectCacheRenderingM :: MonadEffect (CacheRenderingM c)
+newtype CacheRenderingM parent c a = CacheRenderingM (StateT (Cache c) (ReaderT parent RenderingM) a)
 
-liftRenderingM :: forall c a. RenderingM a -> CacheRenderingM c a
-liftRenderingM r = CacheRenderingM $ lift r
+derive newtype instance functorCacheRenderingM     :: Functor (CacheRenderingM p c)
+derive newtype instance applyCacheRenderingM       :: Apply (CacheRenderingM p c)
+derive newtype instance applicativeRenderingM      :: Applicative (CacheRenderingM p c)
+derive newtype instance bindCacheRenderingM        :: Bind (CacheRenderingM p c)
+derive newtype instance monadCacheRenderingM       :: Monad (CacheRenderingM p c)
+derive newtype instance monadStateCacheRenderingM  :: MonadState (Cache c) (CacheRenderingM p c)
+derive newtype instance monadAskCacheRenderingM    :: MonadAsk p (CacheRenderingM p c)
+derive newtype instance monadReaderCacheRenderingM :: MonadReader p (CacheRenderingM p c)
+derive newtype instance monadEffectCacheRenderingM :: MonadEffect (CacheRenderingM p c)
 
-renderWithCache :: forall p c cn. IsObject3D p => Renderable c cn => p -> c -> CacheRenderingM c cn
-renderWithCache parent val = liftRenderingM $ render val
+liftRenderingM :: forall p c a. RenderingM a -> CacheRenderingM p c a
+liftRenderingM r = CacheRenderingM $ lift $ lift r
+
+render :: forall p c cn. IsObject3D p => Renderable c cn => c -> CacheRenderingM p cn Unit
+render val = do
+    n <- liftRenderingM $ R.render val
+    p <- ask
+    liftEffect $ add n p
