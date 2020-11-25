@@ -3,6 +3,7 @@ module Editor.RoofManager where
 import Prelude hiding (add,degree)
 
 import Algorithm.MeshFlatten (flattenRoofPlates)
+import Algorithm.RoofCheck (couldBeRoof)
 import Control.Alt ((<|>))
 import Control.Monad.Reader (ask)
 import Control.Plus (empty)
@@ -26,7 +27,7 @@ import Data.UUID (UUID)
 import Data.UUIDMap (UUIDMap)
 import Data.UUIDMap as UM
 import Editor.ArrayBuilder (runArrayBuilder)
-import Editor.Common.Lenses (_alignment, _disposable, _geometry, _houseId, _id, _mesh, _modeDyn, _mouseMove, _orientation, _panelType, _roof, _roofId, _roofs, _tapped, _verticeTree, _wrapper)
+import Editor.Common.Lenses (_alignment, _disposable, _face, _geometry, _houseId, _id, _mesh, _modeDyn, _mouseMove, _orientation, _panelType, _point, _roof, _roofId, _roofs, _tapped, _verticeTree, _wrapper)
 import Editor.Disposable (class Disposable, dispose)
 import Editor.EditorMode (EditorMode(..))
 import Editor.House (HouseMeshData)
@@ -38,15 +39,16 @@ import Editor.RoofNode (RoofNode, RoofNodeConfig, _roofDelete, _roofUpdate, crea
 import Editor.RoofRecognizer (RoofRecognizer, _addedNewRoof, createRoofRecognizer)
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import FRP.Dynamic (Dynamic, step)
-import FRP.Event (Event, create, fold, keepLatest, subscribe, withLast)
+import FRP.Dynamic (Dynamic, gateDyn, step)
+import FRP.Event (Event, create, fold, keepLatest, sampleOn, subscribe, withLast)
 import FRP.Event.Extra (debounce, delay, distinct, mergeArray, multicast, performEvent, skip)
 import Model.Racking.OldRackingSystem (OldRoofRackingData, guessRackingType)
 import Model.Racking.RackingType (RackingType(..))
 import Model.Roof.Panel (Alignment(..), Orientation(..), Panel, PanelsDict, generalOrientation, panelsDict)
 import Model.Roof.RoofPlate (RoofEdited, RoofOperation(..), RoofPlate, _roofIntId, toRoofEdited)
 import Model.RoofSpecific (_value)
-import Three.Core.Object3D (class IsObject3D, Object3D, add, mkObject3D, remove, setName)
+import Three.Core.Face3 (normal)
+import Three.Core.Object3D (class IsObject3D, Object3D, add, mkObject3D, remove, setName, worldToLocal)
 
 newtype RoofManager = RoofManager {
     wrapper       :: Object3D,
@@ -193,12 +195,23 @@ isRoofEditing = map ((==) RoofEditing) <<< view _modeDyn <$> ask
 -- | function to add the roof recognizer and recognize new roofs
 recognizeNewRoofs :: HouseMeshData -> Object3D -> Event RoofDict -> Dynamic (Maybe UUID) -> Dynamic Boolean -> Effect RoofRecognizer
 recognizeNewRoofs meshData wrapper newRoofs activeRoof canEditRoofDyn = do
-    let canShowRecognizer = (&&) <$> (isNothing <$> activeRoof) <*> canEditRoofDyn
+    let canShowAdder = (&&) <$> (isNothing <$> activeRoof) <*> canEditRoofDyn
+        houseWrapper = meshData ^. _wrapper
+        roofs        = UM.toUnfoldable <$> newRoofs
+        getCandidatePoint evt rs = do
+            isRoof <- couldBeRoof houseWrapper rs evt
+            if isRoof
+            then do
+                np <- worldToLocal (evt ^. _point) houseWrapper
+                pure $ Just { position: np, faceNormal: normal (evt ^. _face) }
+            else pure Nothing
+        
+        mouseMoveEvt = meshData ^. _mesh <<< _mouseMove
+        point = step Nothing $ performEvent $ sampleOn roofs (getCandidatePoint <$> gateDyn canShowAdder mouseMoveEvt)
+        mkRoof _ p = newRoofPlate p.position p.faceNormal
+
     -- create the roof recognizer and add it to the roof wrapper object
-    recognizer <- createRoofRecognizer (meshData ^. _wrapper)
-                                       (UM.toUnfoldable <$> newRoofs)
-                                       (meshData ^. _mesh <<< _mouseMove)
-                                       canShowRecognizer
+    recognizer <- createRoofRecognizer 
     add recognizer wrapper
     pure recognizer
 
