@@ -15,7 +15,7 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (List(..), concat, toUnfoldable)
 import Data.List as List
-import Data.Map (Map, delete, fromFoldable, insert, lookup, values)
+import Data.Map (Map, delete, insert, lookup, values)
 import Data.Maybe (Maybe(..), fromMaybe, isNothing)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
@@ -23,7 +23,8 @@ import Data.Time.Duration (Milliseconds(..))
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Data.UUID (UUID)
-import Data.Unfoldable (class Unfoldable)
+import Data.UUIDMap (UUIDMap)
+import Data.UUIDMap as UM
 import Editor.ArrayBuilder (runArrayBuilder)
 import Editor.Common.Lenses (_alignment, _disposable, _geometry, _houseId, _id, _mesh, _modeDyn, _mouseMove, _orientation, _panelType, _roof, _roofId, _roofs, _tapped, _verticeTree, _wrapper)
 import Editor.Disposable (class Disposable, dispose)
@@ -64,14 +65,7 @@ instance disposableRoofManager :: Disposable RoofManager where
 _editedRoofs :: Lens' RoofManager (Event (Array RoofEdited))
 _editedRoofs = _Newtype <<< prop (SProxy :: SProxy "editedRoofs")
 
-type RoofDict = Map UUID RoofPlate
-
-roofDict :: forall f. Foldable f => Functor f => f RoofPlate -> RoofDict
-roofDict = fromFoldable <<< map f
-    where f r = Tuple (r ^. _id) r
-
-dictToUnfoldable :: forall f. Unfoldable f => RoofDict -> f RoofPlate
-dictToUnfoldable = toUnfoldable <<< values
+type RoofDict = UUIDMap RoofPlate
 
 -- internal data structure used to manage roofs
 newtype RoofDictData = RoofDictData {
@@ -167,7 +161,7 @@ renderRoofs wrapper param activeRoof roofsData panelsDict racks = do
 
     houseId <- view _houseId <$> ask
 
-    let rsToRenderArr = dictToUnfoldable <$> compact (view _roofsToRender <$> roofsData)
+    let rsToRenderArr = UM.toUnfoldable <$> compact (view _roofsToRender <$> roofsData)
         
         mainOrientDyn = step Landscape $ distinct mainOrientE
         orientDyn     = step Landscape $ param ^. _orientation
@@ -202,7 +196,7 @@ recognizeNewRoofs meshData wrapper newRoofs activeRoof canEditRoofDyn = do
     let canShowRecognizer = (&&) <$> (isNothing <$> activeRoof) <*> canEditRoofDyn
     -- create the roof recognizer and add it to the roof wrapper object
     recognizer <- createRoofRecognizer (meshData ^. _wrapper)
-                                       (dictToUnfoldable <$> newRoofs)
+                                       (UM.toUnfoldable <$> newRoofs)
                                        (meshData ^. _mesh <<< _mouseMove)
                                        canShowRecognizer
     add recognizer wrapper
@@ -234,7 +228,7 @@ createRoofManager param meshData roofs panels racks = do
     let activeRoofDyn = step Nothing activeRoof
 
     -- get the default roof plates as a dict
-    let defRoofDict = roofDict roofs
+    let defRoofDict = UM.fromFoldable roofs
         psDict      = panelsDict panels
     canEditRoofDyn <- isRoofEditing
 
@@ -275,7 +269,7 @@ createRoofManager param meshData roofs panels racks = do
         updateRoofsData defRoofData
         updateActive Nothing
 
-    let getRoofEdited = map toRoofEdited <<< dictToUnfoldable
+    let getRoofEdited = map toRoofEdited <<< UM.toUnfoldable
 
     -- skipe the first roof in teh editedRoofs event, because it's the default data
     pure $ RoofManager {

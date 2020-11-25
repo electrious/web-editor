@@ -46,10 +46,10 @@ derive instance newtypeVertMarker :: Newtype VertMarker _
 renderVertMarker :: VertMarker -> Effect DraggableObject
 renderVertMarker m = do
     mesh <- createDraggableObject (m ^. _isActive)
-                                    (m ^. _index)
-                                    (m ^. _position)
-                                    (Nothing :: Maybe Geometry)
-                                    Nothing
+                                  (m ^. _index)
+                                  (m ^. _position)
+                                  (Nothing :: Maybe Geometry)
+                                  Nothing
     setName "vertex-marker" mesh
     pure mesh
 

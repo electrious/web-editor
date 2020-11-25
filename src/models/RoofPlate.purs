@@ -17,12 +17,13 @@ import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.UUID (UUID, emptyUUID, genUUID, parseUUID, toString)
 import Editor.Common.Lenses (_alignment, _center, _id, _leadId, _normal, _orientation, _slope)
-import Model.Polygon (Polygon(..))
 import Effect (Effect)
 import Foreign.Generic (class Decode, class Encode, decode, defaultOptions, encode, genericDecode, genericEncode)
 import Math as Math
 import Math.Angle (Angle, acos, atan2, degree, degreeVal)
+import Model.Polygon (Polygon(..))
 import Model.Roof.Panel (Alignment(..), Orientation(..))
+import Model.UUID (class HasUUID, idLens)
 import Three.Math.Vector (class Vector, Vector2, Vector3, addScaled, cross, length, mkVec2, mkVec3, vecX, vecY, vecZ, (<.>))
 
 -- | define the core RoofPlate type as a record
@@ -48,6 +49,8 @@ instance showRoofplate :: Show RoofPlate where
     show = genericShow
 instance eqRoofplate :: Eq RoofPlate where
     eq = genericEq
+instance hasUUIDRoofPlate :: HasUUID RoofPlate where
+    idLens = _id
 instance encodeRoofPlate :: Encode RoofPlate where
     encode = encode <<< toJSRoofPlate
 instance decodeRoofPlate :: Decode RoofPlate where
