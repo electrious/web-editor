@@ -10,15 +10,13 @@ import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Data.Traversable (traverse)
 import Editor.Common.Lenses (_disposable, _mesh, _tapped)
 import Editor.Disposable (class Disposable)
 import Effect (Effect)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, sampleDyn, subscribeDyn)
 import FRP.Event (Event)
-import FRP.Event.Extra (multicast, performEvent)
-import Model.Roof.RoofPlate (RoofPlate, newRoofPlate)
+import FRP.Event.Extra (multicast)
 import Three.Core.Geometry (CircleGeometry, mkCircleGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial)
 import Three.Core.Mesh (Mesh)
@@ -38,10 +36,10 @@ instance isObject3DPolygonAdder :: IsObject3D PolygonAdder where
 instance disposePolygonAdder :: Disposable PolygonAdder where
     dispose r = r ^. _disposable
 
-_marker :: Lens' PolygonAdder Mesh
+_marker :: forall t a r. Newtype t { marker :: a | r } => Lens' t a
 _marker = _Newtype <<< prop (SProxy :: SProxy "marker")
 
-_addedPoint :: Lens' PolygonAdder (Event RoofPlate)
+_addedPoint :: forall t a r. Newtype t { addedPoint :: a | r } => Lens' t a
 _addedPoint = _Newtype <<< prop (SProxy :: SProxy "addedPoint")
 
 -- | Candidate point that will allow user to show the adder marker
@@ -88,16 +86,15 @@ createPolygonAdder point canShow = do
     -- hide the marker by default
     setVisible false marker
 
-    let 
-        -- update candidate point with canShow status
+    let -- update candidate point with canShow status
         pointCanShow true p  = p
         pointCanShow false _ = Nothing
 
     d <- subscribeDyn (pointCanShow <$> canShow <*> point) (showMarker marker)
 
-    let roof = compact $ performEvent $ sampleDyn point (flip const <$> marker ^. _tapped)
+    let pe = compact $ sampleDyn point (flip const <$> marker ^. _tapped)
     pure $ PolygonAdder {
         marker     : marker ^. _mesh,
-        addedPoint : multicast roof,
+        addedPoint : multicast pe,
         disposable : d
     }
