@@ -239,8 +239,8 @@ createRoofManager param meshData roofs panels racks = do
 
     let activeRoofDyn = step Nothing activeRoof
 
-    -- get the default roof plates as a dict
-    let defRoofDict = UM.fromFoldable roofs
+        -- get the default roof plates as a dict
+        defRoofDict = UM.fromFoldable roofs
         psDict      = panelsDict panels
     canEditRoofDyn <- isRoofEditing
 
