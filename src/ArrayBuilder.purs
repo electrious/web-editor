@@ -18,7 +18,7 @@ import Model.Hardware.PanelTextureInfo (PanelTextureInfo)
 import Model.Hardware.PanelType (PanelType)
 import Model.Racking.RackingType (RackingType)
 import Model.Roof.ArrayConfig (ArrayConfig, arrayConfigForRack)
-import Rendering.Renderable (RendererConfig(..), RenderingM, runRenderingM)
+import Rendering.Renderable (RenderingM, runRenderingM)
 import Rendering.TextureLoader (loadMaterialFromUrl)
 import Three.Core.Material (doubleSide, setSide)
 
