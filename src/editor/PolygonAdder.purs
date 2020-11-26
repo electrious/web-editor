@@ -14,7 +14,7 @@ import Editor.Common.Lenses (_disposable, _mesh, _tapped)
 import Editor.Disposable (class Disposable)
 import Effect (Effect)
 import Effect.Unsafe (unsafePerformEffect)
-import FRP.Dynamic (Dynamic, sampleDyn, subscribeDyn)
+import FRP.Dynamic (Dynamic, sampleDyn_, subscribeDyn)
 import FRP.Event (Event)
 import FRP.Event.Extra (multicast)
 import Three.Core.Geometry (CircleGeometry, mkCircleGeometry)
@@ -92,9 +92,8 @@ createPolygonAdder point canShow = do
 
     d <- subscribeDyn (pointCanShow <$> canShow <*> point) (showMarker marker)
 
-    let pe = compact $ sampleDyn point (flip const <$> marker ^. _tapped)
     pure $ PolygonAdder {
         marker     : marker ^. _mesh,
-        addedPoint : multicast pe,
+        addedPoint : multicast $ compact $ sampleDyn_ point (marker ^. _tapped),
         disposable : d
     }
