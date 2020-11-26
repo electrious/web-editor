@@ -23,8 +23,8 @@ import Math as Math
 import Math.Angle (Angle, acos, atan2, degree, degreeVal)
 import Model.Polygon (Polygon(..))
 import Model.Roof.Panel (Alignment(..), Orientation(..))
-import Model.UUID (class HasUUID, idLens)
-import Three.Math.Vector (class Vector, Vector2, Vector3, addScaled, cross, length, mkVec2, mkVec3, vecX, vecY, vecZ, (<.>))
+import Model.UUID (class HasUUID)
+import Three.Math.Vector (class Vector, Vector3, addScaled, cross, length, mkVec2, mkVec3, vecX, vecY, vecZ, (<.>))
 
 -- | define the core RoofPlate type as a record
 newtype RoofPlate = RoofPlate {

@@ -27,7 +27,7 @@ import Three.Math.Vector (mkVec3)
 
 
 newtype FXRackingComponentRenderable = FXRackingComponentRenderable FXRackingComponent
-instance renderableFXRackingComponent :: Renderable FXRackingComponentRenderable Object3D where
+instance renderableFXRackingComponent :: Renderable e FXRackingComponentRenderable Object3D where
     render (FXRackingComponentRenderable f) = do
         comp <- liftEffect mkObject3D
         liftEffect $ setName "FXRackingComponent" comp
@@ -89,7 +89,7 @@ buildMount = do
 
 
 newtype MountRenderable = MountRenderable Mount
-instance renderableMount :: Renderable MountRenderable Object3D where
+instance renderableMount :: Renderable e MountRenderable Object3D where
     render (MountRenderable m) = liftEffect do
         let bx = meterVal $ m ^. _clampX - m ^. _x
 
@@ -123,7 +123,7 @@ instance renderableMount :: Renderable MountRenderable Object3D where
 
 
 newtype BridgeRenderable = BridgeRenderable Bridge
-instance renderableBridge :: Renderable BridgeRenderable Object3D where
+instance renderableBridge :: Renderable e BridgeRenderable Object3D where
     render (BridgeRenderable b) = liftEffect do
         top <- mkMesh bridgeTopBox blackMaterial
         setName "top" top
@@ -158,7 +158,7 @@ bridgeBotBox = unsafePerformEffect $ mkBoxGeometry 0.2032 0.1 0.003
 
 
 newtype SkirtRenderable = SkirtRenderable Skirt
-instance renderableSkirt :: Renderable SkirtRenderable Mesh where
+instance renderableSkirt :: Renderable e SkirtRenderable Mesh where
     render (SkirtRenderable s) = liftEffect do
         m <- mkMesh skirtBox blackMaterial
         setName "Skirt" m
@@ -173,7 +173,7 @@ skirtBox :: BoxGeometry
 skirtBox = unsafePerformEffect $ mkBoxGeometry 1.0 0.03 0.04
 
 newtype EndCapRenderable = EndCapRenderable EndCap
-instance renderableEndCap :: Renderable EndCapRenderable Mesh where
+instance renderableEndCap :: Renderable e EndCapRenderable Mesh where
     render (EndCapRenderable e) = liftEffect do
         m <- mkMesh endCapBox blackMaterial
         setName "EndCap" m

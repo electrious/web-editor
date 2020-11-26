@@ -24,7 +24,8 @@ import FRP.Event (Event, keepLatest)
 import FRP.Event.Extra (anyEvt, foldEffect, multicast)
 import Model.PlusButton (PlusButton)
 import Model.RotateButton (RotateButton)
-import Rendering.Renderable (RendererConfig, RenderingM, render, runRenderingM)
+import Rendering.Renderable (RenderingM, render, runRenderingM)
+import Three.Core.Material (MeshBasicMaterial)
 import Three.Core.Object3D (class IsObject3D, add, remove)
 import Three.Math.Vector (Vector3)
 
@@ -76,7 +77,7 @@ _rotBtns :: forall t a r. Newtype t { rotBtns :: a | r } => Lens' t a
 _rotBtns = _Newtype <<< prop (SProxy :: SProxy "rotBtns")
 
 -- | helper function to apply buttons operation and update the internal state
-applyOp :: forall a. IsObject3D a => a -> RendererConfig -> ButtonOperation -> ButtonRendererState -> Effect ButtonRendererState
+applyOp :: forall a. IsObject3D a => a -> MeshBasicMaterial -> ButtonOperation -> ButtonRendererState -> Effect ButtonRendererState
 applyOp parent cfg (RenderPlusButtons ps) st = do
     nst   <- delPlusNodes parent st
     nodes <- runRenderingM (traverse render ps) cfg
@@ -117,7 +118,7 @@ delRotNodes parent st = do
     pure $ st # _rotBtns .~ Nil
 
 -- | create buttons renderer that will render all buttons
-mkButtonsRenderer :: forall a. IsObject3D a => a -> Event ButtonOperation -> RenderingM ButtonsRenderer
+mkButtonsRenderer :: forall a. IsObject3D a => a -> Event ButtonOperation -> RenderingM MeshBasicMaterial ButtonsRenderer
 mkButtonsRenderer parent opEvt = do
     cfg <- ask
 

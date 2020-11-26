@@ -16,7 +16,7 @@ import Three.Core.Object3D (Object3D, add, mkObject3D, setName)
 import Three.Math.Vector (Vector3)
 
 newtype RidgeRenderable = RidgeRenderable Ridge
-instance renderableRidge :: Renderable RidgeRenderable Object3D where
+instance renderableRidge :: Renderable e RidgeRenderable Object3D where
     render (RidgeRenderable r) = do
         ro <- liftEffect mkObject3D
         liftEffect $ setName "Ridge" ro

@@ -31,7 +31,7 @@ import Three.Math.Vector (mkVec3)
 
 
 newtype XRFlatRackingComponentRenderable = XRFlatRackingComponentRenderable XRFlatRackingComponent
-instance renderableXRFlatRackingComponent :: RenderableWithSlope XRFlatRackingComponentRenderable Object3D where
+instance renderableXRFlatRackingComponent :: RenderableWithSlope e XRFlatRackingComponentRenderable Object3D where
     renderWithSlope slope (XRFlatRackingComponentRenderable x) = do
         comp <- liftEffect mkObject3D
         liftEffect $ setName "XRFlatRackingComponent" comp
@@ -60,7 +60,7 @@ instance renderableXRFlatRackingComponent :: RenderableWithSlope XRFlatRackingCo
         pure comp
 
 newtype RailRenderableWithSlope = RailRenderableWithSlope Rail
-instance renderableWithSlopeRail :: RenderableWithSlope RailRenderableWithSlope Mesh where
+instance renderableWithSlopeRail :: RenderableWithSlope e RailRenderableWithSlope Mesh where
     renderWithSlope slope (RailRenderableWithSlope r) = liftEffect do
         rail <- mkMesh railGeometry blackMaterial
         setName "Rail" rail
@@ -74,7 +74,7 @@ instance renderableWithSlopeRail :: RenderableWithSlope RailRenderableWithSlope 
 
 
 newtype SpliceRenderableWithSlope = SpliceRenderableWithSlope Splice
-instance renderableWithSlopeSplice :: RenderableWithSlope SpliceRenderableWithSlope Mesh where
+instance renderableWithSlopeSplice :: RenderableWithSlope e SpliceRenderableWithSlope Mesh where
     renderWithSlope slope (SpliceRenderableWithSlope s) = liftEffect do
         splice <- mkMesh spliceGeometry blackMaterial
         setName "Splice" splice
@@ -87,7 +87,7 @@ instance renderableWithSlopeSplice :: RenderableWithSlope SpliceRenderableWithSl
 
 
 newtype ClampRenderableWithSlope = ClampRenderableWithSlope Clamp
-instance renderableWithSlopeClamp :: RenderableWithSlope ClampRenderableWithSlope Object3D where
+instance renderableWithSlopeClamp :: RenderableWithSlope e ClampRenderableWithSlope Object3D where
     renderWithSlope slope (ClampRenderableWithSlope c) = liftEffect do
         clamp <- buildClamp
         setName "Clamp" clamp
@@ -99,7 +99,7 @@ instance renderableWithSlopeClamp :: RenderableWithSlope ClampRenderableWithSlop
 
 
 newtype StopperRenderableWithSlope = StopperRenderableWithSlope Stopper
-instance renderableWithSlopeStopper :: RenderableWithSlope StopperRenderableWithSlope Mesh where
+instance renderableWithSlopeStopper :: RenderableWithSlope e StopperRenderableWithSlope Mesh where
     renderWithSlope slope (StopperRenderableWithSlope s) = liftEffect do 
         stopper <- mkMesh stopperCy blackMaterial
         setName "Stopper" stopper
@@ -111,7 +111,7 @@ instance renderableWithSlopeStopper :: RenderableWithSlope StopperRenderableWith
 
 
 newtype SupportRailRenderableWithSlope = SupportRailRenderableWithSlope SupportRail
-instance renderableWithSlopeSupportRail :: RenderableWithSlope SupportRailRenderableWithSlope Mesh where
+instance renderableWithSlopeSupportRail :: RenderableWithSlope e SupportRailRenderableWithSlope Mesh where
     renderWithSlope slope (SupportRailRenderableWithSlope s) = liftEffect do
         r <- mkMesh supportRailGeo blackMaterial
         setName "SupportRail" r
@@ -128,7 +128,7 @@ supportRailGeo = unsafePerformEffect $ mkBoxGeometry l 1.0 l
 
 
 newtype QBaseMountRenderable = QBaseMountRenderable QBaseMount
-instance renderableWithSlopeQBaseMount :: RenderableWithSlope QBaseMountRenderable Object3D where
+instance renderableWithSlopeQBaseMount :: RenderableWithSlope e QBaseMountRenderable Object3D where
     renderWithSlope slope (QBaseMountRenderable q) = liftEffect do
         base <- mkMesh qbMountBaseCy blackMaterial
         setName "base" base
@@ -158,7 +158,7 @@ qbMountStickCy = unsafePerformEffect $ mkCylinderGeometry (meterVal $ inch 0.8) 
 
 
 newtype TiltLegRenderable = TiltLegRenderable TiltLeg
-instance renderableWithSlopeTiltLeg :: RenderableWithSlope TiltLegRenderable Mesh where
+instance renderableWithSlopeTiltLeg :: RenderableWithSlope e TiltLegRenderable Mesh where
     renderWithSlope slope (TiltLegRenderable t) = liftEffect do
         m <- mkMesh tiltLegBox blackMaterial
         setName "TiltLeg" m

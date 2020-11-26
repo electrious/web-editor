@@ -25,7 +25,7 @@ import Three.Math.Euler (mkEuler)
 import Three.Math.Vector (mkVec3)
 
 newtype XRRackingComponentRenderable = XRRackingComponentRenderable XRRackingComponent
-instance renderableXRRackingComponent :: Renderable XRRackingComponentRenderable Object3D where
+instance renderableXRRackingComponent :: Renderable e XRRackingComponentRenderable Object3D where
     render (XRRackingComponentRenderable x) = do
         comp <- liftEffect mkObject3D
         liftEffect $ setName "XRRackingComponent" comp
@@ -51,7 +51,7 @@ instance renderableXRRackingComponent :: Renderable XRRackingComponentRenderable
         pure comp
 
 newtype RailRenderable = RailRenderable Rail
-instance renderableRail :: Renderable RailRenderable Mesh where
+instance renderableRail :: Renderable e RailRenderable Mesh where
     render (RailRenderable rail) = liftEffect do
         mesh <- mkMesh railGeometry blackMaterial
         setName "Rail" mesh
@@ -68,7 +68,7 @@ railGeometry = unsafePerformEffect $ mkBoxGeometry 1.0 h l
 
 
 newtype SpliceRenderable = SpliceRenderable Splice
-instance renderableSplice :: Renderable SpliceRenderable Mesh where
+instance renderableSplice :: Renderable e SpliceRenderable Mesh where
     render (SpliceRenderable s) = liftEffect do
         mesh <- mkMesh spliceGeometry blackMaterial
         setName "Splice" mesh
@@ -82,7 +82,7 @@ spliceGeometry = unsafePerformEffect $ mkBoxGeometry 0.1778 0.02 0.06
 
 
 newtype LFootRenderable = LFootRenderable LFoot
-instance renderableLFoot :: Renderable LFootRenderable Object3D where
+instance renderableLFoot :: Renderable e LFootRenderable Object3D where
     render (LFootRenderable l) = liftEffect do
         bot <- mkMesh lfootBotBox blackMaterial
         setName "bottom" bot
@@ -109,7 +109,7 @@ lfootSideBox = unsafePerformEffect $ mkBoxGeometry 0.047752 0.010668 0.0762
 
 
 newtype ClampRenderable = ClampRenderable Clamp
-instance renderableClamp :: Renderable ClampRenderable Object3D where
+instance renderableClamp :: Renderable e ClampRenderable Object3D where
     render (ClampRenderable c) = liftEffect do
         m <- buildClamp
         setPosition (mkVec3 (meterVal $ c ^. _x)
@@ -118,7 +118,7 @@ instance renderableClamp :: Renderable ClampRenderable Object3D where
         pure m
 
 newtype StopperRenderable = StopperRenderable Stopper
-instance renderableStopper :: Renderable StopperRenderable Mesh where
+instance renderableStopper :: Renderable e StopperRenderable Mesh where
     render (StopperRenderable s) = liftEffect do
         m <- mkMesh stopperCy blackMaterial
         setName "Stopper" m

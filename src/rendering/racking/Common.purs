@@ -44,7 +44,7 @@ buildClamp = do
     pure m
 
 newtype FlashRenderable = FlashRenderable Flash
-instance renderableFlash :: Renderable FlashRenderable Mesh where
+instance renderableFlash :: Renderable e FlashRenderable Mesh where
     render (FlashRenderable f) = liftEffect do
         m <- mkMesh flashGeo blackMaterial
         setName "Flash" m

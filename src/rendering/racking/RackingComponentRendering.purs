@@ -13,7 +13,7 @@ import Rendering.Renderable (class RenderableWithSlope, render, renderWithSlope)
 import Three.Core.Object3D (Object3D, add, mkObject3D, setName)
   
 newtype RackignCompRenderable = RackignCompRenderable RackingComp
-instance renderableRackingComp :: RenderableWithSlope RackignCompRenderable Object3D where
+instance renderableRackingComp :: RenderableWithSlope e RackignCompRenderable Object3D where
     renderWithSlope slope (RackignCompRenderable r) = do
         let f (FX fx)     = render $ FXRackingComponentRenderable fx
             f (XR xr)     = render $ XRRackingComponentRenderable xr

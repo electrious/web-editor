@@ -37,29 +37,29 @@ _idle = _Newtype <<< prop (SProxy :: SProxy "idle")
 
 
 -- | ReRenderable will be ab able to update rendered node with new value
-class Renderable v n <= ReRenderable v n where
-    updateNode :: n -> v -> RenderingM Unit
+class Renderable e v n <= ReRenderable e v n where
+    updateNode :: n -> v -> RenderingM e Unit
 
-newtype CacheRenderingM p c a = CacheRenderingM (StateT (Cache c) (ReaderT p RenderingM) a)
+newtype CacheRenderingM e p c a = CacheRenderingM (StateT (Cache c) (ReaderT p (RenderingM e)) a)
 
-derive newtype instance functorCacheRenderingM     :: Functor (CacheRenderingM p c)
-derive newtype instance applyCacheRenderingM       :: Apply (CacheRenderingM p c)
-derive newtype instance applicativeRenderingM      :: Applicative (CacheRenderingM p c)
-derive newtype instance bindCacheRenderingM        :: Bind (CacheRenderingM p c)
-derive newtype instance monadCacheRenderingM       :: Monad (CacheRenderingM p c)
-derive newtype instance monadStateCacheRenderingM  :: MonadState (Cache c) (CacheRenderingM p c)
-derive newtype instance monadAskCacheRenderingM    :: MonadAsk p (CacheRenderingM p c)
-derive newtype instance monadReaderCacheRenderingM :: MonadReader p (CacheRenderingM p c)
-derive newtype instance monadEffectCacheRenderingM :: MonadEffect (CacheRenderingM p c)
+derive newtype instance functorCacheRenderingM     :: Functor (CacheRenderingM e p c)
+derive newtype instance applyCacheRenderingM       :: Apply (CacheRenderingM e p c)
+derive newtype instance applicativeRenderingM      :: Applicative (CacheRenderingM e p c)
+derive newtype instance bindCacheRenderingM        :: Bind (CacheRenderingM e p c)
+derive newtype instance monadCacheRenderingM       :: Monad (CacheRenderingM e p c)
+derive newtype instance monadStateCacheRenderingM  :: MonadState (Cache c) (CacheRenderingM e p c)
+derive newtype instance monadAskCacheRenderingM    :: MonadAsk p (CacheRenderingM e p c)
+derive newtype instance monadReaderCacheRenderingM :: MonadReader p (CacheRenderingM e p c)
+derive newtype instance monadEffectCacheRenderingM :: MonadEffect (CacheRenderingM e p c)
 
-liftRenderingM :: forall p c a. RenderingM a -> CacheRenderingM p c a
+liftRenderingM :: forall e p c a. RenderingM e a -> CacheRenderingM e p c a
 liftRenderingM r = CacheRenderingM $ lift $ lift r
 
-runCacheRenderingM :: forall p c a. CacheRenderingM p c a -> p -> RenderingM a
+runCacheRenderingM :: forall e p c a. CacheRenderingM e p c a -> p -> RenderingM e a
 runCacheRenderingM (CacheRenderingM m) p = runReaderT (evalStateT m (Cache { rendering: Nil, idle : Nil })) p
 
 -- render a value to a new or idle node, internal use only
-render' :: forall p c cn. IsObject3D p => ReRenderable c cn => c -> CacheRenderingM p cn cn
+render' :: forall e p c cn. IsObject3D p => ReRenderable e c cn => c -> CacheRenderingM e p cn cn
 render' val = do
     c <- get
     let idle = c ^. _idle
@@ -74,7 +74,7 @@ render' val = do
             pure n
 
 -- clean up idle nodes to reduce memory usage
-cleanUpIdle :: forall p cn. Disposable cn => CacheRenderingM p cn Unit
+cleanUpIdle :: forall e p cn. Disposable cn => CacheRenderingM e p cn Unit
 cleanUpIdle = do
     s <- get
 
@@ -89,7 +89,7 @@ cleanUpIdle = do
         liftEffect $ traverse_ dispose i2
 
 -- | render a new value in CacheRenderingM
-render :: forall p c cn. IsObject3D p => ReRenderable c cn => c -> CacheRenderingM p cn Unit
+render :: forall e p c cn. IsObject3D p => ReRenderable e c cn => c -> CacheRenderingM e p cn Unit
 render val = do
     p <- ask
     n <- render' val
@@ -98,7 +98,7 @@ render val = do
     pure unit
 
 -- | rerenderAll will delete all rendered nodes and render new values in the list given
-rerenderAll :: forall p c cn f. IsObject3D p => ReRenderable c cn => Disposable cn => Foldable f => f c -> CacheRenderingM p cn Unit
+rerenderAll :: forall e p c cn f. IsObject3D p => ReRenderable e c cn => Disposable cn => Foldable f => f c -> CacheRenderingM e p cn Unit
 rerenderAll vs = do
     p  <- ask
     st <- get
