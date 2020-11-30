@@ -16,7 +16,7 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.UUID (UUID, emptyUUID, genUUID, parseUUID, toString)
-import Editor.Common.Lenses (_alignment, _center, _id, _leadId, _normal, _orientation, _slope)
+import Editor.Common.Lenses (_alignment, _center, _id, _leadId, _normal, _orientation, _rotation, _slope)
 import Effect (Effect)
 import Foreign.Generic (class Decode, class Encode, decode, defaultOptions, encode, genericDecode, genericEncode)
 import Math as Math
@@ -85,9 +85,6 @@ _coefs = _Newtype <<< prop (SProxy :: SProxy "coefs")
 
 _azimuth :: Lens' RoofPlate Angle
 _azimuth = _Newtype <<< prop (SProxy :: SProxy "azimuth")
-
-_rotation :: Lens' RoofPlate Angle
-_rotation = _Newtype <<< prop (SProxy :: SProxy "rotation")
 
 isFlat :: RoofPlate -> Boolean
 isFlat r = degreeVal (r ^. _slope) < 4.0

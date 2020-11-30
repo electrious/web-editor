@@ -1,6 +1,8 @@
 module Editor.Disposable where
 
 import Prelude
+
+import Data.Default (class Default)
 import Data.Foldable (class Foldable, traverse_)
 import Data.Newtype (class Newtype)
 import Effect (Effect)
@@ -19,6 +21,8 @@ newtype Disposee = Disposee (Effect Unit)
 derive instance newtypeDisposee :: Newtype Disposee _
 instance disposableDisposee :: Disposable Disposee where
     dispose (Disposee d) = d
+instance defaultDisposee :: Default Disposee where
+    def = Disposee $ pure unit
 derive newtype instance semigroupDisposee :: Semigroup Disposee
 derive newtype instance monoidDisposee :: Monoid Disposee
 
