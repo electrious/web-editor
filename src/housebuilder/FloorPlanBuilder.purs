@@ -3,8 +3,8 @@ module HouseBuilder.FloorPlanBuilder where
 import Prelude
 
 import Control.Plus (empty)
-import Data.Default (class Default)
-import Data.Lens (Lens', view, (^.), (.~), (%~))
+import Data.Default (class Default, def)
+import Data.Lens (Lens', (%~), (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Map (delete, insert)
@@ -13,26 +13,13 @@ import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.UUIDMap (UUIDMap)
-import Editor.Common.Lenses (_disposable, _id, _object)
-import Editor.Disposable (class Disposable)
-import Effect (Effect)
+import Editor.Common.Lenses (_id, _name)
+import Effect.Class (liftEffect)
 import FRP.Dynamic (step)
 import FRP.Event (Event, create)
 import Model.HouseBuilder.FloorPlan (FloorPlan, FloorPlanOp(..))
-import Three.Core.Object3D (class IsObject3D, Object3D, mkObject3D, setName)
+import Rendering.Node (Node, node)
 
-newtype FloorPlanBuilder = FloorPlanBuilder {
-    object     :: Object3D,
-    plans      :: Event (Array FloorPlan),
-    disposable :: Effect Unit
-}
-
-derive instance newtypeFloorPlanBuilder :: Newtype FloorPlanBuilder _
-
-instance isObject3DFloorPlanBuilder :: IsObject3D FloorPlanBuilder where
-    toObject3D = view _object
-instance disposableFloorPlanBuilder :: Disposable FloorPlanBuilder where
-    dispose = view _disposable
 
 -- internal data structure to manage floor plans
 newtype FloorPlanState = FloorPlanState {
@@ -64,24 +51,11 @@ applyFloorOp (FPODelete fid) s = renderAll $ s # _floors %~ delete fid
 applyFloorOp (FPOUpdate fp)  s = s # _floors %~ insert (fp ^. _id) fp
                                    # _floorsToRender .~ Nothing
 
-createWrapper :: Effect Object3D
-createWrapper = do
-    wrapper <- mkObject3D
-    setName "floor wrapper" wrapper
-    pure wrapper
-
-mkFloorPlanBuilder :: Effect FloorPlanBuilder
-mkFloorPlanBuilder = do
-    wrapper <- createWrapper
-
-    { event : actFloorEvt, push : updateActive } <- create
-    { event : stEvt, push : updateSt } <- create
+buildFloorPlan :: Node (Event (Array FloorPlan))
+buildFloorPlan = node (def # _name .~ "floor plan builder") do
+    { event : actFloorEvt, push : updateActive } <- liftEffect create
+    { event : stEvt, push : updateSt } <- liftEffect create
 
     let actFloorDyn = step Nothing actFloorEvt
 
-
-    pure $ FloorPlanBuilder {
-        object     : wrapper,
-        plans      : empty,
-        disposable : pure unit
-    }
+    pure empty
