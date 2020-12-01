@@ -139,15 +139,24 @@ dynamic :: forall a. Dynamic (Node a) -> Node (Dynamic a)
 dynamic dyn = do
     parent <- ask
 
-    let rDyn = performDynamic $ flip runNode parent <$> dyn
-        resDyn = fst <$> rDyn
+    let rDyn       = performDynamic $ flip runNode parent <$> dyn
+        resDyn     = fst <$> rDyn
 
-        getLast o = o.last
+        getLast o  = o.last
 
-        f Nothing = pure unit
+        f Nothing  = pure unit
         f (Just d) = dispose d
         
     d <- liftEffect $ subscribeDyn (withLast $ snd <$> rDyn) (getLast >>> f)
     tell $ Disposee d
     
     pure resDyn
+
+dynamic_ :: forall a. Dynamic (Node a) -> Node Unit
+dynamic_ = void <<< dynamic
+
+withDynamic :: forall a b. Dynamic a -> (a -> Node b) -> Node (Dynamic b)
+withDynamic dyn f = dynamic $ f <$> dyn
+
+withDynamic_ :: forall a. Dynamic a -> (a -> Node Unit) -> Node Unit
+withDynamic_ dyn f = dynamic_ $ f <$> dyn
