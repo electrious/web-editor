@@ -11,15 +11,13 @@ import Data.Default (class Default)
 import Data.Lens (Lens', (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Data.Tuple (Tuple(..), fst, snd)
+import Data.Tuple (Tuple(..), fst)
 import Editor.Common.Lenses (_name, _position, _rotation, _scale)
-import Editor.Disposable (Disposee(..), dispose)
+import Editor.Disposable (Disposee(..))
 import Effect (Effect)
 import Effect.Class (class MonadEffect, liftEffect)
-import FRP.Dynamic (Dynamic, performDynamic, subscribeDyn, withLast)
 import FRP.Event (Event, subscribe)
 import Three.Core.Geometry (class IsGeometry)
 import Three.Core.Material (class IsMaterial)
@@ -115,6 +113,10 @@ mkNode prop child func = do
     r <- local (const (toObject3D m)) child
     pure $ Tuple r m
 
+-- empty node
+leaf :: Node Unit
+leaf = pure unit
+
 node :: forall a. Props -> Node a -> Node a
 node prop child = map fst $ mkNode prop child mkObject3D
 
@@ -132,31 +134,3 @@ dragMesh prop geo mat child = mkNode prop child $ mkDraggableMesh geo mat
 
 tapDragMesh :: forall geo mat a. IsGeometry geo => IsMaterial mat => Props -> geo -> mat -> Node a -> Node (Tuple a TapDragMesh)
 tapDragMesh prop geo mat child = mkNode prop child $ mkTapDragMesh geo mat
-
-
--- create node dynamically
-dynamic :: forall a. Dynamic (Node a) -> Node (Dynamic a)
-dynamic dyn = do
-    parent <- ask
-
-    let rDyn       = performDynamic $ flip runNode parent <$> dyn
-        resDyn     = fst <$> rDyn
-
-        getLast o  = o.last
-
-        f Nothing  = pure unit
-        f (Just d) = dispose d
-        
-    d <- liftEffect $ subscribeDyn (withLast $ snd <$> rDyn) (getLast >>> f)
-    tell $ Disposee d
-    
-    pure resDyn
-
-dynamic_ :: forall a. Dynamic (Node a) -> Node Unit
-dynamic_ = void <<< dynamic
-
-withDynamic :: forall a b. Dynamic a -> (a -> Node b) -> Node (Dynamic b)
-withDynamic dyn f = dynamic $ f <$> dyn
-
-withDynamic_ :: forall a. Dynamic a -> (a -> Node Unit) -> Node Unit
-withDynamic_ dyn f = dynamic_ $ f <$> dyn

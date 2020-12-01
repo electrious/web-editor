@@ -3,13 +3,12 @@ module Rendering.Renderable where
 import Prelude hiding (add)
 
 import Control.Monad.Reader (class MonadAsk, class MonadReader, ReaderT, ask, runReaderT, withReaderT)
-import Data.Traversable (class Traversable, traverse, traverse_)
 import Effect (Effect)
-import Effect.Class (class MonadEffect, liftEffect)
+import Effect.Class (class MonadEffect)
 import FRP.Event (Event)
 import FRP.Event.Extra (performEvent)
 import Math.Angle (Angle)
-import Three.Core.Object3D (class IsObject3D, add)
+import Three.Core.Object3D (class IsObject3D)
 
 newtype RenderingM e a = RenderingM (ReaderT e Effect a)
 
@@ -42,22 +41,3 @@ class IsObject3D b <= Renderable e a b where
 
 class IsObject3D b <= RenderableWithSlope e a b where
     renderWithSlope :: Angle -> a -> RenderingM e b
-
-
--- | render a Renderable value and attach it to a parent node
-renderTo :: forall a b e p. IsObject3D p => Renderable e a b => p -> a -> RenderingM e b
-renderTo p = render >=> f
-    where f o = do
-              liftEffect $ add o p
-              pure o
-
--- | render a list of Renderable values to nodes
-renderList :: forall a e n f. Traversable f => Renderable e a n => f a -> RenderingM e (f n)
-renderList = traverse render
-
--- | render a list of Renderable values and attach them to a parent node
-renderListTo :: forall a e n f p. IsObject3D p => Traversable f => Renderable e a n => p -> f a -> RenderingM e (f n)
-renderListTo p = renderList >=> f
-    where f ns = do
-              liftEffect $ traverse_ (flip add p) ns
-              pure ns
