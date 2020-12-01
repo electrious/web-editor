@@ -11,13 +11,15 @@ import Data.Default (class Default)
 import Data.Lens (Lens', (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
+import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Data.Tuple (Tuple(..), fst)
+import Data.Tuple (Tuple(..), fst, snd)
 import Editor.Common.Lenses (_name, _position, _rotation, _scale)
-import Editor.Disposable (Disposee(..))
+import Editor.Disposable (Disposee(..), dispose)
 import Effect (Effect)
 import Effect.Class (class MonadEffect, liftEffect)
+import FRP.Dynamic (Dynamic, performDynamic, subscribeDyn, withLast)
 import FRP.Event (Event, subscribe)
 import Three.Core.Geometry (class IsGeometry)
 import Three.Core.Material (class IsMaterial)
@@ -130,3 +132,22 @@ dragMesh prop geo mat child = mkNode prop child $ mkDraggableMesh geo mat
 
 tapDragMesh :: forall geo mat a. IsGeometry geo => IsMaterial mat => Props -> geo -> mat -> Node a -> Node (Tuple a TapDragMesh)
 tapDragMesh prop geo mat child = mkNode prop child $ mkTapDragMesh geo mat
+
+
+-- create node dynamically
+dynamic :: forall a. Dynamic (Node a) -> Node (Dynamic a)
+dynamic dyn = do
+    parent <- ask
+
+    let rDyn = performDynamic $ flip runNode parent <$> dyn
+        resDyn = fst <$> rDyn
+
+        getLast o = o.last
+
+        f Nothing = pure unit
+        f (Just d) = dispose d
+        
+    d <- liftEffect $ subscribeDyn (withLast $ snd <$> rDyn) (getLast >>> f)
+    tell $ Disposee d
+    
+    pure resDyn
