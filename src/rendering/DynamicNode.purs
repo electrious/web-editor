@@ -13,11 +13,11 @@ import Rendering.Node (Node, runNode)
 import Rendering.NodeRenderable (class NodeRenderable, render)
 
 -- | run a dynamic Node action in a Node context
-dynamic :: forall a. Dynamic (Node a) -> Node (Dynamic a)
+dynamic :: forall e a. Dynamic (Node e a) -> Node e (Dynamic a)
 dynamic dyn = do
-    parent <- ask
+    env <- ask
 
-    let rDyn       = performDynamic $ flip runNode parent <$> dyn
+    let rDyn       = performDynamic $ flip runNode env <$> dyn
         resDyn     = fst <$> rDyn
 
         getLast o  = o.last
@@ -31,9 +31,9 @@ dynamic dyn = do
     pure resDyn
 
 -- | run a dynamic node action in a node context and omit the result
-dynamic_ :: forall a. Dynamic (Node a) -> Node Unit
+dynamic_ :: forall e a. Dynamic (Node e a) -> Node e Unit
 dynamic_ = void <<< dynamic
 
 -- | render a dynamic value in Node
-renderDynamic :: forall a b. NodeRenderable a b => Dynamic a -> Node (Dynamic b)
+renderDynamic :: forall e a b. NodeRenderable e a b => Dynamic a -> Node e (Dynamic b)
 renderDynamic dyn = dynamic $ render <$> dyn

@@ -2,5 +2,5 @@ module Rendering.NodeRenderable where
 
 import Rendering.Node (Node)
 
-class NodeRenderable a b where
-    render :: a -> Node b
+class NodeRenderable e a b where
+    render :: a -> Node e b

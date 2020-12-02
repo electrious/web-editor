@@ -8,7 +8,7 @@ import Control.Monad.Reader (class MonadAsk, class MonadReader, ReaderT, ask, lo
 import Control.Monad.Writer (class MonadTell, class MonadWriter, WriterT, runWriterT)
 import Custom.Mesh (DraggableMesh, TapDragMesh, TappableMesh, mkDraggableMesh, mkTapDragMesh, mkTappableMesh)
 import Data.Default (class Default)
-import Data.Lens (Lens', (^.))
+import Data.Lens (Lens', view, (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
@@ -16,6 +16,7 @@ import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple(..), fst)
 import Editor.Common.Lenses (_name, _position, _rotation, _scale)
 import Editor.Disposable (Disposee(..))
+import Editor.Rendering.PanelRendering (_parent)
 import Effect (Effect)
 import Effect.Class (class MonadEffect, liftEffect)
 import FRP.Event (Event, subscribe)
@@ -26,23 +27,52 @@ import Three.Core.Object3D (class IsObject3D, Object3D, add, mkObject3D, remove,
 import Three.Math.Euler (Euler)
 import Three.Math.Vector (Vector3)
 
-newtype Node a = Node (ReaderT Object3D (WriterT Disposee Effect) a)
+newtype NodeEnv e = NodeEnv {
+    parent :: Object3D,
+    env    :: e
+}
 
-derive instance newtypeNode :: Newtype (Node a) _
+derive instance newtypeNodeEnv :: Newtype (NodeEnv e) _
+instance functorNodeEnv :: Functor NodeEnv where
+    map f e = NodeEnv {
+                parent : e ^. _parent,
+                env    : f (e ^. _env)
+              }
 
-derive newtype instance functorNode     :: Functor Node
-derive newtype instance applyNode       :: Apply Node
-derive newtype instance applicativeNode :: Applicative Node
-derive newtype instance bindNode        :: Bind Node
-derive newtype instance monadNode       :: Monad Node
-derive newtype instance monadEffectNode :: MonadEffect Node
-derive newtype instance monadAskNode    :: MonadAsk Object3D Node
-derive newtype instance monadReaderNode :: MonadReader Object3D Node
-derive newtype instance monadTellNode   :: MonadTell Disposee Node
-derive newtype instance monadWriterNode :: MonadWriter Disposee Node
+_env :: forall t a r. Newtype t { env :: a | r } => Lens' t a
+_env = _Newtype <<< prop (SProxy :: SProxy "env")
 
-runNode :: forall a. Node a -> Object3D -> Effect (Tuple a Disposee)
+
+newtype Node e a = Node (ReaderT (NodeEnv e) (WriterT Disposee Effect) a)
+
+derive instance newtypeNode :: Newtype (Node e a) _
+
+derive newtype instance functorNode     :: Functor (Node e)
+derive newtype instance applyNode       :: Apply (Node e)
+derive newtype instance applicativeNode :: Applicative (Node e)
+derive newtype instance bindNode        :: Bind (Node e)
+derive newtype instance monadNode       :: Monad (Node e)
+derive newtype instance monadEffectNode :: MonadEffect (Node e)
+derive newtype instance monadAskNode    :: MonadAsk (NodeEnv e) (Node e)
+derive newtype instance monadReaderNode :: MonadReader (NodeEnv e) (Node e)
+derive newtype instance monadTellNode   :: MonadTell Disposee (Node e)
+derive newtype instance monadWriterNode :: MonadWriter Disposee (Node e)
+
+-- | run a Node action with NodeEnv
+runNode :: forall e a. Node e a -> NodeEnv e -> Effect (Tuple a Disposee)
 runNode (Node r) = runWriterT <<< runReaderT r
+
+-- | run a child node action in a parent context that has different env value.
+localEnv :: forall ep ec a. (ep -> ec) -> Node ec a -> Node ep a
+localEnv f c = do
+    e <- ask
+    Tuple r d <- liftEffect $ runNode c (f <$> e)
+    tell d
+    pure r
+
+-- | get the env value in Node monad
+getEnv :: forall e. Node e e
+getEnv = view _env <$> ask
 
 -- Define Node properties
 newtype Props = Props {
@@ -97,10 +127,11 @@ setupProps prop o = do
     pure $ Disposee $ d1 *> d2 *> d3
 
 -- internal helper function to create node functions with specified node maker function
-mkNode :: forall a m. IsObject3D m => Props -> Node a -> Effect m -> Node (Tuple a m)
+mkNode :: forall e a m. IsObject3D m => Props -> Node e a -> Effect m -> Node e (Tuple a m)
 mkNode prop child func = do
     m <- liftEffect func
-    parent <- ask
+    env <- ask
+    let parent = env ^. _parent
 
     liftEffect $ add m parent
 
@@ -110,27 +141,28 @@ mkNode prop child func = do
     tell $ d <> Disposee (remove m parent)
     
     -- run child action with the new oobject as parent
-    r <- local (const (toObject3D m)) child
+    let newEnv = env # _parent .~ toObject3D m
+    r <- local (const newEnv) child
     pure $ Tuple r m
 
 -- empty node
-leaf :: Node Unit
+leaf :: forall e. Node e Unit
 leaf = pure unit
 
-node :: forall a. Props -> Node a -> Node a
+node :: forall e a. Props -> Node e a -> Node e a
 node prop child = map fst $ mkNode prop child mkObject3D
 
-mesh :: forall geo mat a. IsGeometry geo => IsMaterial mat => Props -> geo -> mat -> Node a -> Node (Tuple a Mesh)
+mesh :: forall geo mat e a. IsGeometry geo => IsMaterial mat => Props -> geo -> mat -> Node e a -> Node e (Tuple a Mesh)
 mesh prop geo mat child = mkNode prop child $ mkMesh geo mat
 
-mesh' :: forall geo mat a. IsGeometry geo => IsMaterial mat => Props -> geo -> mat -> Node a -> Node a
+mesh' :: forall geo mat e a. IsGeometry geo => IsMaterial mat => Props -> geo -> mat -> Node e a -> Node e a
 mesh' prop geo mat = map fst <<< mesh prop geo mat
 
-tapMesh :: forall geo mat a. IsGeometry geo => IsMaterial mat => Props -> geo -> mat -> Node a -> Node (Tuple a TappableMesh)
+tapMesh :: forall geo mat e a. IsGeometry geo => IsMaterial mat => Props -> geo -> mat -> Node e a -> Node e (Tuple a TappableMesh)
 tapMesh prop geo mat child = mkNode prop child $ mkTappableMesh geo mat
 
-dragMesh :: forall geo mat a. IsGeometry geo => IsMaterial mat => Props -> geo -> mat -> Node a -> Node (Tuple a DraggableMesh)
+dragMesh :: forall geo mat e a. IsGeometry geo => IsMaterial mat => Props -> geo -> mat -> Node e a -> Node e (Tuple a DraggableMesh)
 dragMesh prop geo mat child = mkNode prop child $ mkDraggableMesh geo mat
 
-tapDragMesh :: forall geo mat a. IsGeometry geo => IsMaterial mat => Props -> geo -> mat -> Node a -> Node (Tuple a TapDragMesh)
+tapDragMesh :: forall geo mat e a. IsGeometry geo => IsMaterial mat => Props -> geo -> mat -> Node e a -> Node e (Tuple a TapDragMesh)
 tapDragMesh prop geo mat child = mkNode prop child $ mkTapDragMesh geo mat
