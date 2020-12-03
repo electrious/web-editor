@@ -1,4 +1,4 @@
-module Editor.Rendering.PanelRendering (PanelRendererConfig(..), _parent, _operations,
+module Editor.Rendering.PanelRendering (PanelRendererConfig(..), _operations,
     _opacity, PanelRenderer, _allPanels, createPanelRenderer) where
 
 import Prelude hiding (add)
@@ -20,7 +20,7 @@ import Data.Triple (Triple(..))
 import Data.Tuple (Tuple(..))
 import Data.UUID (UUID)
 import Editor.ArrayBuilder (ArrayBuilder, getArrayConfig, getPanelType, getTextureInfo)
-import Editor.Common.Lenses (_dragged, _tapped)
+import Editor.Common.Lenses (_dragged, _parent, _tapped)
 import Editor.PanelNode (PanelNode, PanelOpacity, _panel, changePanel, changeToNormal, enableShadows, isOpaque, mkPanelNode, moveBy, updateOpacity)
 import Editor.PanelOperation (ArrayOperation(..), PanelOperation(..))
 import Editor.UI.DragInfo (DragInfo)
@@ -42,9 +42,6 @@ newtype PanelRendererConfig = PanelRendererConfig {
 }
 
 derive instance newtypePanelRendererConfig :: Newtype PanelRendererConfig _
-
-_parent :: forall t a r. Newtype t { parent :: a | r } => Lens' t a
-_parent = _Newtype <<< prop (SProxy :: SProxy "parent")
 
 _operations :: forall t a r. Newtype t { operations :: a | r } => Lens' t a
 _operations = _Newtype <<< prop (SProxy :: SProxy "operations")

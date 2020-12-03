@@ -265,3 +265,6 @@ _name = _Newtype <<< prop (SProxy :: SProxy "name")
 
 _apiConfig :: forall t a r. Newtype t { apiConfig :: a | r } => Lens' t a
 _apiConfig = _Newtype <<< prop (SProxy :: SProxy "apiConfig")
+
+_parent :: forall t a r. Newtype t { parent :: a | r } => Lens' t a
+_parent = _Newtype <<< prop (SProxy :: SProxy "parent")
