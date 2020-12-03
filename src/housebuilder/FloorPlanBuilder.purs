@@ -51,11 +51,13 @@ applyFloorOp (FPODelete fid) s = renderAll $ s # _floors %~ delete fid
 applyFloorOp (FPOUpdate fp)  s = s # _floors %~ insert (fp ^. _id) fp
                                    # _floorsToRender .~ Nothing
 
+
+-- | create FloorPlan builder node and setup all events necessary.
 buildFloorPlan :: forall e. Node e (Event (Array FloorPlan))
 buildFloorPlan = node (def # _name .~ "floor plan builder") do
     { event : actFloorEvt, push : updateActive } <- liftEffect create
     { event : stEvt, push : updateSt } <- liftEffect create
 
     let actFloorDyn = step Nothing actFloorEvt
-
+        
     pure empty

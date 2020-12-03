@@ -24,6 +24,7 @@ renderPolygon p mat = do
 
 newtype PolygonRenderable = PolygonRenderable Polygon
 
+
 instance nodeRenderablePolygon :: NodeRenderable MeshBasicMaterial PolygonRenderable TappableMesh where
     render (PolygonRenderable p) = do
         mat <- getEnv
