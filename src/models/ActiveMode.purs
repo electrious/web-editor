@@ -1,10 +1,9 @@
 module Model.ActiveMode where
 
-import Data.Bounded (class Ord)
-import Data.Eq (class Eq)
+import Prelude
+
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Show (class Show)
 
 data ActiveMode = Active
                 | Inactive
@@ -15,3 +14,6 @@ derive instance ordActiveMode :: Ord ActiveMode
 
 instance showActiveMode :: Show ActiveMode where
     show = genericShow
+
+isActive :: ActiveMode -> Boolean
+isActive = (==) Active

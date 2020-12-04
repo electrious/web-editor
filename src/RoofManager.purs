@@ -247,9 +247,9 @@ createRoofManager param meshData roofs panels racks = do
     -- render roofs dynamically
     Tuple renderedNodes d <- renderRoofs wrapper param activeRoof roofsData psDict racks
 
-    let deleteRoofOp  = multicast  $ keepLatest $ getRoofDelete        <$> renderedNodes
-        updateRoofOp  = keepLatest $ getRoofUpdate                     <$> renderedNodes
-        activatedRoof = keepLatest $ getActivated                      <$> renderedNodes
+    let deleteRoofOp  = multicast  $ keepLatest $ getRoofDelete <$> renderedNodes
+        updateRoofOp  = keepLatest $ getRoofUpdate              <$> renderedNodes
+        activatedRoof = keepLatest $ getActivated               <$> renderedNodes
         serverUpdEvt  = multicast $ keepLatest $ foldEvtWith (view _serverUpdated) <$> renderedNodes
         alignEvt      = multicast $ keepLatest $ mergeArrEvt (view _alignment)     <$> renderedNodes
         orientEvt     = multicast $ keepLatest $ mergeArrEvt (view _orientation)   <$> renderedNodes
