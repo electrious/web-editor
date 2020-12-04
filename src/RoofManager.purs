@@ -123,12 +123,12 @@ createWrapper = do
 -- | function to create roof node
 mkNode :: Event (Maybe UUID) -> PanelsDict -> Map Int OldRoofRackingData -> RoofNodeConfig -> RoofPlate -> HouseEditor RoofNode
 mkNode activeRoof panelsDict racks cfg roof = runArrayBuilder rackTypeDyn roofNodeBuilder
-    where roofNodeBuilder = createRoofNode $ cfg # _roof            .~ roof
-                                                 # _roofActive      .~ roofActive
-                                                 # _initPanels      .~ delay 100 (pure ps)
+    where roofNodeBuilder = createRoofNode $ cfg # _roof       .~ roof
+                                                 # _roofActive .~ roofActive
+                                                 # _initPanels .~ delay 100 (pure ps)
 
           rid = roof ^. _id
-          ps = fromMaybe Nil (lookup rid panelsDict)
+          ps  = fromMaybe Nil (lookup rid panelsDict)
           rackType    = fromMaybe XR10 $ guessRackingType <$> lookup (roof ^. _roofIntId) racks
           rackTypeDyn = step rackType empty
           roofActive  = step false $ (==) (Just rid) <$> activeRoof

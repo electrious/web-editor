@@ -48,7 +48,6 @@ import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial, setOpacity, 
 import Three.Core.Mesh (Mesh, geometry, mkMesh)
 import Three.Core.Object3D (class IsObject3D, Object3D, add, matrix, mkObject3D, remove, rotateX, rotateZ, setName, setPosition, setVisible, updateMatrix, updateMatrixWorld, worldToLocal)
 import Three.Math.Vector (Vector3, applyMatrix, mkVec2, mkVec3, vecX, vecY, vecZ)
-import Unsafe.Coerce (unsafeCoerce)
 
 newtype RoofNodeConfig = RoofNodeConfig {
     houseId         :: Int,
@@ -114,7 +113,7 @@ _roofObject = _Newtype <<< prop (SProxy :: SProxy "roofObject")
 
 -- | default material for roof plate.
 defMaterial :: MeshBasicMaterial
-defMaterial = unsafeCoerce $ unsafePerformEffect do
+defMaterial = unsafePerformEffect do
     mat <- mkMeshBasicMaterial 0xffffbb
     setTransparent true mat
     setOpacity 0.7 mat
@@ -122,7 +121,7 @@ defMaterial = unsafeCoerce $ unsafePerformEffect do
 
 -- | material for active roof plate
 activeMaterial :: MeshBasicMaterial
-activeMaterial = unsafeCoerce $ unsafePerformEffect do
+activeMaterial = unsafePerformEffect do
     mat <- mkMeshBasicMaterial 0xffff88
     setTransparent true mat
     setOpacity 0.9 mat
@@ -130,7 +129,7 @@ activeMaterial = unsafeCoerce $ unsafePerformEffect do
 
 -- | material for transparent roof plate
 transparentMaterial :: MeshBasicMaterial
-transparentMaterial = unsafeCoerce $ unsafePerformEffect do
+transparentMaterial = unsafePerformEffect do
     mat <- mkMeshBasicMaterial 0xffffff
     setTransparent true mat
     setOpacity 0.01 mat
