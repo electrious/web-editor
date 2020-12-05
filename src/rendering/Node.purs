@@ -7,7 +7,7 @@ import Control.Monad.RWS (tell)
 import Control.Monad.Reader (class MonadAsk, class MonadReader, ReaderT, ask, local, runReaderT)
 import Control.Monad.Writer (class MonadTell, class MonadWriter, WriterT, runWriterT)
 import Custom.Mesh (DraggableMesh, TapDragMesh, TappableMesh, mkDraggableMesh, mkTapDragMesh, mkTappableMesh)
-import Data.Default (class Default)
+import Data.Default (class Default, def)
 import Data.Lens (Lens', view, (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
@@ -18,13 +18,13 @@ import Editor.Common.Lenses (_name, _parent, _position, _rotation, _scale)
 import Editor.Disposable (Disposee(..))
 import Effect (Effect)
 import Effect.Class (class MonadEffect, liftEffect)
-import FRP.Event (Event, subscribe)
+import FRP.Dynamic (Dynamic, step, subscribeDyn)
 import Three.Core.Geometry (class IsGeometry)
 import Three.Core.Material (class IsMaterial)
 import Three.Core.Mesh (Mesh, mkMesh)
 import Three.Core.Object3D (class IsObject3D, Object3D, add, mkObject3D, remove, setCastShadow, setName, setPosition, setReceiveShadow, setRenderOrder, setRotation, setScale, setVisible, toObject3D)
 import Three.Math.Euler (Euler)
-import Three.Math.Vector (Vector3)
+import Three.Math.Vector (Vector3, mkVec3)
 
 newtype NodeEnv e = NodeEnv {
     parent :: Object3D,
@@ -80,9 +80,9 @@ newtype Props = Props {
     receiveShadow :: Boolean,
     visible       :: Boolean,
     renderOrder   :: Int,
-    position      :: Event Vector3,
-    rotation      :: Event Euler,
-    scale         :: Event Vector3
+    position      :: Dynamic Vector3,
+    rotation      :: Dynamic Euler,
+    scale         :: Dynamic Vector3
     }
 
 derive instance newtypeProps :: Newtype Props _
@@ -94,9 +94,9 @@ instance defaultProps :: Default Props where
         receiveShadow : true,
         visible       : true,
         renderOrder   : 0,
-        position      : empty,
-        rotation      : empty,
-        scale         : empty
+        position      : step def empty,
+        rotation      : step def empty,
+        scale         : step (mkVec3 1.0 1.0 1.0) empty
         }
 
 _castShadow :: forall t a r. Newtype t { castShadow :: a | r } => Lens' t a
@@ -119,9 +119,9 @@ setupProps prop o = do
     setVisible       (prop ^. _visible) o
     setRenderOrder   (prop ^. _renderOrder) o
 
-    d1 <- subscribe (prop ^. _position) (flip setPosition o)
-    d2 <- subscribe (prop ^. _rotation) (flip setRotation o)
-    d3 <- subscribe (prop ^. _scale) (flip setScale o)
+    d1 <- subscribeDyn (prop ^. _position) (flip setPosition o)
+    d2 <- subscribeDyn (prop ^. _rotation) (flip setRotation o)
+    d3 <- subscribeDyn (prop ^. _scale) (flip setScale o)
     
     pure $ Disposee $ d1 *> d2 *> d3
 
