@@ -10,6 +10,7 @@ import Custom.Mesh (TappableMesh)
 import Data.Array (deleteAt, filter, foldl, head, insertAt, length, mapWithIndex, range, snoc, tail, zip, zipWith)
 import Data.Compactable (compact)
 import Data.Default (def)
+import Data.Foldable (class Foldable)
 import Data.Int (toNumber)
 import Data.Lens (Lens', view, (^.), (.~))
 import Data.Lens.Iso.Newtype (_Newtype)
@@ -17,17 +18,16 @@ import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Data.Traversable (sum, traverse_)
+import Data.Traversable (sum)
 import Data.Tuple (Tuple(..), fst, snd)
-import Editor.Common.Lenses (_index, _isDragging, _mesh, _name, _parent, _point, _position, _tapped)
+import Editor.Common.Lenses (_index, _isDragging, _name, _parent, _position, _tapped)
 import Editor.Disposable (Disposee(..))
 import Editor.SceneEvent (SceneTapEvent)
-import Effect (Effect)
 import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, step, subscribeDyn)
 import FRP.Event (Event, create, keepLatest, sampleOn, subscribe)
-import FRP.Event.Extra (anyEvt, mergeArray, multicast, performEvent)
+import FRP.Event.Extra (anyEvt, mergeArray, multicast)
 import Model.Hardware.PanelModel (_isActive)
 import Model.Polygon (Polygon(..))
 import Rendering.DynamicNode (renderEvent)
@@ -35,7 +35,6 @@ import Rendering.Node (Node, _visible, leaf, tapMesh)
 import Rendering.NodeRenderable (class NodeRenderable)
 import Three.Core.Geometry (CircleGeometry, Geometry, mkCircleGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial)
-import Three.Core.Object3D (class IsObject3D, setVisible, toObject3D)
 import Three.Math.Vector (Vector2, Vector3, dist, mkVec2, mkVec3, toVec2, vecX, vecY)
 import UI.DraggableObject (createDraggableObject)
 
@@ -119,19 +118,17 @@ mkPolyDelMarker posEvt visEvt = snd <$> tapMesh (def # _name     .~ "delete-mark
 -- | internal object for middle marker point data
 newtype MidMarkerPoint = MidMarkerPoint {
     position :: Vector2,
-    index    :: Int
+    index    :: Int,
+    isActive :: Dynamic Boolean
 }
 
 derive instance newtypeMidMarkerPoint :: Newtype MidMarkerPoint _
 
 newtype MidMarker = MidMarker {
-    mesh  :: TappableMesh,
-    point :: MidMarkerPoint
+    tapped :: Event MidMarkerPoint
 }
 
 derive instance newtypeMidMarker :: Newtype MidMarker _
-instance isObject3DMidMarker :: IsObject3D MidMarker where
-    toObject3D = toObject3D <<< view _mesh
 
 -- | create material and geometry for the middle marker.
 midMaterial :: MeshBasicMaterial
@@ -147,15 +144,16 @@ instance nodeRenderableMidMarkerPoint :: NodeRenderable e MidMarkerPoint MidMark
         let getPos pos = mkVec3 (vecX pos) (vecY pos) 0.01
         Tuple _ m <- tapMesh (def # _name     .~ "mid-marker"
                                   # _position .~ step (getPos $ p ^. _position) empty
+                                  # _visible  .~ (p ^. _isActive)
                              ) midGeometry midMaterial leaf
         
-        pure $ MidMarker { mesh: m, point: p }
+        pure $ MidMarker { tapped : const p <$> m ^. _tapped }
 
 -- | given a list of vertices position, calculate all middle points
-midMarkerPoints :: Polygon -> Array MidMarkerPoint
-midMarkerPoints (Polygon [])       = []
-midMarkerPoints (Polygon [a])      = []
-midMarkerPoints (Polygon vertices) = h <$> filter g d
+midMarkerPoints :: Dynamic Boolean -> Polygon -> Array MidMarkerPoint
+midMarkerPoints _ (Polygon [])         = []
+midMarkerPoints _ (Polygon [a])        = []
+midMarkerPoints act (Polygon vertices) = h <$> filter g d
     where -- take all vertices and their indices
           v1List = mapWithIndex Tuple vertices
           -- a new list with the head put to end
@@ -166,7 +164,8 @@ midMarkerPoints (Polygon vertices) = h <$> filter g d
                        v1 = snd v
                        point = MidMarkerPoint {
                                  position : mkVec2 ((vecX v1 + vecX v2) / 2.0) ((vecY v1 + vecY v2) / 2.0),
-                                 index    : idx + 1
+                                 index    : idx + 1,
+                                 isActive : act
                                }
                     in { dist: dist v1 v2, point: point }
 
@@ -174,20 +173,13 @@ midMarkerPoints (Polygon vertices) = h <$> filter g d
           g r = r.dist > 1.0
           h r = r.point
 
-setActive :: Array MidMarker -> Boolean -> Effect Unit
-setActive ms active = traverse_ (\m -> setVisible active m) ms
-
 -- | render all middle markers
 mkMidMarkers :: forall e. Event Boolean -> Event Polygon -> Node e (Event MidMarkerPoint)
 mkMidMarkers active polyEvt = do
-    let mPointsEvt = midMarkerPoints <$> polyEvt
-    markers <- renderEvent mPointsEvt
-    let res = performEvent $ lift2 setActive markers active
-        
-        getTap m = const (m ^. _point) <$> (m ^. _mesh ^. _tapped)
-        getTapForAll ms = anyEvt (getTap <$> ms)
-        
-    pure $ keepLatest $ getTapForAll <$> markers
+    let actDyn = step false active
+        mPointsEvt = midMarkerPoints actDyn <$> polyEvt
+    markers :: (Event (Array MidMarker)) <- renderEvent mPointsEvt
+    pure $ keepLatest $ getTapEvt <$> markers
 
 
 -- | calculate the center based on polygon
@@ -215,8 +207,9 @@ getPosition os = Polygon <$> mergeArray (f <$> os)
     where f o = g <$> o ^. _position
           g p = toVec2 p
 
-getDelEvt :: Array VertMarkerObj -> Event Int
-getDelEvt = anyEvt <<< map (view _tapped)
+-- | merge all tapped events in a foldable list of objects support it.
+getTapEvt :: forall t a r f. Functor f => Foldable f => Newtype t { tapped :: Event a | r } => f t -> Event a
+getTapEvt = anyEvt <<< map (view _tapped)
 
 delMarker :: Int -> Polygon -> Polygon
 delMarker idx (Polygon ps) = Polygon $ fromMaybe [] (deleteAt idx ps)
@@ -253,7 +246,7 @@ createPolyEditor active poly = do
         vertsAfterAdd = compact (sampleOn newPolyEvt $ addVert <$> toAddEvt)
 
         -- get delete event of tapping on a marker
-        delEvts = keepLatest $ getDelEvt <$> vertMarkersEvt
+        delEvts = keepLatest $ getTapEvt <$> vertMarkersEvt
         -- calculate new vertices after deleting a vertex
         vertsAfterDel = sampleOn newPolyEvt (delMarker <$> delEvts)
     
