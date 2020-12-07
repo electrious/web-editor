@@ -1,4 +1,5 @@
-module Rendering.DynamicNode where
+module Rendering.DynamicNode (eventNode, eventNode_, renderEvent,
+                              dynamic, dynamic_, renderDynamic) where
 
 import Prelude
 
@@ -7,6 +8,7 @@ import Control.Monad.Writer (tell)
 import Data.Maybe (Maybe(..))
 import Data.Tuple (fst, snd)
 import Editor.Disposable (Disposee(..), dispose)
+import Effect (Effect)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic, performDynamic, subscribeDyn, withLast)
 import FRP.Event (Event, subscribe)
@@ -14,6 +16,15 @@ import FRP.Event as Evt
 import FRP.Event.Extra (performEvent)
 import Rendering.Node (Node, runNode)
 import Rendering.NodeRenderable (class NodeRenderable, render)
+
+
+-- internal help functions
+getLast :: forall a r. { last :: a | r } -> a
+getLast o = o.last
+
+toDispose :: Maybe Disposee -> Effect Unit
+toDispose Nothing  = pure unit
+toDispose (Just d) = dispose d
 
 -- | run an event Node action in a Node context
 eventNode :: forall e a. Event (Node e a) -> Node e (Event a)
@@ -23,11 +34,7 @@ eventNode evt = do
     let rEvt = performEvent $ flip runNode env <$> evt
         resEvt = fst <$> rEvt
 
-        getLast o = o.last
-
-        f Nothing = pure unit
-        f (Just d) = dispose d
-    d <- liftEffect $ subscribe (Evt.withLast $ snd <$> rEvt) (getLast >>> f)
+    d <- liftEffect $ subscribe (Evt.withLast $ snd <$> rEvt) (getLast >>> toDispose)
     tell $ Disposee d
 
     pure resEvt
@@ -47,13 +54,7 @@ dynamic dyn = do
 
     let rDyn       = performDynamic $ flip runNode env <$> dyn
         resDyn     = fst <$> rDyn
-
-        getLast o  = o.last
-
-        f Nothing  = pure unit
-        f (Just d) = dispose d
-        
-    d <- liftEffect $ subscribeDyn (withLast $ snd <$> rDyn) (getLast >>> f)
+    d <- liftEffect $ subscribeDyn (withLast $ snd <$> rDyn) (getLast >>> toDispose)
     tell $ Disposee d
     
     pure resDyn
