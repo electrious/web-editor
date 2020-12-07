@@ -5,7 +5,6 @@ import Data.List (List)
 import Data.Map (Map)
 import Data.Maybe (Maybe)
 import Data.Traversable (traverse)
-import Data.Unit (Unit)
 import Rendering.Node (Node)
 
 class NodeRenderable e a b where
@@ -20,8 +19,3 @@ instance nodeRenderableMap :: NodeRenderable e a b => NodeRenderable e (Map k a)
     render = traverse render
 instance nodeRenderableMaybe :: NodeRenderable e a b => NodeRenderable e (Maybe a) (Maybe b) where
     render = traverse render
-
-
-class NodeReRenderable e a b where
-    updateNode :: a -> b -> Node e Unit
-
