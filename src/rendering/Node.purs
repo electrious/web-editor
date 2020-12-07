@@ -41,6 +41,8 @@ instance functorNodeEnv :: Functor NodeEnv where
 _env :: forall t a r. Newtype t { env :: a | r } => Lens' t a
 _env = _Newtype <<< prop (SProxy :: SProxy "env")
 
+mkNodeEnv :: forall e. Object3D -> e -> NodeEnv e
+mkNodeEnv obj e = NodeEnv { parent : obj, env : e }
 
 newtype Node e a = Node (ReaderT (NodeEnv e) (WriterT Disposee Effect) a)
 
@@ -78,11 +80,11 @@ newtype Props = Props {
     name          :: String,
     castShadow    :: Boolean,
     receiveShadow :: Boolean,
-    visible       :: Boolean,
     renderOrder   :: Int,
     position      :: Dynamic Vector3,
     rotation      :: Dynamic Euler,
-    scale         :: Dynamic Vector3
+    scale         :: Dynamic Vector3,
+    visible       :: Dynamic Boolean
     }
 
 derive instance newtypeProps :: Newtype Props _
@@ -92,11 +94,11 @@ instance defaultProps :: Default Props where
         name          : "node",
         castShadow    : true,
         receiveShadow : true,
-        visible       : true,
         renderOrder   : 0,
         position      : step def empty,
         rotation      : step def empty,
-        scale         : step (mkVec3 1.0 1.0 1.0) empty
+        scale         : step (mkVec3 1.0 1.0 1.0) empty,
+        visible       : step true empty
         }
 
 _castShadow :: forall t a r. Newtype t { castShadow :: a | r } => Lens' t a
@@ -116,14 +118,14 @@ setupProps prop o = do
     setName          (prop ^. _name) o
     setCastShadow    (prop ^. _castShadow) o
     setReceiveShadow (prop ^. _receiveShadow) o
-    setVisible       (prop ^. _visible) o
     setRenderOrder   (prop ^. _renderOrder) o
 
     d1 <- subscribeDyn (prop ^. _position) (flip setPosition o)
     d2 <- subscribeDyn (prop ^. _rotation) (flip setRotation o)
     d3 <- subscribeDyn (prop ^. _scale) (flip setScale o)
+    d4 <- subscribeDyn (prop ^. _visible) (flip setVisible o)
     
-    pure $ Disposee $ d1 *> d2 *> d3
+    pure $ Disposee $ d1 *> d2 *> d3 *> d4
 
 -- internal helper function to create node functions with specified node maker function
 mkNode :: forall e a m. IsObject3D m => Props -> Node e a -> Effect m -> Node e (Tuple a m)

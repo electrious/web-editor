@@ -17,6 +17,7 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (sequence_, traverse, traverse_)
+import Data.Tuple (Tuple(..))
 import Data.UUID (UUID)
 import Editor.ArrayBuilder (ArrayBuilder, _editorMode, _heatmapMaterial, liftRenderingM)
 import Editor.Common.Lenses (_alignment, _center, _houseId, _id, _mesh, _orientation, _panelType, _polygon, _position, _roof, _rotation, _slope, _tapped)
@@ -42,6 +43,7 @@ import Model.Roof.Panel (Alignment(..), Orientation(..), Panel)
 import Model.Roof.RoofPlate (RoofOperation(..), RoofPlate, _azimuth, _borderPoints, _unifiedPoints)
 import Model.RoofSpecific (RoofSpecific, mkRoofSpecific)
 import Model.ShadePoint (ShadePoint, shadePointFrom)
+import Rendering.Node (mkNodeEnv, runNode)
 import SimplePolygon (isSimplePolygon)
 import Three.Core.Geometry (ShapeGeometry, faces, vertices)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial, setOpacity, setTransparent)
@@ -280,7 +282,7 @@ createRoofNode cfg = do
 
         -- create the vertex markers editor
         let canEdit = (&&) <$> isActive <*> canEditRoofDyn
-        editor <- createPolyEditor obj canEdit poly
+        Tuple editor d0 <- runNode (createPolyEditor canEdit poly) (mkNodeEnv obj unit)
 
         let polyDyn = step poly (editor ^. _polygon)
             meshDyn = performDynamic (createRoofMesh <$> polyDyn <*> isActive <*> canEditRoofDyn)
@@ -314,7 +316,7 @@ createRoofNode cfg = do
             roofUpdate    : multicast newRoof,
             tapped        : multicast $ const roof <$> (roofTapEvt <|> roofTapOnPanelEvt),
             roofObject    : obj,
-            disposable    : sequence_ [d1, d2, dispose editor],
+            disposable    : sequence_ [dispose d0, d1, d2],
             currentPanels : panelLayer ^. _currentPanels,
             serverUpdated : panelLayer ^. _serverUpdated,
             alignment     : map (map (view _alignment)) <$> roofSpecActArrEvt,
