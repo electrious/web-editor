@@ -4,7 +4,6 @@ import Prelude hiding (add)
 
 import Control.Alt ((<|>))
 import Control.Monad.Reader (ask)
-import Control.Monad.Writer (tell)
 import Custom.Mesh (DraggableMesh, TapDragMesh, calcDragDelta, validateDrag)
 import Data.Default (def)
 import Data.Filterable (filter)
@@ -16,14 +15,13 @@ import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Tuple (snd)
 import Editor.Common.Lenses (_dragged, _name, _parent, _position, _tapped)
-import Editor.Disposable (Disposee(..))
 import Editor.SceneEvent (isDragEnd, isDragStart)
 import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, step)
-import FRP.Event (Event, create, subscribe)
+import FRP.Event (Event)
 import FRP.Event.Extra (foldWithDef, multicast)
-import Rendering.Node (Node, _renderOrder, _visible, dragMesh, leaf, node, tapDragMesh)
+import Rendering.Node (Node, _renderOrder, _visible, dragMesh, fixNodeE, leaf, node, tapDragMesh)
 import Three.Core.Geometry (class IsGeometry, mkCircleGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial, setOpacity, setTransparent)
 import Three.Core.Object3D (worldToLocal)
@@ -83,44 +81,40 @@ createDraggableObject :: forall e geo. IsGeometry geo =>
                                         -> Maybe geo
                                         -> Maybe MeshBasicMaterial
                                         -> Node e DraggableObject
-createDraggableObject active position customGeo customMat = node (def # _name .~ "drag-object") do
-    { event : newPosEvt, push : pushNewPos } <- liftEffect create
+createDraggableObject active position customGeo customMat =
+    node (def # _name .~ "drag-object") $
+        fixNodeE \newPosEvt ->
+            fixNodeE \isDraggingEvt -> do
+                -- create the visible marker
+                let defPos = mkVec3 (vecX position) (vecY position) 0.1
+                    posDyn = step defPos newPosEvt
+                    visDyn = step false active
+                mesh <- visibleObj posDyn visDyn customGeo customMat
 
-    -- create the visible marker
-    let defPos = mkVec3 (vecX position) (vecY position) 0.1
-        posDyn = step defPos newPosEvt
-        visDyn = step false active
-    mesh <- visibleObj posDyn visDyn customGeo customMat
+                -- create the invisible circle
+                let vis2Dyn = step false isDraggingEvt
+                invCircle <- invisibleCircle posDyn vis2Dyn 10
 
-    { event : isDraggingEvt, push : pushIsDragging } <- liftEffect create
-    -- create the invisible circle
-    let vis2Dyn = step false isDraggingEvt
-    invCircle <- invisibleCircle posDyn vis2Dyn 10
+                let dragEvts = multicast $ mesh ^. _dragged <|> invCircle ^. _dragged
+                    evts     = multicast $ validateDrag dragEvts
+                    startEvt = filter isDragStart evts
+                    endEvt   = filter isDragEnd evts
 
-    let dragEvts = multicast $ mesh ^. _dragged <|> invCircle ^. _dragged
-        evts     = multicast $ validateDrag dragEvts
-        startEvt = filter isDragStart evts
-        endEvt   = filter isDragEnd evts
+                    dragging = multicast $ (const true <$> startEvt) <|> (const false <$> endEvt)
 
-        dragging = (const true <$> startEvt) <|> (const false <$> endEvt)
+                parent <- view _parent <$> ask
+                let toLocal v = Just <$> worldToLocal v parent
+                    delta = calcDragDelta toLocal evts
 
-    d1 <- liftEffect $ subscribe dragging pushIsDragging
+                    -- function to calculate new position with delta
+                    updatePos d lastPos = lastPos <+> zeroZ d
+                    zeroZ v = mkVec3 (vecX v) (vecY v) 0.0
 
-    parent <- view _parent <$> ask
-    let toLocal v = Just <$> worldToLocal v parent
-        delta = calcDragDelta toLocal evts
-
-    -- function to calculate new position with delta
-    let updatePos d lastPos = lastPos <+> zeroZ d
-        zeroZ v = mkVec3 (vecX v) (vecY v) 0.0
-
-        newPos = multicast $ foldWithDef updatePos delta defPos
-    d2 <- liftEffect $ subscribe newPos pushNewPos
-
-    tell $ Disposee $ d1 *> d2
-    
-    pure $ DraggableObject {
-        tapped     : const unit <$> mesh ^. _tapped,
-        position   : newPos,
-        isDragging : multicast dragging
-    }
+                    newPos = multicast $ foldWithDef updatePos delta defPos
+                    
+                    dragObj = DraggableObject {
+                        tapped     : const unit <$> mesh ^. _tapped,
+                        position   : newPos,
+                        isDragging : dragging
+                    }
+                pure { input : dragging, output: { input : newPos, output: dragObj } }

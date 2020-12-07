@@ -19,6 +19,7 @@ import Editor.Disposable (Disposee(..))
 import Effect (Effect)
 import Effect.Class (class MonadEffect, liftEffect)
 import FRP.Dynamic (Dynamic, step, subscribeDyn)
+import FRP.Event (Event, create, subscribe)
 import Three.Core.Geometry (class IsGeometry)
 import Three.Core.Material (class IsMaterial)
 import Three.Core.Mesh (Mesh, mkMesh)
@@ -167,3 +168,24 @@ dragMesh prop geo mat child = mkNode prop child $ mkDraggableMesh geo mat
 
 tapDragMesh :: forall geo mat e a. IsGeometry geo => IsMaterial mat => Props -> geo -> mat -> Node e a -> Node e (Tuple a TapDragMesh)
 tapDragMesh prop geo mat child = mkNode prop child $ mkTapDragMesh geo mat
+
+-- | compute fixed point in Node context
+fixNodeE :: forall e i o. (Event i -> Node e { input :: Event i, output :: o }) -> Node e o
+fixNodeE f = do
+    { event: inEvt, push: pushInput } <- liftEffect create
+    { input: newInEvt, output: out } <- f inEvt
+    d <- liftEffect $ subscribe newInEvt pushInput
+    tell $ Disposee d
+    pure out
+
+-- | compute fixed point with default value in Node context
+fixNodeEWith :: forall e i o. i -> (Event i -> Node e { input :: Event i, output :: o }) -> Node e o
+fixNodeEWith v f = do
+    { event: inEvt, push: pushInput } <- liftEffect create
+    { input: newInEvt, output: out } <- f inEvt
+    d <- liftEffect $ subscribe newInEvt pushInput
+    tell $ Disposee d
+
+    liftEffect $ pushInput v
+
+    pure out

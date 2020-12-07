@@ -4,7 +4,7 @@ import Prelude hiding (add)
 
 import Control.Alt ((<|>))
 import Control.Apply (lift2)
-import Control.Monad.RWS (ask, tell)
+import Control.Monad.RWS (ask)
 import Control.Plus (empty)
 import Custom.Mesh (TappableMesh)
 import Data.Array (deleteAt, filter, head, insertAt, length, mapWithIndex, range, snoc, tail, zip, zipWith)
@@ -21,17 +21,15 @@ import Data.Symbol (SProxy(..))
 import Data.Traversable (sum)
 import Data.Tuple (Tuple(..), fst, snd)
 import Editor.Common.Lenses (_index, _isDragging, _name, _parent, _position, _tapped)
-import Editor.Disposable (Disposee(..))
 import Editor.SceneEvent (SceneTapEvent)
-import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
-import FRP.Dynamic (Dynamic, step, subscribeDyn)
-import FRP.Event (Event, create, keepLatest, sampleOn, subscribe)
+import FRP.Dynamic (Dynamic, dynEvent, step)
+import FRP.Event (Event, keepLatest, sampleOn)
 import FRP.Event.Extra (anyEvt, mergeArray, multicast)
 import Model.Hardware.PanelModel (_isActive)
 import Model.Polygon (Polygon(..))
 import Rendering.DynamicNode (renderEvent)
-import Rendering.Node (Node, _visible, leaf, tapMesh)
+import Rendering.Node (Node, _visible, fixNodeE, fixNodeEWith, leaf, tapMesh)
 import Rendering.NodeRenderable (class NodeRenderable)
 import Three.Core.Geometry (CircleGeometry, Geometry, mkCircleGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial)
@@ -214,56 +212,43 @@ delMarker idx (Polygon ps) = Polygon $ fromMaybe [] (deleteAt idx ps)
 
 -- | create polygon editor
 createPolyEditor :: forall e. Dynamic Boolean -> Polygon -> Node e PolyEditor
-createPolyEditor active poly = do
-    -- internal event for maintaining the polygon active status
-    { event: polyActive, push: setPolyActive } <- liftEffect create
-    -- pipe the 'active' param event into internal polyActive event
-    d1 <- liftEffect $ subscribeDyn active setPolyActive
+createPolyEditor active poly =
+    fixNodeEWith false \polyActive ->
+        fixNodeEWith poly \polyEvt ->
+            fixNodeE \actMarkerEvt -> do
+                -- pipe the 'active' param event into internal polyActive event
+                vertMarkersEvt <- setupVertMarkers polyActive actMarkerEvt polyEvt
 
-    -- event for new list of vertices
-    { event: polyEvt, push: updatePoly } <- liftEffect create
-    -- internal event for currently active marker
-    { event: activeMarker, push: setActiveMarker } <- liftEffect create
+                -- event for active vertex marker
+                let newActMarkerEvt = getVertMarkerActiveStatus vertMarkersEvt
 
-    vertMarkersEvt <- setupVertMarkers polyActive activeMarker polyEvt
+                    -- get new positions after dragging
+                    vertsAfterDrag = keepLatest $ getPosition <$> vertMarkersEvt
 
-    -- event for active vertex marker
-    d2 <- liftEffect $ subscribe (getVertMarkerActiveStatus vertMarkersEvt) setActiveMarker
-
-    -- get new positions after dragging
-    let vertsAfterDrag = keepLatest $ getPosition <$> vertMarkersEvt
-
-        -- merge new vertices after dragging and vertices after adding/deleting
-        newPolyEvt = multicast $ polyEvt <|> vertsAfterDrag
+                    -- merge new vertices after dragging and vertices after adding/deleting
+                    newPolyEvt = multicast $ polyEvt <|> vertsAfterDrag
     
-        midActive = multicast $ lift2 (\pa am -> pa && am == Nothing) polyActive activeMarker
-        -- create mid markers for adding new vertices
-    toAddEvt <- mkMidMarkers midActive newPolyEvt
+                    midActive = multicast $ lift2 (\pa am -> pa && am == Nothing) polyActive actMarkerEvt
+                -- create mid markers for adding new vertices
+                toAddEvt <- mkMidMarkers midActive newPolyEvt
 
-    let addVert p (Polygon pns) = Polygon <$> insertAt (p ^. _index) (p ^. _position) pns
-        vertsAfterAdd = compact (sampleOn newPolyEvt $ addVert <$> toAddEvt)
+                let addVert p (Polygon pns) = Polygon <$> insertAt (p ^. _index) (p ^. _position) pns
+                    vertsAfterAdd = compact (sampleOn newPolyEvt $ addVert <$> toAddEvt)
 
-        -- get delete event of tapping on a marker
-        delEvts = keepLatest $ getTapEvt <$> vertMarkersEvt
-        -- calculate new vertices after deleting a vertex
-        vertsAfterDel = sampleOn newPolyEvt (delMarker <$> delEvts)
+                    -- get delete event of tapping on a marker
+                    delEvts = keepLatest $ getTapEvt <$> vertMarkersEvt
+                    -- calculate new vertices after deleting a vertex
+                    vertsAfterDel = sampleOn newPolyEvt (delMarker <$> delEvts)
     
-    -- update the real vertex list after adding/deleting
-    d3 <- liftEffect $ subscribe (vertsAfterAdd <|> vertsAfterDel) \vs -> do
-            updatePoly vs
-            setPolyActive true
-    
-    tell $ Disposee $ d1 *> d2 *> d3
+                    -- update the real vertex list after adding/deleting
+                    polygonEvt = multicast $ vertsAfterAdd <|> vertsAfterDel
 
-    -- create the polygon delete button
-    polyDel <- mkPolyDelMarker (polyCenter <$> newPolyEvt) polyActive
+                    polyActEvt = dynEvent active <|> (const true <$> polygonEvt)
+                -- create the polygon delete button
+                polyDel <- mkPolyDelMarker (polyCenter <$> newPolyEvt) polyActive
 
-    -- set the default vertices
-    liftEffect $ updatePoly poly
-    -- disable polygon by default
-    liftEffect $ setPolyActive false
-
-    pure $ PolyEditor {
-        polygon    : newPolyEvt,
-        delete     : polyDel ^. _tapped
-    }
+                let editor = PolyEditor {
+                    polygon : newPolyEvt,
+                    delete  : polyDel ^. _tapped
+                    }
+                pure { input: newActMarkerEvt, output: { input: polygonEvt, output : { input: polyActEvt, output: editor } } }
