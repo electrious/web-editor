@@ -7,7 +7,7 @@ import Control.Apply (lift2)
 import Control.Monad.RWS (ask, tell)
 import Control.Plus (empty)
 import Custom.Mesh (TappableMesh)
-import Data.Array (deleteAt, filter, foldl, head, insertAt, length, mapWithIndex, range, snoc, tail, zip, zipWith)
+import Data.Array (deleteAt, filter, head, insertAt, length, mapWithIndex, range, snoc, tail, zip, zipWith)
 import Data.Compactable (compact)
 import Data.Default (def)
 import Data.Foldable (class Foldable)
@@ -40,64 +40,62 @@ import UI.DraggableObject (createDraggableObject)
 
 -----------------------------------------------------------
 -- vertex marker
-newtype VertMarker = VertMarker {
+newtype VertMarkerPoint = VertMarkerPoint {
     position :: Vector2,
     index    :: Int,
     isActive :: Event Boolean
 }
 
-derive instance newtypeVertMarker :: Newtype VertMarker _
+derive instance newtypeVertMarkerPoint :: Newtype VertMarkerPoint _
 
-newtype VertMarkerObj = VertMarkerObj {
+newtype VertMarker = VertMarker {
     tapped     :: Event Int,
     position   :: Event Vector3,
     isDragging :: Event Boolean
 }
 
-derive instance newtypeVertMarkerObj :: Newtype VertMarkerObj _
+derive instance newtypeVertMarker :: Newtype VertMarker _
 
-instance nodeRenderableVertMarker :: NodeRenderable e VertMarker VertMarkerObj where
+instance nodeRenderableVertMarkerPoint :: NodeRenderable e VertMarkerPoint VertMarker where
     render m = do
         dragObj <- createDraggableObject (m ^. _isActive)
                                          (m ^. _position)
                                          (Nothing :: Maybe Geometry)
                                          Nothing
-        pure $ VertMarkerObj {
+        pure $ VertMarker {
             tapped     : const (m ^. _index) <$> dragObj ^. _tapped,
             position   : dragObj ^. _position,
             isDragging : dragObj ^. _isDragging
-            }
+        }
 
--- create a vertex marker 
-mkVertMarker :: Event Boolean -> Event (Maybe Int) -> Tuple Vector2 Int -> VertMarker
-mkVertMarker polyActive actMarker (Tuple pos idx) = VertMarker {
-                                                        position : pos,
-                                                        index    : idx,
-                                                        isActive : isActive
-                                                    }
+-- create a vertex marker point
+mkVertMarkerPoint :: Event Boolean -> Event (Maybe Int) -> Tuple Vector2 Int -> VertMarkerPoint
+mkVertMarkerPoint polyActive actMarker (Tuple pos idx) = VertMarkerPoint {
+                                                             position : pos,
+                                                             index    : idx,
+                                                             isActive : isActive
+                                                         }
     where f act Nothing       = act
           f act (Just actIdx) = act && actIdx == idx
 
-          isActive = multicast $ lift2 f polyActive actMarker
+          isActive = multicast $ f <$> polyActive <*> actMarker
 
 -- create vertex markers for an array of vertices
-mkVertMarkers :: Event Boolean -> Event (Maybe Int) -> Polygon -> Array VertMarker
-mkVertMarkers polyActive actMarker (Polygon ps) = mkVertMarker polyActive actMarker <$> zip ps (range 0 (length ps - 1))
+mkVertMarkerPoints :: Event Boolean -> Event (Maybe Int) -> Polygon -> Array VertMarkerPoint
+mkVertMarkerPoints polyActive actMarker (Polygon ps) = mkVertMarkerPoint polyActive actMarker <$> zip ps (range 0 (length ps - 1))
 
 -- | get vertex markers' active status event
-getVertMarkerActiveStatus :: Event (Array VertMarkerObj) -> Event (Maybe Int)
+getVertMarkerActiveStatus :: Event (Array VertMarker) -> Event (Maybe Int)
 getVertMarkerActiveStatus ms = statusForDragging <|> statusForNewMarker
-    where g idx m = (\d -> if d then Just idx else Nothing) <$> m ^. _isDragging
-          h objs = foldl (<|>) empty (mapWithIndex g objs)
-
-          statusForDragging  = keepLatest $ h <$> ms
+    where g idx m = (if _ then Just idx else Nothing) <$> m ^. _isDragging
+          statusForDragging  = keepLatest $ (anyEvt <<< mapWithIndex g) <$> ms
           statusForNewMarker = const Nothing <$> ms
 
 
 -- create new markers and attach them to the parent object
-setupVertMarkers :: forall e. Event Boolean -> Event (Maybe Int) -> Event Polygon -> Node e (Event (Array VertMarkerObj))
+setupVertMarkers :: forall e. Event Boolean -> Event (Maybe Int) -> Event Polygon -> Node e (Event (Array VertMarker))
 setupVertMarkers polyActive activeMarker polyEvt = renderEvent vertMarkers
-    where vertMarkers = mkVertMarkers polyActive activeMarker <$> polyEvt
+    where vertMarkers = mkVertMarkerPoints polyActive activeMarker <$> polyEvt
 
 -----------------------------------------------------------
 -- Marker to delete the current polygon
@@ -176,7 +174,7 @@ midMarkerPoints act (Polygon vertices) = h <$> filter g d
 -- | render all middle markers
 mkMidMarkers :: forall e. Event Boolean -> Event Polygon -> Node e (Event MidMarkerPoint)
 mkMidMarkers active polyEvt = do
-    let actDyn = step false active
+    let actDyn     = step false active
         mPointsEvt = midMarkerPoints actDyn <$> polyEvt
     markers :: (Event (Array MidMarker)) <- renderEvent mPointsEvt
     pure $ keepLatest $ getTapEvt <$> markers
@@ -202,7 +200,7 @@ _delete :: forall t a r. Newtype t { delete :: a | r } => Lens' t a
 _delete = _Newtype <<< prop (SProxy :: SProxy "delete")
 
 -- get new positions after dragging
-getPosition :: Array VertMarkerObj -> Event Polygon
+getPosition :: Array VertMarker -> Event Polygon
 getPosition os = Polygon <$> mergeArray (f <$> os)
     where f o = g <$> o ^. _position
           g p = toVec2 p
