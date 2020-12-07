@@ -4,12 +4,14 @@ import Prelude hiding (add)
 
 import Control.Alt ((<|>))
 import Control.Apply (lift2)
+import Control.Monad.RWS (ask)
 import Control.Plus (empty)
 import Custom.Mesh (TappableMesh, mkTappableMesh)
 import Data.Array (deleteAt, filter, foldl, head, insertAt, length, mapWithIndex, range, snoc, tail, take, takeEnd, zip, zipWith)
 import Data.Compactable (compact)
+import Data.Default (def)
 import Data.Int (toNumber)
-import Data.Lens (Lens', view, (^.))
+import Data.Lens (Lens', view, (^.), (.~))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..), fromMaybe)
@@ -17,21 +19,25 @@ import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (sequence, sequence_, sum, traverse, traverse_)
 import Data.Tuple (Tuple(..), fst, snd)
-import Editor.Common.Lenses (_disposable, _index, _isDragging, _mesh, _point, _position, _tapped)
+import Editor.Common.Lenses (_disposable, _index, _isDragging, _mesh, _name, _parent, _point, _position, _tapped)
 import Editor.Disposable (class Disposable, dispose)
-import Model.Polygon (Polygon(..))
 import Editor.SceneEvent (SceneTapEvent)
 import Effect (Effect)
+import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
-import FRP.Dynamic (Dynamic, subscribeDyn)
+import FRP.Dynamic (Dynamic, step, subscribeDyn)
 import FRP.Event (Event, create, keepLatest, sampleOn, subscribe)
 import FRP.Event.Extra (foldEffect, mergeArray, multicast, performEvent)
 import Model.Hardware.PanelModel (_isActive)
+import Model.Polygon (Polygon(..))
+import Rendering.DynamicNode (renderEvent)
+import Rendering.Node (Node(..), leaf, tapMesh)
+import Rendering.NodeRenderable (class NodeRenderable, render)
 import Three.Core.Geometry (CircleGeometry, Geometry, mkCircleGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial)
 import Three.Core.Object3D (class IsObject3D, add, remove, setName, setPosition, setVisible, toObject3D)
 import Three.Math.Vector (Vector2, Vector3, dist, mkVec2, mkVec3, toVec2, vecX, vecY)
-import UI.DraggableObject (DraggableObject, createDraggableObject)
+import UI.DraggableObject (DraggableObject(..), createDraggableObject)
 
 -----------------------------------------------------------
 -- vertex marker
@@ -43,15 +49,14 @@ newtype VertMarker = VertMarker {
 
 derive instance newtypeVertMarker :: Newtype VertMarker _
 
-renderVertMarker :: VertMarker -> Effect DraggableObject
-renderVertMarker m = do
-    mesh <- createDraggableObject (m ^. _isActive)
-                                  (m ^. _index)
-                                  (m ^. _position)
-                                  (Nothing :: Maybe Geometry)
-                                  Nothing
-    setName "vertex-marker" mesh
-    pure mesh
+instance nodeRenderableVertMarker :: NodeRenderable e VertMarker DraggableObject where
+    render m = do
+        parent <- view _parent <$> ask
+        mesh <- liftEffect $ createDraggableObject (m ^. _isActive) (m ^. _index) (m ^. _position) (Nothing :: Maybe Geometry) Nothing
+        liftEffect $ setName "vertex-marker" mesh
+        liftEffect $ add mesh parent
+        
+        pure mesh
 
 -- create a vertex marker 
 mkVertMarker :: Event Boolean -> Event (Maybe Int) -> Tuple Vector2 Int -> VertMarker
@@ -78,19 +83,11 @@ getVertMarkerActiveStatus ms = statusForDragging <|> statusForNewMarker
           statusForDragging  = keepLatest $ h <$> ms
           statusForNewMarker = const Nothing <$> ms
 
--- | delete old marker objects and add new ones.
-attachObjs :: forall a. IsObject3D a => a -> Array DraggableObject -> Array DraggableObject -> Effect (Array DraggableObject)
-attachObjs parent newObjs objs = do
-    traverse_ (\o -> remove o parent *> dispose o) objs
-    traverse_ (flip add parent) newObjs
-    pure newObjs
-
 
 -- create new markers and attach them to the parent object
-setupVertMarkers :: forall p. IsObject3D p => p -> Event Boolean -> Event (Maybe Int) -> Event Polygon -> Event (Array DraggableObject)
-setupVertMarkers parent polyActive activeMarker polyEvt = multicast $ foldEffect (attachObjs parent) markerObjs []
-    where vertMarkers = mkVertMarkers polyActive activeMarker    <$> polyEvt
-          markerObjs  = performEvent $ traverse renderVertMarker <$> vertMarkers
+setupVertMarkers :: forall e. Event Boolean -> Event (Maybe Int) -> Event Polygon -> Node e (Event (Array DraggableObject))
+setupVertMarkers polyActive activeMarker polyEvt = renderEvent vertMarkers
+    where vertMarkers = mkVertMarkers polyActive activeMarker <$> polyEvt
 
 -----------------------------------------------------------
 -- Marker to delete the current polygon
@@ -133,13 +130,16 @@ midMaterial = unsafePerformEffect (mkMeshBasicMaterial 0x22ff22)
 midGeometry :: CircleGeometry
 midGeometry = unsafePerformEffect (mkCircleGeometry 0.3 32)
 
-mkMidMarker :: MidMarkerPoint -> Effect MidMarker
-mkMidMarker p = do
-    m <- mkTappableMesh midGeometry midMaterial
-    setName "mid-marker" m
-    let pos = p ^. _position
-    setPosition (mkVec3 (vecX pos) (vecY pos) 0.01) m
-    pure $ MidMarker { mesh: m, point: p }
+instance nodeRenderableMidMarkerPoint :: NodeRenderable e MidMarkerPoint MidMarker where
+    render p = do
+        parent <- view _parent <$> ask
+
+        let getPos pos = mkVec3 (vecX pos) (vecY pos) 0.01
+        Tuple _ m <- tapMesh (def # _name     .~ "mid-marker"
+                                  # _position .~ step (getPos $ p ^. _position) empty
+                             ) midGeometry midMaterial leaf
+        
+        pure $ MidMarker { mesh: m, point: p }
 
 -- | given a list of vertices position, calculate all middle points
 midMarkerPositions :: Polygon -> Array MidMarkerPoint
@@ -189,8 +189,8 @@ updateMarkers parent ps oldObjs | length ps == length oldObjs = sequence (zipWit
                                         pure updObjs
                                 | otherwise = pure oldObjs
 
-mkMidMarkers :: forall a. IsObject3D a => a -> Event Boolean -> Event Polygon -> Event MidMarkerPoint
-mkMidMarkers parent active polyEvt = keepLatest $ getTapForAll <$> markers
+mkMidMarkers :: forall e. Event Boolean -> Event Polygon -> Node e (Event MidMarkerPoint)
+mkMidMarkers active polyEvt = keepLatest $ getTapForAll <$> markers
     where mPosList = midMarkerPositions <$> polyEvt
           markers = multicast $ foldEffect (updateMarkers parent) mPosList []
           res = performEvent $ lift2 setActive markers active
@@ -235,24 +235,25 @@ delMarker :: Int -> Polygon -> Polygon
 delMarker idx (Polygon ps) = Polygon $ fromMaybe [] (deleteAt idx ps)
 
 -- | create polygon editor
-createPolyEditor :: forall a. IsObject3D a => a -> Dynamic Boolean -> Polygon -> Effect PolyEditor
-createPolyEditor parent active poly = do
+createPolyEditor :: forall e. Dynamic Boolean -> Polygon -> Node e PolyEditor
+createPolyEditor active poly = do
     -- internal event for maintaining the polygon active status
-    { event: polyActive, push: setPolyActive } <- create
+    { event: polyActive, push: setPolyActive } <- liftEffect create
     -- pipe the 'active' param event into internal polyActive event
-    d1 <- subscribeDyn active setPolyActive
+    d1 <- liftEffect $ subscribeDyn active setPolyActive
 
     -- event for new list of vertices
-    { event: polyEvt, push: updatePoly } <- create
+    { event: polyEvt, push: updatePoly } <- liftEffect create
     -- internal event for currently active marker
-    { event: activeMarker, push: setActiveMarker } <- create
+    { event: activeMarker, push: setActiveMarker } <- liftEffect create
 
-    let vertMarkers = setupVertMarkers parent polyActive activeMarker polyEvt
+    vertMarkersEvt <- setupVertMarkers polyActive activeMarker polyEvt
+
     -- event for active vertex marker
-    d2 <- subscribe (getVertMarkerActiveStatus vertMarkers) setActiveMarker
+    d2 <- liftEffect $ subscribe (getVertMarkerActiveStatus vertMarkersEvt) setActiveMarker
 
     -- get new positions after dragging
-    let vertsAfterDrag = keepLatest $ getPosition <$> vertMarkers
+    let vertsAfterDrag = keepLatest $ getPosition <$> vertMarkersEvt
 
         -- merge new vertices after dragging and vertices after adding/deleting
         newPolyEvt = multicast $ polyEvt <|> vertsAfterDrag
