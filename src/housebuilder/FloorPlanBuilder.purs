@@ -3,30 +3,27 @@ module HouseBuilder.FloorPlanBuilder where
 import Prelude
 
 import Control.Plus (empty)
-import Custom.Mesh (TappableMesh)
 import Data.Compactable (compact)
 import Data.Default (class Default, def)
-import Data.FunctorWithIndex (mapWithIndex)
 import Data.Lens (Lens', view, (%~), (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.Map (delete, insert, lookup)
+import Data.Map (delete, insert)
 import Data.Map as M
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
-import Data.UUID (UUID)
 import Data.UUIDMap (UUIDMap)
-import Editor.Common.Lenses (_id, _name, _tapped)
-import FRP.Dynamic (Dynamic, latestEvt, sampleDyn, step)
+import Editor.Common.Lenses (_deleted, _id, _name, _tapped, _updated)
+import FRP.Dynamic (Dynamic, latestEvt, step)
 import FRP.Event (Event)
 import FRP.Event.Extra (anyEvt, multicast)
+import HouseBuilder.FloorPlanNode (FloorPlanConfig(..), FloorPlanNode, createFloorNode)
 import Model.ActiveMode (ActiveMode(..))
 import Model.HouseBuilder.FloorPlan (FloorPlan, FloorPlanOp(..))
 import Rendering.DynamicNode (dynamic)
-import Rendering.Node (Node, fixNodeEWith, localEnv, node)
-import Rendering.NodeRenderable (render)
+import Rendering.Node (Node, fixNodeEWith, node)
 
 
 -- internal data structure to manage floor plans
@@ -59,22 +56,22 @@ applyFloorOp (FPODelete fid) s = renderAll $ s # _floors %~ delete fid
 applyFloorOp (FPOUpdate fp)  s = s # _floors %~ insert (fp ^. _id) fp
                                    # _floorsToRender .~ Nothing
 
+
+renderPlan :: forall e. Dynamic ActiveMode -> FloorPlan -> Node e FloorPlanNode
+renderPlan actDyn fp = createFloorNode (FloorPlanConfig { floor : fp, active : actDyn })
+
 -- | render all dynamic floor plans and get the tap event on any one of them
-renderPlans :: forall e. Dynamic (UUIDMap FloorPlan) -> Dynamic (Maybe FloorPlan) -> Node e (Event UUID)
+renderPlans :: forall e. Dynamic (UUIDMap FloorPlan) -> Dynamic (Maybe FloorPlan) -> Node e (Dynamic (UUIDMap FloorPlanNode))
 renderPlans psDyn actP = do
     let checkMode fp Nothing  = Inactive
         checkMode fp (Just a) = if fp == a then Active else Inactive
 
         -- render each floor plan with active mode dynamic as local env
-        doRender fp = localEnv (const $ checkMode fp <$> actP) (render fp)
-    meshMapDyn :: Dynamic (UUIDMap TappableMesh) <- dynamic $ traverse doRender <$> psDyn
+        doRender fp = renderPlan (checkMode fp <$> actP) fp
+    dynamic $ traverse doRender <$> psDyn
 
-    -- get tap events from all rendered plans
-    let tapPlan i m = const i <$> m ^. _tapped
-        tapEvt = latestEvt $ (anyEvt <<< mapWithIndex tapPlan) <$> meshMapDyn
-    pure tapEvt
-
-
+getNodeEvt :: forall a. (FloorPlanNode -> Event a) -> Dynamic (UUIDMap FloorPlanNode) -> Event a
+getNodeEvt f = multicast <<< latestEvt <<< map (anyEvt <<< map f)
 
 -- | create FloorPlan builder node and setup all events necessary.
 buildFloorPlan :: forall e. Node e (Event (Array FloorPlan))
@@ -86,9 +83,11 @@ buildFloorPlan = node (def # _name .~ "floor plan builder") $
                 plansDyn    = step M.empty plansEvt
 
             -- render the floor plans
-            planTapEvt <- renderPlans plansDyn actFloorDyn
-
+            nodesMapDyn <- renderPlans plansDyn actFloorDyn
+            
             -- get the tapped floor plan and set it active
-            let planTappedEvt = multicast $ sampleDyn plansDyn (lookup <$> planTapEvt)
+            let planTappedEvt = Just <$> getNodeEvt (view _tapped) nodesMapDyn
+                planUpdEvt = getNodeEvt (view _updated) nodesMapDyn
+                planDelEvt = getNodeEvt (view _deleted) nodesMapDyn
 
             pure { input : empty, output : { input : planTappedEvt, output : empty } }

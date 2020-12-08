@@ -34,7 +34,7 @@ activeMat :: MeshBasicMaterial
 activeMat = unsafePerformEffect do
     mat <- mkMeshBasicMaterial 0xffff88
     setTransparent true mat
-    setopacity 0.9 mat
+    setOpacity 0.9 mat
     pure mat
 
 -- | mesh material for inactive floor plan
