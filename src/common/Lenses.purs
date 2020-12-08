@@ -268,3 +268,12 @@ _apiConfig = _Newtype <<< prop (SProxy :: SProxy "apiConfig")
 
 _parent :: forall t a r. Newtype t { parent :: a | r } => Lens' t a
 _parent = _Newtype <<< prop (SProxy :: SProxy "parent")
+
+_updated :: forall t a r. Newtype t { updated :: a | r } => Lens' t a
+_updated = _Newtype <<< prop (SProxy :: SProxy "updated")
+
+_deleted :: forall t a r. Newtype t { deleted :: a | r } => Lens' t a
+_deleted = _Newtype <<< prop (SProxy :: SProxy "deleted")
+
+_active :: forall t a r. Newtype t { active :: a | r } => Lens' t a
+_active = _Newtype <<< prop (SProxy :: SProxy "active")

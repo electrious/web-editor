@@ -249,6 +249,6 @@ createPolyEditor active poly =
 
                 let editor = PolyEditor {
                     polygon : newPolyEvt,
-                    delete  : polyDel ^. _tapped
+                    delete  : multicast $ polyDel ^. _tapped
                     }
                 pure { input: newActMarkerEvt, output: { input: polygonEvt, output : { input: polyActEvt, output: editor } } }

@@ -83,8 +83,8 @@ newtype RoofNode = RoofNode {
     roofId        :: UUID,
     roof          :: RoofPlate,
     -- roof plate editing operation events
-    roofUpdate    :: Event RoofOperation,
-    roofDelete    :: Event RoofOperation,
+    updated       :: Event RoofOperation,
+    deleted       :: Event RoofOperation,
     tapped        :: Event RoofPlate,
 
     roofObject    :: Object3D,
@@ -103,12 +103,6 @@ instance isObject3DRoofNode :: IsObject3D RoofNode where
     toObject3D = view _roofObject
 instance disposableRoofNode :: Disposable RoofNode where
     dispose (RoofNode { disposable }) = disposable
-
-_roofUpdate :: Lens' RoofNode (Event RoofOperation)
-_roofUpdate = _Newtype <<< prop (SProxy :: SProxy "roofUpdate")
-
-_roofDelete :: Lens' RoofNode (Event RoofOperation)
-_roofDelete = _Newtype <<< prop (SProxy :: SProxy "roofDelete")
 
 _roofObject :: Lens' RoofNode Object3D
 _roofObject = _Newtype <<< prop (SProxy :: SProxy "roofObject")
@@ -312,8 +306,8 @@ createRoofNode cfg = do
         pure $ RoofNode {
             roofId        : rid,
             roof          : roof,
-            roofDelete    : multicast $ const (RoofOpDelete rid) <$> delRoofEvt,
-            roofUpdate    : multicast newRoof,
+            deleted       : multicast $ const (RoofOpDelete rid) <$> delRoofEvt,
+            updated       : multicast newRoof,
             tapped        : multicast $ const roof <$> (roofTapEvt <|> roofTapOnPanelEvt),
             roofObject    : obj,
             disposable    : sequence_ [dispose d0, d1, d2],

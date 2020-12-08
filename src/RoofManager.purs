@@ -27,7 +27,7 @@ import Data.UUID (UUID)
 import Data.UUIDMap (UUIDMap)
 import Data.UUIDMap as UM
 import Editor.ArrayBuilder (runArrayBuilder)
-import Editor.Common.Lenses (_alignment, _disposable, _face, _geometry, _houseId, _id, _mesh, _modeDyn, _mouseMove, _orientation, _panelType, _point, _roof, _roofId, _roofs, _tapped, _verticeTree, _wrapper)
+import Editor.Common.Lenses (_alignment, _deleted, _disposable, _face, _geometry, _houseId, _id, _mesh, _modeDyn, _mouseMove, _orientation, _panelType, _point, _roof, _roofId, _roofs, _tapped, _updated, _verticeTree, _wrapper)
 import Editor.Disposable (class Disposable, dispose)
 import Editor.EditorMode (EditorMode(..))
 import Editor.House (HouseMeshData)
@@ -36,7 +36,7 @@ import Editor.PanelLayer (_currentPanels, _initPanels, _mainOrientation, _roofAc
 import Editor.PanelNode (PanelOpacity(..))
 import Editor.PolygonAdder (PolygonAdder, _addedPoint, createPolygonAdder)
 import Editor.Rendering.PanelRendering (_opacity)
-import Editor.RoofNode (RoofNode, RoofNodeConfig, _roofDelete, _roofUpdate, createRoofNode)
+import Editor.RoofNode (RoofNode, RoofNodeConfig, createRoofNode)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic, gateDyn, step)
@@ -103,11 +103,11 @@ foldEvtWith f l = foldl (<|>) empty (f <$> l)
 
 -- | get roofUpdate event from an array of roof nodes
 getRoofUpdate :: forall f. Foldable f => Functor f => f RoofNode -> Event RoofOperation
-getRoofUpdate = foldEvtWith (view _roofUpdate)
+getRoofUpdate = foldEvtWith (view _updated)
 
 -- | get roofDelete event from an array of roof nodes
 getRoofDelete :: forall f. Foldable f => Functor f => f RoofNode -> Event RoofOperation
-getRoofDelete = foldEvtWith (view _roofDelete)
+getRoofDelete = foldEvtWith (view _deleted)
 
 -- | get the activated roof id event from an array of roof nodes
 getActivated :: forall f. Foldable f => Functor f => f RoofNode -> Event UUID
