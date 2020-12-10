@@ -2,6 +2,7 @@ module HouseBuilder.FloorPlanBuilder where
 
 import Prelude
 
+import Control.Alt ((<|>))
 import Control.Monad.Reader (ask)
 import Control.Plus (empty)
 import Data.Compactable (compact)
@@ -16,19 +17,20 @@ import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
 import Data.UUIDMap (UUIDMap)
-import Editor.Common.Lenses (_deleted, _face, _id, _mouseMove, _name, _parent, _point, _tapped, _updated)
-import Editor.PolygonAdder (createPolygonAdder, mkCandidatePoint)
+import Editor.Common.Lenses (_deleted, _face, _id, _mouseMove, _name, _parent, _point, _position, _tapped, _updated)
+import Editor.PolygonAdder (_addedPoint, createPolygonAdder, mkCandidatePoint)
 import Editor.SceneEvent (SceneMouseMoveEvent)
 import FRP.Dynamic (Dynamic, gateDyn, latestEvt, step)
-import FRP.Event (Event)
+import FRP.Event (Event, fold)
 import FRP.Event.Extra (anyEvt, multicast, performEvent)
 import HouseBuilder.FloorPlanNode (FloorPlanConfig(..), FloorPlanNode, createFloorNode)
 import Model.ActiveMode (ActiveMode(..))
-import Model.HouseBuilder.FloorPlan (FloorPlan, FloorPlanOp(..))
+import Model.HouseBuilder.FloorPlan (FloorPlan, FloorPlanOp(..), newFloorPlan)
 import Rendering.DynamicNode (dynamic)
 import Rendering.Node (Node, fixNodeEWith, node)
 import Three.Core.Face3 (normal)
 import Three.Core.Object3D (worldToLocal)
+import Three.Math.Vector (toVec2)
 
 newtype FloorPlanBuilderConf = FloorPlanBuilderConf {
     mouseMove :: Event SceneMouseMoveEvent,
@@ -119,5 +121,13 @@ buildFloorPlan conf = node (def # _name .~ "floor plan builder") $
                 candPntDyn = step Nothing $ performEvent $ getCandPoint <$> gateDyn canShowAdder mouseEvt
             -- add PolygonAdder
             adder <- createPolygonAdder candPntDyn canShowAdder
+            let addedNewFloor = performEvent $ newFloorPlan <<< toVec2 <<< view _position <$> (adder ^. _addedPoint)
+                planAddEvt = FPOCreate <$> addedNewFloor
 
-            pure { input : empty, output : { input : planTappedEvt, output : empty } }
+                -- combine all floor plan operations
+                opEvt = planAddEvt <|> planDelEvt <|> planUpdEvt
+
+                -- apply operations to update the internal state
+                newStEvt = fold applyFloorOp opEvt def
+
+            pure { input : newStEvt, output : { input : planTappedEvt, output : empty } }

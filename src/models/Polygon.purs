@@ -4,7 +4,9 @@ import Prelude
 
 import Control.Monad.Writer (tell)
 import Custom.Mesh (TappableMesh, mkTappableMesh)
+import Data.Array (fromFoldable)
 import Data.Default (def)
+import Data.Foldable (class Foldable)
 import Data.Lens (Lens', (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Newtype (class Newtype)
@@ -19,7 +21,7 @@ import Rendering.NodeRenderable (class NodeRenderable)
 import Three.Core.Geometry (mkShape, mkShapeGeometry)
 import Three.Core.Material (MeshBasicMaterial)
 import Three.Core.Mesh (setMaterial)
-import Three.Math.Vector (Vector2)
+import Three.Math.Vector (Vector2, mkVec2, vecX, vecY)
 
 newtype Polygon = Polygon (Array Vector2)
 
@@ -28,6 +30,21 @@ derive instance eqPolygon :: Eq Polygon
 
 _polyVerts :: Lens' Polygon (Array Vector2)
 _polyVerts = _Newtype
+
+-- | create a Polygon from a list of Vectors
+newPolygon :: forall f. Foldable f => f Vector2 -> Polygon
+newPolygon = fromFoldable >>> Polygon
+
+-- | create a Polygon around a central vector
+polygonAround :: Vector2 -> Polygon
+polygonAround p = newPolygon [p1, p2, p3, p4, p1]
+    where x = vecX p
+          y = vecY p
+          l = 1.0
+          p1 = mkVec2 (x - l) (y - l)
+          p2 = mkVec2 (x - l) (y + l)
+          p3 = mkVec2 (x + l) (y + l)
+          p4 = mkVec2 (x + l) (y - l)
 
 
 instance nodeRenderablePolygon :: NodeRenderable (Dynamic MeshBasicMaterial) Polygon TappableMesh where
