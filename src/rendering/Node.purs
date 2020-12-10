@@ -11,8 +11,10 @@ import Data.Default (class Default, def)
 import Data.Lens (Lens', view, (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
+import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
+import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..), fst)
 import Editor.Common.Lenses (_name, _parent, _position, _rotation, _scale)
 import Editor.Disposable (Disposee(..))
@@ -23,7 +25,7 @@ import FRP.Event (Event, create, subscribe)
 import Three.Core.Geometry (class IsGeometry)
 import Three.Core.Material (class IsMaterial)
 import Three.Core.Mesh (Mesh, mkMesh)
-import Three.Core.Object3D (class IsObject3D, Object3D, add, mkObject3D, remove, setCastShadow, setName, setPosition, setReceiveShadow, setRenderOrder, setRotation, setScale, setVisible, toObject3D)
+import Three.Core.Object3D (class IsObject3D, Object3D, add, lookAt, mkObject3D, remove, setCastShadow, setName, setPosition, setReceiveShadow, setRenderOrder, setRotation, setScale, setVisible, toObject3D)
 import Three.Math.Euler (Euler)
 import Three.Math.Vector (Vector3, mkVec3)
 
@@ -85,6 +87,7 @@ newtype Props = Props {
     position      :: Dynamic Vector3,
     rotation      :: Dynamic Euler,
     scale         :: Dynamic Vector3,
+    target        :: Dynamic (Maybe Vector3),
     visible       :: Dynamic Boolean
     }
 
@@ -99,6 +102,7 @@ instance defaultProps :: Default Props where
         position      : step def empty,
         rotation      : step def empty,
         scale         : step (mkVec3 1.0 1.0 1.0) empty,
+        target        : step Nothing empty,
         visible       : step true empty
         }
 
@@ -107,6 +111,9 @@ _castShadow = _Newtype <<< prop (SProxy :: SProxy "castShadow")
 
 _receiveShadow :: forall t a r. Newtype t { receiveShadow :: a | r } => Lens' t a
 _receiveShadow = _Newtype <<< prop (SProxy :: SProxy "receiveShadow")
+
+_target :: forall t a r. Newtype t { target :: a | r } => Lens' t a
+_target = _Newtype <<< prop (SProxy :: SProxy "target")
 
 _visible :: forall t a r. Newtype t { visible :: a | r } => Lens' t a
 _visible = _Newtype <<< prop (SProxy :: SProxy "visible")
@@ -125,8 +132,9 @@ setupProps prop o = do
     d2 <- subscribeDyn (prop ^. _rotation) (flip setRotation o)
     d3 <- subscribeDyn (prop ^. _scale) (flip setScale o)
     d4 <- subscribeDyn (prop ^. _visible) (flip setVisible o)
+    d5 <- subscribeDyn (prop ^. _target) (traverse (flip lookAt o))
     
-    pure $ Disposee $ d1 *> d2 *> d3 *> d4
+    pure $ Disposee $ d1 *> d2 *> d3 *> d4 *> d5
 
 -- internal helper function to create node functions with specified node maker function
 mkNode :: forall e a m. IsObject3D m => Props -> Node e a -> Effect m -> Node e (Tuple a m)

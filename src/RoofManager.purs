@@ -47,6 +47,7 @@ import Model.Racking.RackingType (RackingType(..))
 import Model.Roof.Panel (Alignment(..), Orientation(..), Panel, PanelsDict, generalOrientation, panelsDict)
 import Model.Roof.RoofPlate (RoofEdited, RoofOperation(..), RoofPlate, _roofIntId, newRoofPlate, toRoofEdited)
 import Model.RoofSpecific (_value)
+import Rendering.Node (Node, mkNodeEnv, runNode)
 import Three.Core.Face3 (normal)
 import Three.Core.Object3D (class IsObject3D, Object3D, add, mkObject3D, remove, setName, worldToLocal)
 
@@ -193,26 +194,21 @@ isRoofEditing :: HouseEditor (Dynamic Boolean)
 isRoofEditing = map ((==) RoofEditing) <<< view _modeDyn <$> ask
 
 -- | function to add the roof recognizer and recognize new roofs
-recognizeNewRoofs :: HouseMeshData -> Object3D -> Event RoofDict -> Dynamic (Maybe UUID) -> Dynamic Boolean -> Effect PolygonAdder
-recognizeNewRoofs meshData wrapper newRoofs activeRoof canEditRoofDyn = do
-    let canShowAdder = (&&) <$> (isNothing <$> activeRoof) <*> canEditRoofDyn
-        houseWrapper = meshData ^. _wrapper
-        roofs        = UM.toUnfoldable <$> newRoofs
-        getCandidatePoint evt rs = do
-            isRoof <- couldBeRoof houseWrapper rs evt
-            if isRoof
-            then do
-                np <- worldToLocal (evt ^. _point) houseWrapper
-                pure $ Just { position: np, faceNormal: normal (evt ^. _face) }
-            else pure Nothing
+recognizeNewRoofs :: forall e . HouseMeshData -> Object3D -> Event RoofDict -> Dynamic (Maybe UUID) -> Dynamic Boolean -> Node e PolygonAdder
+recognizeNewRoofs meshData wrapper newRoofs activeRoof canEditRoofDyn = createPolygonAdder point canShowAdder
+    where canShowAdder = (&&) <$> (isNothing <$> activeRoof) <*> canEditRoofDyn
+          houseWrapper = meshData ^. _wrapper
+          roofs        = UM.toUnfoldable <$> newRoofs
+          getCandidatePoint evt rs = do
+              isRoof <- couldBeRoof houseWrapper rs evt
+              if isRoof
+                  then do
+                      np <- worldToLocal (evt ^. _point) houseWrapper
+                      pure $ Just { position: np, faceNormal: normal (evt ^. _face) }
+                  else pure Nothing
         
-        mouseMoveEvt = meshData ^. _mesh <<< _mouseMove
-        point = step Nothing $ performEvent $ sampleOn roofs (getCandidatePoint <$> gateDyn canShowAdder mouseMoveEvt)
-
-    -- create the roof recognizer and add it to the roof wrapper object
-    adder <- createPolygonAdder point canShowAdder 
-    add adder wrapper
-    pure adder
+          mouseMoveEvt = meshData ^. _mesh <<< _mouseMove
+          point = step Nothing $ performEvent $ sampleOn roofs (getCandidatePoint <$> gateDyn canShowAdder mouseMoveEvt)
 
 getActiveRoof :: HouseMeshData -> Event UUID -> Event RoofOperation -> Event RoofPlate -> Event (Maybe UUID)
 getActiveRoof meshData activated deleteRoofOp addedNewRoof =
@@ -260,7 +256,7 @@ createRoofManager param meshData roofs panels racks = do
         flattened = performEvent $ doFlatten meshData <$> newRoofs
 
     -- recognize new roofs
-    adder <- liftEffect $ recognizeNewRoofs meshData wrapper newRoofs activeRoofDyn canEditRoofDyn
+    Tuple adder adderDisp <- liftEffect $ runNode (recognizeNewRoofs meshData wrapper newRoofs activeRoofDyn canEditRoofDyn) (mkNodeEnv wrapper unit)
     let mkRoof p     = newRoofPlate p.position p.faceNormal
         addedNewRoof = performEvent $ mkRoof <$> adder ^. _addedPoint
         addRoofOp    = RoofOpCreate <$> addedNewRoof
@@ -291,5 +287,5 @@ createRoofManager param meshData roofs panels racks = do
         alignment     : map (view _value) <$> alignEvt,
         orientation   : map (view _value) <$> orientEvt,
         serverUpdated : serverUpdEvt,
-        disposable    : sequence_ [d, d1, d2, dispose adder]
+        disposable    : sequence_ [d, d1, d2, dispose adderDisp]
     }
