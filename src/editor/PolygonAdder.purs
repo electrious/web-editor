@@ -3,7 +3,6 @@ module Editor.PolygonAdder where
 import Prelude
 
 import Control.Monad.RWS (ask)
-import Custom.Mesh (TappableMesh)
 import Data.Compactable (compact)
 import Data.Default (def)
 import Data.Lens (Lens', view, (.~), (^.))
@@ -36,10 +35,18 @@ _addedPoint :: forall t a r. Newtype t { addedPoint :: a | r } => Lens' t a
 _addedPoint = _Newtype <<< prop (SProxy :: SProxy "addedPoint")
 
 -- | Candidate point that will allow user to show the adder marker
-type CandidatePoint = {
+newtype CandidatePoint = CandidatePoint {
     position   :: Vector3,
     faceNormal :: Vector3
 }
+
+derive instance newtypeCandidatePoint :: Newtype CandidatePoint _
+
+_faceNormal :: forall t a r. Newtype t { faceNormal :: a | r } => Lens' t a
+_faceNormal = _Newtype <<< prop (SProxy :: SProxy "faceNormal")
+
+mkCandidatePoint :: Vector3 -> Vector3 -> CandidatePoint
+mkCandidatePoint p n = CandidatePoint { position : p, faceNormal : n }
 
 adderMarkerMat :: MeshBasicMaterial
 adderMarkerMat = unsafePerformEffect (mkMeshBasicMaterial 0x2222ff)
@@ -47,7 +54,7 @@ adderMarkerMat = unsafePerformEffect (mkMeshBasicMaterial 0x2222ff)
 adderMarkerGeo :: CircleGeometry
 adderMarkerGeo = unsafePerformEffect (mkCircleGeometry 1.0 32)
 
-createAdderMarker :: forall e. Dynamic (Maybe CandidatePoint) -> Node e TappableMesh
+createAdderMarker :: forall e. Dynamic (Maybe CandidatePoint) -> Node e (Event CandidatePoint)
 createAdderMarker pDyn = do
     parent <- view _parent <$> ask
 
@@ -55,19 +62,19 @@ createAdderMarker pDyn = do
         -- and move it along the normal vector a bit.
         -- then used as the new position of the marker
         calcPos Nothing  = def
-        calcPos (Just p) = addScaled p.position p.faceNormal 0.03
+        calcPos (Just p) = addScaled (p ^. _position) (p ^. _faceNormal) 0.03
 
-        calcTarget p = localToWorld (p.position <+> p.faceNormal) parent
+        calcTarget p = localToWorld (p ^. _position <+> p ^. _faceNormal) parent
 
         posDyn    = calcPos <$> pDyn
         targetDyn = performDynamic $ traverse calcTarget <$> pDyn
         
-    snd <$> tapMesh (def # _name     .~ "add-poly-marker"
-                         # _position .~ posDyn
-                         # _target   .~ targetDyn
-                         # _visible  .~ (isJust <$> pDyn)
-                    ) adderMarkerGeo adderMarkerMat leaf
-
+    m <- snd <$> tapMesh (def # _name     .~ "add-poly-marker"
+                              # _position .~ posDyn
+                              # _target   .~ targetDyn
+                              # _visible  .~ (isJust <$> pDyn)
+                         ) adderMarkerGeo adderMarkerMat leaf
+    pure $ compact $ sampleDyn_ pDyn $ m ^. _tapped
 
 -- | create a roof recognizer
 createPolygonAdder :: forall e. Dynamic (Maybe CandidatePoint) -> Dynamic Boolean -> Node e PolygonAdder
@@ -78,8 +85,8 @@ createPolygonAdder point canShow = do
 
         pDyn = pointCanShow <$> canShow <*> point
 
-    marker <- createAdderMarker pDyn
+    tapPntEvt <- createAdderMarker pDyn
 
     pure $ PolygonAdder {
-        addedPoint : multicast $ compact $ sampleDyn_ point (marker ^. _tapped)
+        addedPoint : multicast tapPntEvt
     }

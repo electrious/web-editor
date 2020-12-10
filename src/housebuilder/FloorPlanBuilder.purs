@@ -2,6 +2,7 @@ module HouseBuilder.FloorPlanBuilder where
 
 import Prelude
 
+import Control.Monad.Reader (ask)
 import Control.Plus (empty)
 import Data.Compactable (compact)
 import Data.Default (class Default, def)
@@ -10,21 +11,34 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Map (delete, insert)
 import Data.Map as M
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), isNothing)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
 import Data.UUIDMap (UUIDMap)
-import Editor.Common.Lenses (_deleted, _id, _name, _tapped, _updated)
-import FRP.Dynamic (Dynamic, latestEvt, step)
+import Editor.Common.Lenses (_deleted, _face, _id, _mouseMove, _name, _parent, _point, _tapped, _updated)
+import Editor.PolygonAdder (createPolygonAdder, mkCandidatePoint)
+import Editor.SceneEvent (SceneMouseMoveEvent)
+import FRP.Dynamic (Dynamic, gateDyn, latestEvt, step)
 import FRP.Event (Event)
-import FRP.Event.Extra (anyEvt, multicast)
+import FRP.Event.Extra (anyEvt, multicast, performEvent)
 import HouseBuilder.FloorPlanNode (FloorPlanConfig(..), FloorPlanNode, createFloorNode)
 import Model.ActiveMode (ActiveMode(..))
 import Model.HouseBuilder.FloorPlan (FloorPlan, FloorPlanOp(..))
 import Rendering.DynamicNode (dynamic)
 import Rendering.Node (Node, fixNodeEWith, node)
+import Three.Core.Face3 (normal)
+import Three.Core.Object3D (worldToLocal)
 
+newtype FloorPlanBuilderConf = FloorPlanBuilderConf {
+    mouseMove :: Event SceneMouseMoveEvent,
+    canEdit   :: Dynamic Boolean
+    }
+
+derive instance newtypeFloorPlanBuilderConf :: Newtype FloorPlanBuilderConf _
+
+_canEdit :: forall t a r. Newtype t { canEdit :: a | r } => Lens' t a
+_canEdit = _Newtype <<< prop (SProxy :: SProxy "canEdit")
 
 -- internal data structure to manage floor plans
 newtype FloorPlanState = FloorPlanState {
@@ -74,8 +88,8 @@ getNodeEvt :: forall a. (FloorPlanNode -> Event a) -> Dynamic (UUIDMap FloorPlan
 getNodeEvt f = multicast <<< latestEvt <<< map (anyEvt <<< map f)
 
 -- | create FloorPlan builder node and setup all events necessary.
-buildFloorPlan :: forall e. Node e (Event (Array FloorPlan))
-buildFloorPlan = node (def # _name .~ "floor plan builder") $
+buildFloorPlan :: forall e. FloorPlanBuilderConf -> Node e (Event (Array FloorPlan))
+buildFloorPlan conf = node (def # _name .~ "floor plan builder") $
     fixNodeEWith Nothing \actFloorEvt ->
         fixNodeEWith (def :: FloorPlanState) \stEvt -> do
             let plansEvt    = compact $ view _floorsToRender <$> stEvt
@@ -84,10 +98,26 @@ buildFloorPlan = node (def # _name .~ "floor plan builder") $
 
             -- render the floor plans
             nodesMapDyn <- renderPlans plansDyn actFloorDyn
+
+            parent <- view _parent <$> ask
             
             -- get the tapped floor plan and set it active
             let planTappedEvt = Just <$> getNodeEvt (view _tapped) nodesMapDyn
                 planUpdEvt = getNodeEvt (view _updated) nodesMapDyn
                 planDelEvt = getNodeEvt (view _deleted) nodesMapDyn
+
+                -- check if to show polygon adder
+                canShowAdder = (&&) <$> (isNothing <$> actFloorDyn) <*> (conf ^. _canEdit)
+
+                -- get a candidate point
+                getCandPoint evt = do
+                    np <- worldToLocal (evt ^. _point) parent
+                    pure $ Just $ mkCandidatePoint np (normal $ evt ^. _face)
+
+                mouseEvt   = conf ^. _mouseMove
+                -- candidate point dynamic
+                candPntDyn = step Nothing $ performEvent $ getCandPoint <$> gateDyn canShowAdder mouseEvt
+            -- add PolygonAdder
+            adder <- createPolygonAdder candPntDyn canShowAdder
 
             pure { input : empty, output : { input : planTappedEvt, output : empty } }

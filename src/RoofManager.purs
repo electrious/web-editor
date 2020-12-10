@@ -27,14 +27,14 @@ import Data.UUID (UUID)
 import Data.UUIDMap (UUIDMap)
 import Data.UUIDMap as UM
 import Editor.ArrayBuilder (runArrayBuilder)
-import Editor.Common.Lenses (_alignment, _deleted, _disposable, _face, _geometry, _houseId, _id, _mesh, _modeDyn, _mouseMove, _orientation, _panelType, _point, _roof, _roofId, _roofs, _tapped, _updated, _verticeTree, _wrapper)
+import Editor.Common.Lenses (_alignment, _deleted, _disposable, _face, _geometry, _houseId, _id, _mesh, _modeDyn, _mouseMove, _orientation, _panelType, _point, _position, _roof, _roofId, _roofs, _tapped, _updated, _verticeTree, _wrapper)
 import Editor.Disposable (class Disposable, dispose)
 import Editor.EditorMode (EditorMode(..))
 import Editor.House (HouseMeshData)
 import Editor.HouseEditor (ArrayEditParam, HouseEditor, _heatmap, performEditorEvent)
 import Editor.PanelLayer (_currentPanels, _initPanels, _mainOrientation, _roofActive, _serverUpdated)
 import Editor.PanelNode (PanelOpacity(..))
-import Editor.PolygonAdder (PolygonAdder, _addedPoint, createPolygonAdder)
+import Editor.PolygonAdder (PolygonAdder, _addedPoint, _faceNormal, createPolygonAdder, mkCandidatePoint)
 import Editor.Rendering.PanelRendering (_opacity)
 import Editor.RoofNode (RoofNode, RoofNodeConfig, createRoofNode)
 import Effect (Effect)
@@ -204,7 +204,7 @@ recognizeNewRoofs meshData wrapper newRoofs activeRoof canEditRoofDyn = createPo
               if isRoof
                   then do
                       np <- worldToLocal (evt ^. _point) houseWrapper
-                      pure $ Just { position: np, faceNormal: normal (evt ^. _face) }
+                      pure $ Just $ mkCandidatePoint np (normal (evt ^. _face))
                   else pure Nothing
         
           mouseMoveEvt = meshData ^. _mesh <<< _mouseMove
@@ -257,7 +257,7 @@ createRoofManager param meshData roofs panels racks = do
 
     -- recognize new roofs
     Tuple adder adderDisp <- liftEffect $ runNode (recognizeNewRoofs meshData wrapper newRoofs activeRoofDyn canEditRoofDyn) (mkNodeEnv wrapper unit)
-    let mkRoof p     = newRoofPlate p.position p.faceNormal
+    let mkRoof p     = newRoofPlate (p ^. _position) (p ^. _faceNormal)
         addedNewRoof = performEvent $ mkRoof <$> adder ^. _addedPoint
         addRoofOp    = RoofOpCreate <$> addedNewRoof
         ops          = addRoofOp <|> deleteRoofOp <|> updateRoofOp
