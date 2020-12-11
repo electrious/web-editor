@@ -2,6 +2,7 @@ module HouseBuilder.HouseBuilder where
 
 import Prelude hiding (add)
 
+import Control.Plus (empty)
 import Custom.Mesh (TapDragMesh)
 import Data.Default (class Default, def)
 import Data.Generic.Rep (class Generic)
@@ -11,10 +12,14 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Data.Tuple (snd)
-import Editor.Common.Lenses (_name)
+import Data.Tuple (Tuple(..), snd)
+import Editor.Common.Lenses (_mouseMove, _name)
+import Editor.SceneEvent (SceneMouseMoveEvent, makeMouseMove, stopMouseMove)
 import Effect.Class (liftEffect)
-import HouseBuilder.FloorPlanBuilder (buildFloorPlan)
+import FRP.Dynamic (step)
+import FRP.Event (Event, makeEvent)
+import FRP.Event.Extra (multicast)
+import HouseBuilder.FloorPlanBuilder (_canEdit, buildFloorPlan)
 import Rendering.Node (Node, getEnv, leaf, node, tapDragMesh)
 import Rendering.TextureLoader (loadTextureFromUrl)
 import Three.Core.Geometry (mkPlaneGeometry)
@@ -47,7 +52,7 @@ _image :: forall t a r. Newtype t { image :: a | r } => Lens' t a
 _image = _Newtype <<< prop (SProxy :: SProxy "image")
 
 
-mkHelperPlane :: Node HouseBuilderConfig TapDragMesh
+mkHelperPlane :: Node HouseBuilderConfig (Tuple TapDragMesh (Event SceneMouseMoveEvent))
 mkHelperPlane = do
     img <- view _image <$> getEnv
 
@@ -57,13 +62,18 @@ mkHelperPlane = do
                         else mkMeshBasicMaterialWithTexture $ loadTextureFromUrl img
 
     m <- snd <$> tapDragMesh (def # _name .~ "helper-plane") geo mat leaf
-    pure m
+    let mouseEvt = multicast $ makeEvent \k -> do
+            makeMouseMove m k
+            pure (stopMouseMove m)
+            
+    pure $ Tuple m mouseEvt
 
 createHouseBuilder :: Node HouseBuilderConfig Unit
 createHouseBuilder = node (def # _name .~ "house-builder") do
     -- add helper plane that accepts tap and drag events
-    plane <- mkHelperPlane
+    Tuple plane mouseEvt <- mkHelperPlane
 
-    floorPlanEvt <- buildFloorPlan def
+    floorPlanEvt <- buildFloorPlan $ def # _mouseMove .~ mouseEvt
+                                         # _canEdit .~ step true empty
     
     pure unit
