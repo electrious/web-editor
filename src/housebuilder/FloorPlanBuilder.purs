@@ -4,6 +4,7 @@ import Prelude
 
 import Control.Alt ((<|>))
 import Control.Monad.Reader (ask)
+import Control.Plus (empty)
 import Data.Compactable (compact)
 import Data.Default (class Default, def)
 import Data.Lens (Lens', view, (%~), (.~), (^.))
@@ -37,6 +38,11 @@ newtype FloorPlanBuilderConf = FloorPlanBuilderConf {
     }
 
 derive instance newtypeFloorPlanBuilderConf :: Newtype FloorPlanBuilderConf _
+instance defaultFloorPlanBuilderConf :: Default FloorPlanBuilderConf where
+    def = FloorPlanBuilderConf {
+        mouseMove : empty,
+        canEdit   : step false empty
+        }
 
 _canEdit :: forall t a r. Newtype t { canEdit :: a | r } => Lens' t a
 _canEdit = _Newtype <<< prop (SProxy :: SProxy "canEdit")
@@ -70,7 +76,6 @@ applyFloorOp (FPOCreate fp)  s = renderAll $ s # _floors %~ insert (fp ^. _id) f
 applyFloorOp (FPODelete fid) s = renderAll $ s # _floors %~ delete fid
 applyFloorOp (FPOUpdate fp)  s = s # _floors %~ insert (fp ^. _id) fp
                                    # _floorsToRender .~ Nothing
-
 
 renderPlan :: forall e. Dynamic ActiveMode -> FloorPlan -> Node e FloorPlanNode
 renderPlan actDyn fp = createFloorNode (FloorPlanConfig { floor : fp, active : actDyn })
