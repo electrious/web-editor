@@ -4,7 +4,6 @@ import Prelude
 
 import Control.Alt ((<|>))
 import Control.Monad.Reader (ask)
-import Control.Plus (empty)
 import Data.Compactable (compact)
 import Data.Default (class Default, def)
 import Data.Lens (Lens', view, (%~), (.~), (^.))
@@ -110,7 +109,7 @@ setupFloorAdder conf actFloorDyn = do
 
 
 -- | create FloorPlan builder node and setup all events necessary.
-buildFloorPlan :: forall e. FloorPlanBuilderConf -> Node e (Event (Array FloorPlan))
+buildFloorPlan :: forall e. FloorPlanBuilderConf -> Node e (Event (UUIDMap FloorPlan))
 buildFloorPlan conf = node (def # _name .~ "floor plan builder") $
     fixNodeEWith Nothing \actFloorEvt ->
         fixNodeEWith (def :: FloorPlanState) \stEvt -> do
@@ -123,14 +122,16 @@ buildFloorPlan conf = node (def # _name .~ "floor plan builder") $
 
             -- get the tapped floor plan and set it active
             let planTappedEvt = Just <$> getNodeEvt (view _tapped) nodesMapDyn
-                planUpdEvt = getNodeEvt (view _updated) nodesMapDyn
-                planDelEvt = getNodeEvt (view _deleted) nodesMapDyn
+                planUpdEvt    = getNodeEvt (view _updated) nodesMapDyn
+                planDelEvt    = getNodeEvt (view _deleted) nodesMapDyn
 
-            planAddEvt <- setupFloorAdder conf actFloorDyn            
-                -- combine all floor plan operations
-            let opEvt = planAddEvt <|> planDelEvt <|> planUpdEvt
-
+            planAddEvt <- setupFloorAdder conf actFloorDyn
+            -- combine all floor plan operations
+            let opEvt    = planAddEvt <|> planDelEvt <|> planUpdEvt
                 -- apply operations to update the internal state
                 newStEvt = fold applyFloorOp opEvt def
 
-            pure { input : newStEvt, output : { input : planTappedEvt, output : empty } }
+                -- final edited floor plans
+                floorsEvt = view _floors <$> newStEvt
+            
+            pure { input : newStEvt, output : { input : planTappedEvt, output : floorsEvt } }

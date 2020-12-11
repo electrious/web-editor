@@ -3,19 +3,19 @@ module HouseBuilder.FloorPlanNode where
 import Prelude
 
 import Custom.Mesh (TappableMesh)
-import Data.Lens (Lens', (.~), (^.))
+import Data.Lens (Lens', view, (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Editor.Common.Lenses (_active, _id, _polygon, _tapped)
 import Editor.PolygonEditor (_delete, createPolyEditor)
-import FRP.Dynamic (Dynamic)
+import FRP.Dynamic (Dynamic, latestEvt, step)
 import FRP.Event (Event)
 import Model.ActiveMode (ActiveMode, isActive)
 import Model.HouseBuilder.FloorPlan (FloorPlan, FloorPlanOp(..))
-import Rendering.Node (Node, localEnv)
-import Rendering.NodeRenderable (render)
+import Rendering.DynamicNode (renderDynamic)
+import Rendering.Node (Node, fixNodeE, localEnv)
 
 newtype FloorPlanConfig = FloorPlanConfig {
     floor  :: FloorPlan,
@@ -24,9 +24,10 @@ newtype FloorPlanConfig = FloorPlanConfig {
 
 derive instance newtypeFloorPlanConfig :: Newtype FloorPlanConfig _
 
-newtype FloorPlanNode = FloorPlanNode {
-    floor   :: FloorPlan,
+_floor :: forall t a r. Newtype t { floor :: a | r } => Lens' t a
+_floor = _Newtype <<< prop (SProxy :: SProxy "floor")
 
+newtype FloorPlanNode = FloorPlanNode {
     updated :: Event FloorPlanOp,
     deleted :: Event FloorPlanOp,
     tapped  :: Event FloorPlan
@@ -34,16 +35,14 @@ newtype FloorPlanNode = FloorPlanNode {
 
 derive instance newtypeFloorPlanNode :: Newtype FloorPlanNode _
 
-_floor :: forall t a r. Newtype t { floor :: a | r } => Lens' t a
-_floor = _Newtype <<< prop (SProxy :: SProxy "floor")
-
-
 createFloorNode :: forall e. FloorPlanConfig -> Node e FloorPlanNode
-createFloorNode cfg = do
+createFloorNode cfg = fixNodeE \newFpEvt -> do
     let fp  = cfg ^. _floor
         act = cfg ^. _active
+
+        fpDyn = step fp newFpEvt
     -- render the polygon
-    polyM :: TappableMesh <- localEnv (const $ cfg ^. _active) $ render (cfg ^. _floor)
+    polyMDyn :: Dynamic TappableMesh <- localEnv (const $ cfg ^. _active) $ renderDynamic fpDyn
 
     -- setup the polygon editor
     editor <- createPolyEditor (isActive <$> act) (fp ^. _polygon)
@@ -52,9 +51,9 @@ createFloorNode cfg = do
     let updatePoly f poly = f # _polygon .~ poly
         fpEvt = updatePoly fp <$> editor ^. _polygon
 
-    pure $ FloorPlanNode {
-        floor   : fp,
-        updated : FPOUpdate <$> fpEvt,
-        deleted : const (FPODelete $ fp ^. _id) <$> editor ^. _delete,
-        tapped  : const fp <$> polyM ^. _tapped
-        }
+        node = FloorPlanNode {
+            updated : FPOUpdate <$> fpEvt,
+            deleted : const (FPODelete $ fp ^. _id) <$> editor ^. _delete,
+            tapped  : const fp <$> (latestEvt $ view _tapped <$> polyMDyn)
+            }
+    pure { input : fpEvt, output : node }
