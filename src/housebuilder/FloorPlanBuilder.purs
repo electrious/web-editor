@@ -89,6 +89,26 @@ renderPlans psDyn actP = do
 getNodeEvt :: forall a. (FloorPlanNode -> Event a) -> Dynamic (UUIDMap FloorPlanNode) -> Event a
 getNodeEvt f = multicast <<< latestEvt <<< map (anyEvt <<< map f)
 
+-- | setup PolygonAdder to add new FloorPlan
+setupFloorAdder :: forall e. FloorPlanBuilderConf -> Dynamic (Maybe FloorPlan) -> Node e (Event FloorPlanOp)
+setupFloorAdder conf actFloorDyn = do
+    parent <- view _parent <$> ask
+    let canShowAdder = (&&) <$> (isNothing <$> actFloorDyn) <*> (conf ^. _canEdit)
+
+        -- get a candidate point
+        getCandPoint evt = do
+            np <- worldToLocal (evt ^. _point) parent
+            pure $ Just $ mkCandidatePoint np (normal $ evt ^. _face)
+
+        mouseEvt   = conf ^. _mouseMove
+        -- candidate point dynamic
+        candPntDyn = step Nothing $ performEvent $ getCandPoint <$> gateDyn canShowAdder mouseEvt
+        -- add PolygonAdder
+    adder <- createPolygonAdder candPntDyn canShowAdder
+    let addedNewFloor = performEvent $ newFloorPlan <<< toVec2 <<< view _position <$> (adder ^. _addedPoint)
+    pure $ FPOCreate <$> addedNewFloor
+
+
 -- | create FloorPlan builder node and setup all events necessary.
 buildFloorPlan :: forall e. FloorPlanBuilderConf -> Node e (Event (Array FloorPlan))
 buildFloorPlan conf = node (def # _name .~ "floor plan builder") $
@@ -101,31 +121,14 @@ buildFloorPlan conf = node (def # _name .~ "floor plan builder") $
             -- render the floor plans
             nodesMapDyn <- renderPlans plansDyn actFloorDyn
 
-            parent <- view _parent <$> ask
-            
             -- get the tapped floor plan and set it active
             let planTappedEvt = Just <$> getNodeEvt (view _tapped) nodesMapDyn
                 planUpdEvt = getNodeEvt (view _updated) nodesMapDyn
                 planDelEvt = getNodeEvt (view _deleted) nodesMapDyn
 
-                -- check if to show polygon adder
-                canShowAdder = (&&) <$> (isNothing <$> actFloorDyn) <*> (conf ^. _canEdit)
-
-                -- get a candidate point
-                getCandPoint evt = do
-                    np <- worldToLocal (evt ^. _point) parent
-                    pure $ Just $ mkCandidatePoint np (normal $ evt ^. _face)
-
-                mouseEvt   = conf ^. _mouseMove
-                -- candidate point dynamic
-                candPntDyn = step Nothing $ performEvent $ getCandPoint <$> gateDyn canShowAdder mouseEvt
-            -- add PolygonAdder
-            adder <- createPolygonAdder candPntDyn canShowAdder
-            let addedNewFloor = performEvent $ newFloorPlan <<< toVec2 <<< view _position <$> (adder ^. _addedPoint)
-                planAddEvt = FPOCreate <$> addedNewFloor
-
+            planAddEvt <- setupFloorAdder conf actFloorDyn            
                 -- combine all floor plan operations
-                opEvt = planAddEvt <|> planDelEvt <|> planUpdEvt
+            let opEvt = planAddEvt <|> planDelEvt <|> planUpdEvt
 
                 -- apply operations to update the internal state
                 newStEvt = fold applyFloorOp opEvt def
