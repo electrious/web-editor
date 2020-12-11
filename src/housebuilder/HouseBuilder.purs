@@ -26,15 +26,10 @@ import Three.Core.Geometry (mkPlaneGeometry)
 import Three.Core.Material (mkMeshBasicMaterial, mkMeshBasicMaterialWithTexture)
 
 -- represent the state of the builder
-data BuilderMode = AddGutter  -- Add gutter points and lines
-                 | AddRidge   -- Add ridge points and lines
-                 | LiftRidge  -- lift ridges to the right height
-                 | LiftHouse  -- lift house to the right height
+data BuilderMode = AddFloorPlan  -- Add and edit FloorPlans
+                 | AddRoofs      -- Add Roof ridges and plates
 
-derive instance genericBuilderMode :: Generic BuilderMode _
 derive instance eqBuilderMode :: Eq BuilderMode
-instance showBuilderMode :: Show BuilderMode where
-    show = genericShow
 
 
 newtype HouseBuilderConfig = HouseBuilderConfig {
@@ -73,7 +68,9 @@ createHouseBuilder = node (def # _name .~ "house-builder") do
     -- add helper plane that accepts tap and drag events
     Tuple plane mouseEvt <- mkHelperPlane
 
+    let modeDyn = step AddFloorPlan empty
+    
     floorPlanEvt <- buildFloorPlan $ def # _mouseMove .~ mouseEvt
-                                         # _canEdit .~ step true empty
+                                         # _canEdit   .~ ((==) AddFloorPlan <$> modeDyn)
     
     pure unit
