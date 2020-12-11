@@ -3,7 +3,7 @@ module HouseBuilder.HouseBuilder where
 import Prelude hiding (add)
 
 import Control.Monad.Cont (lift)
-import Control.Monad.Reader (class MonadAsk, class MonadReader, ReaderT, ask, runReaderT)
+import Control.Monad.Reader (ReaderT, ask, runReaderT)
 import Custom.Mesh (TapDragMesh)
 import Data.Default (class Default, def)
 import Data.Generic.Rep (class Generic)
@@ -15,7 +15,7 @@ import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Tuple (snd)
 import Editor.Common.Lenses (_name)
-import Effect.Class (class MonadEffect, liftEffect)
+import Effect.Class (liftEffect)
 import HouseBuilder.FloorPlanBuilder (buildFloorPlan)
 import Rendering.Node (Node, Props, leaf, node, tapDragMesh)
 import Rendering.TextureLoader (loadTextureFromUrl)
@@ -50,29 +50,16 @@ _image = _Newtype <<< prop (SProxy :: SProxy "image")
 
 
 -- HouseBuilder is the main Monad where house building happens
-newtype HouseBuilder e a = HouseBuilder (ReaderT HouseBuilderConfig (Node e) a)
-
-derive newtype instance functorHouseBuilder     :: Functor (HouseBuilder e)
-derive newtype instance applyHouseBuilder       :: Apply (HouseBuilder e)
-derive newtype instance applicativeHouseBuilder :: Applicative (HouseBuilder e)
-derive newtype instance bindHouseBuilder        :: Bind (HouseBuilder e)
-derive newtype instance monadHouseBuilder       :: Monad (HouseBuilder e)
-derive newtype instance monadAskHouseBuilder    :: MonadAsk HouseBuilderConfig (HouseBuilder e)
-derive newtype instance monadReaderHouseBuilder :: MonadReader HouseBuilderConfig (HouseBuilder e)
-derive newtype instance monadEFfectHouseBuilder :: MonadEffect (HouseBuilder e)
+type HouseBuilder e a = ReaderT HouseBuilderConfig (Node e) a
 
 runHouseBuilder :: forall e a. HouseBuilder e a -> HouseBuilderConfig -> Node e a
-runHouseBuilder (HouseBuilder b) = runReaderT b
-
--- | lift a Node action into HouseBuilder
-liftNode :: forall e a. Node e a -> HouseBuilder e a
-liftNode = HouseBuilder <<< lift
+runHouseBuilder = runReaderT
 
 -- | lift a Node transform to HouseBuilder transform
 liftNodeFunc :: forall e a b. (Node e a -> Node e b) -> HouseBuilder e a -> HouseBuilder e b
 liftNodeFunc f child = do
     cfg <- ask
-    liftNode $ f $ runHouseBuilder child cfg
+    lift $ f $ runHouseBuilder child cfg
 
 nodeBuilder :: forall e a. Props -> HouseBuilder e a -> HouseBuilder e a
 nodeBuilder p = liftNodeFunc (node p)
@@ -86,7 +73,7 @@ mkHelperPlane = do
                         then mkMeshBasicMaterial 0x002222
                         else mkMeshBasicMaterialWithTexture $ loadTextureFromUrl img
 
-    m <- liftNode $ snd <$> tapDragMesh (def # _name .~ "helper-plane") geo mat leaf
+    m <- lift $ snd <$> tapDragMesh (def # _name .~ "helper-plane") geo mat leaf
     pure m
 
 createHouseBuilder :: forall e. HouseBuilder e Unit
@@ -94,6 +81,6 @@ createHouseBuilder = nodeBuilder (def # _name .~ "house-builder") do
     -- add helper plane that accepts tap and drag events
     plane <- mkHelperPlane
 
-    floorPlanEvt <- liftNode $ buildFloorPlan def
+    floorPlanEvt <- lift $ buildFloorPlan def
     
     pure unit
