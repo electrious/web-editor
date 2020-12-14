@@ -27,7 +27,7 @@ import HouseBuilder.FloorPlanNode (FloorPlanConfig(..), FloorPlanNode, createFlo
 import Model.ActiveMode (ActiveMode(..))
 import Model.HouseBuilder.FloorPlan (FloorPlan, FloorPlanOp(..), newFloorPlan)
 import Rendering.DynamicNode (dynamic)
-import Rendering.Node (Node, fixNodeEWith, node)
+import Rendering.Node (Node, fixNodeEWith, localEnv, node)
 import Three.Core.Face3 (normal)
 import Three.Core.Object3D (worldToLocal)
 import Three.Math.Vector (toVec2)
@@ -78,7 +78,7 @@ applyFloorOp (FPOUpdate fp)  s = s # _floors %~ insert (fp ^. _id) fp
                                    # _floorsToRender .~ Nothing
 
 renderPlan :: forall e. Dynamic ActiveMode -> FloorPlan -> Node e FloorPlanNode
-renderPlan actDyn fp = createFloorNode (FloorPlanConfig { floor : fp, active : actDyn })
+renderPlan actDyn fp = localEnv (const $ FloorPlanConfig { floor : fp, active : actDyn }) createFloorNode
 
 -- | render all dynamic floor plans and get the tap event on any one of them
 renderPlans :: forall e. Dynamic (UUIDMap FloorPlan) -> Dynamic (Maybe FloorPlan) -> Node e (Dynamic (UUIDMap FloorPlanNode))

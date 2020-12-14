@@ -3,9 +3,11 @@ module HouseBuilder.FloorPlanNode where
 import Prelude
 
 import Custom.Mesh (TappableMesh)
+import Data.Default (def)
 import Data.Lens (Lens', view, (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
+import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Editor.Common.Lenses (_active, _id, _polygon, _tapped)
@@ -15,17 +17,26 @@ import FRP.Event (Event)
 import Model.ActiveMode (ActiveMode, isActive)
 import Model.HouseBuilder.FloorPlan (FloorPlan, FloorPlanOp(..))
 import Rendering.DynamicNode (renderDynamic)
-import Rendering.Node (Node, fixNodeE, localEnv)
+import Rendering.Node (Node, fixNodeE, getEnv, localEnv)
+import Three.Core.Geometry (BoxGeometry)
+import Three.Core.Material (MeshBasicMaterial)
+import UI.DraggableObject (DraggableObject, createDraggableObject)
 
 newtype FloorPlanConfig = FloorPlanConfig {
-    floor  :: FloorPlan,
-    active :: Dynamic ActiveMode
+    floor         :: FloorPlan,
+    active        :: Dynamic ActiveMode,
+
+    arrowMaterial :: MeshBasicMaterial
     }
 
 derive instance newtypeFloorPlanConfig :: Newtype FloorPlanConfig _
 
 _floor :: forall t a r. Newtype t { floor :: a | r } => Lens' t a
 _floor = _Newtype <<< prop (SProxy :: SProxy "floor")
+
+_arrowMaterial :: forall t a r. Newtype t { arrowMaterial :: a | r } => Lens' t a
+_arrowMaterial = _Newtype <<< prop (SProxy :: SProxy "arrowMaterial")
+
 
 newtype FloorPlanNode = FloorPlanNode {
     updated :: Event FloorPlanOp,
@@ -35,8 +46,18 @@ newtype FloorPlanNode = FloorPlanNode {
 
 derive instance newtypeFloorPlanNode :: Newtype FloorPlanNode _
 
-createFloorNode :: forall e. FloorPlanConfig -> Node e FloorPlanNode
-createFloorNode cfg = fixNodeE \newFpEvt -> do
+type DragArrow = DraggableObject
+
+-- | create the drag arrow to drag the Floor Plan to form the house
+dragArrow :: Event Boolean -> Node FloorPlanConfig DragArrow
+dragArrow actEvt = do
+    mat <- view _arrowMaterial <$> getEnv
+    createDraggableObject actEvt def (Nothing :: Maybe BoxGeometry) (Just mat)
+
+createFloorNode :: Node FloorPlanConfig FloorPlanNode
+createFloorNode = fixNodeE \newFpEvt -> do
+    cfg <- getEnv
+    
     let fp  = cfg ^. _floor
         act = cfg ^. _active
 
