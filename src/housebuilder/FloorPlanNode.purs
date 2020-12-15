@@ -2,8 +2,9 @@ module HouseBuilder.FloorPlanNode where
 
 import Prelude
 
+import Control.Alternative (empty)
 import Custom.Mesh (TappableMesh)
-import Data.Default (def)
+import Data.Default (class Default, def)
 import Data.Lens (Lens', view, (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
@@ -14,22 +15,29 @@ import Editor.Common.Lenses (_active, _id, _polygon, _tapped)
 import Editor.PolygonEditor (_delete, createPolyEditor)
 import FRP.Dynamic (Dynamic, latestEvt, step)
 import FRP.Event (Event)
-import Model.ActiveMode (ActiveMode, isActive)
+import Model.ActiveMode (ActiveMode(..), isActive)
+import Model.Hardware.PanelModel (_isActive)
 import Model.HouseBuilder.FloorPlan (FloorPlan, FloorPlanOp(..))
 import Rendering.DynamicNode (renderDynamic)
 import Rendering.Node (Node, fixNodeE, getEnv, localEnv)
-import Three.Core.Geometry (BoxGeometry)
+import Three.Core.Geometry (Geometry)
 import Three.Core.Material (MeshBasicMaterial)
-import UI.DraggableObject (DraggableObject, createDraggableObject)
+import UI.DraggableObject (DragObjCfg, DraggableObject, _customMat, createDraggableObject)
 
 newtype FloorPlanConfig = FloorPlanConfig {
     floor         :: FloorPlan,
     active        :: Dynamic ActiveMode,
 
-    arrowMaterial :: MeshBasicMaterial
+    arrowMaterial :: Maybe MeshBasicMaterial
     }
 
 derive instance newtypeFloorPlanConfig :: Newtype FloorPlanConfig _
+instance defaultFloorPlanConfig :: Default FloorPlanConfig where
+    def = FloorPlanConfig {
+        floor         : def,
+        active        : step Active empty,
+        arrowMaterial : Nothing
+        }
 
 _floor :: forall t a r. Newtype t { floor :: a | r } => Lens' t a
 _floor = _Newtype <<< prop (SProxy :: SProxy "floor")
@@ -52,7 +60,9 @@ type DragArrow = DraggableObject
 dragArrow :: Event Boolean -> Node FloorPlanConfig DragArrow
 dragArrow actEvt = do
     mat <- view _arrowMaterial <$> getEnv
-    createDraggableObject actEvt def (Nothing :: Maybe BoxGeometry) (Just mat)
+    let cfg = def # _isActive  .~ actEvt
+                  # _customMat .~ mat
+    localEnv (const (cfg :: DragObjCfg Geometry)) createDraggableObject
 
 createFloorNode :: Node FloorPlanConfig FloorPlanNode
 createFloorNode = fixNodeE \newFpEvt -> do

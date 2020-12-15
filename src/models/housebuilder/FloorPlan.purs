@@ -3,10 +3,11 @@ module Model.HouseBuilder.FloorPlan (FloorPlan(..), newFloorPlan, FloorPlanOp(..
 import Prelude
 
 import Custom.Mesh (TappableMesh)
+import Data.Default (class Default, def)
 import Data.Lens (view)
 import Data.Meter (Meter, meter)
 import Data.Newtype (class Newtype)
-import Data.UUID (UUID, genUUID)
+import Data.UUID (UUID, emptyUUID, genUUID)
 import Editor.Common.Lenses (_id, _polygon)
 import Effect (Effect)
 import Effect.Unsafe (unsafePerformEffect)
@@ -27,9 +28,15 @@ newtype FloorPlan = FloorPlan {
 }
 
 derive instance newtypeFloorPlan :: Newtype FloorPlan _
-derive instance eqFloorPlan :: Eq FloorPlan
-instance hasUUIDFloorPlan :: HasUUID FloorPlan where
+derive instance eqFloorPlan      :: Eq FloorPlan
+instance hasUUIDFloorPlan        :: HasUUID FloorPlan where
     idLens = _id
+instance defaultFloorPlan        :: Default FloorPlan where
+    def = FloorPlan {
+        id      : emptyUUID,
+        polygon : def,
+        height  : def
+        }
 
 newFloorPlan :: Vector2 -> Effect FloorPlan
 newFloorPlan p = do

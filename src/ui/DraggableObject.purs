@@ -5,9 +5,9 @@ import Prelude hiding (add)
 import Control.Alt ((<|>))
 import Control.Monad.Reader (ask)
 import Custom.Mesh (DraggableMesh, TapDragMesh, calcDragDelta, validateDrag)
-import Data.Default (def)
+import Data.Default (class Default, def)
 import Data.Filterable (filter)
-import Data.Lens (Lens', view, (^.), (.~))
+import Data.Lens (Lens', view, (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..), fromMaybe)
@@ -21,12 +21,42 @@ import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, step)
 import FRP.Event (Event)
 import FRP.Event.Extra (foldWithDef, multicast)
-import Rendering.Node (Node, _renderOrder, _visible, dragMesh, fixNodeE, leaf, node, tapDragMesh)
+import Model.Hardware.PanelModel (_isActive)
+import Rendering.Node (Node, _renderOrder, _visible, dragMesh, fixNodeE, getEnv, leaf, node, tapDragMesh)
 import Three.Core.Geometry (class IsGeometry, mkCircleGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial, setOpacity, setTransparent)
 import Three.Core.Object3D (worldToLocal)
 import Three.Math.Vector (Vector2, Vector3, mkVec3, vecX, vecY, (<+>))
 import Unsafe.Coerce (unsafeCoerce)
+
+newtype DragObjCfg geo = DragObjCfg {
+    isActive  :: Event Boolean,
+    position  :: Vector2,
+    customGeo :: Maybe geo,
+    customMat :: Maybe MeshBasicMaterial,
+    validator :: Vector3 -> Boolean
+    }
+
+derive instance newtypeDragObjCfg :: Newtype (DragObjCfg geo) _
+
+instance defaultDragObjCfg :: Default (DragObjCfg geo) where
+    def = DragObjCfg {
+        isActive  : pure true,
+        position  : def,
+        customGeo : Nothing,
+        customMat : Nothing,
+        validator : const true
+        }
+
+_customGeo :: forall t a r. Newtype t { customGeo :: a | r } => Lens' t a
+_customGeo = _Newtype <<< prop (SProxy :: SProxy "customGeo")
+
+_customMat :: forall t a r. Newtype t { customMat :: a | r } => Lens' t a
+_customMat = _Newtype <<< prop (SProxy :: SProxy "customMat")
+
+_validator :: forall t a r. Newtype t { validator :: a | r } => Lens' t a
+_validator = _Newtype <<< prop (SProxy :: SProxy "validator")
+
 
 newtype DraggableObject = DraggableObject {
     tapped     :: Event Unit,
@@ -75,18 +105,19 @@ invisibleCircle posDyn visDyn rOrder = do
 
 
 -- | create a draggable object
-createDraggableObject :: forall e geo. IsGeometry geo =>
-                                        Event Boolean
-                                        -> Vector2
-                                        -> Maybe geo
-                                        -> Maybe MeshBasicMaterial
-                                        -> Node e DraggableObject
-createDraggableObject active position customGeo customMat =
+createDraggableObject :: forall geo. IsGeometry geo => Node (DragObjCfg geo) DraggableObject
+createDraggableObject =
     node (def # _name .~ "drag-object") $
         fixNodeE \newPosEvt ->
             fixNodeE \isDraggingEvt -> do
-                -- create the visible marker
-                let defPos = mkVec3 (vecX position) (vecY position) 0.1
+                cfg <- getEnv
+                let position  = cfg ^. _position
+                    active    = cfg ^. _isActive
+                    customGeo = cfg ^. _customGeo
+                    customMat = cfg ^. _customMat
+                    
+                    -- create the visible marker
+                    defPos = mkVec3 (vecX position) (vecY position) 0.1
                     posDyn = step defPos newPosEvt
                     visDyn = step false active
                 mesh <- visibleObj posDyn visDyn customGeo customMat
@@ -110,7 +141,7 @@ createDraggableObject active position customGeo customMat =
                     updatePos d lastPos = lastPos <+> zeroZ d
                     zeroZ v = mkVec3 (vecX v) (vecY v) 0.0
 
-                    newPos = multicast $ foldWithDef updatePos delta defPos
+                    newPos = multicast $ filter (cfg ^. _validator) $ foldWithDef updatePos delta defPos
                     
                     dragObj = DraggableObject {
                         tapped     : const unit <$> mesh ^. _tapped,

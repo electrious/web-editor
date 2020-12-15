@@ -29,12 +29,12 @@ import FRP.Event.Extra (anyEvt, mergeArray, multicast)
 import Model.Hardware.PanelModel (_isActive)
 import Model.Polygon (Polygon(..))
 import Rendering.DynamicNode (renderEvent)
-import Rendering.Node (Node, _visible, fixNodeE, fixNodeEWith, leaf, tapMesh)
+import Rendering.Node (Node, _visible, fixNodeE, fixNodeEWith, leaf, localEnv, tapMesh)
 import Rendering.NodeRenderable (class NodeRenderable)
 import Three.Core.Geometry (CircleGeometry, Geometry, mkCircleGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial)
 import Three.Math.Vector (Vector2, Vector3, dist, mkVec2, mkVec3, toVec2, vecX, vecY)
-import UI.DraggableObject (createDraggableObject)
+import UI.DraggableObject (DragObjCfg, createDraggableObject)
 
 -----------------------------------------------------------
 -- vertex marker
@@ -56,10 +56,10 @@ derive instance newtypeVertMarker :: Newtype VertMarker _
 
 instance nodeRenderableVertMarkerPoint :: NodeRenderable e VertMarkerPoint VertMarker where
     render m = do
-        dragObj <- createDraggableObject (m ^. _isActive)
-                                         (m ^. _position)
-                                         (Nothing :: Maybe Geometry)
-                                         Nothing
+        let cfg = def # _isActive .~ (m ^. _isActive)
+                      # _position .~ (m ^. _position)
+        dragObj <- localEnv (const (cfg :: DragObjCfg Geometry)) createDraggableObject
+        
         pure $ VertMarker {
             tapped     : const (m ^. _index) <$> dragObj ^. _tapped,
             position   : dragObj ^. _position,

@@ -5,7 +5,7 @@ import Prelude
 import Control.Monad.Writer (tell)
 import Custom.Mesh (TappableMesh, mkTappableMesh)
 import Data.Array (fromFoldable)
-import Data.Default (def)
+import Data.Default (class Default, def)
 import Data.Foldable (class Foldable)
 import Data.Lens (Lens', (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
@@ -27,6 +27,8 @@ newtype Polygon = Polygon (Array Vector2)
 
 derive instance newtypePolygon :: Newtype Polygon _
 derive instance eqPolygon :: Eq Polygon
+instance defaultPolygon :: Default Polygon where
+    def = Polygon []
 
 _polyVerts :: Lens' Polygon (Array Vector2)
 _polyVerts = _Newtype

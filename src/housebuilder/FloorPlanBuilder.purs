@@ -17,13 +17,13 @@ import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
 import Data.UUIDMap (UUIDMap)
-import Editor.Common.Lenses (_deleted, _face, _id, _mouseMove, _name, _parent, _point, _position, _tapped, _updated)
+import Editor.Common.Lenses (_active, _deleted, _face, _id, _mouseMove, _name, _parent, _point, _position, _tapped, _updated)
 import Editor.PolygonAdder (_addedPoint, createPolygonAdder, mkCandidatePoint)
 import Editor.SceneEvent (SceneMouseMoveEvent)
 import FRP.Dynamic (Dynamic, gateDyn, latestEvt, step)
 import FRP.Event (Event, fold)
 import FRP.Event.Extra (anyEvt, multicast, performEvent)
-import HouseBuilder.FloorPlanNode (FloorPlanConfig(..), FloorPlanNode, createFloorNode)
+import HouseBuilder.FloorPlanNode (FloorPlanNode, _floor, createFloorNode)
 import Model.ActiveMode (ActiveMode(..))
 import Model.HouseBuilder.FloorPlan (FloorPlan, FloorPlanOp(..), newFloorPlan)
 import Rendering.DynamicNode (dynamic)
@@ -78,7 +78,8 @@ applyFloorOp (FPOUpdate fp)  s = s # _floors %~ insert (fp ^. _id) fp
                                    # _floorsToRender .~ Nothing
 
 renderPlan :: forall e. Dynamic ActiveMode -> FloorPlan -> Node e FloorPlanNode
-renderPlan actDyn fp = localEnv (const $ FloorPlanConfig { floor : fp, active : actDyn }) createFloorNode
+renderPlan actDyn fp = localEnv (const $ def # _floor  .~ fp
+                                             # _active .~ actDyn) createFloorNode
 
 -- | render all dynamic floor plans and get the tap event on any one of them
 renderPlans :: forall e. Dynamic (UUIDMap FloorPlan) -> Dynamic (Maybe FloorPlan) -> Node e (Dynamic (UUIDMap FloorPlanNode))
