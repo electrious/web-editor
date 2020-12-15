@@ -22,8 +22,8 @@ import Rendering.DynamicNode (renderDynamic)
 import Rendering.Node (Node, fixNodeE, getEnv, localEnv)
 import Three.Core.Geometry (Geometry)
 import Three.Core.Material (MeshBasicMaterial)
-import Three.Math.Vector (vecZ)
-import UI.DraggableObject (DragObjCfg, DraggableObject, _customMat, _transform, _validator, createDraggableObject)
+import Three.Math.Vector (mkVec3, vecZ)
+import UI.DraggableObject (DragObjCfg, DraggableObject, _customMat, _deltaTransform, _validator, createDraggableObject)
 
 newtype FloorPlanConfig = FloorPlanConfig {
     floor         :: FloorPlan,
@@ -62,13 +62,16 @@ dragArrow :: Event Boolean -> Node FloorPlanConfig DragArrow
 dragArrow actEvt = do
     mat <- view _arrowMaterial <$> getEnv
     
-    let validator pos = let z = vecZ pos in z >= 0.0 && z <= 20.0
-        transF pos    = pos
+    let -- make sure the arrow can only be dragged between 0 and 20 in Z axis
+        validator pos = let z = vecZ pos in z >= 0.0 && z <= 20.0
+        -- omit the value changes in x/y axis
+        transF pos    = mkVec3 0.0 0.0 (vecZ pos)
         
-        cfg = def # _isActive  .~ actEvt
-                  # _customMat .~ mat
-                  # _validator .~ validator
-                  # _transform .~ transF
+        cfg = def # _isActive       .~ actEvt
+                  # _customMat      .~ mat
+                  # _validator      .~ validator
+                  # _deltaTransform .~ transF
+                  
     localEnv (const (cfg :: DragObjCfg Geometry)) createDraggableObject
 
 createFloorNode :: Node FloorPlanConfig FloorPlanNode

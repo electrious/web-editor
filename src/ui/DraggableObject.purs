@@ -30,24 +30,24 @@ import Three.Math.Vector (Vector2, Vector3, mkVec3, vecX, vecY, (<+>))
 import Unsafe.Coerce (unsafeCoerce)
 
 newtype DragObjCfg geo = DragObjCfg {
-    isActive  :: Event Boolean,
-    position  :: Vector2,
-    customGeo :: Maybe geo,
-    customMat :: Maybe MeshBasicMaterial,
-    validator :: Vector3 -> Boolean,
-    transform :: Vector3 -> Vector3
+    isActive       :: Event Boolean,
+    position       :: Vector2,
+    customGeo      :: Maybe geo,
+    customMat      :: Maybe MeshBasicMaterial,
+    validator      :: Vector3 -> Boolean,
+    deltaTransform :: Vector3 -> Vector3
     }
 
 derive instance newtypeDragObjCfg :: Newtype (DragObjCfg geo) _
 
 instance defaultDragObjCfg :: Default (DragObjCfg geo) where
     def = DragObjCfg {
-        isActive  : pure true,
-        position  : def,
-        customGeo : Nothing,
-        customMat : Nothing,
-        validator : const true,
-        transform : identity
+        isActive       : pure true,
+        position       : def,
+        customGeo      : Nothing,
+        customMat      : Nothing,
+        validator      : const true,
+        deltaTransform : identity
         }
 
 _customGeo :: forall t a r. Newtype t { customGeo :: a | r } => Lens' t a
@@ -59,8 +59,8 @@ _customMat = _Newtype <<< prop (SProxy :: SProxy "customMat")
 _validator :: forall t a r. Newtype t { validator :: a | r } => Lens' t a
 _validator = _Newtype <<< prop (SProxy :: SProxy "validator")
 
-_transform :: forall t a r. Newtype t { transform :: a | r } => Lens' t a
-_transform = _Newtype <<< prop (SProxy :: SProxy "transform")
+_deltaTransform :: forall t a r. Newtype t { deltaTransform :: a | r } => Lens' t a
+_deltaTransform = _Newtype <<< prop (SProxy :: SProxy "deltaTransform")
 
 
 newtype DraggableObject = DraggableObject {
@@ -148,9 +148,9 @@ createDraggableObject =
 
                     -- validate and transform the new position with configured funtions
                     filtF  = cfg ^. _validator
-                    transF = cfg ^. _transform
+                    transF = cfg ^. _deltaTransform
                     
-                    newPos = multicast $ transF <$> filter filtF (foldWithDef updatePos delta defPos)
+                    newPos = multicast $ filter filtF $ foldWithDef updatePos (transF <$> delta) defPos
                     
                     dragObj = DraggableObject {
                         tapped     : const unit <$> mesh ^. _tapped,
