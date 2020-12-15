@@ -34,7 +34,8 @@ newtype DragObjCfg geo = DragObjCfg {
     position  :: Vector2,
     customGeo :: Maybe geo,
     customMat :: Maybe MeshBasicMaterial,
-    validator :: Vector3 -> Boolean
+    validator :: Vector3 -> Boolean,
+    transform :: Vector3 -> Vector3
     }
 
 derive instance newtypeDragObjCfg :: Newtype (DragObjCfg geo) _
@@ -45,7 +46,8 @@ instance defaultDragObjCfg :: Default (DragObjCfg geo) where
         position  : def,
         customGeo : Nothing,
         customMat : Nothing,
-        validator : const true
+        validator : const true,
+        transform : identity
         }
 
 _customGeo :: forall t a r. Newtype t { customGeo :: a | r } => Lens' t a
@@ -56,6 +58,9 @@ _customMat = _Newtype <<< prop (SProxy :: SProxy "customMat")
 
 _validator :: forall t a r. Newtype t { validator :: a | r } => Lens' t a
 _validator = _Newtype <<< prop (SProxy :: SProxy "validator")
+
+_transform :: forall t a r. Newtype t { transform :: a | r } => Lens' t a
+_transform = _Newtype <<< prop (SProxy :: SProxy "transform")
 
 
 newtype DraggableObject = DraggableObject {
@@ -141,7 +146,11 @@ createDraggableObject =
                     updatePos d lastPos = lastPos <+> zeroZ d
                     zeroZ v = mkVec3 (vecX v) (vecY v) 0.0
 
-                    newPos = multicast $ filter (cfg ^. _validator) $ foldWithDef updatePos delta defPos
+                    -- validate and transform the new position with configured funtions
+                    filtF  = cfg ^. _validator
+                    transF = cfg ^. _transform
+                    
+                    newPos = multicast $ transF <$> filter filtF (foldWithDef updatePos delta defPos)
                     
                     dragObj = DraggableObject {
                         tapped     : const unit <$> mesh ^. _tapped,
