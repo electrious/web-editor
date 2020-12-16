@@ -2,6 +2,12 @@ module Three.Core.Geometry where
 
 import Prelude
 
+import Data.Default (class Default)
+import Data.Lens (Lens')
+import Data.Lens.Iso.Newtype (_Newtype)
+import Data.Lens.Record (prop)
+import Data.Newtype (class Newtype)
+import Data.Symbol (SProxy(..))
 import Effect (Effect)
 import Three.Core.Face3 (Face3)
 import Three.Math.Color (Color)
@@ -51,6 +57,61 @@ foreign import data PlaneGeometry :: Type
 foreign import mkPlaneGeometry :: Number -> Number -> Int -> Int -> Effect PlaneGeometry
 
 instance isGeometryPlaneGeometry :: IsGeometry PlaneGeometry
+
+-- | ExtrudeGeometry
+foreign import data ExtrudeGeometry :: Type
+
+-- | ExtrudeSettings
+newtype ExtrudeSettings = ExtrudeSettings {
+    curveSegments  :: Int,
+    steps          :: Int,
+    depth          :: Int,
+    bevelEnabled   :: Boolean,
+    bevelThickness :: Number,
+    bevelSize      :: Number,
+    bevelOffset    :: Number,
+    bevelSegments  :: Int
+    }
+
+derive instance newtypeExtrudeSettings :: Newtype ExtrudeSettings _
+
+instance defaultExtrudeSettings :: Default ExtrudeSettings where
+    def = ExtrudeSettings {
+        curveSegments  : 12,
+        steps          : 1,
+        depth          : 100,
+        bevelEnabled   : true,
+        bevelThickness : 6.0,
+        bevelSize      : 2.0,
+        bevelOffset    : 0.0,
+        bevelSegments  : 3
+        }
+
+_curveSegments :: forall t a r. Newtype t { curveSegments :: a | r } => Lens' t a
+_curveSegments = _Newtype <<< prop (SProxy :: SProxy "curveSegments")
+
+_steps :: forall t a r. Newtype t { steps :: a | r } => Lens' t a
+_steps = _Newtype <<< prop (SProxy :: SProxy "steps")
+
+_depth :: forall t a r. Newtype t { depth :: a | r } => Lens' t a
+_depth = _Newtype <<< prop (SProxy :: SProxy "depth")
+
+_bevelEnabled :: forall t a r. Newtype t { bevelEnabled :: a | r } => Lens' t a
+_bevelEnabled = _Newtype <<< prop (SProxy :: SProxy "bevelEnabled")
+
+_bevelThickness :: forall t a r. Newtype t { bevelThickness :: a | r } => Lens' t a
+_bevelThickness = _Newtype <<< prop (SProxy :: SProxy "bevelThickness")
+
+_bevelSize :: forall t a r. Newtype t { bevelSize :: a | r } => Lens' t a
+_bevelSize = _Newtype <<< prop (SProxy :: SProxy "bevelSize")
+
+_bevelOffset :: forall t a r. Newtype t { bevelOffset :: a | r } => Lens' t a
+_bevelOffset = _Newtype <<< prop (SProxy :: SProxy "bevelOffset")
+
+_bevelSegments :: forall t a r. Newtype t { bevelSegments :: a | r } => Lens' t a
+_bevelSegments = _Newtype <<< prop (SProxy :: SProxy "bevelSegments")
+
+foreign import mkExtrudeGeometry :: Shape -> ExtrudeSettings -> Effect ExtrudeGeometry
 
 foreign import data LineGeometry :: Type
 foreign import mkLineGeometry :: Effect LineGeometry
