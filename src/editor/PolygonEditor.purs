@@ -41,7 +41,7 @@ import UI.DraggableObject (DragObjCfg, createDraggableObject)
 newtype VertMarkerPoint = VertMarkerPoint {
     position :: Vector2,
     index    :: Int,
-    isActive :: Event Boolean
+    isActive :: Dynamic Boolean
 }
 
 derive instance newtypeVertMarkerPoint :: Newtype VertMarkerPoint _
@@ -71,7 +71,7 @@ mkVertMarkerPoint :: Event Boolean -> Event (Maybe Int) -> Tuple Vector2 Int -> 
 mkVertMarkerPoint polyActive actMarker (Tuple pos idx) = VertMarkerPoint {
                                                              position : pos,
                                                              index    : idx,
-                                                             isActive : isActive
+                                                             isActive : step false isActive
                                                          }
     where f act Nothing       = act
           f act (Just actIdx) = act && actIdx == idx

@@ -4,6 +4,7 @@ import Prelude hiding (add)
 
 import Control.Alt ((<|>))
 import Control.Monad.Reader (ask)
+import Control.Plus (empty)
 import Custom.Mesh (DraggableMesh, TapDragMesh, calcDragDelta, validateDrag)
 import Data.Default (class Default, def)
 import Data.Filterable (filter)
@@ -30,7 +31,7 @@ import Three.Math.Vector (Vector2, Vector3, mkVec3, vecX, vecY, (<+>))
 import Unsafe.Coerce (unsafeCoerce)
 
 newtype DragObjCfg geo = DragObjCfg {
-    isActive       :: Event Boolean,
+    isActive       :: Dynamic Boolean,
     position       :: Vector2,
     customGeo      :: Maybe geo,
     customMat      :: Maybe MeshBasicMaterial,
@@ -42,7 +43,7 @@ derive instance newtypeDragObjCfg :: Newtype (DragObjCfg geo) _
 
 instance defaultDragObjCfg :: Default (DragObjCfg geo) where
     def = DragObjCfg {
-        isActive       : pure true,
+        isActive       : step false empty,
         position       : def,
         customGeo      : Nothing,
         customMat      : Nothing,
@@ -117,14 +118,13 @@ createDraggableObject =
             fixNodeE \isDraggingEvt -> do
                 cfg <- getEnv
                 let position  = cfg ^. _position
-                    active    = cfg ^. _isActive
+                    visDyn    = cfg ^. _isActive
                     customGeo = cfg ^. _customGeo
                     customMat = cfg ^. _customMat
                     
                     -- create the visible marker
                     defPos = mkVec3 (vecX position) (vecY position) 0.1
                     posDyn = step defPos newPosEvt
-                    visDyn = step false active
                 mesh <- visibleObj posDyn visDyn customGeo customMat
 
                 -- create the invisible circle
