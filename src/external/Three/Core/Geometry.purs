@@ -60,12 +60,13 @@ instance isGeometryPlaneGeometry :: IsGeometry PlaneGeometry
 
 -- | ExtrudeGeometry
 foreign import data ExtrudeGeometry :: Type
+instance isGeometryExtrudeGeometry :: IsGeometry ExtrudeGeometry
 
 -- | ExtrudeSettings
 newtype ExtrudeSettings = ExtrudeSettings {
     curveSegments  :: Int,
     steps          :: Int,
-    depth          :: Int,
+    depth          :: Number,
     bevelEnabled   :: Boolean,
     bevelThickness :: Number,
     bevelSize      :: Number,
@@ -79,7 +80,7 @@ instance defaultExtrudeSettings :: Default ExtrudeSettings where
     def = ExtrudeSettings {
         curveSegments  : 12,
         steps          : 1,
-        depth          : 100,
+        depth          : 100.0,
         bevelEnabled   : true,
         bevelThickness : 6.0,
         bevelSize      : 2.0,

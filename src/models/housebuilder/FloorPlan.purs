@@ -4,19 +4,21 @@ import Prelude
 
 import Custom.Mesh (TappableMesh)
 import Data.Default (class Default, def)
-import Data.Lens (view)
-import Data.Meter (Meter, meter)
+import Data.Lens ((^.), (.~))
+import Data.Meter (Meter, meter, meterVal)
 import Data.Newtype (class Newtype)
 import Data.UUID (UUID, emptyUUID, genUUID)
-import Editor.Common.Lenses (_id, _polygon)
+import Editor.Common.Lenses (_height, _id, _name, _polygon)
 import Effect (Effect)
+import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic)
 import Model.ActiveMode (ActiveMode(..))
-import Model.Polygon (Polygon, polygonAround)
+import Model.Polygon (Polygon, _polyVerts, polygonAround)
 import Model.UUID (class HasUUID)
-import Rendering.Node (localEnv)
+import Rendering.Node (leaf, localEnv, mesh')
 import Rendering.NodeRenderable (class NodeRenderable, render)
+import Three.Core.Geometry (_depth, mkExtrudeGeometry, mkShape)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial, setOpacity, setTransparent)
 import Three.Math.Vector (Vector2)
 
@@ -69,7 +71,19 @@ floorPlanMaterial Active   = activeMat
 floorPlanMaterial Inactive = inactiveMat
 
 instance nodeRenderableFloorPlan :: NodeRenderable (Dynamic ActiveMode) FloorPlan TappableMesh where
-    render = localEnv (map floorPlanMaterial) <<< render <<< view _polygon
+    render fp = do
+        let poly = fp ^. _polygon
+            h    = meterVal $ fp ^. _height
+        m <- localEnv (map floorPlanMaterial) $ render poly
+
+        when (h > 0.0) do
+            shp <- liftEffect $ mkShape $ poly ^. _polyVerts
+            geo <- liftEffect $ mkExtrudeGeometry shp $ def # _depth .~ h
+            mat <- liftEffect $ mkMeshBasicMaterial 0xffeeff
+
+            mesh' (def # _name .~ "floor-body") geo mat leaf
+        
+        pure m
 
 -- | operations applied to FloorPlans
 data FloorPlanOp = FPOCreate FloorPlan
