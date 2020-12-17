@@ -112,7 +112,8 @@ createFloorNode = fixNodeE \newFpEvt -> do
     editor <- createPolyEditor isActEvt (fp ^. _polygon)
 
     -- setup the height editor
-    heightEvt <- setupHeightEditor isActEvt
+    --heightEvt <- setupHeightEditor isActEvt
+    let heightEvt = empty
 
     -- calculate the updated floor plan
     let opEvt = (UpdPoly <$> editor ^. _polygon) <|>

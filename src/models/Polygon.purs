@@ -42,7 +42,7 @@ polygonAround :: Vector2 -> Polygon
 polygonAround p = newPolygon [p1, p2, p3, p4, p1]
     where x = vecX p
           y = vecY p
-          l = 1.0
+          l = 10.0
           p1 = mkVec2 (x - l) (y - l)
           p2 = mkVec2 (x - l) (y + l)
           p3 = mkVec2 (x + l) (y + l)

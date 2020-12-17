@@ -95,7 +95,7 @@ getNodeEvt :: forall a. (FloorPlanNode -> Event a) -> Dynamic (UUIDMap FloorPlan
 getNodeEvt f = multicast <<< latestEvt <<< map (anyEvt <<< map f)
 
 -- | setup PolygonAdder to add new FloorPlan
-setupFloorAdder :: Dynamic (Maybe FloorPlan) -> Node FloorPlanBuilderConf (Event FloorPlanOp)
+setupFloorAdder :: Dynamic (Maybe FloorPlan) -> Node FloorPlanBuilderConf (Event FloorPlan)
 setupFloorAdder actFloorDyn = do
     e <- ask
     let parent = e ^. _parent
@@ -112,8 +112,7 @@ setupFloorAdder actFloorDyn = do
         candPntDyn = step Nothing $ performEvent $ getCandPoint <$> gateDyn canShowAdder mouseEvt
         -- add PolygonAdder
     adder <- createPolygonAdder candPntDyn canShowAdder
-    let addedNewFloor = performEvent $ newFloorPlan <<< toVec2 <<< view _position <$> (adder ^. _addedPoint)
-    pure $ FPOCreate <$> addedNewFloor
+    pure $ performEvent $ newFloorPlan <<< toVec2 <<< view _position <$> (adder ^. _addedPoint)
 
 
 -- | create FloorPlan builder node and setup all events necessary.
@@ -135,11 +134,13 @@ buildFloorPlan = node (def # _name .~ "floor plan builder") $
 
             planAddEvt <- setupFloorAdder actFloorDyn
             -- combine all floor plan operations
-            let opEvt    = planAddEvt <|> planDelEvt <|> planUpdEvt
+            let opEvt    = (FPOCreate <$> planAddEvt) <|> planDelEvt <|> planUpdEvt
                 -- apply operations to update the internal state
                 newStEvt = fold applyFloorOp opEvt def
 
                 -- final edited floor plans
                 floorsEvt = view _floors <$> newStEvt
+
+                newActFloorEvt = (Just <$> planAddEvt) <|> planTappedEvt
             
-            pure { input : newStEvt, output : { input : planTappedEvt, output : floorsEvt } }
+            pure { input : newStEvt, output : { input : newActFloorEvt, output : floorsEvt } }
