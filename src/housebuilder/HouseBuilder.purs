@@ -17,7 +17,7 @@ import FRP.Dynamic (step)
 import FRP.Event (Event, makeEvent)
 import FRP.Event.Extra (multicast)
 import HouseBuilder.FloorPlanBuilder (_canEdit, buildFloorPlan)
-import Rendering.Node (Node, getEnv, leaf, mkNodeEnv, node, runNode, tapDragMesh)
+import Rendering.Node (Node, getEnv, leaf, localEnv, mkNodeEnv, node, runNode, tapDragMesh)
 import Rendering.TextureLoader (loadTextureFromUrl)
 import Three.Core.Geometry (mkPlaneGeometry)
 import Three.Core.Material (mkMeshBasicMaterialWithTexture)
@@ -69,9 +69,10 @@ createHouseBuilder = node (def # _name .~ "house-builder") do
     Tuple plane mouseEvt <- mkHelperPlane
 
     let modeDyn = step AddFloorPlan empty
+        cfg = def # _mouseMove .~ mouseEvt
+                  # _canEdit   .~ ((==) AddFloorPlan <$> modeDyn)
     
-    floorPlanEvt <- buildFloorPlan $ def # _mouseMove .~ mouseEvt
-                                         # _canEdit   .~ ((==) AddFloorPlan <$> modeDyn)
+    floorPlanEvt <- localEnv (const cfg) buildFloorPlan
     
     pure unit
 

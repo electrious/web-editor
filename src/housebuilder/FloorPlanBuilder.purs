@@ -27,7 +27,7 @@ import HouseBuilder.FloorPlanNode (FloorPlanNode, _floor, createFloorNode)
 import Model.ActiveMode (ActiveMode(..))
 import Model.HouseBuilder.FloorPlan (FloorPlan, FloorPlanOp(..), newFloorPlan)
 import Rendering.DynamicNode (dynamic)
-import Rendering.Node (Node, fixNodeEWith, localEnv, node)
+import Rendering.Node (Node, _env, fixNodeEWith, localEnv, node)
 import Three.Core.Face3 (normal)
 import Three.Core.Object3D (worldToLocal)
 import Three.Math.Vector (toVec2)
@@ -95,9 +95,11 @@ getNodeEvt :: forall a. (FloorPlanNode -> Event a) -> Dynamic (UUIDMap FloorPlan
 getNodeEvt f = multicast <<< latestEvt <<< map (anyEvt <<< map f)
 
 -- | setup PolygonAdder to add new FloorPlan
-setupFloorAdder :: forall e. FloorPlanBuilderConf -> Dynamic (Maybe FloorPlan) -> Node e (Event FloorPlanOp)
-setupFloorAdder conf actFloorDyn = do
-    parent <- view _parent <$> ask
+setupFloorAdder :: Dynamic (Maybe FloorPlan) -> Node FloorPlanBuilderConf (Event FloorPlanOp)
+setupFloorAdder actFloorDyn = do
+    e <- ask
+    let parent = e ^. _parent
+        conf   = e ^. _env
     let canShowAdder = (&&) <$> (isNothing <$> actFloorDyn) <*> (conf ^. _canEdit)
 
         -- get a candidate point
@@ -115,8 +117,8 @@ setupFloorAdder conf actFloorDyn = do
 
 
 -- | create FloorPlan builder node and setup all events necessary.
-buildFloorPlan :: forall e. FloorPlanBuilderConf -> Node e (Event (UUIDMap FloorPlan))
-buildFloorPlan conf = node (def # _name .~ "floor plan builder") $
+buildFloorPlan :: Node FloorPlanBuilderConf (Event (UUIDMap FloorPlan))
+buildFloorPlan = node (def # _name .~ "floor plan builder") $
     fixNodeEWith Nothing \actFloorEvt ->
         fixNodeEWith (def :: FloorPlanState) \stEvt -> do
             let plansEvt    = compact $ view _floorsToRender <$> stEvt
@@ -131,7 +133,7 @@ buildFloorPlan conf = node (def # _name .~ "floor plan builder") $
                 planUpdEvt    = getNodeEvt (view _updated) nodesMapDyn
                 planDelEvt    = getNodeEvt (view _deleted) nodesMapDyn
 
-            planAddEvt <- setupFloorAdder conf actFloorDyn
+            planAddEvt <- setupFloorAdder actFloorDyn
             -- combine all floor plan operations
             let opEvt    = planAddEvt <|> planDelEvt <|> planUpdEvt
                 -- apply operations to update the internal state
