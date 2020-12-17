@@ -2,17 +2,18 @@ module Model.HouseBuilder.FloorPlan (FloorPlan(..), newFloorPlan, FloorPlanOp(..
 
 import Prelude
 
+import Control.Plus (empty)
 import Custom.Mesh (TappableMesh)
 import Data.Default (class Default, def)
 import Data.Lens ((^.), (.~))
 import Data.Meter (Meter, meter, meterVal)
 import Data.Newtype (class Newtype)
 import Data.UUID (UUID, emptyUUID, genUUID)
-import Editor.Common.Lenses (_height, _id, _name, _polygon)
+import Editor.Common.Lenses (_height, _id, _name, _polygon, _position)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
-import FRP.Dynamic (Dynamic)
+import FRP.Dynamic (Dynamic, step)
 import Model.ActiveMode (ActiveMode(..))
 import Model.Polygon (Polygon, _polyVerts, polygonAround)
 import Model.UUID (class HasUUID)
@@ -20,7 +21,7 @@ import Rendering.Node (leaf, localEnv, mesh')
 import Rendering.NodeRenderable (class NodeRenderable, render)
 import Three.Core.Geometry (_depth, mkExtrudeGeometry, mkShape)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial, setOpacity, setTransparent)
-import Three.Math.Vector (Vector2)
+import Three.Math.Vector (Vector2, mkVec3)
 
 -- | a FloorPlan represent a house part with 2D polygon and height
 newtype FloorPlan = FloorPlan {
@@ -81,7 +82,10 @@ instance nodeRenderableFloorPlan :: NodeRenderable (Dynamic ActiveMode) FloorPla
             geo <- liftEffect $ mkExtrudeGeometry shp $ def # _depth .~ h
             mat <- liftEffect $ mkMeshBasicMaterial 0xffeeff
 
-            mesh' (def # _name .~ "floor-body") geo mat leaf
+            let pos = mkVec3 0.0 0.0 (h / 2.0)
+
+            mesh' (def # _name     .~ "floor-body"
+                       # _position .~ step pos empty) geo mat leaf
         
         pure m
 
