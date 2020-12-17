@@ -44,8 +44,8 @@ instance functorNodeEnv :: Functor NodeEnv where
 _env :: forall t a r. Newtype t { env :: a | r } => Lens' t a
 _env = _Newtype <<< prop (SProxy :: SProxy "env")
 
-mkNodeEnv :: forall e. Object3D -> e -> NodeEnv e
-mkNodeEnv obj e = NodeEnv { parent : obj, env : e }
+mkNodeEnv :: forall o e. IsObject3D o => o -> e -> NodeEnv e
+mkNodeEnv obj e = NodeEnv { parent : toObject3D obj, env : e }
 
 newtype Node e a = Node (ReaderT (NodeEnv e) (WriterT Disposee Effect) a)
 

@@ -1,26 +1,23 @@
-module HouseBuilder.HouseBuilder where
+module HouseBuilder.HouseBuilder (buildHouse, HouseBuilderConfig) where
 
 import Prelude hiding (add)
 
 import Control.Plus (empty)
 import Custom.Mesh (TapDragMesh)
 import Data.Default (class Default, def)
-import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Show (genericShow)
-import Data.Lens (Lens', view, (.~))
-import Data.Lens.Iso.Newtype (_Newtype)
-import Data.Lens.Record (prop)
+import Data.Lens (view, (.~))
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple(..), snd)
-import Editor.Common.Lenses (_mouseMove, _name)
+import Editor.Common.Lenses (_leadId, _mouseMove, _name)
+import Editor.Editor (Editor)
 import Editor.SceneEvent (SceneMouseMoveEvent, makeMouseMove, stopMouseMove)
+import Effect (Effect)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (step)
 import FRP.Event (Event, makeEvent)
 import FRP.Event.Extra (multicast)
 import HouseBuilder.FloorPlanBuilder (_canEdit, buildFloorPlan)
-import Rendering.Node (Node, getEnv, leaf, node, tapDragMesh)
+import Rendering.Node (Node, getEnv, leaf, mkNodeEnv, node, runNode, tapDragMesh)
 import Rendering.TextureLoader (loadTextureFromUrl)
 import Three.Core.Geometry (mkPlaneGeometry)
 import Three.Core.Material (mkMeshBasicMaterial, mkMeshBasicMaterialWithTexture)
@@ -33,23 +30,22 @@ derive instance eqBuilderMode :: Eq BuilderMode
 
 
 newtype HouseBuilderConfig = HouseBuilderConfig {
-    image :: String
+    leadId :: Int
 }
 
-derive instance genericHouseBuilderConfig :: Generic HouseBuilderConfig _
 derive instance newtypeHouseBuilderConfig :: Newtype HouseBuilderConfig _
-instance showHouseBuilderConfig :: Show HouseBuilderConfig where
-    show = genericShow
 instance defaultHouseBuilderConfig :: Default HouseBuilderConfig where
-    def = HouseBuilderConfig { image : "" }
+    def = HouseBuilderConfig { leadId : 0 }
 
-_image :: forall t a r. Newtype t { image :: a | r } => Lens' t a
-_image = _Newtype <<< prop (SProxy :: SProxy "image")
 
+-- | get 2D image url for a lead
+imageUrlForLead :: Int -> String
+imageUrlForLead l = "https://s3.eu-west-1.amazonaws.com/data.electrious.com/leads/" <> show l <> "/manual.jpg"
 
 mkHelperPlane :: Node HouseBuilderConfig (Tuple TapDragMesh (Event SceneMouseMoveEvent))
 mkHelperPlane = do
-    img <- view _image <$> getEnv
+    lId <- view _leadId <$> getEnv
+    let img = imageUrlForLead lId
 
     geo <- liftEffect $ mkPlaneGeometry 100.0 100.0 10 10
     mat <- liftEffect $ if img == ""
@@ -74,3 +70,8 @@ createHouseBuilder = node (def # _name .~ "house-builder") do
                                          # _canEdit   .~ ((==) AddFloorPlan <$> modeDyn)
     
     pure unit
+
+
+-- | external API to build a 3D house for 2D lead
+buildHouse :: Editor -> HouseBuilderConfig -> Effect Unit
+buildHouse editor cfg = void $ runNode createHouseBuilder $ mkNodeEnv editor cfg
