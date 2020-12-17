@@ -27,7 +27,7 @@ import FRP.Event (Event, subscribe)
 import FRP.Event.Extra (debounce, multicast, performEvent)
 import Three.Core.Camera (class IsCamera)
 import Three.Core.Face3 (Face3)
-import Three.Core.Object3D (class IsObject3D)
+import Three.Core.Object3D (class IsObject3D, Object3D, toObject3D)
 import Three.Core.Raycaster (Intersection, distance, face, intersectObject, mkRaycaster, object, point, setFromCamera)
 import Three.Math.Vector (Vector2, Vector3, mkVec2, mkVec3)
 
@@ -94,24 +94,60 @@ mkDragEndable evt = evt <|> compact (f <$> e)
 
 -- | Convert an Object3D to be tappable by attaching a callback
 -- function for tap events.
-foreign import makeTappable :: forall a. IsObject3D a => a -> (SceneTapEvent -> Effect Unit) -> Effect Unit
-foreign import stopTappable :: forall a. IsObject3D a => a -> Effect Unit
-foreign import isTappable :: forall a. IsObject3D a => a -> Boolean
-foreign import sendTapEvent :: forall a. IsObject3D a => a -> SceneTapEvent -> Effect Unit
+foreign import makeTappableJS :: Object3D -> (SceneTapEvent -> Effect Unit) -> Effect Unit
+foreign import stopTappableJS :: Object3D -> Effect Unit
+foreign import isTappableJS   :: Object3D -> Boolean
+foreign import sendTapEventJS :: Object3D -> SceneTapEvent -> Effect Unit
+
+makeTappable :: forall a. IsObject3D a => a -> (SceneTapEvent -> Effect Unit) -> Effect Unit
+makeTappable o = makeTappableJS (toObject3D o)
+
+stopTappable :: forall a. IsObject3D a => a -> Effect Unit
+stopTappable = stopTappableJS <<< toObject3D
+
+isTappable :: forall a. IsObject3D a => a -> Boolean
+isTappable = isTappableJS <<< toObject3D
+
+sendTapEvent :: forall a. IsObject3D a => a -> SceneTapEvent -> Effect Unit
+sendTapEvent o = sendTapEventJS (toObject3D o)
 
 -- | Convert an Object3D to be MouseMovable by attaching a callback
 -- function for mouseMove events.
-foreign import makeMouseMove :: forall a. IsObject3D a => a -> (SceneMouseMoveEvent -> Effect Unit) -> Effect Unit
-foreign import stopMouseMove :: forall a. IsObject3D a => a -> Effect Unit
-foreign import isMouseMove :: forall a. IsObject3D a => a -> Boolean
-foreign import sendMouseMoveEvent :: forall a. IsObject3D a => a -> SceneMouseMoveEvent -> Effect Unit
+foreign import makeMouseMoveJS      :: Object3D -> (SceneMouseMoveEvent -> Effect Unit) -> Effect Unit
+foreign import stopMouseMoveJS      :: Object3D -> Effect Unit
+foreign import isMouseMoveJS        :: Object3D -> Boolean
+foreign import sendMouseMoveEventJS :: Object3D -> SceneMouseMoveEvent -> Effect Unit
+
+makeMouseMove :: forall a. IsObject3D a => a -> (SceneMouseMoveEvent -> Effect Unit) -> Effect Unit
+makeMouseMove o = makeMouseMoveJS (toObject3D o)
+
+stopMouseMove :: forall a. IsObject3D a => a -> Effect Unit
+stopMouseMove = stopMouseMoveJS <<< toObject3D
+
+isMouseMove :: forall a. IsObject3D a => a -> Boolean
+isMouseMove = isMouseMoveJS <<< toObject3D
+
+sendMouseMoveEvent :: forall a. IsObject3D a => a -> SceneMouseMoveEvent -> Effect Unit
+sendMouseMoveEvent o = sendMouseMoveEventJS (toObject3D o)
 
 -- | Convert an Object3D to be Draggable by attaching a callback
 -- function for drag events.
-foreign import makeDraggable :: forall a. IsObject3D a => a -> (SceneDragEvent -> Effect Unit) -> Effect Unit
-foreign import stopDraggable :: forall a. IsObject3D a => a -> Effect Unit
-foreign import isDraggable :: forall a. IsObject3D a => a -> Boolean
-foreign import sendDragEvent :: forall a. IsObject3D a => a -> SceneDragEvent -> Effect Unit
+foreign import makeDraggableJS :: Object3D -> (SceneDragEvent -> Effect Unit) -> Effect Unit
+foreign import stopDraggableJS :: Object3D -> Effect Unit
+foreign import isDraggableJS   :: Object3D -> Boolean
+foreign import sendDragEventJS :: Object3D -> SceneDragEvent -> Effect Unit
+
+makeDraggable :: forall a. IsObject3D a => a -> (SceneDragEvent -> Effect Unit) -> Effect Unit
+makeDraggable o = makeDraggableJS (toObject3D o)
+
+stopDraggable :: forall a. IsObject3D a => a -> Effect Unit
+stopDraggable = stopDraggableJS <<< toObject3D
+
+isDraggable :: forall a. IsObject3D a => a -> Boolean
+isDraggable = isDraggableJS <<< toObject3D
+
+sendDragEvent :: forall a. IsObject3D a => a -> SceneDragEvent -> Effect Unit
+sendDragEvent o = sendDragEventJS (toObject3D o)
 
 -- | convert mouse/touch position to values between -1 and 1
 calcPosition :: forall t r. Newtype t { x :: Number, y :: Number | r} => Size -> t -> Vector2
