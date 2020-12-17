@@ -22,6 +22,7 @@ import FRP.Event (subscribe)
 import FRP.Event.Extra (delay)
 import Foreign (Foreign)
 import Foreign.Generic (decode)
+import HouseBuilder.HouseBuilder (buildHouse)
 import Model.Hardware.PanelTextureInfo (_premium, _standard, _standard72)
 import Model.Hardware.PanelType (PanelType(..))
 import Model.Roof.Panel (Panel(..))
@@ -82,11 +83,15 @@ doTest roofDat panelDat = do
                                        # _apiConfig      .~ apiCfg
                                        # _arrayEditParam .~ param
 
+                        builderCfg = def # _leadId .~ 318872
+
                     editor <- createEditor el cfg
 
-                    house <- editHouse editor houseCfg
+                    --house <- editHouse editor houseCfg
 
-                    void $ subscribe (house ^. _roofUpdate) logShow
+                    --void $ subscribe (house ^. _roofUpdate) logShow
                     --void $ subscribe (house ^. _serverUpdated) logShow
                     --void $ subscribe (house ^. _alignment) logShow
                     --void $ subscribe (house ^. _screenshot) logShow
+
+                    buildHouse editor builderCfg

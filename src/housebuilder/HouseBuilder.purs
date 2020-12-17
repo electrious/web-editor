@@ -20,7 +20,8 @@ import HouseBuilder.FloorPlanBuilder (_canEdit, buildFloorPlan)
 import Rendering.Node (Node, getEnv, leaf, mkNodeEnv, node, runNode, tapDragMesh)
 import Rendering.TextureLoader (loadTextureFromUrl)
 import Three.Core.Geometry (mkPlaneGeometry)
-import Three.Core.Material (mkMeshBasicMaterial, mkMeshBasicMaterialWithTexture)
+import Three.Core.Material (mkMeshBasicMaterialWithTexture)
+import Three.Loader.TextureLoader (clampToEdgeWrapping, repeatWrapping, setRepeat, setWrapS, setWrapT)
 
 -- represent the state of the builder
 data BuilderMode = AddFloorPlan  -- Add and edit FloorPlans
@@ -47,10 +48,13 @@ mkHelperPlane = do
     lId <- view _leadId <$> getEnv
     let img = imageUrlForLead lId
 
-    geo <- liftEffect $ mkPlaneGeometry 100.0 100.0 10 10
-    mat <- liftEffect $ if img == ""
-                        then mkMeshBasicMaterial 0x002222
-                        else mkMeshBasicMaterialWithTexture $ loadTextureFromUrl img
+    geo <- liftEffect $ mkPlaneGeometry 400.0 186.0 10 10
+    let t = loadTextureFromUrl img
+    liftEffect do
+        setWrapS clampToEdgeWrapping t
+        setWrapT repeatWrapping t
+        setRepeat 1.0 1.0 t
+    mat <- liftEffect $ mkMeshBasicMaterialWithTexture t
 
     m <- snd <$> tapDragMesh (def # _name .~ "helper-plane") geo mat leaf
     let mouseEvt = multicast $ makeEvent \k -> do
