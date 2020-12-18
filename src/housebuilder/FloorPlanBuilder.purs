@@ -3,6 +3,7 @@ module HouseBuilder.FloorPlanBuilder where
 import Prelude
 
 import Control.Alt ((<|>))
+import Control.Alternative (empty)
 import Control.Monad.Reader (ask)
 import Control.Plus (empty)
 import Data.Compactable (compact)
@@ -30,7 +31,7 @@ import Rendering.DynamicNode (dynamic)
 import Rendering.Node (Node, _env, fixNodeEWith, localEnv, node)
 import Three.Core.Face3 (normal)
 import Three.Core.Object3D (worldToLocal)
-import Three.Math.Vector (toVec2)
+import Three.Math.Vector (mkVec3, toVec2)
 
 newtype FloorPlanBuilderConf = FloorPlanBuilderConf {
     mouseMove :: Event SceneMouseMoveEvent,
@@ -100,7 +101,8 @@ setupFloorAdder actFloorDyn = do
     e <- ask
     let parent = e ^. _parent
         conf   = e ^. _env
-    let canShowAdder = (&&) <$> (isNothing <$> actFloorDyn) <*> (conf ^. _canEdit)
+
+        canShowAdder = (&&) <$> (isNothing <$> actFloorDyn) <*> (conf ^. _canEdit)
 
         -- get a candidate point
         getCandPoint evt = do
@@ -111,7 +113,11 @@ setupFloorAdder actFloorDyn = do
         -- candidate point dynamic
         candPntDyn = step Nothing $ performEvent $ getCandPoint <$> gateDyn canShowAdder mouseEvt
         -- add PolygonAdder
-    adder <- createPolygonAdder candPntDyn canShowAdder
+
+        opt = def # _name     .~ "poly-adder"
+                  # _position .~ step (mkVec3 0.0 0.0 0.2) empty
+        
+    adder <- node opt $ createPolygonAdder candPntDyn canShowAdder
     pure $ performEvent $ newFloorPlan <<< toVec2 <<< view _position <$> (adder ^. _addedPoint)
 
 
