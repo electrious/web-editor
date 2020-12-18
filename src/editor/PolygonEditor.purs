@@ -29,7 +29,7 @@ import FRP.Event.Extra (anyEvt, mergeArray, multicast)
 import Model.Hardware.PanelModel (_isActive)
 import Model.Polygon (Polygon(..))
 import Rendering.DynamicNode (renderEvent)
-import Rendering.Node (Node, _visible, fixNodeE, fixNodeEWith, leaf, localEnv, tapMesh)
+import Rendering.Node (Node, _visible, fixNodeE, fixNodeEWith, localEnv, tapMesh)
 import Rendering.NodeRenderable (class NodeRenderable)
 import Three.Core.Geometry (CircleGeometry, Geometry, mkCircleGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial)
@@ -105,10 +105,10 @@ polyDelGeo = unsafePerformEffect (mkCircleGeometry 0.6 32)
 
 -- | create the polygon delete marker button
 mkPolyDelMarker :: forall e. Event Vector3 -> Event Boolean -> Node e TappableMesh
-mkPolyDelMarker posEvt visEvt = snd <$> tapMesh (def # _name     .~ "delete-marker"
-                                                     # _position .~ step def posEvt
-                                                     # _visible  .~ step false visEvt
-                                                ) polyDelGeo polyDelMat leaf
+mkPolyDelMarker posEvt visEvt = tapMesh (def # _name     .~ "delete-marker"
+                                             # _position .~ step def posEvt
+                                             # _visible  .~ step false visEvt
+                                        ) polyDelGeo polyDelMat
 
 -----------------------------------------------------------
 -- | internal object for middle marker point data
@@ -138,10 +138,10 @@ instance nodeRenderableMidMarkerPoint :: NodeRenderable e MidMarkerPoint MidMark
         parent <- view _parent <$> ask
 
         let getPos pos = mkVec3 (vecX pos) (vecY pos) 0.01
-        Tuple _ m <- tapMesh (def # _name     .~ "mid-marker"
-                                  # _position .~ step (getPos $ p ^. _position) empty
-                                  # _visible  .~ (p ^. _isActive)
-                             ) midGeometry midMaterial leaf
+        m <- tapMesh (def # _name     .~ "mid-marker"
+                          # _position .~ step (getPos $ p ^. _position) empty
+                          # _visible  .~ (p ^. _isActive)
+                     ) midGeometry midMaterial
         
         pure $ MidMarker { tapped : const p <$> m ^. _tapped }
 

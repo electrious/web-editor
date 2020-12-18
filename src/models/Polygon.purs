@@ -10,13 +10,12 @@ import Data.Foldable (class Foldable)
 import Data.Lens (Lens', (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Newtype (class Newtype)
-import Data.Tuple (snd)
 import Editor.Common.Lenses (_mesh)
 import Editor.Disposable (Disposee(..))
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic, current, subscribeDyn)
-import Rendering.Node (getEnv, leaf, tapMesh)
+import Rendering.Node (getEnv, tapMesh)
 import Rendering.NodeRenderable (class NodeRenderable)
 import Three.Core.Geometry (mkShape, mkShapeGeometry)
 import Three.Core.Material (MeshBasicMaterial)
@@ -58,7 +57,7 @@ instance nodeRenderablePolygon :: NodeRenderable (Dynamic MeshBasicMaterial) Pol
         shp <- liftEffect $ mkShape $ p ^. _polyVerts
         geo <- liftEffect $ mkShapeGeometry shp
         
-        m <- snd <$> tapMesh def geo mat leaf
+        m <- tapMesh def geo mat
 
         -- update the material when it changes
         let mesh = m ^. _mesh

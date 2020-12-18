@@ -138,7 +138,11 @@ setupProps prop o = do
 
 -- internal helper function to create node functions with specified node maker function
 mkNode :: forall e a m. IsObject3D m => Props -> Node e a -> Effect m -> Node e (Tuple a m)
-mkNode prop child func = do
+mkNode prop child func = mkNode' prop func >>= withChild child
+
+-- internal helper function to create node functions with node maker function
+mkNode' :: forall e m. IsObject3D m => Props -> Effect m -> Node e m
+mkNode' prop func = do
     m <- liftEffect func
     env <- ask
     let parent = env ^. _parent
@@ -149,10 +153,14 @@ mkNode prop child func = do
 
     -- remove the object from parent if node is disposed
     tell $ d <> Disposee (remove m parent)
-    
+    pure m
+
+
+withChild :: forall e a m. IsObject3D m => Node e a -> m -> Node e (Tuple a m)
+withChild child m = do
     -- run child action with the new oobject as parent
-    let newEnv = env # _parent .~ toObject3D m
-    r <- local (const newEnv) child
+    let setP env = env # _parent .~ toObject3D m
+    r <- local setP child
     pure $ Tuple r m
 
 -- empty node
@@ -162,23 +170,20 @@ leaf = pure unit
 node :: forall e a. Props -> Node e a -> Node e a
 node prop child = map fst $ mkNode prop child mkObject3D
 
-mesh :: forall geo mat e a. IsGeometry geo => IsMaterial mat => Props -> geo -> mat -> Node e a -> Node e (Tuple a Mesh)
-mesh prop geo mat child = mkNode prop child $ mkMesh geo mat
+mesh :: forall geo mat e. IsGeometry geo => IsMaterial mat => Props -> geo -> mat -> Node e Mesh
+mesh prop geo mat = mkNode' prop $ mkMesh geo mat
 
-mesh' :: forall geo mat e a. IsGeometry geo => IsMaterial mat => Props -> geo -> mat -> Node e a -> Node e a
-mesh' prop geo mat = map fst <<< mesh prop geo mat
+tapMesh :: forall geo mat e. IsGeometry geo => IsMaterial mat => Props -> geo -> mat -> Node e TappableMesh
+tapMesh prop geo mat = mkNode' prop $ mkTappableMesh geo mat
 
-tapMesh :: forall geo mat e a. IsGeometry geo => IsMaterial mat => Props -> geo -> mat -> Node e a -> Node e (Tuple a TappableMesh)
-tapMesh prop geo mat child = mkNode prop child $ mkTappableMesh geo mat
+dragMesh :: forall geo mat e. IsGeometry geo => IsMaterial mat => Props -> geo -> mat -> Node e DraggableMesh
+dragMesh prop geo mat = mkNode' prop $ mkDraggableMesh geo mat
 
-dragMesh :: forall geo mat e a. IsGeometry geo => IsMaterial mat => Props -> geo -> mat -> Node e a -> Node e (Tuple a DraggableMesh)
-dragMesh prop geo mat child = mkNode prop child $ mkDraggableMesh geo mat
+tapDragMesh :: forall geo mat e. IsGeometry geo => IsMaterial mat => Props -> geo -> mat -> Node e TapDragMesh
+tapDragMesh prop geo mat = mkNode' prop $ mkTapDragMesh geo mat
 
-tapDragMesh :: forall geo mat e a. IsGeometry geo => IsMaterial mat => Props -> geo -> mat -> Node e a -> Node e (Tuple a TapDragMesh)
-tapDragMesh prop geo mat child = mkNode prop child $ mkTapDragMesh geo mat
-
-tapMouseMesh :: forall geo mat e a. IsGeometry geo => IsMaterial mat => Props -> geo -> mat -> Node e a -> Node e (Tuple a TapMouseMesh)
-tapMouseMesh prop geo mat child = mkNode prop child $ mkTapMouseMesh geo mat
+tapMouseMesh :: forall geo mat e. IsGeometry geo => IsMaterial mat => Props -> geo -> mat -> Node e TapMouseMesh
+tapMouseMesh prop geo mat = mkNode' prop $ mkTapMouseMesh geo mat
 
 -- | compute fixed point in Node context
 fixNodeE :: forall e i o. (Event i -> Node e { input :: Event i, output :: o }) -> Node e o

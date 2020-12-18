@@ -14,7 +14,6 @@ import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Data.Tuple (snd)
 import Editor.Common.Lenses (_dragged, _name, _parent, _position, _tapped)
 import Editor.SceneEvent (isDragEnd, isDragStart)
 import Effect.Class (liftEffect)
@@ -23,7 +22,7 @@ import FRP.Dynamic (Dynamic, step)
 import FRP.Event (Event)
 import FRP.Event.Extra (foldWithDef, multicast)
 import Model.Hardware.PanelModel (_isActive)
-import Rendering.Node (Node, _renderOrder, _visible, dragMesh, fixNodeE, getEnv, leaf, node, tapDragMesh)
+import Rendering.Node (Node, _renderOrder, _visible, dragMesh, fixNodeE, getEnv, node, tapDragMesh)
 import Three.Core.Geometry (class IsGeometry, mkCircleGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial, setOpacity, setTransparent)
 import Three.Core.Object3D (worldToLocal)
@@ -94,20 +93,20 @@ visibleObj posDyn visDyn geo mat = do
     cm <- liftEffect $ mkCircleGeometry 0.5 32
     let g = fromMaybe (unsafeCoerce cm) geo
         m = fromMaybe defMaterial mat
-    snd <$> tapDragMesh (def # _name     .~ "visible-obj"
-                             # _position .~ posDyn
-                             # _visible  .~ visDyn
-                        ) g m leaf
+    tapDragMesh (def # _name     .~ "visible-obj"
+                     # _position .~ posDyn
+                     # _visible  .~ visDyn
+                ) g m
 
 
 invisibleCircle :: forall e. Dynamic Vector3 -> Dynamic Boolean -> Int -> Node e DraggableMesh
 invisibleCircle posDyn visDyn rOrder = do
     geo <- liftEffect $ mkCircleGeometry 10.0 32
-    snd <$> dragMesh (def # _name        .~ "invisible-circle"
-                          # _position    .~ posDyn
-                          # _visible     .~ visDyn
-                          # _renderOrder .~ rOrder
-                     ) geo invisibleMaterial leaf
+    dragMesh (def # _name        .~ "invisible-circle"
+                  # _position    .~ posDyn
+                  # _visible     .~ visDyn
+                  # _renderOrder .~ rOrder
+             ) geo invisibleMaterial
 
 
 -- | create a draggable object

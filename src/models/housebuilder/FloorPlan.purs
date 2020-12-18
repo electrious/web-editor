@@ -17,7 +17,7 @@ import FRP.Dynamic (Dynamic, step)
 import Model.ActiveMode (ActiveMode(..))
 import Model.Polygon (Polygon, _polyVerts, polygonAround)
 import Model.UUID (class HasUUID)
-import Rendering.Node (leaf, localEnv, mesh')
+import Rendering.Node (localEnv, mesh)
 import Rendering.NodeRenderable (class NodeRenderable, render)
 import Three.Core.Geometry (_depth, mkExtrudeGeometry, mkShape)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial, setOpacity, setTransparent)
@@ -84,8 +84,8 @@ instance nodeRenderableFloorPlan :: NodeRenderable (Dynamic ActiveMode) FloorPla
 
             let pos = mkVec3 0.0 0.0 (h / 2.0)
 
-            mesh' (def # _name     .~ "floor-body"
-                       # _position .~ step pos empty) geo mat leaf
+            void $ mesh (def # _name     .~ "floor-body"
+                             # _position .~ step pos empty) geo mat
         
         pure m
 

@@ -12,13 +12,12 @@ import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
-import Data.Tuple (snd)
 import Editor.Common.Lenses (_name, _parent, _position, _tapped)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, performDynamic, sampleDyn_)
 import FRP.Event (Event)
 import FRP.Event.Extra (multicast)
-import Rendering.Node (Node, _target, _visible, leaf, tapMesh)
+import Rendering.Node (Node, _target, _visible, tapMesh)
 import Three.Core.Geometry (CircleGeometry, mkCircleGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial)
 import Three.Core.Object3D (localToWorld)
@@ -69,11 +68,11 @@ createAdderMarker pDyn = do
         posDyn    = calcPos <$> pDyn
         targetDyn = performDynamic $ traverse calcTarget <$> pDyn
         
-    m <- snd <$> tapMesh (def # _name     .~ "add-poly-marker"
-                              # _position .~ posDyn
-                              # _target   .~ targetDyn
-                              # _visible  .~ (isJust <$> pDyn)
-                         ) adderMarkerGeo adderMarkerMat leaf
+    m <- tapMesh (def # _name     .~ "add-poly-marker"
+                      # _position .~ posDyn
+                      # _target   .~ targetDyn
+                      # _visible  .~ (isJust <$> pDyn)
+                 ) adderMarkerGeo adderMarkerMat
     pure $ compact $ sampleDyn_ pDyn $ m ^. _tapped
 
 -- | create a roof recognizer
