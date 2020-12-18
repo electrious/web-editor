@@ -123,16 +123,14 @@ mkTapDragMesh geo mat = do
         dragDelta : m ^. _dragDelta
     }
 
-newtype TapDragMouseMesh = TapDragMouseMesh {
+newtype TapMouseMesh = TapMouseMesh {
     mesh      :: Mesh,
     tapped    :: Event SceneTapEvent,
-    dragged   :: Event SceneDragEvent,
-    dragDelta :: Event Vector3,
     mouseMove :: Event SceneMouseMoveEvent
     }
 
-derive instance newtypeTapDragMouseMesh :: Newtype TapDragMouseMesh _
-instance toObject3DTapDragMouseMesh :: IsObject3D TapDragMouseMesh where
+derive instance newtypeTapMouseMesh :: Newtype TapMouseMesh _
+instance toObject3DTapMouseMesh :: IsObject3D TapMouseMesh where
     toObject3D = toObject3D <<< view _mesh
 
 mouseEvtOn :: Mesh -> Event SceneMouseMoveEvent
@@ -140,14 +138,12 @@ mouseEvtOn m = makeEvent \k -> do
     makeMouseMove m k
     pure $ stopMouseMove m
 
-mkTapDragMouseMesh :: forall geo mat. IsGeometry geo => IsMaterial mat => geo -> mat -> Effect TapDragMouseMesh
-mkTapDragMouseMesh geo mat = do
-    m <- mkTapDragMesh geo mat
+mkTapMouseMesh :: forall geo mat. IsGeometry geo => IsMaterial mat => geo -> mat -> Effect TapMouseMesh
+mkTapMouseMesh geo mat = do
+    m <- mkTappableMesh geo mat
     let mesh = m ^. _mesh
-    pure $ TapDragMouseMesh {
+    pure $ TapMouseMesh {
         mesh      : mesh,
         tapped    : m ^. _tapped,
-        dragged   : m ^. _dragged,
-        dragDelta : m ^. _dragDelta,
         mouseMove : mouseEvtOn mesh
         }

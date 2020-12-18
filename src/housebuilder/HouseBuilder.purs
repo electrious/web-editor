@@ -1,9 +1,9 @@
 module HouseBuilder.HouseBuilder (buildHouse, HouseBuilderConfig) where
 
-import Prelude hiding (add)
+import Custom.Mesh (TapMouseMesh)
+import Prelude (class Eq, Unit, bind, const, discard, pure, show, unit, void, (#), ($), (<$>), (<>), (==))
 
 import Control.Plus (empty)
-import Custom.Mesh (TapDragMouseMesh)
 import Data.Default (class Default, def)
 import Data.Lens (view, (.~), (^.))
 import Data.Newtype (class Newtype)
@@ -14,7 +14,7 @@ import Effect (Effect)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (step)
 import HouseBuilder.FloorPlanBuilder (_canEdit, buildFloorPlan)
-import Rendering.Node (Node, getEnv, leaf, localEnv, mkNodeEnv, node, runNode, tapDragMouseMesh)
+import Rendering.Node (Node, getEnv, leaf, localEnv, mkNodeEnv, node, runNode, tapMouseMesh)
 import Rendering.TextureLoader (loadTextureFromUrl)
 import Three.Core.Geometry (mkPlaneGeometry)
 import Three.Core.Material (mkMeshBasicMaterialWithTexture)
@@ -40,7 +40,7 @@ instance defaultHouseBuilderConfig :: Default HouseBuilderConfig where
 imageUrlForLead :: Int -> String
 imageUrlForLead l = "https://s3.eu-west-1.amazonaws.com/data.electrious.com/leads/" <> show l <> "/manual.jpg"
 
-mkHelperPlane :: Node HouseBuilderConfig TapDragMouseMesh
+mkHelperPlane :: Node HouseBuilderConfig TapMouseMesh
 mkHelperPlane = do
     lId <- view _leadId <$> getEnv
     let img = imageUrlForLead lId
@@ -53,7 +53,7 @@ mkHelperPlane = do
         setRepeat 1.0 1.0 t
     mat <- liftEffect $ mkMeshBasicMaterialWithTexture t
 
-    snd <$> tapDragMouseMesh (def # _name .~ "helper-plane") geo mat leaf
+    snd <$> tapMouseMesh (def # _name .~ "helper-plane") geo mat leaf
 
 createHouseBuilder :: Node HouseBuilderConfig Unit
 createHouseBuilder = node (def # _name .~ "house-builder") do

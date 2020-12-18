@@ -3,7 +3,7 @@ module Editor.House where
 import Prelude hiding (add)
 
 import Algorithm.MeshFlatten (VertexItem, buildRTree)
-import Custom.Mesh (TapDragMouseMesh, mkTapDragMouseMesh)
+import Custom.Mesh (TapMouseMesh, mkTapMouseMesh)
 import Data.Array (range)
 import Data.Compactable (compact)
 import Data.Foldable (find, traverse_)
@@ -26,13 +26,13 @@ import Three.Math.Vector (Vector3, mkVec3)
 meshPath :: String -> Int -> String
 meshPath serverUrl leadId = serverUrl <> "/leads/" <> show leadId <> "/mesh/"
 
-type HouseMesh = TapDragMouseMesh
+type HouseMesh = TapMouseMesh
 
 -- | create new HouseMesh, which is a mesh composed with the tap and mouse
 -- events from the mesh.
 mkHouseMesh :: forall geo mat. IsGeometry geo => IsMaterial mat => geo -> mat -> Effect HouseMesh
 mkHouseMesh geo mat = do
-    mesh <- mkTapDragMouseMesh geo mat
+    mesh <- mkTapMouseMesh geo mat
     setName "house-mesh" mesh
     pure mesh
 

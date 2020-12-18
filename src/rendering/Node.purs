@@ -6,7 +6,7 @@ import Control.Alternative (empty)
 import Control.Monad.RWS (tell)
 import Control.Monad.Reader (class MonadAsk, class MonadReader, ReaderT, ask, local, runReaderT)
 import Control.Monad.Writer (class MonadTell, class MonadWriter, WriterT, runWriterT)
-import Custom.Mesh (DraggableMesh, TapDragMesh, TapDragMouseMesh, TappableMesh, mkDraggableMesh, mkTapDragMesh, mkTapDragMouseMesh, mkTappableMesh)
+import Custom.Mesh (DraggableMesh, TapDragMesh, TapMouseMesh, TappableMesh, mkDraggableMesh, mkTapDragMesh, mkTapMouseMesh, mkTappableMesh)
 import Data.Default (class Default, def)
 import Data.Lens (Lens', view, (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
@@ -177,8 +177,8 @@ dragMesh prop geo mat child = mkNode prop child $ mkDraggableMesh geo mat
 tapDragMesh :: forall geo mat e a. IsGeometry geo => IsMaterial mat => Props -> geo -> mat -> Node e a -> Node e (Tuple a TapDragMesh)
 tapDragMesh prop geo mat child = mkNode prop child $ mkTapDragMesh geo mat
 
-tapDragMouseMesh :: forall geo mat e a. IsGeometry geo => IsMaterial mat => Props -> geo -> mat -> Node e a -> Node e (Tuple a TapDragMouseMesh)
-tapDragMouseMesh prop geo mat child = mkNode prop child $ mkTapDragMouseMesh geo mat
+tapMouseMesh :: forall geo mat e a. IsGeometry geo => IsMaterial mat => Props -> geo -> mat -> Node e a -> Node e (Tuple a TapMouseMesh)
+tapMouseMesh prop geo mat child = mkNode prop child $ mkTapMouseMesh geo mat
 
 -- | compute fixed point in Node context
 fixNodeE :: forall e i o. (Event i -> Node e { input :: Event i, output :: o }) -> Node e o
