@@ -21,7 +21,7 @@ import Effect (Effect)
 import Foreign.Generic (class Decode, class Encode, decode, defaultOptions, encode, genericDecode, genericEncode)
 import Math as Math
 import Math.Angle (Angle, acos, atan2, degree, degreeVal)
-import Model.Polygon (Polygon(..))
+import Model.Polygon (class IsPolygon, Polygon(..))
 import Model.Roof.Panel (Alignment(..), Orientation(..))
 import Model.UUID (class HasUUID)
 import Three.Math.Vector (class Vector, Vector3, addScaled, cross, length, mkVec2, mkVec3, vecX, vecY, vecZ, (<.>))
@@ -71,6 +71,10 @@ instance defaultRoofPlate :: Default RoofPlate where
         azimuth       : def,
         rotation      : def
     }
+instance isPolygonRoofPlate :: IsPolygon RoofPlate where
+    toPolygon r = Polygon $ f <$> r ^. _borderPoints
+        where f v = mkVec2 (vecX v) (vecY v)
+
 _roofIntId :: Lens' RoofPlate Int
 _roofIntId = _Newtype <<< prop (SProxy :: SProxy "intId")
 
@@ -203,11 +207,6 @@ toJSRoofPlate r = JSRoofPlate {
     azimuth           : degreeVal $ r ^. _azimuth,
     rotation_override : degreeVal $ r ^. _rotation
 }
-
--- | get the 2D polygon for a roof plate
-getRoofPolygon :: RoofPlate -> Polygon
-getRoofPolygon r = Polygon $ f <$> r ^. _borderPoints
-    where f v = mkVec2 (vecX v) (vecY v)
 
 -- | helper function to calculate angle between two Vector3
 angleBetween :: forall a. Vector a => a -> a -> Angle

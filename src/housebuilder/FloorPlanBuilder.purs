@@ -2,6 +2,7 @@ module HouseBuilder.FloorPlanBuilder where
 
 import Prelude
 
+import Algorithm.PointInPolygon (underPolygons)
 import Control.Alt ((<|>))
 import Control.Monad.Reader (ask)
 import Control.Plus (empty)
@@ -21,7 +22,7 @@ import Editor.Common.Lenses (_active, _deleted, _face, _id, _mouseMove, _name, _
 import Editor.PolygonAdder (_addedPoint, createPolygonAdder, mkCandidatePoint)
 import Editor.SceneEvent (SceneMouseMoveEvent)
 import FRP.Dynamic (Dynamic, gateDyn, latestEvt, step)
-import FRP.Event (Event, fold)
+import FRP.Event (Event, fold, sampleOn)
 import FRP.Event.Extra (anyEvt, multicast, performEvent)
 import HouseBuilder.FloorPlanNode (FloorPlanNode, _floor, createFloorNode)
 import Model.ActiveMode (ActiveMode(..))
@@ -95,8 +96,8 @@ getNodeEvt :: forall a. (FloorPlanNode -> Event a) -> Dynamic (UUIDMap FloorPlan
 getNodeEvt f = multicast <<< latestEvt <<< map (anyEvt <<< map f)
 
 -- | setup PolygonAdder to add new FloorPlan
-setupFloorAdder :: Dynamic (Maybe FloorPlan) -> Node FloorPlanBuilderConf (Event FloorPlan)
-setupFloorAdder actFloorDyn = do
+setupFloorAdder :: Event (UUIDMap FloorPlan) -> Dynamic (Maybe FloorPlan) -> Node FloorPlanBuilderConf (Event FloorPlan)
+setupFloorAdder fpsEvt actFloorDyn = do
     e <- ask
     let parent = e ^. _parent
         conf   = e ^. _env
@@ -104,13 +105,15 @@ setupFloorAdder actFloorDyn = do
         canShowAdder = (&&) <$> (isNothing <$> actFloorDyn) <*> (conf ^. _canEdit)
 
         -- get a candidate point
-        getCandPoint evt = do
+        getCandPoint evt fps = do
             np <- worldToLocal (evt ^. _point) parent
-            pure $ Just $ mkCandidatePoint np (normal $ evt ^. _face)
+            if not $ underPolygons fps np
+                then pure $ Just $ mkCandidatePoint np (normal $ evt ^. _face)
+                else pure Nothing
 
         mouseEvt   = conf ^. _mouseMove
         -- candidate point dynamic
-        candPntDyn = step Nothing $ performEvent $ getCandPoint <$> gateDyn canShowAdder mouseEvt
+        candPntDyn = step Nothing $ performEvent $ sampleOn fpsEvt $ getCandPoint <$> gateDyn canShowAdder mouseEvt
         -- add PolygonAdder
 
         opt = def # _name     .~ "poly-adder"
@@ -137,7 +140,7 @@ buildFloorPlan bgTapEvt = node (def # _name .~ "floor plan builder") $
                 planUpdEvt    = getNodeEvt (view _updated) nodesMapDyn
                 planDelEvt    = getNodeEvt (view _deleted) nodesMapDyn
 
-            planAddEvt <- setupFloorAdder actFloorDyn
+            planAddEvt <- setupFloorAdder (view _floors <$> stEvt) actFloorDyn
             -- combine all floor plan operations
             let opEvt    = (FPOCreate <$> planAddEvt) <|> planDelEvt <|> planUpdEvt
                 -- apply operations to update the internal state

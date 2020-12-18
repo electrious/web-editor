@@ -3,7 +3,7 @@ module Editor.RoofManager where
 import Prelude hiding (add,degree)
 
 import Algorithm.MeshFlatten (flattenRoofPlates)
-import Algorithm.RoofCheck (couldBeRoof)
+import Algorithm.PointInPolygon (underPolygons)
 import Control.Alt ((<|>))
 import Control.Monad.Reader (ask)
 import Control.Plus (empty)
@@ -42,6 +42,7 @@ import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic, gateDyn, step)
 import FRP.Event (Event, create, fold, keepLatest, sampleOn, subscribe, withLast)
 import FRP.Event.Extra (debounce, delay, distinct, mergeArray, multicast, performEvent, skip)
+import Math.Angle (acos, degreeVal)
 import Model.Racking.OldRackingSystem (OldRoofRackingData, guessRackingType)
 import Model.Racking.RackingType (RackingType(..))
 import Model.Roof.Panel (Alignment(..), Orientation(..), Panel, PanelsDict, generalOrientation, panelsDict)
@@ -50,6 +51,7 @@ import Model.RoofSpecific (_value)
 import Rendering.Node (Node, mkNodeEnv, runNode)
 import Three.Core.Face3 (normal)
 import Three.Core.Object3D (class IsObject3D, Object3D, add, mkObject3D, remove, setName, worldToLocal)
+import Three.Math.Vector (mkVec3, (<.>))
 
 newtype RoofManager = RoofManager {
     wrapper       :: Object3D,
@@ -198,17 +200,20 @@ recognizeNewRoofs :: forall e . HouseMeshData -> Object3D -> Event RoofDict -> D
 recognizeNewRoofs meshData wrapper newRoofs activeRoof canEditRoofDyn = createPolygonAdder point canShowAdder
     where canShowAdder = (&&) <$> (isNothing <$> activeRoof) <*> canEditRoofDyn
           houseWrapper = meshData ^. _wrapper
-          roofs        = UM.toUnfoldable <$> newRoofs
+
+          up             = mkVec3 0.0 0.0 1.0
+          calcAngle norm = acos $ norm <.> up
+          validNormal e  = degreeVal (calcAngle (normal $ e ^. _face)) < 60.0
+          
           getCandidatePoint evt rs = do
-              isRoof <- couldBeRoof houseWrapper rs evt
+              np <- worldToLocal (evt ^. _point) houseWrapper
+              let isRoof = not (underPolygons rs np) && validNormal evt
               if isRoof
-                  then do
-                      np <- worldToLocal (evt ^. _point) houseWrapper
-                      pure $ Just $ mkCandidatePoint np (normal (evt ^. _face))
+                  then pure $ Just $ mkCandidatePoint np (normal (evt ^. _face))
                   else pure Nothing
         
           mouseMoveEvt = meshData ^. _mesh <<< _mouseMove
-          point = step Nothing $ performEvent $ sampleOn roofs (getCandidatePoint <$> gateDyn canShowAdder mouseMoveEvt)
+          point = step Nothing $ performEvent $ sampleOn newRoofs (getCandidatePoint <$> gateDyn canShowAdder mouseMoveEvt)
 
 getActiveRoof :: HouseMeshData -> Event UUID -> Event RoofOperation -> Event RoofPlate -> Event (Maybe UUID)
 getActiveRoof meshData activated deleteRoofOp addedNewRoof =

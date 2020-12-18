@@ -5,7 +5,7 @@ import Prelude
 import Control.Plus (empty)
 import Custom.Mesh (TappableMesh)
 import Data.Default (class Default, def)
-import Data.Lens ((^.), (.~))
+import Data.Lens (view, (.~), (^.))
 import Data.Meter (Meter, meter, meterVal)
 import Data.Newtype (class Newtype)
 import Data.UUID (UUID, emptyUUID, genUUID)
@@ -15,7 +15,7 @@ import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, step)
 import Model.ActiveMode (ActiveMode(..))
-import Model.Polygon (Polygon, _polyVerts, polygonAround)
+import Model.Polygon (class IsPolygon, Polygon, _polyVerts, polygonAround)
 import Model.UUID (class HasUUID)
 import Rendering.Node (localEnv, mesh)
 import Rendering.NodeRenderable (class NodeRenderable, render)
@@ -40,6 +40,8 @@ instance defaultFloorPlan        :: Default FloorPlan where
         polygon : def,
         height  : def
         }
+instance isPolygonFloorPlan :: IsPolygon FloorPlan where
+    toPolygon = view _polygon
 
 newFloorPlan :: Vector2 -> Effect FloorPlan
 newFloorPlan p = do

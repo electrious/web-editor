@@ -14,10 +14,10 @@ import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Tuple (fst, snd)
 import Editor.Common.Lenses (_center, _index, _item, _maxX, _maxY, _minX, _minY, _normal, _polygon, _position)
-import Model.Polygon (Polygon(..))
 import Effect (Effect)
 import Math.Angle (degreeVal)
-import Model.Roof.RoofPlate (RoofPlate, angleBetween, getRoofPolygon)
+import Model.Polygon (Polygon(..), toPolygon)
+import Model.Roof.RoofPlate (RoofPlate, angleBetween)
 import RBush.RBush (BBox, RBush, load, mkRBush, search)
 import Three.Core.Geometry (class IsBufferGeometry, clone, getAttribute, isBufferAttribute, setNeedsUpdate, setXYZ)
 import Three.Core.Mesh (Mesh, setBufferGeometry)
@@ -98,7 +98,7 @@ distToRoof flattener v = flattener ^. _normal <.> nv
 
 -- | get the RoofFlattener for a roof
 roofFlattener :: RoofPlate -> RoofFlattener
-roofFlattener r = RoofFlattener { normal: r ^. _normal, center: r ^. _center, polygon: getRoofPolygon r}
+roofFlattener r = RoofFlattener { normal: r ^. _normal, center: r ^. _center, polygon: toPolygon r}
 
 -- | flattened vertex info
 newtype FlattenedVertex = FlattenedVertex {

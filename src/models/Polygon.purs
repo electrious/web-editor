@@ -72,3 +72,7 @@ renderPolygon p mat = do
     shp <- mkShape $ p ^. _polyVerts
     geo <- mkShapeGeometry shp
     mkTappableMesh geo mat
+
+
+class IsPolygon v where
+    toPolygon :: v -> Polygon

@@ -19,8 +19,8 @@ import Data.Tuple (Tuple(..), snd)
 import Editor.Common.Lenses (_center, _normal, _rotation)
 import Math (abs, atan, sqrt)
 import Math.Angle (Angle, cos, degree, degreeVal, radian, sin)
-import Model.Polygon (Polygon)
-import Model.Roof.RoofPlate (RoofPlate, _borderPoints, _coefs, getRoofPolygon)
+import Model.Polygon (Polygon, toPolygon)
+import Model.Roof.RoofPlate (RoofPlate, _borderPoints, _coefs)
 import Three.Math.Vector (Vector3, cross, length, mkVec3, normal, toVec2, vecX, vecY, vecZ, (<**>), (<+>), (<->), (<.>))
 
 -- data type representing the right and top vectors for a roof plate
@@ -154,5 +154,5 @@ wrapAroundPoint poly t = pointInPolygon poly <<< toVec2 <<< transformVector t
 -- roofplate's local coordinate
 wrapAroundPoints :: forall f. Foldable f => RoofPlate -> f Vector3 -> Boolean
 wrapAroundPoints roof = all (wrapAroundPoint poly t)
-    where poly = getRoofPolygon roof
+    where poly = toPolygon roof
           t    = getRoofTransform roof
