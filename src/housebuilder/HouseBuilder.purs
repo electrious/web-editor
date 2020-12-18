@@ -1,18 +1,17 @@
 module HouseBuilder.HouseBuilder (buildHouse, HouseBuilderConfig) where
 
-import Custom.Mesh (TapMouseMesh)
-import Prelude (class Eq, Unit, bind, const, discard, pure, show, unit, void, (#), ($), (<$>), (<>), (==))
-
 import Control.Plus (empty)
+import Custom.Mesh (TapMouseMesh)
 import Data.Default (class Default, def)
 import Data.Lens (view, (.~), (^.))
 import Data.Newtype (class Newtype)
-import Editor.Common.Lenses (_leadId, _mouseMove, _name)
+import Editor.Common.Lenses (_leadId, _mouseMove, _name, _tapped)
 import Editor.Editor (Editor)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (step)
 import HouseBuilder.FloorPlanBuilder (_canEdit, buildFloorPlan)
+import Prelude (class Eq, Unit, bind, const, discard, pure, show, unit, void, (#), ($), (<$>), (<>), (==))
 import Rendering.Node (Node, getEnv, localEnv, mkNodeEnv, node, runNode, tapMouseMesh)
 import Rendering.TextureLoader (loadTextureFromUrl)
 import Three.Core.Geometry (mkPlaneGeometry)
@@ -57,13 +56,15 @@ mkHelperPlane = do
 createHouseBuilder :: Node HouseBuilderConfig Unit
 createHouseBuilder = node (def # _name .~ "house-builder") do
     -- add helper plane that accepts tap and drag events
-    planEvt <- mkHelperPlane
+    helper <- mkHelperPlane
 
     let modeDyn = step AddFloorPlan empty
-        cfg = def # _mouseMove .~ planEvt ^. _mouseMove
+        cfg = def # _mouseMove .~ helper ^. _mouseMove
                   # _canEdit   .~ ((==) AddFloorPlan <$> modeDyn)
+
+        bgTapEvt = const unit <$> helper ^. _tapped
     
-    floorPlanEvt <- localEnv (const cfg) buildFloorPlan
+    floorPlanEvt <- localEnv (const cfg) $ buildFloorPlan bgTapEvt
     
     pure unit
 

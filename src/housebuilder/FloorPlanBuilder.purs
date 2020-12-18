@@ -121,8 +121,8 @@ setupFloorAdder actFloorDyn = do
 
 
 -- | create FloorPlan builder node and setup all events necessary.
-buildFloorPlan :: Node FloorPlanBuilderConf (Event (UUIDMap FloorPlan))
-buildFloorPlan = node (def # _name .~ "floor plan builder") $
+buildFloorPlan :: Event Unit ->  Node FloorPlanBuilderConf (Event (UUIDMap FloorPlan))
+buildFloorPlan bgTapEvt = node (def # _name .~ "floor plan builder") $
     fixNodeEWith Nothing \actFloorEvt ->
         fixNodeEWith (def :: FloorPlanState) \stEvt -> do
             let plansEvt    = compact $ view _floorsToRender <$> stEvt
@@ -146,6 +146,6 @@ buildFloorPlan = node (def # _name .~ "floor plan builder") $
                 -- final edited floor plans
                 floorsEvt = view _floors <$> newStEvt
 
-                newActFloorEvt = (Just <$> planAddEvt) <|> planTappedEvt
+                newActFloorEvt = (Just <$> planAddEvt) <|> planTappedEvt <|> (const Nothing <$> bgTapEvt)
             
             pure { input : newStEvt, output : { input : newActFloorEvt, output : floorsEvt } }
