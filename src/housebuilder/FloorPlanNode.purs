@@ -13,7 +13,7 @@ import Data.Maybe (Maybe(..))
 import Data.Meter (Meter, meter)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Editor.Common.Lenses (_active, _height, _id, _polygon, _position, _tapped)
+import Editor.Common.Lenses (_active, _height, _id, _name, _polygon, _position, _tapped)
 import Editor.PolygonEditor (_delete, createPolyEditor)
 import FRP.Dynamic (Dynamic, latestEvt, step)
 import FRP.Event (Event, fold)
@@ -23,7 +23,7 @@ import Model.Hardware.PanelModel (_isActive)
 import Model.HouseBuilder.FloorPlan (FloorPlan, FloorPlanOp(..))
 import Model.Polygon (Polygon)
 import Rendering.DynamicNode (renderDynamic)
-import Rendering.Node (Node, fixNodeE, getEnv, localEnv)
+import Rendering.Node (Node, fixNodeE, getEnv, localEnv, node)
 import Three.Core.Geometry (Geometry)
 import Three.Core.Material (MeshBasicMaterial)
 import Three.Math.Vector (mkVec3, vecZ)
@@ -96,33 +96,37 @@ applyOp (UpdPoly poly) fp = fp # _polygon .~ poly
 applyOp (UpdHeight h)  fp = fp # _height  .~ h
 
 createFloorNode :: Node FloorPlanConfig FloorPlanNode
-createFloorNode = fixNodeE \newFpEvt -> do
-    cfg <- getEnv
+createFloorNode = do
+    let opt = def # _name     .~ "floor-node"
+                  # _position .~ step (mkVec3 0.0 0.0 0.5) empty
+
+    fixNodeE \newFpEvt -> node opt do
+        cfg <- getEnv
     
-    let fp  = cfg ^. _floor
-        act = cfg ^. _active
+        let fp  = cfg ^. _floor
+            act = cfg ^. _active
 
-        fpDyn = step fp newFpEvt
+            fpDyn = step fp newFpEvt
 
-        isActEvt = isActive <$> act
-    -- render the polygon
-    polyMDyn :: Dynamic TappableMesh <- localEnv (const $ cfg ^. _active) $ renderDynamic fpDyn
+            isActEvt = isActive <$> act
+        -- render the polygon
+        polyMDyn :: Dynamic TappableMesh <- localEnv (const $ cfg ^. _active) $ renderDynamic fpDyn
 
-    -- setup the polygon editor
-    editor <- createPolyEditor isActEvt (fp ^. _polygon)
+        -- setup the polygon editor
+        editor <- createPolyEditor isActEvt (fp ^. _polygon)
 
-    -- setup the height editor
-    --heightEvt <- setupHeightEditor isActEvt
-    let heightEvt = empty
+        -- setup the height editor
+        --heightEvt <- setupHeightEditor isActEvt
+        let heightEvt = empty
 
-    -- calculate the updated floor plan
-    let opEvt = (UpdPoly <$> editor ^. _polygon) <|>
-                (UpdHeight <$> heightEvt)
-        fpEvt = multicast $ fold applyOp opEvt fp
+        -- calculate the updated floor plan
+        let opEvt = (UpdPoly <$> editor ^. _polygon) <|>
+                    (UpdHeight <$> heightEvt)
+            fpEvt = multicast $ fold applyOp opEvt fp
 
-        node = FloorPlanNode {
-            updated : FPOUpdate <$> fpEvt,
-            deleted : const (FPODelete $ fp ^. _id) <$> editor ^. _delete,
-            tapped  : const fp <$> (latestEvt $ view _tapped <$> polyMDyn)
-            }
-    pure { input : fpEvt, output : node }
+            node = FloorPlanNode {
+                updated : FPOUpdate <$> fpEvt,
+                deleted : const (FPODelete $ fp ^. _id) <$> editor ^. _delete,
+                tapped  : const fp <$> (latestEvt $ view _tapped <$> polyMDyn)
+                }
+        pure { input : fpEvt, output : node }
