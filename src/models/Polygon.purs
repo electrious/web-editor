@@ -39,7 +39,7 @@ newPolygon = fromFoldable >>> Polygon
 
 -- | create a Polygon around a central vector
 polygonAround :: Vector2 -> Polygon
-polygonAround p = newPolygon [p1, p2, p3, p4, p1]
+polygonAround p = newPolygon [p1, p2, p3, p4]
     where x = vecX p
           y = vecY p
           l = 10.0
