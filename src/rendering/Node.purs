@@ -8,14 +8,14 @@ import Control.Monad.Reader (class MonadAsk, class MonadReader, ReaderT, ask, lo
 import Control.Monad.Writer (class MonadTell, class MonadWriter, WriterT, runWriterT)
 import Custom.Mesh (DraggableMesh, TapDragMesh, TapMouseMesh, TappableMesh, mkDraggableMesh, mkTapDragMesh, mkTapMouseMesh, mkTappableMesh)
 import Data.Default (class Default, def)
-import Data.Lens (Lens', view, (.~), (^.))
+import Data.Lens (Lens', set, view, (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
-import Data.Tuple (Tuple(..), fst)
+import Data.Tuple (Tuple(..))
 import Editor.Common.Lenses (_name, _parent, _position, _rotation, _scale)
 import Editor.Disposable (Disposee(..))
 import Effect (Effect)
@@ -140,8 +140,7 @@ setupProps prop o = do
 mkNode :: forall e m. IsObject3D m => Props -> Effect m -> Node e m
 mkNode prop func = do
     m <- liftEffect func
-    env <- ask
-    let parent = env ^. _parent
+    parent <- view _parent <$> ask
 
     liftEffect $ add m parent
 
@@ -153,19 +152,15 @@ mkNode prop func = do
 
 
 -- | run a child node action with the specified Object3D as parent
-runChild :: forall e a m. IsObject3D m => Node e a -> m -> Node e (Tuple a m)
-runChild child m = do
-    -- run child action with the new oobject as parent
-    let setP env = env # _parent .~ toObject3D m
-    r <- local setP child
-    pure $ Tuple r m
+runChild :: forall e a m. IsObject3D m => Node e a -> m -> Node e a
+runChild child m = local (set _parent (toObject3D m)) child
 
 -- empty node
 leaf :: forall e. Node e Unit
 leaf = pure unit
 
 node :: forall e a. Props -> Node e a -> Node e a
-node prop child = map fst $ mkNode prop mkObject3D >>= runChild child
+node prop child = mkNode prop mkObject3D >>= runChild child
 
 mesh :: forall geo mat e. IsGeometry geo => IsMaterial mat => Props -> geo -> mat -> Node e Mesh
 mesh prop geo mat = mkNode prop $ mkMesh geo mat
