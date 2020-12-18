@@ -3,7 +3,6 @@ module HouseBuilder.FloorPlanBuilder where
 import Prelude
 
 import Control.Alt ((<|>))
-import Control.Alternative (empty)
 import Control.Monad.Reader (ask)
 import Control.Plus (empty)
 import Data.Compactable (compact)

@@ -8,9 +8,9 @@ import Data.Lens (view, (.~), (^.))
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Tuple (Tuple(..))
-import Editor.Common.Lenses (_dragDelta, _dragType, _dragged, _mesh, _point)
+import Editor.Common.Lenses (_dragDelta, _dragType, _dragged, _mesh, _point, _tapped)
 import Editor.Input.Commoon (DragType(..))
-import Editor.SceneEvent (SceneDragEvent, SceneTapEvent, makeDraggable, makeTappable, stopDraggable, stopTappable)
+import Editor.SceneEvent (SceneDragEvent, SceneMouseMoveEvent, SceneTapEvent, makeDraggable, makeMouseMove, makeTappable, stopDraggable, stopMouseMove, stopTappable)
 import Effect (Effect)
 import FRP.Event (Event, makeEvent, mapAccum)
 import FRP.Event.Extra (multicast, performEvent)
@@ -122,3 +122,32 @@ mkTapDragMesh geo mat = do
         dragged   : m ^. _dragged,
         dragDelta : m ^. _dragDelta
     }
+
+newtype TapDragMouseMesh = TapDragMouseMesh {
+    mesh      :: Mesh,
+    tapped    :: Event SceneTapEvent,
+    dragged   :: Event SceneDragEvent,
+    dragDelta :: Event Vector3,
+    mouseMove :: Event SceneMouseMoveEvent
+    }
+
+derive instance newtypeTapDragMouseMesh :: Newtype TapDragMouseMesh _
+instance toObject3DTapDragMouseMesh :: IsObject3D TapDragMouseMesh where
+    toObject3D = toObject3D <<< view _mesh
+
+mouseEvtOn :: Mesh -> Event SceneMouseMoveEvent
+mouseEvtOn m = makeEvent \k -> do
+    makeMouseMove m k
+    pure $ stopMouseMove m
+
+mkTapDragMouseMesh :: forall geo mat. IsGeometry geo => IsMaterial mat => geo -> mat -> Effect TapDragMouseMesh
+mkTapDragMouseMesh geo mat = do
+    m <- mkTapDragMesh geo mat
+    let mesh = m ^. _mesh
+    pure $ TapDragMouseMesh {
+        mesh      : mesh,
+        tapped    : m ^. _tapped,
+        dragged   : m ^. _dragged,
+        dragDelta : m ^. _dragDelta,
+        mouseMove : mouseEvtOn mesh
+        }
