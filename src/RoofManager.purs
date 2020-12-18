@@ -207,8 +207,7 @@ recognizeNewRoofs meshData wrapper newRoofs activeRoof canEditRoofDyn = createPo
           
           getCandidatePoint evt rs = do
               np <- worldToLocal (evt ^. _point) houseWrapper
-              let isRoof = not (underPolygons rs np) && validNormal evt
-              if isRoof
+              if not (underPolygons rs np) && validNormal evt
                   then pure $ Just $ mkCandidatePoint np (normal (evt ^. _face))
                   else pure Nothing
         
