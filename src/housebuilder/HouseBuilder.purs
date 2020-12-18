@@ -48,7 +48,7 @@ mkHelperPlane = do
     lId <- view _leadId <$> getEnv
     let img = imageUrlForLead lId
 
-    geo <- liftEffect $ mkPlaneGeometry 400.0 186.0 10 10
+    geo <- liftEffect $ mkPlaneGeometry 100.0 46.5 10 10
     let t = loadTextureFromUrl img
     liftEffect do
         setWrapS clampToEdgeWrapping t
