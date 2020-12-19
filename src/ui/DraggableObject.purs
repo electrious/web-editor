@@ -3,18 +3,17 @@ module UI.DraggableObject where
 import Prelude hiding (add)
 
 import Control.Alt ((<|>))
-import Control.Monad.Reader (ask)
 import Control.Plus (empty)
 import Custom.Mesh (DraggableMesh, TapDragMesh, calcDragDelta, validateDrag)
 import Data.Default (class Default, def)
 import Data.Filterable (filter)
-import Data.Lens (Lens', view, (.~), (^.))
+import Data.Lens (Lens', (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Editor.Common.Lenses (_dragged, _name, _parent, _position, _tapped)
+import Editor.Common.Lenses (_dragged, _name, _position, _tapped)
 import Editor.SceneEvent (isDragEnd, isDragStart)
 import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
@@ -22,7 +21,7 @@ import FRP.Dynamic (Dynamic, step)
 import FRP.Event (Event)
 import FRP.Event.Extra (foldWithDef, multicast)
 import Model.Hardware.PanelModel (_isActive)
-import Rendering.Node (Node, _renderOrder, _visible, dragMesh, fixNodeE, getEnv, node, tapDragMesh)
+import Rendering.Node (Node, _renderOrder, _visible, dragMesh, fixNodeE, getEnv, getParent, node, tapDragMesh)
 import Three.Core.Geometry (class IsGeometry, mkCircleGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial, setOpacity, setTransparent)
 import Three.Core.Object3D (worldToLocal)
@@ -137,7 +136,7 @@ createDraggableObject =
 
                     dragging = multicast $ (const true <$> startEvt) <|> (const false <$> endEvt)
 
-                parent <- view _parent <$> ask
+                parent <- getParent
                 let toLocal v = Just <$> worldToLocal v parent
                     delta = calcDragDelta toLocal evts
 

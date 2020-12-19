@@ -127,7 +127,7 @@ setupFloorAdder fpsEvt actFloorDyn = do
 buildFloorPlan :: Event Unit ->  Node FloorPlanBuilderConf (Event (UUIDMap FloorPlan))
 buildFloorPlan bgTapEvt = node (def # _name .~ "floor plan builder") $
     fixNodeEWith Nothing \actFloorEvt ->
-        fixNodeEWith (def :: FloorPlanState) \stEvt -> do
+        fixNodeEWith def \stEvt -> do
             let plansEvt    = compact $ view _floorsToRender <$> stEvt
                 actFloorDyn = step Nothing actFloorEvt
                 plansDyn    = step M.empty plansEvt

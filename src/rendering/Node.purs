@@ -78,6 +78,10 @@ localEnv f c = do
 getEnv :: forall e. Node e e
 getEnv = view _env <$> ask
 
+-- | get the parent object in Node monad
+getParent :: forall e. Node e Object3D
+getParent = view _parent <$> ask
+
 -- Define Node properties
 newtype Props = Props {
     name          :: String,
@@ -140,7 +144,7 @@ setupProps prop o = do
 mkNode :: forall e m. IsObject3D m => Props -> Effect m -> Node e m
 mkNode prop func = do
     m <- liftEffect func
-    parent <- view _parent <$> ask
+    parent <- getParent
 
     liftEffect $ add m parent
 

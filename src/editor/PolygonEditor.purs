@@ -4,7 +4,6 @@ import Prelude hiding (add)
 
 import Control.Alt ((<|>))
 import Control.Apply (lift2)
-import Control.Monad.RWS (ask)
 import Control.Plus (empty)
 import Custom.Mesh (TappableMesh)
 import Data.Array (deleteAt, filter, head, insertAt, length, mapWithIndex, range, snoc, tail, zip, zipWith)
@@ -20,7 +19,7 @@ import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (sum)
 import Data.Tuple (Tuple(..), fst, snd)
-import Editor.Common.Lenses (_index, _isDragging, _name, _parent, _position, _tapped)
+import Editor.Common.Lenses (_index, _isDragging, _name, _position, _tapped)
 import Editor.SceneEvent (SceneTapEvent)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, dynEvent, step)
@@ -29,7 +28,7 @@ import FRP.Event.Extra (anyEvt, mergeArray, multicast)
 import Model.Hardware.PanelModel (_isActive)
 import Model.Polygon (Polygon(..))
 import Rendering.DynamicNode (renderEvent)
-import Rendering.Node (Node, _visible, fixNodeE, fixNodeEWith, localEnv, tapMesh)
+import Rendering.Node (Node, _visible, fixNodeE, fixNodeEWith, getParent, localEnv, tapMesh)
 import Rendering.NodeRenderable (class NodeRenderable)
 import Three.Core.Geometry (CircleGeometry, Geometry, mkCircleGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial)
@@ -135,7 +134,7 @@ midGeometry = unsafePerformEffect (mkCircleGeometry 0.3 32)
 
 instance nodeRenderableMidMarkerPoint :: NodeRenderable e MidMarkerPoint MidMarker where
     render p = do
-        parent <- view _parent <$> ask
+        parent <- getParent
 
         let getPos pos = mkVec3 (vecX pos) (vecY pos) 0.01
         m <- tapMesh (def # _name     .~ "mid-marker"

@@ -2,22 +2,21 @@ module Editor.PolygonAdder where
 
 import Prelude
 
-import Control.Monad.RWS (ask)
 import Data.Compactable (compact)
 import Data.Default (def)
-import Data.Lens (Lens', view, (.~), (^.))
+import Data.Lens (Lens', (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
-import Editor.Common.Lenses (_name, _parent, _position, _tapped)
+import Editor.Common.Lenses (_name, _position, _tapped)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, performDynamic, sampleDyn_)
 import FRP.Event (Event)
 import FRP.Event.Extra (multicast)
-import Rendering.Node (Node, _target, _visible, tapMesh)
+import Rendering.Node (Node, _target, _visible, getParent, tapMesh)
 import Three.Core.Geometry (CircleGeometry, mkCircleGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial)
 import Three.Core.Object3D (localToWorld)
@@ -55,7 +54,7 @@ adderMarkerGeo = unsafePerformEffect (mkCircleGeometry 1.0 32)
 
 createAdderMarker :: forall e. Dynamic (Maybe CandidatePoint) -> Node e (Event CandidatePoint)
 createAdderMarker pDyn = do
-    parent <- view _parent <$> ask
+    parent <- getParent
 
     let -- get the local position of the candidate point
         -- and move it along the normal vector a bit.
