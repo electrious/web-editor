@@ -25,12 +25,12 @@ import Rendering.Node (Node, _renderOrder, _visible, dragMesh, fixNodeE, getPare
 import Three.Core.Geometry (class IsGeometry, mkCircleGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial, setOpacity, setTransparent)
 import Three.Core.Object3D (worldToLocal)
-import Three.Math.Vector (Vector2, Vector3, mkVec3, vecX, vecY, (<+>))
+import Three.Math.Vector (Vector3, mkVec3, vecX, vecY, vecZ, (<+>))
 import Unsafe.Coerce (unsafeCoerce)
 
 newtype DragObjCfg geo = DragObjCfg {
     isActive       :: Dynamic Boolean,
-    position       :: Vector2,
+    position       :: Vector3,
     customGeo      :: Maybe geo,
     customMat      :: Maybe MeshBasicMaterial,
     validator      :: Vector3 -> Boolean,
@@ -108,20 +108,30 @@ invisibleCircle posDyn visDyn rOrder = do
              ) geo invisibleMaterial
 
 
+-- | increment z of a Vector3 by 0.1
+incZ :: Vector3 -> Vector3
+incZ p = mkVec3 (vecX p) (vecY p) (vecZ p + 0.1)
+
+
+-- | decrement z of a Vector3 by 0.1
+decZ :: Vector3 -> Vector3
+decZ p = mkVec3 (vecX p) (vecY p) (vecZ p - 0.1)
+
+
 -- | create a draggable object
 createDraggableObject :: forall e geo. IsGeometry geo => DragObjCfg geo -> Node e DraggableObject
 createDraggableObject cfg =
     node (def # _name .~ "drag-object") $
         fixNodeE \newPosEvt ->
             fixNodeE \isDraggingEvt -> do
-                let position  = cfg ^. _position
+                -- all positions used below will be raised up a bit on Z axis
+                let position  = incZ $ cfg ^. _position
                     visDyn    = cfg ^. _isActive
                     customGeo = cfg ^. _customGeo
                     customMat = cfg ^. _customMat
                     
                     -- create the visible marker
-                    defPos = mkVec3 (vecX position) (vecY position) 0.1
-                    posDyn = step defPos newPosEvt
+                    posDyn = step position $ incZ <$> newPosEvt
                 mesh <- visibleObj posDyn visDyn customGeo customMat
 
                 -- create the invisible circle
@@ -147,7 +157,7 @@ createDraggableObject cfg =
                     filtF  = cfg ^. _validator
                     transF = cfg ^. _deltaTransform
                     
-                    newPos = multicast $ filter filtF $ foldWithDef updatePos (transF <$> delta) defPos
+                    newPos = decZ <$> multicast (filter filtF $ foldWithDef updatePos (transF <$> delta) position)
                     
                     dragObj = DraggableObject {
                         tapped     : const unit <$> mesh ^. _tapped,
