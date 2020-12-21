@@ -113,7 +113,8 @@ createFloorNode = do
         polyMDyn :: Dynamic TappableMesh <- localEnv (const $ cfg ^. _active) $ renderDynamic fpDyn
 
         -- setup the polygon editor
-        editor <- createPolyEditor isActEvt (fp ^. _polygon)
+        editor <- createPolyEditor $ def # _isActive .~ isActEvt
+                                         # _polygon  .~ fp ^. _polygon
 
         -- setup the height editor
         --heightEvt <- setupHeightEditor isActEvt

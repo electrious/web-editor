@@ -28,7 +28,7 @@ import FRP.Event.Extra (anyEvt, mergeArray, multicast)
 import Model.Hardware.PanelModel (_isActive)
 import Model.Polygon (Polygon(..))
 import Rendering.DynamicNode (renderEvent)
-import Rendering.Node (Node, _visible, fixNodeE, fixNodeEWith, getEnv, getParent, localEnv, tapMesh)
+import Rendering.Node (Node, _visible, fixNodeE, fixNodeEWith, getParent, localEnv, tapMesh)
 import Rendering.NodeRenderable (class NodeRenderable)
 import Three.Core.Geometry (CircleGeometry, Geometry, mkCircleGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial)
@@ -222,9 +222,8 @@ delMarker :: Int -> Polygon -> Polygon
 delMarker idx (Polygon ps) = Polygon $ fromMaybe [] (deleteAt idx ps)
 
 -- | create polygon editor
-createPolyEditor :: Node PolyEditorConf PolyEditor
-createPolyEditor = do
-    cfg <- getEnv
+createPolyEditor :: forall e. PolyEditorConf -> Node e PolyEditor
+createPolyEditor cfg = do
     let poly   = cfg ^. _polygon
         active = cfg ^. _isActive
     

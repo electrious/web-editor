@@ -37,7 +37,7 @@ import FRP.Event (Event, create, keepLatest)
 import FRP.Event.Extra (multicast)
 import Math (pi)
 import Math.Angle (degreeVal, radianVal)
-import Model.Hardware.PanelModel (PanelModel)
+import Model.Hardware.PanelModel (PanelModel, _isActive)
 import Model.Polygon (Polygon(..), _polyVerts, renderPolygon)
 import Model.Roof.Panel (Alignment(..), Orientation(..), Panel)
 import Model.Roof.RoofPlate (RoofOperation(..), RoofPlate, _azimuth, _borderPoints, _unifiedPoints)
@@ -276,7 +276,10 @@ createRoofNode cfg = do
 
         -- create the vertex markers editor
         let canEdit = (&&) <$> isActive <*> canEditRoofDyn
-        Tuple editor d0 <- runNode (createPolyEditor canEdit poly) (mkNodeEnv obj unit)
+            -- PolyEditorConf
+            opt = def # _isActive .~ isActive
+                      # _polygon  .~ poly
+        Tuple editor d0 <- runNode (createPolyEditor opt) (mkNodeEnv obj unit)
 
         let polyDyn = step poly (editor ^. _polygon)
             meshDyn = performDynamic (createRoofMesh <$> polyDyn <*> isActive <*> canEditRoofDyn)
