@@ -8,7 +8,7 @@ import Control.Plus (empty)
 import Custom.Mesh (TappableMesh)
 import Data.Array (deleteAt, filter, head, insertAt, length, mapWithIndex, range, snoc, tail, zip, zipWith)
 import Data.Compactable (compact)
-import Data.Default (def)
+import Data.Default (class Default, def)
 import Data.Foldable (class Foldable)
 import Data.Int (toNumber)
 import Data.Lens (Lens', view, (^.), (.~))
@@ -19,7 +19,7 @@ import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (sum)
 import Data.Tuple (Tuple(..), fst, snd)
-import Editor.Common.Lenses (_index, _isDragging, _name, _position, _tapped)
+import Editor.Common.Lenses (_index, _isDragging, _name, _polygon, _position, _tapped)
 import Editor.SceneEvent (SceneTapEvent)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, dynEvent, step)
@@ -28,7 +28,7 @@ import FRP.Event.Extra (anyEvt, mergeArray, multicast)
 import Model.Hardware.PanelModel (_isActive)
 import Model.Polygon (Polygon(..))
 import Rendering.DynamicNode (renderEvent)
-import Rendering.Node (Node, _visible, fixNodeE, fixNodeEWith, getParent, localEnv, tapMesh)
+import Rendering.Node (Node, _visible, fixNodeE, fixNodeEWith, getEnv, getParent, localEnv, tapMesh)
 import Rendering.NodeRenderable (class NodeRenderable)
 import Three.Core.Geometry (CircleGeometry, Geometry, mkCircleGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial)
@@ -186,9 +186,21 @@ polyCenter (Polygon vs) = mkVec3 (tx / l) (ty / l) 0.01
           l = toNumber (length vs)
 
 
+newtype PolyEditorConf = PolyEditorConf {
+    isActive :: Dynamic Boolean,
+    polygon  :: Polygon
+    }
+
+derive instance newtypePolyEditorConf :: Newtype PolyEditorConf _
+instance defaultPolyEditorConf :: Default PolyEditorConf where
+    def = PolyEditorConf {
+        isActive : step false empty,
+        polygon  : def
+        }
+
 newtype PolyEditor = PolyEditor {
-    polygon    :: Event Polygon,
-    delete     :: Event SceneTapEvent
+    polygon :: Event Polygon,
+    delete  :: Event SceneTapEvent
 }
 
 derive instance newtypePolyEditor :: Newtype PolyEditor _
@@ -210,8 +222,12 @@ delMarker :: Int -> Polygon -> Polygon
 delMarker idx (Polygon ps) = Polygon $ fromMaybe [] (deleteAt idx ps)
 
 -- | create polygon editor
-createPolyEditor :: forall e. Dynamic Boolean -> Polygon -> Node e PolyEditor
-createPolyEditor active poly =
+createPolyEditor :: Node PolyEditorConf PolyEditor
+createPolyEditor = do
+    cfg <- getEnv
+    let poly   = cfg ^. _polygon
+        active = cfg ^. _isActive
+    
     fixNodeEWith false \polyActive ->
         fixNodeEWith poly \polyEvt ->
             fixNodeE \actMarkerEvt -> do
