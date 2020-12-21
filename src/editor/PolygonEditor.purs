@@ -28,7 +28,7 @@ import FRP.Event.Extra (anyEvt, mergeArray, multicast)
 import Model.Hardware.PanelModel (_isActive)
 import Model.Polygon (Polygon(..))
 import Rendering.DynamicNode (renderEvent)
-import Rendering.Node (Node, _visible, fixNodeE, fixNodeEWith, getParent, localEnv, tapMesh)
+import Rendering.Node (Node, _visible, fixNodeE, fixNodeEWith, getParent, tapMesh)
 import Rendering.NodeRenderable (class NodeRenderable)
 import Three.Core.Geometry (CircleGeometry, Geometry, mkCircleGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial)
@@ -57,7 +57,7 @@ instance nodeRenderableVertMarkerPoint :: NodeRenderable e VertMarkerPoint VertM
     render m = do
         let cfg = def # _isActive .~ (m ^. _isActive)
                       # _position .~ (m ^. _position)
-        dragObj <- localEnv (const (cfg :: DragObjCfg Geometry)) createDraggableObject
+        dragObj <- createDraggableObject (cfg :: DragObjCfg Geometry)
         
         pure $ VertMarker {
             tapped     : const (m ^. _index) <$> dragObj ^. _tapped,

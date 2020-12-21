@@ -21,7 +21,7 @@ import FRP.Dynamic (Dynamic, step)
 import FRP.Event (Event)
 import FRP.Event.Extra (foldWithDef, multicast)
 import Model.Hardware.PanelModel (_isActive)
-import Rendering.Node (Node, _renderOrder, _visible, dragMesh, fixNodeE, getEnv, getParent, node, tapDragMesh)
+import Rendering.Node (Node, _renderOrder, _visible, dragMesh, fixNodeE, getParent, node, tapDragMesh)
 import Three.Core.Geometry (class IsGeometry, mkCircleGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial, setOpacity, setTransparent)
 import Three.Core.Object3D (worldToLocal)
@@ -109,12 +109,11 @@ invisibleCircle posDyn visDyn rOrder = do
 
 
 -- | create a draggable object
-createDraggableObject :: forall geo. IsGeometry geo => Node (DragObjCfg geo) DraggableObject
-createDraggableObject =
+createDraggableObject :: forall e geo. IsGeometry geo => DragObjCfg geo -> Node e DraggableObject
+createDraggableObject cfg =
     node (def # _name .~ "drag-object") $
         fixNodeE \newPosEvt ->
             fixNodeE \isDraggingEvt -> do
-                cfg <- getEnv
                 let position  = cfg ^. _position
                     visDyn    = cfg ^. _isActive
                     customGeo = cfg ^. _customGeo

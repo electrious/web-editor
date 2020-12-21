@@ -76,7 +76,7 @@ dragArrow actDyn = do
                   # _validator      .~ validator
                   # _deltaTransform .~ transF
                   
-    localEnv (const (cfg :: DragObjCfg Geometry)) createDraggableObject
+    createDraggableObject (cfg :: DragObjCfg Geometry)
 
 
 -- | setup drag arrow to edit the house height
@@ -117,8 +117,7 @@ createFloorNode = do
                                          # _polygon  .~ fp ^. _polygon
 
         -- setup the height editor
-        --heightEvt <- setupHeightEditor isActEvt
-        let heightEvt = empty
+        heightEvt <- setupHeightEditor isActEvt
 
         -- calculate the updated floor plan
         let opEvt = (UpdPoly <$> editor ^. _polygon) <|>

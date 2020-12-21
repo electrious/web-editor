@@ -19,7 +19,7 @@ import Model.Polygon (class IsPolygon, Polygon, _polyVerts, polygonAround)
 import Model.UUID (class HasUUID)
 import Rendering.Node (localEnv, mesh)
 import Rendering.NodeRenderable (class NodeRenderable, render)
-import Three.Core.Geometry (_depth, mkExtrudeGeometry, mkShape)
+import Three.Core.Geometry (_bevelEnabled, _depth, mkExtrudeGeometry, mkShape)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial, setOpacity, setTransparent)
 import Three.Math.Vector (Vector2, mkVec3)
 
@@ -82,7 +82,10 @@ instance nodeRenderableFloorPlan :: NodeRenderable (Dynamic ActiveMode) FloorPla
         when (h > 0.0) do
             shp <- liftEffect $ mkShape $ poly ^. _polyVerts
             geo <- liftEffect $ mkExtrudeGeometry shp $ def # _depth .~ h
-            mat <- liftEffect $ mkMeshBasicMaterial 0xffeeff
+                                                            # _bevelEnabled .~ false
+            mat <- liftEffect $ mkMeshBasicMaterial 0x009900
+            liftEffect $ setTransparent true mat
+            liftEffect $ setOpacity 0.5 mat
 
             let pos = mkVec3 0.0 0.0 (h / 2.0)
 
