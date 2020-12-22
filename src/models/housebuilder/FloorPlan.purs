@@ -2,18 +2,17 @@ module Model.HouseBuilder.FloorPlan (FloorPlan(..), newFloorPlan, FloorPlanOp(..
 
 import Prelude
 
-import Control.Plus (empty)
 import Custom.Mesh (TappableMesh)
 import Data.Default (class Default, def)
 import Data.Lens (view, (.~), (^.))
 import Data.Meter (Meter, meter, meterVal)
 import Data.Newtype (class Newtype)
 import Data.UUID (UUID, emptyUUID, genUUID)
-import Editor.Common.Lenses (_height, _id, _name, _polygon, _position)
+import Editor.Common.Lenses (_height, _id, _name, _polygon)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
-import FRP.Dynamic (Dynamic, step)
+import FRP.Dynamic (Dynamic)
 import Model.ActiveMode (ActiveMode(..))
 import Model.Polygon (class IsPolygon, Polygon, _polyVerts, polygonAround)
 import Model.UUID (class HasUUID)
@@ -21,7 +20,7 @@ import Rendering.Node (localEnv, mesh)
 import Rendering.NodeRenderable (class NodeRenderable, render)
 import Three.Core.Geometry (_bevelEnabled, _depth, mkExtrudeGeometry, mkShape)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial, setOpacity, setTransparent)
-import Three.Math.Vector (Vector2, mkVec3)
+import Three.Math.Vector (Vector2)
 
 -- | a FloorPlan represent a house part with 2D polygon and height
 newtype FloorPlan = FloorPlan {
@@ -87,10 +86,7 @@ instance nodeRenderableFloorPlan :: NodeRenderable (Dynamic ActiveMode) FloorPla
             liftEffect $ setTransparent true mat
             liftEffect $ setOpacity 0.5 mat
 
-            let pos = mkVec3 0.0 0.0 (h / 2.0)
-
-            void $ mesh (def # _name     .~ "floor-body"
-                             # _position .~ step pos empty) geo mat
+            void $ mesh (def # _name .~ "floor-body") geo mat
         
         pure m
 

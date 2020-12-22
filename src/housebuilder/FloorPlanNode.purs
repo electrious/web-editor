@@ -13,11 +13,12 @@ import Data.Maybe (Maybe(..))
 import Data.Meter (Meter, meter)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Editor.Common.Lenses (_active, _height, _id, _name, _polygon, _position, _tapped)
+import Editor.Common.Lenses (_active, _height, _id, _name, _polygon, _position, _rotation, _tapped)
 import Editor.PolygonEditor (_delete, createPolyEditor)
 import FRP.Dynamic (Dynamic, latestEvt, step)
 import FRP.Event (Event, fold)
 import FRP.Event.Extra (multicast)
+import Math (pi)
 import Model.ActiveMode (ActiveMode(..), isActive)
 import Model.Hardware.PanelModel (_isActive)
 import Model.HouseBuilder.FloorPlan (FloorPlan, FloorPlanOp(..))
@@ -26,8 +27,9 @@ import Rendering.DynamicNode (renderDynamic)
 import Rendering.Node (Node, fixNodeE, getEnv, localEnv, node)
 import Three.Core.Geometry (Geometry)
 import Three.Core.Material (MeshBasicMaterial)
+import Three.Math.Euler (mkEuler)
 import Three.Math.Vector (mkVec3, vecZ)
-import UI.DraggableObject (DragObjCfg, DraggableObject, _customMat, _deltaTransform, _validator, createDraggableObject)
+import UI.DraggableObject (DragObjCfg, DraggableObject, _customMat, _validator, createDraggableObject)
 
 newtype FloorPlanConfig = FloorPlanConfig {
     floor         :: FloorPlan,
@@ -68,14 +70,11 @@ dragArrow actDyn = do
     
     let -- make sure the arrow can only be dragged between 0 and 20 in Z axis
         validator pos = let z = vecZ pos in z >= 0.0 && z <= 20.0
-        -- omit the value changes in x/y axis
-        transF pos    = mkVec3 0.0 0.0 (vecZ pos)
-        
-        cfg = def # _isActive       .~ actDyn
-                  # _customMat      .~ mat
-                  # _validator      .~ validator
-                  # _deltaTransform .~ transF
-                  
+
+        cfg = def # _isActive  .~ actDyn
+                  # _customMat .~ mat
+                  # _validator .~ validator
+                  # _rotation  .~ mkEuler (pi / 2.0) 0.0 0.0
     createDraggableObject (cfg :: DragObjCfg Geometry)
 
 
