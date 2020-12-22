@@ -29,7 +29,7 @@ import Three.Core.Geometry (Geometry)
 import Three.Core.Material (MeshBasicMaterial)
 import Three.Math.Euler (mkEuler)
 import Three.Math.Vector (mkVec3, vecZ)
-import UI.DraggableObject (DragObjCfg, DraggableObject, _customMat, _validator, createDraggableObject)
+import UI.DraggableObject (DragObjCfg, DraggableObject, _customMat, _deltaTransform, _validator, createDraggableObject)
 
 newtype FloorPlanConfig = FloorPlanConfig {
     floor         :: FloorPlan,
@@ -70,11 +70,14 @@ dragArrow actDyn = do
     
     let -- make sure the arrow can only be dragged between 0 and 20 in Z axis
         validator pos = let z = vecZ pos in z >= 0.0 && z <= 20.0
-
-        cfg = def # _isActive  .~ actDyn
-                  # _customMat .~ mat
-                  # _validator .~ validator
-                  # _rotation  .~ mkEuler (pi / 2.0) 0.0 0.0
+        -- make sure the arrow only can be dragged along Z axis
+        transF d = mkVec3 0.0 0.0 (vecZ d)
+        
+        cfg = def # _isActive       .~ actDyn
+                  # _customMat      .~ mat
+                  # _validator      .~ validator
+                  # _deltaTransform .~ Just transF
+                  # _rotation       .~ mkEuler (pi / 2.0) 0.0 0.0
     createDraggableObject (cfg :: DragObjCfg Geometry)
 
 

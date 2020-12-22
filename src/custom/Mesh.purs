@@ -62,7 +62,7 @@ calcDragDelta toLocalF evt = mapAccum calcDelta e def
     where f d = map (mkNewDrag d) <$> toLocalF (d ^. _point)
           mkNewDrag d p = d # _point .~ p
           -- convert drag event to use local coordinate system
-          e = compact (performEvent $ f <$> evt)
+          e = compact $ performEvent $ f <$> evt
 
           calcDelta ne oldE | ne ^. _dragType == DragStart = Tuple ne def
                             | otherwise                    = Tuple ne (ne ^. _point <-> oldE ^. _point)

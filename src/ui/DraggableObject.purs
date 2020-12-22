@@ -35,7 +35,8 @@ newtype DragObjCfg geo = DragObjCfg {
     rotation       :: Euler,
     customGeo      :: Maybe geo,
     customMat      :: Maybe MeshBasicMaterial,
-    validator      :: Vector3 -> Boolean
+    validator      :: Vector3 -> Boolean,
+    deltaTransform :: Maybe (Vector3 -> Vector3)
     }
 
 derive instance newtypeDragObjCfg :: Newtype (DragObjCfg geo) _
@@ -47,7 +48,8 @@ instance defaultDragObjCfg :: Default (DragObjCfg geo) where
         rotation       : def,
         customGeo      : Nothing,
         customMat      : Nothing,
-        validator      : const true
+        validator      : const true,
+        deltaTransform : Nothing
         }
 
 _customGeo :: forall t a r. Newtype t { customGeo :: a | r } => Lens' t a
@@ -58,6 +60,9 @@ _customMat = _Newtype <<< prop (SProxy :: SProxy "customMat")
 
 _validator :: forall t a r. Newtype t { validator :: a | r } => Lens' t a
 _validator = _Newtype <<< prop (SProxy :: SProxy "validator")
+
+_deltaTransform :: forall t a r. Newtype t { deltaTransform :: a | r } => Lens' t a
+_deltaTransform = _Newtype <<< prop (SProxy :: SProxy "deltaTransform")
 
 newtype DraggableObject = DraggableObject {
     tapped     :: Event Unit,
@@ -131,16 +136,12 @@ createDraggableObject cfg =
                 
                 -- all positions used below will be raised up a bit on Z axis
                 position <- liftEffect $ toLoc (cfg ^. _position)
-                let visDyn    = cfg ^. _isActive
-                    customGeo = cfg ^. _customGeo
-                    customMat = cfg ^. _customMat
-                    
-                    -- create the visible marker
+                let -- create the visible marker
                     posDyn = step position $ performEvent $ toLoc <$> newPosEvt
                 mesh <- visibleObj (def # _name     .~ "visible-obj"
                                         # _position .~ posDyn
-                                        # _visible  .~ visDyn
-                                   ) customGeo customMat
+                                        # _visible  .~ cfg ^. _isActive
+                                   ) (cfg ^. _customGeo) (cfg ^. _customMat)
 
                 -- create the invisible circle
                 let vis2Dyn = step false isDraggingEvt
@@ -160,13 +161,18 @@ createDraggableObject cfg =
                     toLocal v = Just <$> worldToLocal v parent
                     delta = calcDragDelta toLocal evts
 
+                    -- transform delta in parent coordinate system if deltaTransform provided
+                    deltaEvt = case cfg ^. _deltaTransform of
+                        Nothing -> delta
+                        Just f  -> performEvent $ (toLoc <<< f <=< toParent) <$> delta
+
                     -- function to calculate new position with delta
                     updatePos d lastPos = lastPos <+> zeroZ d
                     zeroZ v = mkVec3 (vecX v) (vecY v) 0.0
 
                     -- validate and transform the new position with configured funtions
                     filtF  = cfg ^. _validator
-                    newPos = multicast $ filter filtF $ performEvent $ toParent <$> foldWithDef updatePos delta position
+                    newPos = multicast $ filter filtF $ performEvent $ toParent <$> foldWithDef updatePos deltaEvt position
                     
                     dragObj = DraggableObject {
                         tapped     : const unit <$> mesh ^. _tapped,
