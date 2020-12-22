@@ -21,7 +21,7 @@ import FRP.Dynamic (Dynamic, step)
 import FRP.Event (Event)
 import FRP.Event.Extra (foldWithDef, multicast)
 import Model.Hardware.PanelModel (_isActive)
-import Rendering.Node (Node, _renderOrder, _visible, dragMesh, fixNodeE, getParent, node, tapDragMesh)
+import Rendering.Node (Node, Props, _renderOrder, _visible, dragMesh, fixNodeE, getParent, node, tapDragMesh)
 import Three.Core.Geometry (class IsGeometry, mkCircleGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial, setOpacity, setTransparent)
 import Three.Core.Object3D (worldToLocal)
@@ -87,25 +87,18 @@ invisibleMaterial = unsafePerformEffect do
 
 -- | create visible part of the object, user can specify custom geometry
 -- and material
-visibleObj :: forall e geo. IsGeometry geo => Dynamic Vector3 -> Dynamic Boolean -> Maybe geo -> Maybe MeshBasicMaterial -> Node e TapDragMesh
-visibleObj posDyn visDyn geo mat = do
+visibleObj :: forall e geo. IsGeometry geo => Props -> Maybe geo -> Maybe MeshBasicMaterial -> Node e TapDragMesh
+visibleObj prop geo mat = do
     cm <- liftEffect $ mkCircleGeometry 0.5 32
     let g = fromMaybe (unsafeCoerce cm) geo
         m = fromMaybe defMaterial mat
-    tapDragMesh (def # _name     .~ "visible-obj"
-                     # _position .~ posDyn
-                     # _visible  .~ visDyn
-                ) g m
+    tapDragMesh prop g m
 
 
-invisibleCircle :: forall e. Dynamic Vector3 -> Dynamic Boolean -> Int -> Node e DraggableMesh
-invisibleCircle posDyn visDyn rOrder = do
+invisibleCircle :: forall e. Props -> Node e DraggableMesh
+invisibleCircle prop = do
     geo <- liftEffect $ mkCircleGeometry 10.0 32
-    dragMesh (def # _name        .~ "invisible-circle"
-                  # _position    .~ posDyn
-                  # _visible     .~ visDyn
-                  # _renderOrder .~ rOrder
-             ) geo invisibleMaterial
+    dragMesh prop geo invisibleMaterial
 
 
 -- | increment z of a Vector3 by 0.1
@@ -132,11 +125,18 @@ createDraggableObject cfg =
                     
                     -- create the visible marker
                     posDyn = step position $ incZ <$> newPosEvt
-                mesh <- visibleObj posDyn visDyn customGeo customMat
+                mesh <- visibleObj (def # _name     .~ "visible-obj"
+                                        # _position .~ posDyn
+                                        # _visible  .~ visDyn
+                                   ) customGeo customMat
 
                 -- create the invisible circle
                 let vis2Dyn = step false isDraggingEvt
-                invCircle <- invisibleCircle posDyn vis2Dyn 10
+                invCircle <- invisibleCircle (def # _name        .~ "invisible-circle"
+                                                  # _position    .~ posDyn
+                                                  # _visible     .~ vis2Dyn
+                                                  # _renderOrder .~ 10
+                                             )
 
                 let dragEvts = multicast $ mesh ^. _dragged <|> invCircle ^. _dragged
                     evts     = multicast $ validateDrag dragEvts
