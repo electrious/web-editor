@@ -10,7 +10,7 @@ import Data.Lens (Lens', view, (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..))
-import Data.Meter (Meter, meter)
+import Data.Meter (Meter, meter, meterVal)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Editor.Common.Lenses (_active, _height, _id, _name, _polygon, _position, _rotation, _tapped)
@@ -111,12 +111,14 @@ createFloorNode = do
             fpDyn = step fp newFpEvt
 
             isActEvt = isActive <$> act
+            calcPos p = mkVec3 0.0 0.0 (meterVal $ p ^. _height)
         -- render the polygon
         polyMDyn :: Dynamic TappableMesh <- localEnv (const $ cfg ^. _active) $ renderDynamic fpDyn
 
         -- setup the polygon editor
-        editor <- createPolyEditor $ def # _isActive .~ isActEvt
-                                         # _polygon  .~ fp ^. _polygon
+        editor <- node (def # _position .~ (calcPos <$> fpDyn)) $
+                      createPolyEditor $ def # _isActive .~ isActEvt
+                                             # _polygon  .~ fp ^. _polygon
 
         -- setup the height editor
         heightEvt <- setupHeightEditor isActEvt

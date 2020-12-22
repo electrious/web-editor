@@ -8,7 +8,7 @@ import Data.Lens (view, (.~), (^.))
 import Data.Meter (Meter, meter, meterVal)
 import Data.Newtype (class Newtype)
 import Data.UUID (UUID, emptyUUID, genUUID)
-import Editor.Common.Lenses (_height, _id, _name, _polygon)
+import Editor.Common.Lenses (_height, _id, _name, _polygon, _position)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
@@ -16,11 +16,11 @@ import FRP.Dynamic (Dynamic)
 import Model.ActiveMode (ActiveMode(..))
 import Model.Polygon (class IsPolygon, Polygon, _polyVerts, polygonAround)
 import Model.UUID (class HasUUID)
-import Rendering.Node (localEnv, mesh)
+import Rendering.Node (localEnv, mesh, node)
 import Rendering.NodeRenderable (class NodeRenderable, render)
 import Three.Core.Geometry (_bevelEnabled, _depth, mkExtrudeGeometry, mkShape)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial, setOpacity, setTransparent)
-import Three.Math.Vector (Vector2)
+import Three.Math.Vector (Vector2, mkVec3)
 
 -- | a FloorPlan represent a house part with 2D polygon and height
 newtype FloorPlan = FloorPlan {
@@ -76,7 +76,8 @@ instance nodeRenderableFloorPlan :: NodeRenderable (Dynamic ActiveMode) FloorPla
     render fp = do
         let poly = fp ^. _polygon
             h    = meterVal $ fp ^. _height
-        m <- localEnv (map floorPlanMaterial) $ render poly
+            pos  = mkVec3 0.0 0.0 h
+        m <- node (def # _position .~ pure pos) $ localEnv (map floorPlanMaterial) $ render poly
 
         when (h > 0.0) do
             shp <- liftEffect $ mkShape $ poly ^. _polyVerts
