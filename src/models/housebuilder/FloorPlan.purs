@@ -19,7 +19,7 @@ import Model.UUID (class HasUUID)
 import Rendering.Node (localEnv, mesh, node)
 import Rendering.NodeRenderable (class NodeRenderable, render)
 import Three.Core.Geometry (_bevelEnabled, _depth, mkExtrudeGeometry, mkShape)
-import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial, setOpacity, setTransparent)
+import Three.Core.Material (MeshBasicMaterial, doubleSide, mkMeshBasicMaterial, mkMeshPhongMaterial, setOpacity, setSide, setTransparent)
 import Three.Math.Vector (Vector2, mkVec3)
 
 -- | a FloorPlan represent a house part with 2D polygon and height
@@ -83,9 +83,11 @@ instance nodeRenderableFloorPlan :: NodeRenderable (Dynamic ActiveMode) FloorPla
             shp <- liftEffect $ mkShape $ poly ^. _polyVerts
             geo <- liftEffect $ mkExtrudeGeometry shp $ def # _depth .~ h
                                                             # _bevelEnabled .~ false
-            mat <- liftEffect $ mkMeshBasicMaterial 0x009900
-            liftEffect $ setTransparent true mat
-            liftEffect $ setOpacity 0.5 mat
+            mat <- liftEffect $ mkMeshPhongMaterial 0x999999
+            liftEffect do
+                setSide doubleSide mat
+                setTransparent true mat
+                setOpacity 0.5 mat
 
             void $ mesh (def # _name .~ "floor-body") geo mat
         

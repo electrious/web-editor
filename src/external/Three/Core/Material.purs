@@ -7,10 +7,12 @@ import Three.Loader.TextureLoader (Texture)
   
 foreign import data Material :: Type
 foreign import data MeshBasicMaterial :: Type
+foreign import data MeshPhongMaterial :: Type
 foreign import data LineBasicMaterial :: Type
 
 foreign import mkMeshBasicMaterial :: Int -> Effect MeshBasicMaterial
 foreign import mkMeshBasicMaterialWithTexture :: Texture -> Effect MeshBasicMaterial
+foreign import mkMeshPhongMaterial :: Int -> Effect MeshPhongMaterial
 
 -- create LineBasicMaterial with color and line width
 foreign import mkLineBasicMaterial :: Int -> Number -> Effect LineBasicMaterial
@@ -19,6 +21,7 @@ class IsMaterial a
 
 instance isMaterialMaterial :: IsMaterial Material
 instance isMaterialMeshBasicMaterial :: IsMaterial MeshBasicMaterial
+instance isMaterialMeshPhongMaterial :: IsMaterial MeshPhongMaterial
 
 foreign import setTransparent :: forall mat. IsMaterial mat => Boolean -> mat -> Effect Unit
 

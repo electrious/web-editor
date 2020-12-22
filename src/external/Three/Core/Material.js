@@ -8,6 +8,10 @@ exports.mkMeshBasicMaterialWithTexture = t => _ => {
     return new three.MeshBasicMaterial({ map: t })
 }
 
+exports.mkMeshPhongMaterial = c => _ => {
+    return new three.MeshPhongMaterial({ color: c })
+}
+
 exports.mkLineBasicMaterial = c => w => _ => {
     return new three.LineBasicMaterial({ color: c, linewidth: w })
 }
