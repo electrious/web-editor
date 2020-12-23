@@ -20,7 +20,7 @@ import FRP.Event.Extra (multicast)
 import Math (pi)
 import Model.ActiveMode (ActiveMode(..), isActive)
 import Model.Hardware.PanelModel (_isActive)
-import Model.HouseBuilder.FloorPlan (FloorPlan, FloorPlanOp(..))
+import Model.HouseBuilder.FloorPlan (FloorPlan, FloorPlanOp(..), floorPlanTop)
 import Model.Polygon (Polygon)
 import Rendering.DynamicNode (renderDynamic)
 import Rendering.Node (Node, fixNodeE, getEnv, localEnv, node)
@@ -110,7 +110,7 @@ createFloorNode = do
             fpDyn = step fp newFpEvt
 
             isActEvt = isActive <$> act
-            calcPos p = mkVec3 0.0 0.0 (meterVal $ p ^. _height)
+            calcPos p = mkVec3 0.0 0.0 (meterVal $ floorPlanTop p)
         -- render the polygon
         polyMDyn :: Dynamic TappableMesh <- localEnv (const $ cfg ^. _active) $ renderDynamic fpDyn
 

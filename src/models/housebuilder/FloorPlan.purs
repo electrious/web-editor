@@ -1,4 +1,4 @@
-module Model.HouseBuilder.FloorPlan (FloorPlan(..), newFloorPlan, FloorPlanOp(..)) where
+module Model.HouseBuilder.FloorPlan (FloorPlan(..), newFloorPlan, FloorPlanOp(..), floorPlanTop) where
 
 import Prelude
 
@@ -72,11 +72,15 @@ floorPlanMaterial :: ActiveMode -> MeshBasicMaterial
 floorPlanMaterial Active   = activeMat
 floorPlanMaterial Inactive = inactiveMat
 
+-- | calculate the floor plan's top height used for rendering
+floorPlanTop :: FloorPlan -> Meter
+floorPlanTop fp = fp ^. _height + meter 0.02
+
 instance nodeRenderableFloorPlan :: NodeRenderable (Dynamic ActiveMode) FloorPlan TappableMesh where
     render fp = do
         let poly = fp ^. _polygon
             h    = meterVal $ fp ^. _height
-            pos  = mkVec3 0.0 0.0 h
+            pos  = mkVec3 0.0 0.0 (meterVal $ floorPlanTop fp)
         m <- node (def # _position .~ pure pos) $ localEnv (map floorPlanMaterial) $ render poly
 
         when (h > 0.0) do
