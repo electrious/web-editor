@@ -4,7 +4,7 @@ import Prelude
 
 import Control.Monad.Writer (tell)
 import Custom.Mesh (TappableMesh, mkTappableMesh)
-import Data.Array (fromFoldable)
+import Data.Array (fromFoldable, length)
 import Data.Default (class Default, def)
 import Data.Foldable (class Foldable)
 import Data.Lens (Lens', (^.))
@@ -47,6 +47,8 @@ polygonAround p = newPolygon [p1, p2, p3, p4]
           p3 = mkVec2 (x + l) (y + l)
           p4 = mkVec2 (x + l) (y - l)
 
+numOfVerts :: Polygon -> Int
+numOfVerts (Polygon vs) = length vs
 
 instance nodeRenderablePolygon :: NodeRenderable (Dynamic MeshBasicMaterial) Polygon TappableMesh where
     render p = do

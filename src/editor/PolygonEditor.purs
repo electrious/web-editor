@@ -25,7 +25,7 @@ import FRP.Dynamic (Dynamic, dynEvent, step)
 import FRP.Event (Event, keepLatest, sampleOn)
 import FRP.Event.Extra (anyEvt, mergeArray, multicast)
 import Model.Hardware.PanelModel (_isActive)
-import Model.Polygon (Polygon(..))
+import Model.Polygon (Polygon(..), numOfVerts)
 import Rendering.DynamicNode (renderEvent)
 import Rendering.Node (Node, _visible, fixNodeE, fixNodeEWith, getParent, tapMesh)
 import Rendering.NodeRenderable (class NodeRenderable)
@@ -219,7 +219,9 @@ getTapEvt :: forall t a r f. Functor f => Foldable f => Newtype t { tapped :: Ev
 getTapEvt = anyEvt <<< map (view _tapped)
 
 delMarker :: Int -> Polygon -> Polygon
-delMarker idx (Polygon ps) = Polygon $ fromMaybe [] (deleteAt idx ps)
+delMarker idx poly@(Polygon ps) = if numOfVerts poly > 3
+                                  then Polygon $ fromMaybe [] (deleteAt idx ps)
+                                  else poly
 
 -- | create polygon editor
 createPolyEditor :: forall e. PolyEditorConf -> Node e PolyEditor
