@@ -4,11 +4,12 @@ import Prelude
 
 import Control.Alt ((<|>))
 import Custom.Mesh (TappableMesh)
+import Data.Array (foldl)
 import Data.Default (class Default, def)
 import Data.Lens (Lens', view, (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), maybe)
 import Data.Meter (Meter, meter, meterVal)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
@@ -21,13 +22,13 @@ import Math (pi)
 import Model.ActiveMode (ActiveMode(..), isActive)
 import Model.Hardware.PanelModel (_isActive)
 import Model.HouseBuilder.FloorPlan (FloorPlan, FloorPlanOp(..), floorPlanTop)
-import Model.Polygon (Polygon)
+import Model.Polygon (Polygon, _polyVerts)
 import Rendering.DynamicNode (renderDynamic)
 import Rendering.Node (Node, fixNodeE, getEnv, localEnv, node)
 import Three.Core.Geometry (Geometry)
 import Three.Core.Material (MeshBasicMaterial)
 import Three.Math.Euler (mkEuler)
-import Three.Math.Vector (mkVec3, vecZ)
+import Three.Math.Vector (Vector3, mkVec3, vecX, vecY, vecZ)
 import UI.DraggableObject (DragObjCfg, DraggableObject, _customMat, _deltaTransform, _validator, createDraggableObject)
 
 newtype FloorPlanConfig = FloorPlanConfig {
@@ -62,9 +63,23 @@ derive instance newtypeFloorPlanNode :: Newtype FloorPlanNode _
 
 type DragArrow = DraggableObject
 
+-- | calculate position for drag Arrow based on all floor plan vertices
+arrowPos :: FloorPlan -> Vector3
+arrowPos fp = mkVec3 x y 0.5
+    where vs = fp ^. _polygon <<< _polyVerts
+
+          f Nothing v   = Just v
+          f (Just ov) v = if vecX v > vecX ov then Just v else Just ov
+
+          mv = foldl f Nothing vs
+
+          x = maybe 2.0 (((+) 2.0) <<< vecX) mv
+          y = maybe 0.0 vecY mv
+
+
 -- | create the drag arrow to drag the Floor Plan to form the house
-dragArrow :: Dynamic Boolean -> Node FloorPlanConfig DragArrow
-dragArrow actDyn = do
+dragArrow :: Dynamic Boolean -> Dynamic Vector3 -> Node FloorPlanConfig DragArrow
+dragArrow actDyn posDyn = do
     mat <- view _arrowMaterial <$> getEnv
     
     let -- make sure the arrow can only be dragged between 0 and 20 in Z axis
@@ -77,13 +92,13 @@ dragArrow actDyn = do
                   # _validator      .~ validator
                   # _deltaTransform .~ Just transF
                   # _rotation       .~ mkEuler (pi / 2.0) 0.0 0.0
-    createDraggableObject (cfg :: DragObjCfg Geometry)
+    node (def # _position .~ posDyn) $ createDraggableObject (cfg :: DragObjCfg Geometry)
 
 
 -- | setup drag arrow to edit the house height
-setupHeightEditor :: Dynamic Boolean -> Node FloorPlanConfig (Event Meter)
-setupHeightEditor actDyn = do
-    arrow <- dragArrow actDyn
+setupHeightEditor :: Dynamic Boolean -> Dynamic Vector3 -> Node FloorPlanConfig (Event Meter)
+setupHeightEditor actDyn posDyn = do
+    arrow <- dragArrow actDyn posDyn
     let toH = meter <<< vecZ
     pure $ toH <$> (arrow ^. _position)
 
@@ -120,7 +135,7 @@ createFloorNode = do
                                              # _polygon  .~ fp ^. _polygon
 
         -- setup the height editor
-        heightEvt <- setupHeightEditor isActEvt
+        heightEvt <- setupHeightEditor isActEvt $ arrowPos <$> fpDyn
 
         -- calculate the updated floor plan
         let opEvt = (UpdPoly <$> editor ^. _polygon) <|>
