@@ -69,12 +69,12 @@ instance defaultRoofNodeConfig :: Default RoofNodeConfig where
     def = RoofNodeConfig {
         houseId         : 0,
         roof            : def,
-        roofActive      : step false empty,
-        mainOrientation : step Landscape empty,
-        orientation     : step Landscape empty,
-        alignment       : step Grid empty,
-        panelType       : step def empty,
-        opacity         : step Opaque empty,
+        roofActive      : pure false,
+        mainOrientation : pure Landscape,
+        orientation     : pure Landscape,
+        alignment       : pure Grid,
+        panelType       : pure def,
+        opacity         : pure Opaque,
         heatmap         : empty,
         initPanels      : empty
     }

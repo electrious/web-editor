@@ -123,8 +123,8 @@ defPanelLayerWith obj roof renderer btnsRenderer apiInterpreter = PanelLayer {
     roof               : roof,
     arrayChanged       : empty,
     serverUpdated      : empty,
-    arrayDragging      : step false empty,
-    plusDragging       : step false empty,
+    arrayDragging      : pure false,
+    plusDragging       : pure false,
     inactiveRoofTapped : empty,
     activeArray        : empty,
     currentPanels      : empty

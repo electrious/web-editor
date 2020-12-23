@@ -133,7 +133,7 @@ mkNode activeRoof panelsDict racks cfg roof = runArrayBuilder rackTypeDyn roofNo
           rid = roof ^. _id
           ps  = fromMaybe Nil (lookup rid panelsDict)
           rackType    = fromMaybe XR10 $ guessRackingType <$> lookup (roof ^. _roofIntId) racks
-          rackTypeDyn = step rackType empty
+          rackTypeDyn = pure rackType
           roofActive  = step false $ (==) (Just rid) <$> activeRoof
 
 -- helper function to delete and dispose an old roof node
@@ -172,7 +172,7 @@ renderRoofs wrapper param activeRoof roofsData panelsDict racks = do
         orientDyn     = step Landscape $ param ^. _orientation
         alignDyn      = step Grid $ param ^. _alignment
         opacityDyn    = step Opaque $ param ^. _opacity
-        panelTypeDyn  = step def empty
+        panelTypeDyn  = pure def
 
         -- base config for roof node
         cfg = def # _houseId         .~ houseId

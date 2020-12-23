@@ -42,7 +42,7 @@ derive instance newtypeFloorPlanBuilderConf :: Newtype FloorPlanBuilderConf _
 instance defaultFloorPlanBuilderConf :: Default FloorPlanBuilderConf where
     def = FloorPlanBuilderConf {
         mouseMove : empty,
-        canEdit   : step false empty
+        canEdit   : pure false
         }
 
 _canEdit :: forall t a r. Newtype t { canEdit :: a | r } => Lens' t a
@@ -117,7 +117,7 @@ setupFloorAdder fpsEvt actFloorDyn = do
         -- add PolygonAdder
 
         opt = def # _name     .~ "poly-adder"
-                  # _position .~ step (mkVec3 0.0 0.0 0.2) empty
+                  # _position .~ pure (mkVec3 0.0 0.0 0.2)
         
     adder <- node opt $ createPolygonAdder candPntDyn canShowAdder
     pure $ performEvent $ newFloorPlan <<< toVec2 <<< view _position <$> (adder ^. _addedPoint)

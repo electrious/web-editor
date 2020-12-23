@@ -49,9 +49,9 @@ newtype EditorConfig = EditorConfig {
 derive instance newtypeEditorConfig :: Newtype EditorConfig _
 instance defaultEditorConfig :: Default EditorConfig where
     def = EditorConfig {
-        sizeDyn         : step (size 800 600) empty,
-        modeDyn         : step Showing empty,
-        flyCameraTarget : step Nothing empty
+        sizeDyn         : pure (size 800 600),
+        modeDyn         : pure Showing,
+        flyCameraTarget : pure Nothing
     }
 
 _sizeDyn :: forall t a r. Newtype t { sizeDyn :: a | r } => Lens' t a

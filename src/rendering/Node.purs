@@ -103,11 +103,11 @@ instance defaultProps :: Default Props where
         castShadow    : true,
         receiveShadow : true,
         renderOrder   : 0,
-        position      : step def empty,
-        rotation      : step def empty,
-        scale         : step (mkVec3 1.0 1.0 1.0) empty,
-        target        : step Nothing empty,
-        visible       : step true empty
+        position      : pure def,
+        rotation      : pure def,
+        scale         : pure (mkVec3 1.0 1.0 1.0),
+        target        : pure Nothing,
+        visible       : pure true
         }
 
 _castShadow :: forall t a r. Newtype t { castShadow :: a | r } => Lens' t a

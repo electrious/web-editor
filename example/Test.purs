@@ -4,29 +4,25 @@ import Prelude
 
 import API (_auth, _baseUrl)
 import Control.Monad.Except (runExcept)
-import Control.Plus (empty)
 import Data.Default (def)
 import Data.Either (Either(..))
-import Data.Lens ((.~), (^.))
+import Data.Lens ((.~))
 import Data.Maybe (Maybe(..))
 import Editor.Common.Lenses (_apiConfig, _houseId, _leadId, _modeDyn, _panelType, _panels, _textureInfo)
 import Editor.Editor (_sizeDyn, createEditor)
 import Editor.EditorMode (EditorMode(..))
 import Editor.HouseEditor (_arrayEditParam, _dataServer, _heatmap, _heatmapTexture, _roofplates, _rotBtnTexture)
-import Editor.HouseLoader (_roofUpdate, editHouse)
 import Editor.SceneEvent (size)
 import Effect (Effect)
 import Effect.Class.Console (logShow)
-import FRP.Dynamic (step)
-import FRP.Event (subscribe)
 import FRP.Event.Extra (delay)
 import Foreign (Foreign)
 import Foreign.Generic (decode)
 import HouseBuilder.HouseBuilder (buildHouse)
 import Model.Hardware.PanelTextureInfo (_premium, _standard, _standard72)
 import Model.Hardware.PanelType (PanelType(..))
-import Model.Roof.Panel (Panel(..))
-import Model.Roof.RoofPlate (RoofPlate(..))
+import Model.Roof.Panel (Panel)
+import Model.Roof.RoofPlate (RoofPlate)
 import Web.DOM.NonElementParentNode (getElementById)
 import Web.HTML (window)
 import Web.HTML.HTMLDocument (toNonElementParentNode)
@@ -55,9 +51,9 @@ doTest roofDat panelDat = do
             Right (panels :: Array Panel) -> case elem of
                 Nothing -> logShow "can't find 'editor' element"
                 Just el -> do
-                    let modeDyn   = step RoofEditing empty
-                        sizeDyn   = step (size 800 600) empty
-                        panelType = step Standard empty
+                    let modeDyn   = pure RoofEditing
+                        sizeDyn   = pure (size 800 600)
+                        panelType = pure Standard
 
                         textures = def # _standard   .~ Just solarModuleJPG
                                        # _premium    .~ Just qCellSolarPanelJPG

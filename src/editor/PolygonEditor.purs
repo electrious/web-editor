@@ -4,7 +4,6 @@ import Prelude hiding (add)
 
 import Control.Alt ((<|>))
 import Control.Apply (lift2)
-import Control.Plus (empty)
 import Custom.Mesh (TappableMesh)
 import Data.Array (deleteAt, filter, head, insertAt, length, mapWithIndex, range, snoc, tail, zip, zipWith)
 import Data.Compactable (compact)
@@ -139,7 +138,7 @@ instance nodeRenderableMidMarkerPoint :: NodeRenderable e MidMarkerPoint MidMark
 
         let getPos pos = mkVec3 (vecX pos) (vecY pos) 0.01
         m <- tapMesh (def # _name     .~ "mid-marker"
-                          # _position .~ step (getPos $ p ^. _position) empty
+                          # _position .~ pure (getPos $ p ^. _position)
                           # _visible  .~ (p ^. _isActive)
                      ) midGeometry midMaterial
         
@@ -195,7 +194,7 @@ newtype PolyEditorConf = PolyEditorConf {
 derive instance newtypePolyEditorConf :: Newtype PolyEditorConf _
 instance defaultPolyEditorConf :: Default PolyEditorConf where
     def = PolyEditorConf {
-        isActive : step false empty,
+        isActive : pure false,
         polygon  : def
         }
 

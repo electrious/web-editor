@@ -3,7 +3,6 @@ module HouseBuilder.FloorPlanNode where
 import Prelude
 
 import Control.Alt ((<|>))
-import Control.Alternative (empty)
 import Custom.Mesh (TappableMesh)
 import Data.Default (class Default, def)
 import Data.Lens (Lens', view, (.~), (^.))
@@ -42,7 +41,7 @@ derive instance newtypeFloorPlanConfig :: Newtype FloorPlanConfig _
 instance defaultFloorPlanConfig :: Default FloorPlanConfig where
     def = FloorPlanConfig {
         floor         : def,
-        active        : step Active empty,
+        active        : pure Active,
         arrowMaterial : Nothing
         }
 
@@ -100,7 +99,7 @@ applyOp (UpdHeight h)  fp = fp # _height  .~ h
 createFloorNode :: Node FloorPlanConfig FloorPlanNode
 createFloorNode = do
     let opt = def # _name     .~ "floor-node"
-                  # _position .~ step (mkVec3 0.0 0.0 0.5) empty
+                  # _position .~ pure (mkVec3 0.0 0.0 0.5)
 
     fixNodeE \newFpEvt -> node opt do
         cfg <- getEnv

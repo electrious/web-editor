@@ -1,6 +1,5 @@
 module HouseBuilder.HouseBuilder (buildHouse, HouseBuilderConfig) where
 
-import Control.Plus (empty)
 import Custom.Mesh (TapMouseMesh)
 import Data.Default (class Default, def)
 import Data.Lens (view, (.~), (^.))
@@ -9,7 +8,6 @@ import Editor.Common.Lenses (_leadId, _mouseMove, _name, _tapped)
 import Editor.Editor (Editor)
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import FRP.Dynamic (step)
 import HouseBuilder.FloorPlanBuilder (_canEdit, buildFloorPlan)
 import Prelude (class Eq, Unit, bind, const, discard, pure, show, unit, void, (#), ($), (<$>), (<>), (==))
 import Rendering.Node (Node, getEnv, localEnv, mkNodeEnv, node, runNode, tapMouseMesh)
@@ -58,7 +56,7 @@ createHouseBuilder = node (def # _name .~ "house-builder") do
     -- add helper plane that accepts tap and drag events
     helper <- mkHelperPlane
 
-    let modeDyn = step AddFloorPlan empty
+    let modeDyn = pure AddFloorPlan
         cfg = def # _mouseMove .~ helper ^. _mouseMove
                   # _canEdit   .~ ((==) AddFloorPlan <$> modeDyn)
 

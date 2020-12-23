@@ -3,7 +3,6 @@ module UI.DraggableObject where
 import Prelude hiding (add)
 
 import Control.Alt ((<|>))
-import Control.Plus (empty)
 import Custom.Mesh (DraggableMesh, TapDragMesh, calcDragDelta, validateDrag)
 import Data.Default (class Default, def)
 import Data.Filterable (filter)
@@ -43,7 +42,7 @@ derive instance newtypeDragObjCfg :: Newtype (DragObjCfg geo) _
 
 instance defaultDragObjCfg :: Default (DragObjCfg geo) where
     def = DragObjCfg {
-        isActive       : step false empty,
+        isActive       : pure false,
         position       : def,
         rotation       : def,
         customGeo      : Nothing,
@@ -122,7 +121,7 @@ decZ p = mkVec3 (vecX p) (vecY p) (vecZ p - 0.1)
 createDraggableObject :: forall e geo. IsGeometry geo => DragObjCfg geo -> Node e DraggableObject
 createDraggableObject cfg =
     node (def # _name     .~ "drag-object"
-              # _rotation .~ step (cfg ^. _rotation) empty
+              # _rotation .~ pure (cfg ^. _rotation)
          ) $
         fixNodeE \newPosEvt ->
             fixNodeE \isDraggingEvt -> do

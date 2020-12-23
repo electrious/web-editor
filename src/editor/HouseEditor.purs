@@ -16,7 +16,7 @@ import Editor.EditorMode (EditorMode(..))
 import Editor.PanelNode (PanelOpacity)
 import Effect (Effect)
 import Effect.Class (class MonadEffect, liftEffect)
-import FRP.Dynamic (Dynamic, step)
+import FRP.Dynamic (Dynamic)
 import FRP.Event (Event, makeEvent, subscribe)
 import Model.Hardware.PanelTextureInfo (PanelTextureInfo)
 import Model.Hardware.PanelType (PanelType(..))
@@ -68,11 +68,11 @@ instance defaultHouseConfig :: Default HouseConfig where
         roofplates      : [],
         panels          : [],
         dataServer      : "",
-        modeDyn         : step Showing empty,
+        modeDyn         : pure Showing,
         textureInfo     : def,
         rotBtnTexture   : "",
         heatmapTexture  : "",
-        panelType       : step Standard empty,
+        panelType       : pure Standard,
         apiConfig       : def,
         screenshotDelay : 100,
 
