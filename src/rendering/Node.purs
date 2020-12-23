@@ -2,7 +2,6 @@ module Rendering.Node where
 
 import Prelude hiding (add)
 
-import Control.Alternative (empty)
 import Control.Monad.RWS (tell)
 import Control.Monad.Reader (class MonadAsk, class MonadReader, ReaderT, ask, local, runReaderT)
 import Control.Monad.Writer (class MonadTell, class MonadWriter, WriterT, runWriterT)
@@ -20,7 +19,7 @@ import Editor.Common.Lenses (_name, _parent, _position, _rotation, _scale)
 import Editor.Disposable (Disposee(..))
 import Effect (Effect)
 import Effect.Class (class MonadEffect, liftEffect)
-import FRP.Dynamic (Dynamic, step, subscribeDyn)
+import FRP.Dynamic (Dynamic, subscribeDyn)
 import FRP.Event (Event, create, subscribe)
 import Three.Core.Geometry (class IsGeometry)
 import Three.Core.Material (class IsMaterial)

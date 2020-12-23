@@ -2,7 +2,6 @@ module Editor.Editor where
 
 import Prelude hiding (add,degree)
 
-import Control.Plus (empty)
 import Data.Array (cons)
 import Data.Default (class Default, def)
 import Data.Foldable (sequence_)
