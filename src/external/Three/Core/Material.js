@@ -24,6 +24,10 @@ exports.setOpacity = _ => o => mat => _ => {
     mat.opacity = o
 }
 
+exports.setDepthWrite = _ => d => mat => _ => {
+    mat.depthWrite = d
+}
+
 exports.frontSide  = three.FrontSide
 exports.backSide   = three.BackSide
 exports.doubleSide = three.DoubleSide
