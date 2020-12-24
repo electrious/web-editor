@@ -4,8 +4,8 @@ import Prelude
 
 import Effect (Effect)
 import Three.Math.Euler (Euler)
-import Three.Math.Matrix (Matrix4)
-import Three.Math.Vector (Vector3)
+import Three.Math.Matrix (Matrix4, invert)
+import Three.Math.Vector (Vector3, applyMatrix)
 
 foreign import data Object3D :: Type
 
@@ -144,6 +144,12 @@ localToWorld v o = jsLocalToWorld v (toObject3D o)
 
 worldToLocal :: forall a. IsObject3D a => Vector3 -> a -> Effect Vector3
 worldToLocal v o = jsWorldToLocal v (toObject3D o)
+
+localToParent :: forall a. IsObject3D a => Vector3 -> a -> Effect Vector3
+localToParent v o = pure $ applyMatrix (matrix o) v
+
+parentToLocal :: forall a. IsObject3D a => Vector3 -> a -> Effect Vector3
+parentToLocal v o = pure $ applyMatrix (invert $ matrix o) v
 
 foreign import jsLookAt :: Vector3 -> Object3D -> Effect Unit
 

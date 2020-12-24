@@ -71,3 +71,6 @@ instance vecVec2 :: Vector Vector2
 instance vecVec3 :: Vector Vector3
 
 foreign import applyMatrix :: Matrix4 -> Vector3 -> Vector3
+
+toVec2 :: Vector3 -> Vector2
+toVec2 v = mkVec2 (vecX v) (vecY v)

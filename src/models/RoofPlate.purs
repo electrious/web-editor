@@ -16,13 +16,15 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.UUID (UUID, emptyUUID, genUUID, parseUUID, toString)
-import Editor.Common.Lenses (_alignment, _center, _id, _leadId, _normal, _orientation, _slope)
+import Editor.Common.Lenses (_alignment, _center, _id, _leadId, _normal, _orientation, _rotation, _slope)
 import Effect (Effect)
 import Foreign.Generic (class Decode, class Encode, decode, defaultOptions, encode, genericDecode, genericEncode)
 import Math as Math
 import Math.Angle (Angle, acos, atan2, degree, degreeVal)
+import Model.Polygon (class IsPolygon, Polygon(..))
 import Model.Roof.Panel (Alignment(..), Orientation(..))
-import Three.Math.Vector (class Vector, Vector2, Vector3, addScaled, cross, length, mkVec2, mkVec3, vecX, vecY, vecZ, (<.>))
+import Model.UUID (class HasUUID)
+import Three.Math.Vector (class Vector, Vector3, addScaled, cross, length, mkVec2, mkVec3, vecX, vecY, vecZ, (<.>))
 
 -- | define the core RoofPlate type as a record
 newtype RoofPlate = RoofPlate {
@@ -47,6 +49,8 @@ instance showRoofplate :: Show RoofPlate where
     show = genericShow
 instance eqRoofplate :: Eq RoofPlate where
     eq = genericEq
+instance hasUUIDRoofPlate :: HasUUID RoofPlate where
+    idLens = _id
 instance encodeRoofPlate :: Encode RoofPlate where
     encode = encode <<< toJSRoofPlate
 instance decodeRoofPlate :: Decode RoofPlate where
@@ -67,6 +71,10 @@ instance defaultRoofPlate :: Default RoofPlate where
         azimuth       : def,
         rotation      : def
     }
+instance isPolygonRoofPlate :: IsPolygon RoofPlate where
+    toPolygon r = Polygon $ f <$> r ^. _borderPoints
+        where f v = mkVec2 (vecX v) (vecY v)
+
 _roofIntId :: Lens' RoofPlate Int
 _roofIntId = _Newtype <<< prop (SProxy :: SProxy "intId")
 
@@ -81,9 +89,6 @@ _coefs = _Newtype <<< prop (SProxy :: SProxy "coefs")
 
 _azimuth :: Lens' RoofPlate Angle
 _azimuth = _Newtype <<< prop (SProxy :: SProxy "azimuth")
-
-_rotation :: Lens' RoofPlate Angle
-_rotation = _Newtype <<< prop (SProxy :: SProxy "rotation")
 
 isFlat :: RoofPlate -> Boolean
 isFlat r = degreeVal (r ^. _slope) < 4.0
@@ -202,14 +207,6 @@ toJSRoofPlate r = JSRoofPlate {
     azimuth           : degreeVal $ r ^. _azimuth,
     rotation_override : degreeVal $ r ^. _rotation
 }
-
--- | 2D polygon for roof plate projection on ground
-type Polygon = Array Vector2
-
--- | get the 2D polygon for a roof plate
-getRoofPolygon :: RoofPlate -> Polygon
-getRoofPolygon r = f <$> r ^. _borderPoints
-    where f v = mkVec2 (vecX v) (vecY v)
 
 -- | helper function to calculate angle between two Vector3
 angleBetween :: forall a. Vector a => a -> a -> Angle

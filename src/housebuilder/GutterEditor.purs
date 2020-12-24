@@ -123,11 +123,11 @@ alignPredGutter gutters lp p =
 
 
 -- render the current GutterEditor state
-renderGutters :: Object3D -> GEState -> RenderingM (Event Unit)
+renderGutters :: Object3D -> GEState -> RenderingM Unit (Event Unit)
 renderGutters editor st = pure empty
 
 -- create the GutterEditor instance
-mkGutterEditor :: RenderingM GutterEditor
+mkGutterEditor :: RenderingM Unit GutterEditor
 mkGutterEditor = do
     editor <- liftEffect mkObject3D
 

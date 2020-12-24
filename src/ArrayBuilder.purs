@@ -4,7 +4,7 @@ import Prelude
 
 import API (APIConfig)
 import Control.Monad.Reader (class MonadAsk, class MonadReader, ReaderT, ask, lift, runReaderT)
-import Data.Lens (Lens', view)
+import Data.Lens (Lens', view, (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
@@ -18,9 +18,9 @@ import Model.Hardware.PanelTextureInfo (PanelTextureInfo)
 import Model.Hardware.PanelType (PanelType)
 import Model.Racking.RackingType (RackingType)
 import Model.Roof.ArrayConfig (ArrayConfig, arrayConfigForRack)
-import Rendering.Renderable (RendererConfig(..), RenderingM, runRenderingM)
+import Rendering.Renderable (RenderingM, runRenderingM)
 import Rendering.TextureLoader (loadMaterialFromUrl)
-import Three.Core.Material (doubleSide, setSide)
+import Three.Core.Material (MeshBasicMaterial, doubleSide, setSide)
 
 -- data used to provide env info for ArrayBuilder monad
 newtype ArrayBuilderEnv = ArrayBuilderEnv {
@@ -39,8 +39,21 @@ _arrayConfig = _Newtype <<< prop (SProxy :: SProxy "arrayConfig")
 _editorMode :: forall t a r. Newtype t { editorMode :: a | r } => Lens' t a
 _editorMode = _Newtype <<< prop (SProxy :: SProxy "editorMode")
 
+newtype RendererConfig = RendererConfig {
+    heatmapMaterial      :: MeshBasicMaterial,
+    rotateButtonMaterial :: MeshBasicMaterial
+}
+
+derive instance newtypeRendererConfig :: Newtype RendererConfig _
+
+_heatmapMaterial :: forall t a r. Newtype t { heatmapMaterial :: a | r } => Lens' t a
+_heatmapMaterial = _Newtype <<< prop (SProxy :: SProxy "heatmapMaterial")
+
+_rotateButtonMaterial :: forall t a r. Newtype t { rotateButtonMaterial :: a | r } => Lens' t a
+_rotateButtonMaterial = _Newtype <<< prop (SProxy :: SProxy "rotateButtonMaterial")
+
 -- | ArrayBuilder is the monad to build arrays in
-newtype ArrayBuilder a = ArrayBuilder (ReaderT ArrayBuilderEnv RenderingM a)
+newtype ArrayBuilder a = ArrayBuilder (ReaderT ArrayBuilderEnv (RenderingM RendererConfig) a)
 
 derive newtype instance functorArrayBuilder     :: Functor ArrayBuilder
 derive newtype instance applyArrayBuilder       :: Apply ArrayBuilder
@@ -51,17 +64,19 @@ derive newtype instance monadAskArrayBuilder    :: MonadAsk ArrayBuilderEnv Arra
 derive newtype instance monadReaderArrayBuilder :: MonadReader ArrayBuilderEnv ArrayBuilder
 derive newtype instance monadEffectArrayBuilder :: MonadEffect ArrayBuilder
 
-liftRenderingM :: forall a. RenderingM a -> ArrayBuilder a
+liftRenderingM :: forall a. RenderingM RendererConfig a -> ArrayBuilder a
 liftRenderingM r = ArrayBuilder $ lift r
 
 runArrayBuilder :: forall a. Dynamic RackingType -> ArrayBuilder a -> HouseEditor a
 runArrayBuilder rtDyn (ArrayBuilder b) = do
-    texture <- view _textureInfo   <$> ask
-    hmText  <- view _heatmapTexture <$> ask
-    btnText <- view _rotBtnTexture <$> ask
-    pt      <- view _panelType     <$> ask
-    modeDyn <- view _modeDyn       <$> ask
-    apiCfg  <- view _apiConfig     <$> ask
+    cfg <- ask
+    let texture = cfg ^. _textureInfo
+        hmText  = cfg ^. _heatmapTexture
+        btnText = cfg ^. _rotBtnTexture
+        pt      = cfg ^. _panelType
+        modeDyn = cfg ^. _modeDyn
+        apiCfg  = cfg ^. _apiConfig
+    
     let env = ArrayBuilderEnv {
                 arrayConfig : arrayConfigForRack <$> rtDyn,
                 textureInfo : texture,

@@ -1,88 +1,72 @@
-module HouseBuilder.HouseBuilder where
+module HouseBuilder.HouseBuilder (buildHouse, HouseBuilderConfig) where
 
-import Prelude hiding (add)
-
-import Control.Monad.Reader (class MonadAsk, class MonadReader, ReaderT, ask, runReaderT)
-import Custom.Mesh (TapDragMesh, mkTapDragMesh)
+import Custom.Mesh (TapMouseMesh)
 import Data.Default (class Default, def)
-import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Show (genericShow)
-import Data.Lens (Lens', (^.))
-import Data.Lens.Iso.Newtype (_Newtype)
-import Data.Lens.Record (prop)
+import Data.Lens (view, (.~), (^.))
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Editor.Common.Lenses (_leadId, _mouseMove, _name, _tapped)
+import Editor.Editor (Editor)
 import Effect (Effect)
-import Effect.Class (class MonadEffect, liftEffect)
+import Effect.Class (liftEffect)
+import HouseBuilder.FloorPlanBuilder (_canEdit, buildFloorPlan)
+import Prelude (class Eq, Unit, bind, const, discard, pure, show, unit, void, (#), ($), (<$>), (<>), (==))
+import Rendering.Node (Node, getEnv, localEnv, mkNodeEnv, node, runNode, tapMouseMesh)
 import Rendering.TextureLoader (loadTextureFromUrl)
 import Three.Core.Geometry (mkPlaneGeometry)
-import Three.Core.Material (mkMeshBasicMaterial, mkMeshBasicMaterialWithTexture)
-import Three.Core.Object3D (add, mkObject3D, setName)
+import Three.Core.Material (mkMeshBasicMaterialWithTexture)
+import Three.Loader.TextureLoader (clampToEdgeWrapping, repeatWrapping, setRepeat, setWrapS, setWrapT)
 
 -- represent the state of the builder
-data BuilderMode = AddGutter  -- Add gutter points and lines
-                 | AddRidge   -- Add ridge points and lines
-                 | LiftRidge  -- lift ridges to the right height
-                 | LiftHouse  -- lift house to the right height
+data BuilderMode = AddFloorPlan  -- Add and edit FloorPlans
+                 | AddRoofs      -- Add Roof ridges and plates
 
-derive instance genericBuilderMode :: Generic BuilderMode _
 derive instance eqBuilderMode :: Eq BuilderMode
-instance showBuilderMode :: Show BuilderMode where
-    show = genericShow
 
 
 newtype HouseBuilderConfig = HouseBuilderConfig {
-    image :: String
+    leadId :: Int
 }
 
-derive instance genericHouseBuilderConfig :: Generic HouseBuilderConfig _
 derive instance newtypeHouseBuilderConfig :: Newtype HouseBuilderConfig _
-instance showHouseBuilderConfig :: Show HouseBuilderConfig where
-    show = genericShow
 instance defaultHouseBuilderConfig :: Default HouseBuilderConfig where
-    def = HouseBuilderConfig { image : "" }
-
-_image :: forall t a r. Newtype t { image :: a | r } => Lens' t a
-_image = _Newtype <<< prop (SProxy :: SProxy "image")
+    def = HouseBuilderConfig { leadId : 0 }
 
 
--- HouseBuilder is the main Monad where house builder functionalities happen
-newtype HouseBuilder a = HouseBuilder (ReaderT HouseBuilderConfig Effect a)
+-- | get 2D image url for a lead
+imageUrlForLead :: Int -> String
+imageUrlForLead l = "https://s3.eu-west-1.amazonaws.com/data.electrious.com/leads/" <> show l <> "/manual.jpg"
 
-derive newtype instance functorHouseBuilder     :: Functor HouseBuilder
-derive newtype instance applyHouseBuilder       :: Apply HouseBuilder
-derive newtype instance applicativeHouseBuilder :: Applicative HouseBuilder
-derive newtype instance bindHouseBuilder        :: Bind HouseBuilder
-derive newtype instance monadHouseBuilder       :: Monad HouseBuilder
-derive newtype instance monadAskHouseBuilder    :: MonadAsk HouseBuilderConfig HouseBuilder
-derive newtype instance monadReaderHouseBuilder :: MonadReader HouseBuilderConfig HouseBuilder
-derive newtype instance monadEFfectHouseBuilder :: MonadEffect HouseBuilder
-
-runHouseBuilder :: forall a. HouseBuilder a -> Effect a
-runHouseBuilder (HouseBuilder b) = do
-    let cfg = def
-    runReaderT b cfg
-
-
-mkHelperPlane :: HouseBuilder TapDragMesh
+mkHelperPlane :: Node HouseBuilderConfig TapMouseMesh
 mkHelperPlane = do
-    cfg <- ask
-    let img = cfg ^. _image
+    lId <- view _leadId <$> getEnv
+    let img = imageUrlForLead lId
 
-    geo <- liftEffect $ mkPlaneGeometry 100.0 100.0 10 10
-    mat <- liftEffect $ if img == ""
-                        then mkMeshBasicMaterial 0x002222
-                        else mkMeshBasicMaterialWithTexture $ loadTextureFromUrl img
+    geo <- liftEffect $ mkPlaneGeometry 100.0 46.5 10 10
+    let t = loadTextureFromUrl img
+    liftEffect do
+        setWrapS clampToEdgeWrapping t
+        setWrapT repeatWrapping t
+        setRepeat 1.0 1.0 t
+    mat <- liftEffect $ mkMeshBasicMaterialWithTexture t
 
-    m <- liftEffect $ mkTapDragMesh geo mat
-    liftEffect $ setName "helper-plane" m
-    pure m
+    tapMouseMesh (def # _name .~ "helper-plane") geo mat
 
-createHouseBuilder :: HouseBuilder Unit
-createHouseBuilder = do
-    builder <- liftEffect mkObject3D
-    liftEffect $ setName "house-builder" builder
-
+createHouseBuilder :: Node HouseBuilderConfig Unit
+createHouseBuilder = node (def # _name .~ "house-builder") do
     -- add helper plane that accepts tap and drag events
-    plane <- mkHelperPlane
-    liftEffect $ add plane builder
+    helper <- mkHelperPlane
+
+    let modeDyn = pure AddFloorPlan
+        cfg = def # _mouseMove .~ helper ^. _mouseMove
+                  # _canEdit   .~ ((==) AddFloorPlan <$> modeDyn)
+
+        bgTapEvt = const unit <$> helper ^. _tapped
+    
+    floorPlanEvt <- localEnv (const cfg) $ buildFloorPlan bgTapEvt
+    
+    pure unit
+
+
+-- | external API to build a 3D house for 2D lead
+buildHouse :: Editor -> HouseBuilderConfig -> Effect Unit
+buildHouse editor cfg = void $ runNode createHouseBuilder $ mkNodeEnv editor cfg

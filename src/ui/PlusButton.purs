@@ -67,7 +67,7 @@ moveBy delta node = do
     setPosition newPos b
     pure $ node # _plusButton %~ addDelta delta
 
-instance renderablePlusButtonNode :: Renderable PlusButton PlusButtonNode where
+instance renderablePlusButtonNode :: Renderable e PlusButton PlusButtonNode where
     render pb = liftEffect do
         btn <- mkObject3D
         setName "PlusButton" btn

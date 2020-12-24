@@ -98,6 +98,12 @@ _dragDelta = _Newtype <<< prop (SProxy :: SProxy "dragDelta")
 _position :: forall t a r. Newtype t { position :: a | r } => Lens' t a
 _position = _Newtype <<< prop (SProxy :: SProxy "position")
 
+_rotation :: forall t a r. Newtype t { rotation :: a | r } => Lens' t a
+_rotation = _Newtype <<< prop (SProxy :: SProxy "rotation")
+
+_scale :: forall t a r. Newtype t { scale :: a | r } => Lens' t a
+_scale = _Newtype <<< prop (SProxy :: SProxy "scale")
+
 _point :: forall t a r. Newtype t { point :: a | r } => Lens' t a
 _point = _Newtype <<< prop (SProxy :: SProxy "point")
 
@@ -259,3 +265,15 @@ _name = _Newtype <<< prop (SProxy :: SProxy "name")
 
 _apiConfig :: forall t a r. Newtype t { apiConfig :: a | r } => Lens' t a
 _apiConfig = _Newtype <<< prop (SProxy :: SProxy "apiConfig")
+
+_parent :: forall t a r. Newtype t { parent :: a | r } => Lens' t a
+_parent = _Newtype <<< prop (SProxy :: SProxy "parent")
+
+_updated :: forall t a r. Newtype t { updated :: a | r } => Lens' t a
+_updated = _Newtype <<< prop (SProxy :: SProxy "updated")
+
+_deleted :: forall t a r. Newtype t { deleted :: a | r } => Lens' t a
+_deleted = _Newtype <<< prop (SProxy :: SProxy "deleted")
+
+_active :: forall t a r. Newtype t { active :: a | r } => Lens' t a
+_active = _Newtype <<< prop (SProxy :: SProxy "active")

@@ -27,7 +27,7 @@ import Data.Symbol (SProxy(..))
 import Data.Time.Duration (Milliseconds(..))
 import Data.Tuple (Tuple(..))
 import Data.UUID (UUID, genUUID)
-import Editor.ArrayBuilder (ArrayBuilder, _arrayConfig, _editorMode, liftRenderingM)
+import Editor.ArrayBuilder (ArrayBuilder, _arrayConfig, _editorMode, _rotateButtonMaterial, liftRenderingM)
 import Editor.Common.Lenses (_alignment, _apiConfig, _arrayNumber, _disposable, _dragType, _dragged, _houseId, _id, _object, _orientation, _panels, _panelsUpdated, _point, _rackingType, _roof, _rowNumber, _rows, _slope, _tapped, _x, _y)
 import Editor.Disposable (class Disposable)
 import Editor.EditorMode (EditorMode(..))
@@ -58,6 +58,7 @@ import Model.UpdatedPanels (delete, deletePanels, get, merge, toUnfoldable)
 import Model.UpdatedPanels as UpdatePanels
 import Model.UpdatedPanels as UpdatedPanels
 import Partial.Unsafe (unsafePartial)
+import Rendering.Renderable (withRenderContext)
 import Three.Core.Geometry (mkBoxGeometry)
 import Three.Core.Material (mkMeshBasicMaterial, setOpacity, setTransparent)
 import Three.Core.Object3D (class IsObject3D, Object3D, add, mkObject3D, setCastShadow, setName, setRenderOrder, setVisible, worldToLocal)
@@ -122,8 +123,8 @@ defPanelLayerWith obj roof renderer btnsRenderer apiInterpreter = PanelLayer {
     roof               : roof,
     arrayChanged       : empty,
     serverUpdated      : empty,
-    arrayDragging      : step false empty,
-    plusDragging       : step false empty,
+    arrayDragging      : pure false,
+    plusDragging       : pure false,
     inactiveRoofTapped : empty,
     activeArray        : empty,
     currentPanels      : empty
@@ -267,7 +268,7 @@ createPanelLayer cfg = do
 
     -- setup the panel renderer and button renderer
     panelRenderer <- setupPanelRenderer layer arrOpEvt (cfg ^. _opacity)
-    btnsRenderer  <- liftRenderingM $ mkButtonsRenderer layer btnOpEvt
+    btnsRenderer  <- liftRenderingM $ withRenderContext (view _rotateButtonMaterial) $ mkButtonsRenderer layer btnOpEvt
     -- setup the panel API interpreter
     let apiInterpreter = mkPanelAPIInterpreter $ def # _apiConfig  .~ apiCfg
                                                      # _roof       .~ roof

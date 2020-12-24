@@ -8,6 +8,10 @@ exports.mkMeshBasicMaterialWithTexture = t => _ => {
     return new three.MeshBasicMaterial({ map: t })
 }
 
+exports.mkMeshPhongMaterial = c => _ => {
+    return new three.MeshPhongMaterial({ color: c })
+}
+
 exports.mkLineBasicMaterial = c => w => _ => {
     return new three.LineBasicMaterial({ color: c, linewidth: w })
 }
@@ -18,6 +22,10 @@ exports.setTransparent = _ => t => mat => _ => {
 
 exports.setOpacity = _ => o => mat => _ => {
     mat.opacity = o
+}
+
+exports.setDepthWrite = _ => d => mat => _ => {
+    mat.depthWrite = d
 }
 
 exports.frontSide  = three.FrontSide

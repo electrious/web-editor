@@ -14,7 +14,7 @@ import Three.Core.Mesh (Mesh, mkMesh)
 import Three.Core.Object3D (setName, setPosition)
 
 newtype HousePointRenderable = HousePointRenderable HousePoint
-instance renderableHousePoint :: Renderable HousePointRenderable Mesh where
+instance renderableHousePoint :: Renderable e HousePointRenderable Mesh where
     render (HousePointRenderable hp) = liftEffect do
         let getMat (HousePointGutter p) = if p ^. _pointType == GPLocked
                                           then blueMat

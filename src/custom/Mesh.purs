@@ -8,9 +8,9 @@ import Data.Lens (view, (.~), (^.))
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Tuple (Tuple(..))
-import Editor.Common.Lenses (_dragDelta, _dragType, _dragged, _mesh, _point)
+import Editor.Common.Lenses (_dragDelta, _dragType, _dragged, _mesh, _point, _tapped)
 import Editor.Input.Commoon (DragType(..))
-import Editor.SceneEvent (SceneDragEvent, SceneTapEvent, makeDraggable, makeTappable, stopDraggable, stopTappable)
+import Editor.SceneEvent (SceneDragEvent, SceneMouseMoveEvent, SceneTapEvent, makeDraggable, makeMouseMove, makeTappable, stopDraggable, stopMouseMove, stopTappable)
 import Effect (Effect)
 import FRP.Event (Event, makeEvent, mapAccum)
 import FRP.Event.Extra (multicast, performEvent)
@@ -62,7 +62,7 @@ calcDragDelta toLocalF evt = mapAccum calcDelta e def
     where f d = map (mkNewDrag d) <$> toLocalF (d ^. _point)
           mkNewDrag d p = d # _point .~ p
           -- convert drag event to use local coordinate system
-          e = compact (performEvent $ f <$> evt)
+          e = compact $ performEvent $ f <$> evt
 
           calcDelta ne oldE | ne ^. _dragType == DragStart = Tuple ne def
                             | otherwise                    = Tuple ne (ne ^. _point <-> oldE ^. _point)
@@ -122,3 +122,28 @@ mkTapDragMesh geo mat = do
         dragged   : m ^. _dragged,
         dragDelta : m ^. _dragDelta
     }
+
+newtype TapMouseMesh = TapMouseMesh {
+    mesh      :: Mesh,
+    tapped    :: Event SceneTapEvent,
+    mouseMove :: Event SceneMouseMoveEvent
+    }
+
+derive instance newtypeTapMouseMesh :: Newtype TapMouseMesh _
+instance toObject3DTapMouseMesh :: IsObject3D TapMouseMesh where
+    toObject3D = toObject3D <<< view _mesh
+
+mouseEvtOn :: Mesh -> Event SceneMouseMoveEvent
+mouseEvtOn m = makeEvent \k -> do
+    makeMouseMove m k
+    pure $ stopMouseMove m
+
+mkTapMouseMesh :: forall geo mat. IsGeometry geo => IsMaterial mat => geo -> mat -> Effect TapMouseMesh
+mkTapMouseMesh geo mat = do
+    m <- mkTappableMesh geo mat
+    let mesh = m ^. _mesh
+    pure $ TapMouseMesh {
+        mesh      : mesh,
+        tapped    : m ^. _tapped,
+        mouseMove : mouseEvtOn mesh
+        }

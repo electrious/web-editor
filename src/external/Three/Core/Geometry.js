@@ -65,6 +65,10 @@ exports.mkPlaneGeometry = w => h => wSegs => hSegs => _ => {
     return new three.PlaneGeometry(w, h, wSegs, hSegs)
 }
 
+exports.mkExtrudeGeometry = s => opt => _ => {
+    return new three.ExtrudeGeometry(s, opt)
+}
+
 exports.mkLineGeometry = _ => {
     return new line.LineGeometry()
 }

@@ -24,7 +24,7 @@ import Three.Math.Vector (mkVec3)
 import Unsafe.Coerce (unsafeCoerce)
 
 newtype BXRackingComponentRenderable = BXRackingComponentRenderable BXRackingComponent
-instance renderableBXRackingComponent :: Renderable BXRackingComponentRenderable Object3D where
+instance renderableBXRackingComponent :: Renderable e BXRackingComponentRenderable Object3D where
     render (BXRackingComponentRenderable b) = do
         comp <- liftEffect mkObject3D
         liftEffect $ setName "BXRackingComponent" comp
@@ -35,7 +35,7 @@ instance renderableBXRackingComponent :: Renderable BXRackingComponentRenderable
         pure comp
 
 newtype ChassisRenderable = ChassisRenderable Chassis
-instance renderableChassis :: Renderable ChassisRenderable Mesh where
+instance renderableChassis :: Renderable e ChassisRenderable Mesh where
     render (ChassisRenderable c) = liftEffect do
         m <- mkMesh (chassisGeo "chassis") blackMaterial
         setName "Chassis" m

@@ -3,22 +3,22 @@ module Editor.House where
 import Prelude hiding (add)
 
 import Algorithm.MeshFlatten (VertexItem, buildRTree)
+import Custom.Mesh (TapMouseMesh, mkTapMouseMesh)
 import Data.Array (range)
 import Data.Compactable (compact)
 import Data.Foldable (find, traverse_)
-import Data.Lens (view, (^.))
+import Data.Lens ((^.))
 import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype)
 import Data.Traversable (traverse)
 import Editor.Common.Lenses (_mesh)
-import Editor.SceneEvent (SceneMouseMoveEvent, SceneTapEvent, makeMouseMove, makeTappable, stopMouseMove, stopTappable)
 import Effect (Effect)
 import FRP.Event (Event, makeEvent)
 import RBush.RBush (RBush)
 import Three.Core.Geometry (class IsGeometry, BufferGeometry, Geometry, count, getAttribute, getX, getY, getZ)
 import Three.Core.Material (class IsMaterial, MaterialCreator, MeshBasicMaterial, getMaterial, preload, setTransparent)
-import Three.Core.Mesh (Mesh, bufferGeometry, geometry, isMesh, mkMesh)
-import Three.Core.Object3D (class IsObject3D, Object3D, add, children, remove, setCastShadow, setName, setReceiveShadow, toObject3D)
+import Three.Core.Mesh (Mesh, bufferGeometry, geometry, isMesh)
+import Three.Core.Object3D (class IsObject3D, Object3D, add, children, remove, setCastShadow, setName, setReceiveShadow)
 import Three.Loader.ObjLoader (loadMTL, loadOBJ, makeMTLLoader, makeOBJLoader2, setPath)
 import Three.Math.Vector (Vector3, mkVec3)
 
@@ -26,35 +26,15 @@ import Three.Math.Vector (Vector3, mkVec3)
 meshPath :: String -> Int -> String
 meshPath serverUrl leadId = serverUrl <> "/leads/" <> show leadId <> "/mesh/"
 
-newtype HouseMesh = HouseMesh {
-    mesh      :: Mesh,
-    tapped    :: Event SceneTapEvent,
-    mouseMove :: Event SceneMouseMoveEvent
-}
-
-derive instance newtypeHouseMesh :: Newtype HouseMesh _
-instance isObject3DHouseMesh :: IsObject3D HouseMesh where
-    toObject3D = toObject3D <<< view _mesh
+type HouseMesh = TapMouseMesh
 
 -- | create new HouseMesh, which is a mesh composed with the tap and mouse
 -- events from the mesh.
 mkHouseMesh :: forall geo mat. IsGeometry geo => IsMaterial mat => geo -> mat -> Effect HouseMesh
 mkHouseMesh geo mat = do
-    mesh <- mkMesh geo mat
+    mesh <- mkTapMouseMesh geo mat
     setName "house-mesh" mesh
-
-    let tapEvt = makeEvent \k -> do
-            makeTappable mesh k
-            pure (stopTappable mesh)
-        mouseEvt = makeEvent \k -> do
-            makeMouseMove mesh k
-            pure (stopMouseMove mesh)
-    
-    pure $ HouseMesh {
-        mesh      : mesh,
-        tapped    : tapEvt,
-        mouseMove : mouseEvt
-    }
+    pure mesh
 
 
 -- | apply the material creator's material to the mesh, which is a child of

@@ -2,6 +2,7 @@ module Data.Meter where
 
 import Prelude
 
+import Data.Default (class Default)
 import Data.Newtype (class Newtype)
 import Foreign.Generic (class Decode, class Encode, decode, encode)
 
@@ -10,6 +11,8 @@ newtype Meter = Meter Number
 derive instance newtypeMeter :: Newtype Meter _
 derive instance eqMeter :: Eq Meter
 derive instance ordMeter :: Ord Meter
+instance defaultMeter :: Default Meter where
+    def = meter 0.0
 instance semiringMeter :: Semiring Meter where
     add (Meter m1) (Meter m2) = Meter $ m1 + m2
     zero = Meter 0.0

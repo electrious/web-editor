@@ -3,134 +3,179 @@ module UI.DraggableObject where
 import Prelude hiding (add)
 
 import Control.Alt ((<|>))
-import Custom.Mesh (DraggableMesh, TapDragMesh, calcDragDelta, mkDraggableMesh, mkTapDragMesh, validateDrag)
+import Custom.Mesh (DraggableMesh, TapDragMesh, calcDragDelta, validateDrag)
+import Data.Default (class Default, def)
 import Data.Filterable (filter)
-import Data.Foldable (sequence_)
-import Data.Lens (Lens', view, (^.))
+import Data.Lens (Lens', (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Editor.Common.Lenses (_disposable, _dragged, _object, _tapped)
-import Editor.Disposable (class Disposable)
+import Editor.Common.Lenses (_dragged, _name, _position, _rotation, _tapped)
 import Editor.SceneEvent (isDragEnd, isDragStart)
-import Effect (Effect)
+import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
-import FRP.Event (Event, subscribe)
-import FRP.Event.Extra (foldWithDef, multicast)
-import Three.Core.Geometry (class IsGeometry, mkCircleGeometry)
-import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial, setOpacity, setTransparent)
-import Three.Core.Object3D (class IsObject3D, Object3D, add, hasParent, mkObject3D, parent, setName, setPosition, setRenderOrder, setVisible, worldToLocal)
-import Three.Math.Vector (Vector2, Vector3, mkVec3, vecX, vecY, (<+>))
+import FRP.Dynamic (Dynamic, step)
+import FRP.Event (Event)
+import FRP.Event.Extra (foldWithDef, multicast, performEvent)
+import Model.Hardware.PanelModel (_isActive)
+import Rendering.Node (Node, Props, _renderOrder, _visible, dragMesh, fixNodeE, getParent, node, tapDragMesh)
+import Three.Core.Geometry (class IsGeometry, CircleGeometry, mkCircleGeometry)
+import Three.Core.Material (MeshBasicMaterial, doubleSide, mkMeshBasicMaterial, setOpacity, setSide, setTransparent)
+import Three.Core.Object3D (localToParent, parentToLocal, worldToLocal)
+import Three.Math.Euler (Euler)
+import Three.Math.Vector (Vector3, mkVec3, vecX, vecY, vecZ, (<+>))
 import Unsafe.Coerce (unsafeCoerce)
 
+newtype DragObjCfg geo = DragObjCfg {
+    isActive       :: Dynamic Boolean,
+    position       :: Vector3,
+    rotation       :: Euler,
+    customGeo      :: Maybe geo,
+    customMat      :: Maybe MeshBasicMaterial,
+    validator      :: Vector3 -> Boolean,
+    deltaTransform :: Maybe (Vector3 -> Vector3)
+    }
+
+derive instance newtypeDragObjCfg :: Newtype (DragObjCfg geo) _
+
+instance defaultDragObjCfg :: Default (DragObjCfg geo) where
+    def = DragObjCfg {
+        isActive       : pure false,
+        position       : def,
+        rotation       : def,
+        customGeo      : Nothing,
+        customMat      : Nothing,
+        validator      : const true,
+        deltaTransform : Nothing
+        }
+
+_customGeo :: forall t a r. Newtype t { customGeo :: a | r } => Lens' t a
+_customGeo = _Newtype <<< prop (SProxy :: SProxy "customGeo")
+
+_customMat :: forall t a r. Newtype t { customMat :: a | r } => Lens' t a
+_customMat = _Newtype <<< prop (SProxy :: SProxy "customMat")
+
+_validator :: forall t a r. Newtype t { validator :: a | r } => Lens' t a
+_validator = _Newtype <<< prop (SProxy :: SProxy "validator")
+
+_deltaTransform :: forall t a r. Newtype t { deltaTransform :: a | r } => Lens' t a
+_deltaTransform = _Newtype <<< prop (SProxy :: SProxy "deltaTransform")
+
 newtype DraggableObject = DraggableObject {
-    object     :: Object3D,
-    tapped     :: Event Int,
+    tapped     :: Event Unit,
     position   :: Event Vector3,
-    isDragging :: Event Boolean,
-    disposable :: Effect Unit
+    isDragging :: Event Boolean
 }
 
 derive instance newtypeDraggableEvent :: Newtype DraggableObject _
-instance isObject3DDraggableObject :: IsObject3D DraggableObject where
-    toObject3D = view _object
-instance disposableDraggableObject :: Disposable DraggableObject where
-    dispose d = d ^. _disposable
 
-_position :: Lens' DraggableObject (Event Vector3)
-_position = _Newtype <<< prop (SProxy :: SProxy "position")
-
-_isDragging :: Lens' DraggableObject (Event Boolean)
+_isDragging :: forall t a r. Newtype t { isDragging :: a | r } => Lens' t a
 _isDragging = _Newtype <<< prop (SProxy :: SProxy "isDragging")
 
 -- | create the default material
 defMaterial :: MeshBasicMaterial
-defMaterial = unsafeCoerce $ unsafePerformEffect (mkMeshBasicMaterial 0xff2222)
+defMaterial = unsafePerformEffect do
+    mat <- mkMeshBasicMaterial 0xff2222
+    setSide doubleSide mat
+    pure mat
 
 -- | invisible material for big circle under marker to easae dragging
 invisibleMaterial :: MeshBasicMaterial
-invisibleMaterial = unsafeCoerce $ unsafePerformEffect do
+invisibleMaterial = unsafePerformEffect do
     mat <- mkMeshBasicMaterial 0
     setTransparent true mat
     setOpacity 0.001 mat
     pure mat
 
+
+defVisCircGeo :: CircleGeometry
+defVisCircGeo = unsafePerformEffect $ mkCircleGeometry 0.5 32
+
 -- | create visible part of the object, user can specify custom geometry
 -- and material
-createVisibleObject :: forall geo. IsGeometry geo => Maybe geo -> Maybe MeshBasicMaterial -> Effect TapDragMesh
-createVisibleObject geo mat = do
-    cm <- mkCircleGeometry 0.5 32
-    let g = fromMaybe (unsafeCoerce cm) geo
-        m = fromMaybe defMaterial mat
-    mkTapDragMesh g m
+visibleObj :: forall e geo. IsGeometry geo => Props -> Maybe geo -> Maybe MeshBasicMaterial -> Node e TapDragMesh
+visibleObj prop geo mat = tapDragMesh prop g m
+    where g = fromMaybe (unsafeCoerce defVisCircGeo) geo
+          m = fromMaybe defMaterial mat
+
+invisCircGeo :: CircleGeometry
+invisCircGeo = unsafePerformEffect $ mkCircleGeometry 10.0 32
+
+invisibleCircle :: forall e. Props -> Node e DraggableMesh
+invisibleCircle prop = dragMesh prop invisCircGeo invisibleMaterial
 
 
-createInvisibleCircle :: Effect DraggableMesh
-createInvisibleCircle = do
-    geo <- mkCircleGeometry 10.0 32
-    mkDraggableMesh geo invisibleMaterial
+-- | increment z of a Vector3 by 0.1
+incZ :: Vector3 -> Vector3
+incZ p = mkVec3 (vecX p) (vecY p) (vecZ p + 0.1)
+
+
+-- | decrement z of a Vector3 by 0.1
+decZ :: Vector3 -> Vector3
+decZ p = mkVec3 (vecX p) (vecY p) (vecZ p - 0.1)
 
 
 -- | create a draggable object
-createDraggableObject :: forall geo. IsGeometry geo =>
-                                        Event Boolean
-                                        -> Int
-                                        -> Vector2
-                                        -> Maybe geo
-                                        -> Maybe MeshBasicMaterial
-                                        -> Effect DraggableObject
-createDraggableObject active index position customGeo customMat = do
-    dragObj <- mkObject3D
-    setName "drag-object" dragObj
+createDraggableObject :: forall e geo. IsGeometry geo => DragObjCfg geo -> Node e DraggableObject
+createDraggableObject cfg =
+    node (def # _name     .~ "drag-object"
+              # _rotation .~ pure (cfg ^. _rotation)
+         ) $
+        fixNodeE \newPosEvt ->
+            fixNodeE \isDraggingEvt -> do
+                parent <- getParent
 
-    -- create the visible marker
-    mesh <- createVisibleObject customGeo customMat
+                -- function to convert parameter Vector3 to local space
+                -- and vice versa.
+                -- all position vectors from user and back to user should be in parent's coordinate system
+                let toLoc = map incZ <<< flip parentToLocal parent
+                    toParent = flip localToParent parent <<< decZ
+                
+                -- all positions used below will be raised up a bit on Z axis
+                position <- liftEffect $ toLoc (cfg ^. _position)
+                let -- create the visible marker
+                    posDyn = step position $ performEvent $ toLoc <$> newPosEvt
+                mesh <- visibleObj (def # _name     .~ "visible-obj"
+                                        # _position .~ posDyn
+                                        # _visible  .~ cfg ^. _isActive
+                                   ) (cfg ^. _customGeo) (cfg ^. _customMat)
 
-    let defPosition = mkVec3 (vecX position) (vecY position) 0.1
-    setPosition defPosition mesh
-    setVisible false mesh  -- invisible by default
-    
-    add mesh dragObj
+                -- create the invisible circle
+                let vis2Dyn = step false isDraggingEvt
+                invCircle <- invisibleCircle (def # _name        .~ "invisible-circle"
+                                                  # _position    .~ posDyn
+                                                  # _visible     .~ vis2Dyn
+                                                  # _renderOrder .~ 10
+                                             )
 
-    -- create the invisible circle
-    invCircle <- createInvisibleCircle
-    setPosition defPosition invCircle
-    setVisible false invCircle
-    setRenderOrder 10 invCircle
-    add invCircle dragObj
+                let dragEvts = multicast $ mesh ^. _dragged <|> invCircle ^. _dragged
+                    evts     = multicast $ validateDrag dragEvts
+                    startEvt = filter isDragStart evts
+                    endEvt   = filter isDragEnd evts
 
-    disp1 <- subscribe active (flip setVisible mesh)
+                    dragging = multicast $ (const true <$> startEvt) <|> (const false <$> endEvt)
 
-    let dragEvts = multicast $ mesh ^. _dragged <|> invCircle ^. _dragged
-        evts = multicast $ validateDrag dragEvts
-        startEvt = filter isDragStart evts
-        endEvt = filter isDragEnd evts
+                    toLocal v = Just <$> worldToLocal v parent
+                    delta = calcDragDelta toLocal evts
 
-        dragging = (const true <$> startEvt) <|> (const false <$> endEvt)
-    
-    disp2 <- subscribe dragging (flip setVisible invCircle)
+                    -- transform delta in parent coordinate system if deltaTransform provided
+                    deltaEvt = case cfg ^. _deltaTransform of
+                        Nothing -> delta
+                        Just f  -> performEvent $ (toLoc <<< f <=< toParent) <$> delta
 
-    let toLocal v = if hasParent dragObj
-                    then Just <$> worldToLocal v (parent dragObj :: Object3D)
-                    else pure Nothing
-        delta = calcDragDelta toLocal evts
+                    -- function to calculate new position with delta
+                    updatePos d lastPos = lastPos <+> zeroZ d
+                    zeroZ v = mkVec3 (vecX v) (vecY v) 0.0
 
-    -- function to calculate new position with delta
-    let updatePos d lastPos = lastPos <+> zeroZ d
-        zeroZ v = mkVec3 (vecX v) (vecY v) 0.0
-
-        newPos = multicast $ foldWithDef updatePos delta defPosition
-    
-    disp3 <- subscribe newPos \p -> do
-                setPosition p mesh
-                setPosition p invCircle
-
-    pure $ DraggableObject {
-        object     : dragObj,
-        tapped     : const index <$> mesh ^. _tapped,
-        position   : newPos,
-        isDragging : multicast dragging,
-        disposable : sequence_ [disp1, disp2, disp3]
-    }
+                    -- validate and transform the new position with configured funtions
+                    filtF  = cfg ^. _validator
+                    newPos = multicast $ filter filtF $ performEvent $ toParent <$> foldWithDef updatePos deltaEvt position
+                    
+                    dragObj = DraggableObject {
+                        tapped     : const unit <$> mesh ^. _tapped,
+                        position   : newPos,
+                        isDragging : dragging
+                    }
+                pure { input : dragging, output: { input : newPos, output: dragObj } }

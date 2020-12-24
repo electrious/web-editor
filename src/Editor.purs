@@ -2,7 +2,6 @@ module Editor.Editor where
 
 import Prelude hiding (add,degree)
 
-import Control.Plus (empty)
 import Data.Array (cons)
 import Data.Default (class Default, def)
 import Data.Foldable (sequence_)
@@ -49,9 +48,9 @@ newtype EditorConfig = EditorConfig {
 derive instance newtypeEditorConfig :: Newtype EditorConfig _
 instance defaultEditorConfig :: Default EditorConfig where
     def = EditorConfig {
-        sizeDyn         : step (size 800 600) empty,
-        modeDyn         : step Showing empty,
-        flyCameraTarget : step Nothing empty
+        sizeDyn         : pure (size 800 600),
+        modeDyn         : pure Showing,
+        flyCameraTarget : pure Nothing
     }
 
 _sizeDyn :: forall t a r. Newtype t { sizeDyn :: a | r } => Lens' t a
@@ -212,13 +211,13 @@ createEditor elem cfg = do
         inputEvts = setupInput (domElement renderer)
     
         newDistEvt = performEvent $ zoomCamera camera <$> (gateDyn canEdit $ inputEvts ^. _zoomed)
-        scaleEvt = (\d -> d / cameraDefDist) <$> newDistEvt
+        scaleEvt = (_ / cameraDefDist) <$> newDistEvt
         scaleDyn = step 1.0 scaleEvt
     rcs <- setupRaycasting camera scene inputEvts sizeDyn
 
     d2 <- subscribe (gateDyn canEdit (rcs ^. _dragEvent)) (rotateContentWithDrag rotWrapper)
 
-    let shiftDragEvt = performEvent $ sampleDyn scaleDyn $ moveWithShiftDrag content <$> gateDyn canEdit (inputEvts ^. _shiftDragged) 
+    let shiftDragEvt = performEvent $ sampleDyn scaleDyn $ moveWithShiftDrag content <$> gateDyn canEdit (inputEvts ^. _shiftDragged)
     d3 <- subscribe shiftDragEvt (const $ pure unit)
 
     disposable <- new [d1, d2, d3, d4, d5, disposeScene scene, dispose rcs, OrbitControls.dispose orbitCtrl]

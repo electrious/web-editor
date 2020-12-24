@@ -3,7 +3,7 @@
  * @param polygon
  * @param point
  */
-exports.pointInPolygon = polygon => {
+exports.pointInPoly = polygon => {
     return point => {
         // ray-casting algorithm based on
         // http://www.ecse.rpi.edu/Homepages/wrf/Research/Short_Notes/pnpoly.html

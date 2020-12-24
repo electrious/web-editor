@@ -6,7 +6,7 @@ import Algorithm.HeatmapMesh (createNewGeometry)
 import Control.Alt ((<|>))
 import Control.Monad.Reader (ask)
 import Control.Plus (empty)
-import Custom.Mesh (TappableMesh, mkTappableMesh)
+import Custom.Mesh (TappableMesh)
 import Data.Array (head, init, snoc)
 import Data.Default (class Default, def)
 import Data.Lens (Lens', view, (.~), (^.))
@@ -17,38 +17,39 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (sequence_, traverse, traverse_)
+import Data.Tuple (Tuple(..))
 import Data.UUID (UUID)
-import Editor.ArrayBuilder (ArrayBuilder, _editorMode, liftRenderingM)
-import Editor.Common.Lenses (_alignment, _center, _houseId, _id, _mesh, _orientation, _panelType, _position, _roof, _slope, _tapped)
+import Editor.ArrayBuilder (ArrayBuilder, _editorMode, _heatmapMaterial, liftRenderingM)
+import Editor.Common.Lenses (_alignment, _center, _houseId, _id, _mesh, _orientation, _panelType, _polygon, _position, _roof, _rotation, _slope, _tapped)
 import Editor.Disposable (class Disposable, dispose)
 import Editor.EditorMode (EditorMode(..))
 import Editor.HouseEditor (_heatmap)
 import Editor.PanelLayer (PanelLayer, PanelLayerConfig(..), _activeArray, _currentPanels, _inactiveRoofTapped, _initPanels, _mainOrientation, _roofActive, _serverUpdated, createPanelLayer)
 import Editor.PanelNode (PanelOpacity(..))
+import Editor.PolygonEditor (_delete, createPolyEditor)
 import Editor.Rendering.PanelRendering (_opacity)
-import Editor.RoofEditor (_deleteRoof, _roofVertices, createRoofEditor)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import Effect.Timer (setTimeout)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, current, dynEvent, performDynamic, step, subscribeDyn, withLast)
-import FRP.Event (Event, create, keepLatest, subscribe)
+import FRP.Event (Event, create, keepLatest)
 import FRP.Event.Extra (multicast)
 import Math (pi)
 import Math.Angle (degreeVal, radianVal)
-import Model.Hardware.PanelModel (PanelModel)
+import Model.Hardware.PanelModel (PanelModel, _isActive)
+import Model.Polygon (Polygon(..), _polyVerts, renderPolygon)
 import Model.Roof.Panel (Alignment(..), Orientation(..), Panel)
-import Model.Roof.RoofPlate (RoofOperation(..), RoofPlate, _azimuth, _borderPoints, _rotation, _unifiedPoints)
+import Model.Roof.RoofPlate (RoofOperation(..), RoofPlate, _azimuth, _borderPoints, _unifiedPoints)
 import Model.RoofSpecific (RoofSpecific, mkRoofSpecific)
 import Model.ShadePoint (ShadePoint, shadePointFrom)
-import Rendering.Renderable (_heatmapMaterial)
+import Rendering.Node (mkNodeEnv, runNode)
 import SimplePolygon (isSimplePolygon)
-import Three.Core.Geometry (ShapeGeometry, faces, mkShape, mkShapeGeometry, vertices)
+import Three.Core.Geometry (ShapeGeometry, faces, vertices)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial, setOpacity, setTransparent)
 import Three.Core.Mesh (Mesh, geometry, mkMesh)
 import Three.Core.Object3D (class IsObject3D, Object3D, add, matrix, mkObject3D, remove, rotateX, rotateZ, setName, setPosition, setVisible, updateMatrix, updateMatrixWorld, worldToLocal)
-import Three.Math.Vector (Vector2, Vector3, applyMatrix, mkVec2, mkVec3, vecX, vecY, vecZ)
-import Unsafe.Coerce (unsafeCoerce)
+import Three.Math.Vector (Vector3, applyMatrix, mkVec2, mkVec3, vecX, vecY, vecZ)
 
 newtype RoofNodeConfig = RoofNodeConfig {
     houseId         :: Int,
@@ -68,12 +69,12 @@ instance defaultRoofNodeConfig :: Default RoofNodeConfig where
     def = RoofNodeConfig {
         houseId         : 0,
         roof            : def,
-        roofActive      : step false empty,
-        mainOrientation : step Landscape empty,
-        orientation     : step Landscape empty,
-        alignment       : step Grid empty,
-        panelType       : step def empty,
-        opacity         : step Opaque empty,
+        roofActive      : pure false,
+        mainOrientation : pure Landscape,
+        orientation     : pure Landscape,
+        alignment       : pure Grid,
+        panelType       : pure def,
+        opacity         : pure Opaque,
         heatmap         : empty,
         initPanels      : empty
     }
@@ -82,8 +83,8 @@ newtype RoofNode = RoofNode {
     roofId        :: UUID,
     roof          :: RoofPlate,
     -- roof plate editing operation events
-    roofUpdate    :: Event RoofOperation,
-    roofDelete    :: Event RoofOperation,
+    updated       :: Event RoofOperation,
+    deleted       :: Event RoofOperation,
     tapped        :: Event RoofPlate,
 
     roofObject    :: Object3D,
@@ -103,18 +104,12 @@ instance isObject3DRoofNode :: IsObject3D RoofNode where
 instance disposableRoofNode :: Disposable RoofNode where
     dispose (RoofNode { disposable }) = disposable
 
-_roofUpdate :: Lens' RoofNode (Event RoofOperation)
-_roofUpdate = _Newtype <<< prop (SProxy :: SProxy "roofUpdate")
-
-_roofDelete :: Lens' RoofNode (Event RoofOperation)
-_roofDelete = _Newtype <<< prop (SProxy :: SProxy "roofDelete")
-
 _roofObject :: Lens' RoofNode Object3D
 _roofObject = _Newtype <<< prop (SProxy :: SProxy "roofObject")
 
 -- | default material for roof plate.
 defMaterial :: MeshBasicMaterial
-defMaterial = unsafeCoerce $ unsafePerformEffect do
+defMaterial = unsafePerformEffect do
     mat <- mkMeshBasicMaterial 0xffffbb
     setTransparent true mat
     setOpacity 0.7 mat
@@ -122,7 +117,7 @@ defMaterial = unsafeCoerce $ unsafePerformEffect do
 
 -- | material for active roof plate
 activeMaterial :: MeshBasicMaterial
-activeMaterial = unsafeCoerce $ unsafePerformEffect do
+activeMaterial = unsafePerformEffect do
     mat <- mkMeshBasicMaterial 0xffff88
     setTransparent true mat
     setOpacity 0.9 mat
@@ -130,7 +125,7 @@ activeMaterial = unsafeCoerce $ unsafePerformEffect do
 
 -- | material for transparent roof plate
 transparentMaterial :: MeshBasicMaterial
-transparentMaterial = unsafeCoerce $ unsafePerformEffect do
+transparentMaterial = unsafePerformEffect do
     mat <- mkMeshBasicMaterial 0xffffff
     setTransparent true mat
     setOpacity 0.01 mat
@@ -142,12 +137,11 @@ getMaterial false true  = defMaterial
 getMaterial _     false = transparentMaterial
 
 -- | create roof mesh
-createRoofMesh :: Array Vector2 -> Boolean -> Boolean -> Effect TappableMesh
-createRoofMesh ps active canEditRoof = do
-    shp <- mkShape ps
-    geo <- mkShapeGeometry shp
-    m <- mkTappableMesh geo (getMaterial active canEditRoof)
-    setName "roof-mesh" $ m ^. _mesh
+createRoofMesh :: Polygon -> Boolean -> Boolean -> Effect TappableMesh
+createRoofMesh poly active canEditRoof = do
+    let mat = getMaterial active canEditRoof
+    m <- renderPolygon poly mat
+    setName "roof-mesh" m
     pure m
 
 updateRoofPlate :: Array Vector3 -> RoofPlate -> RoofPlate
@@ -157,12 +151,12 @@ updateRoofPlate ps roof = roof # _borderPoints .~ newPs
 
 
 -- test if a polygon is simple or with self-intersections
-testSimplePolygon :: Array Vector2 -> Boolean
-testSimplePolygon ps = isSimplePolygon (f <$> ps)
+testSimplePolygon :: Polygon -> Boolean
+testSimplePolygon poly = isSimplePolygon (f <$> poly ^. _polyVerts)
     where f p = [vecX p, vecY p]
 
 mkNode :: String -> Effect Object3D
-mkNode name  = do
+mkNode name = do
     obj <- mkObject3D
     setName name obj
     pure obj
@@ -191,8 +185,8 @@ setupRoofNode obj content roof = do
 -- only the x, y coordinates
 -- NOTE: the last point will be dropped here because it's the same with the
 -- first one
-getBorderPoints :: forall a. IsObject3D a => a -> RoofPlate -> Effect (Array Vector2)
-getBorderPoints obj roof = traverse toLocal $ fromMaybe [] (init $ roof ^. _borderPoints)
+getBorderPolygon :: forall a. IsObject3D a => a -> RoofPlate -> Effect Polygon
+getBorderPolygon obj roof = map Polygon $ traverse toLocal $ fromMaybe [] (init $ roof ^. _borderPoints)
     where toLocal p = do
               np <- worldToLocal p obj
               pure $ mkVec2 (vecX np) (vecY np)
@@ -210,10 +204,10 @@ renderMesh obj {last, now} = do
     traverse_ (flip remove obj) last
     add now obj
 
-getNewRoof :: forall a. IsObject3D a => a -> RoofPlate -> Event (Array Vector2) -> Effect (Event RoofOperation)
-getNewRoof obj roof newVertices = do
+getNewRoof :: forall a. IsObject3D a => a -> RoofPlate -> Event Polygon -> Effect (Event RoofOperation)
+getNewRoof obj roof polyEvt = do
     let toParent v = applyMatrix (matrix obj) (mkVec3 (vecX v) (vecY v) 0.0)
-    pure $ (RoofOpUpdate <<< flip updateRoofPlate roof <<< map toParent) <$> newVertices
+    pure $ (RoofOpUpdate <<< flip updateRoofPlate roof <<< map toParent <<< view _polyVerts) <$> polyEvt
 
 renderPanels :: forall a. IsObject3D a => RoofNodeConfig -> a -> ArrayBuilder PanelLayer
 renderPanels cfg content = do
@@ -278,14 +272,17 @@ createRoofNode cfg = do
     -- set the roof node position
     liftEffect do
         setupRoofNode obj content roof
-        ps <- getBorderPoints obj roof
+        poly <- getBorderPolygon obj roof
 
         -- create the vertex markers editor
         let canEdit = (&&) <$> isActive <*> canEditRoofDyn
-        editor <- createRoofEditor obj canEdit ps
+            -- PolyEditorConf
+            opt = def # _isActive .~ isActive
+                      # _polygon  .~ poly
+        Tuple editor d0 <- runNode (createPolyEditor opt) (mkNodeEnv obj unit)
 
-        let vertices = step ps (editor ^. _roofVertices)
-            meshDyn = performDynamic (createRoofMesh <$> vertices <*> isActive <*> canEditRoofDyn)
+        let polyDyn = step poly (editor ^. _polygon)
+            meshDyn = performDynamic (createRoofMesh <$> polyDyn <*> isActive <*> canEditRoofDyn)
             roofTapEvt = const unit <$> keepLatest (view _tapped <$> dynEvent meshDyn)
 
         -- create heatmap mesh and add to roofnode
@@ -298,13 +295,13 @@ createRoofNode cfg = do
         let canShowHeatmapDyn = canShowHeatmap <$> modeDyn <*> (step false $ cfg ^. _heatmap)
         d2 <- subscribeDyn canShowHeatmapDyn (flip setVisible hmMesh)
 
-        newRoof <- getNewRoof obj roof (editor ^. _roofVertices)
+        newRoof <- getNewRoof obj roof (editor ^. _polygon)
 
         -- create a stream for delete event if the current roof is not simple polygon
         { event: delEvt, push: toDel } <- create
-        let delRoofEvt = delEvt <|> (const unit <$> editor ^. _deleteRoof)
+        let delRoofEvt = delEvt <|> (const unit <$> editor ^. _delete)
 
-        when (not $ testSimplePolygon ps) (void $ setTimeout 1000 (toDel unit))
+        when (not $ testSimplePolygon poly) (void $ setTimeout 1000 (toDel unit))
 
         let actArrEvt = panelLayer ^. _activeArray
             roofSpecActArrEvt = multicast $ map (mkRoofSpecific rid) <$> actArrEvt
@@ -312,11 +309,11 @@ createRoofNode cfg = do
         pure $ RoofNode {
             roofId        : rid,
             roof          : roof,
-            roofDelete    : multicast $ const (RoofOpDelete rid) <$> delRoofEvt,
-            roofUpdate    : multicast newRoof,
+            deleted       : multicast $ const (RoofOpDelete rid) <$> delRoofEvt,
+            updated       : multicast newRoof,
             tapped        : multicast $ const roof <$> (roofTapEvt <|> roofTapOnPanelEvt),
             roofObject    : obj,
-            disposable    : sequence_ [d1, d2, dispose editor],
+            disposable    : sequence_ [dispose d0, d1, d2],
             currentPanels : panelLayer ^. _currentPanels,
             serverUpdated : panelLayer ^. _serverUpdated,
             alignment     : map (map (view _alignment)) <$> roofSpecActArrEvt,
