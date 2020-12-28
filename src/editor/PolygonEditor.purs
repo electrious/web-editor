@@ -55,8 +55,8 @@ derive instance newtypeVertMarker :: Newtype VertMarker _
 instance nodeRenderableVertMarkerPoint :: NodeRenderable e VertMarkerPoint VertMarker where
     render m = do
         let toVec3 v = mkVec3 (vecX v) (vecY v) 0.0
-            cfg = def # _isActive .~ (m ^. _isActive)
-                      # _position .~ (toVec3 $ m ^. _position)
+            cfg = def # _isActive .~ m ^. _isActive
+                      # _position .~ toVec3 (m ^. _position)
         dragObj <- createDraggableObject (cfg :: DragObjCfg Geometry)
         
         pure $ VertMarker {
