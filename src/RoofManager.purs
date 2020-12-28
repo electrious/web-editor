@@ -32,9 +32,9 @@ import Editor.Disposable (class Disposable, dispose)
 import Editor.EditorMode (EditorMode(..))
 import Editor.House (HouseMeshData)
 import Editor.HouseEditor (ArrayEditParam, HouseEditor, _heatmap, performEditorEvent)
+import Editor.ObjectAdder (ObjectAdder, _addedPoint, _faceNormal, createObjectAdder, mkCandidatePoint)
 import Editor.PanelLayer (_currentPanels, _initPanels, _mainOrientation, _roofActive, _serverUpdated)
 import Editor.PanelNode (PanelOpacity(..))
-import Editor.PolygonAdder (PolygonAdder, _addedPoint, _faceNormal, createPolygonAdder, mkCandidatePoint)
 import Editor.Rendering.PanelRendering (_opacity)
 import Editor.RoofNode (RoofNode, RoofNodeConfig, createRoofNode)
 import Effect (Effect)
@@ -196,8 +196,8 @@ isRoofEditing :: HouseEditor (Dynamic Boolean)
 isRoofEditing = map ((==) RoofEditing) <<< view _modeDyn <$> ask
 
 -- | function to add the roof recognizer and recognize new roofs
-recognizeNewRoofs :: forall e . HouseMeshData -> Object3D -> Event RoofDict -> Dynamic (Maybe UUID) -> Dynamic Boolean -> Node e PolygonAdder
-recognizeNewRoofs meshData wrapper newRoofs activeRoof canEditRoofDyn = createPolygonAdder point canShowAdder
+recognizeNewRoofs :: forall e . HouseMeshData -> Object3D -> Event RoofDict -> Dynamic (Maybe UUID) -> Dynamic Boolean -> Node e ObjectAdder
+recognizeNewRoofs meshData wrapper newRoofs activeRoof canEditRoofDyn = createObjectAdder point canShowAdder
     where canShowAdder = (&&) <$> (isNothing <$> activeRoof) <*> canEditRoofDyn
           houseWrapper = meshData ^. _wrapper
 

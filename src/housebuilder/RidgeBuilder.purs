@@ -19,6 +19,7 @@ data RidgeState = RidgeAdding
 
 
 
+
 newtype RidgeEditorConf = RidgeEditorConf {
     floor :: FloorPlan,
     mode  :: Dynamic ActiveMode

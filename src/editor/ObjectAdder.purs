@@ -1,4 +1,4 @@
-module Editor.PolygonAdder where
+module Editor.ObjectAdder where
 
 import Prelude
 
@@ -22,12 +22,12 @@ import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial)
 import Three.Core.Object3D (localToWorld)
 import Three.Math.Vector (Vector3, addScaled, (<+>))
 
--- | PolygonAdder will be able to let user add new roof
-newtype PolygonAdder = PolygonAdder {
+-- | ObjectAdder will be able to let user add new objects
+newtype ObjectAdder = ObjectAdder {
     addedPoint :: Event CandidatePoint
 }
 
-derive instance newtypePolygonAdder :: Newtype PolygonAdder _
+derive instance newtypeObjectAdder :: Newtype ObjectAdder _
 
 _addedPoint :: forall t a r. Newtype t { addedPoint :: a | r } => Lens' t a
 _addedPoint = _Newtype <<< prop (SProxy :: SProxy "addedPoint")
@@ -74,9 +74,9 @@ createAdderMarker pDyn = do
                  ) adderMarkerGeo adderMarkerMat
     pure $ compact $ sampleDyn_ pDyn $ m ^. _tapped
 
--- | create a roof recognizer
-createPolygonAdder :: forall e. Dynamic (Maybe CandidatePoint) -> Dynamic Boolean -> Node e PolygonAdder
-createPolygonAdder point canShow = do
+-- | create a object adder
+createObjectAdder :: forall e. Dynamic (Maybe CandidatePoint) -> Dynamic Boolean -> Node e ObjectAdder
+createObjectAdder point canShow = do
     let -- update candidate point with canShow status
         pointCanShow true p  = p
         pointCanShow false _ = Nothing
@@ -85,6 +85,6 @@ createPolygonAdder point canShow = do
 
     tapPntEvt <- createAdderMarker pDyn
 
-    pure $ PolygonAdder {
+    pure $ ObjectAdder {
         addedPoint : multicast tapPntEvt
     }
