@@ -67,7 +67,7 @@ createAdderMarker pDyn = do
         posDyn    = calcPos <$> pDyn
         targetDyn = performDynamic $ traverse calcTarget <$> pDyn
         
-    m <- tapMesh (def # _name     .~ "add-poly-marker"
+    m <- tapMesh (def # _name     .~ "adder-marker"
                       # _position .~ posDyn
                       # _target   .~ targetDyn
                       # _visible  .~ (isJust <$> pDyn)
