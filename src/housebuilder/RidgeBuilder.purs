@@ -32,13 +32,16 @@ addRidgePoint cfg canShowDyn = do
             np <- worldToLocal (evt ^. _point) parent
             pure $ Just $ mkCandidatePoint np (normal $ evt ^. _face)
 
-        candPntDyn = step Nothing $ performEvent $ getCandPoint <$> gateDyn canShowDyn (cfg ^. _mouseMove)
+        pntsEvt      = performEvent $ getCandPoint <$> gateDyn canShowDyn (cfg ^. _mouseMove)
+        candPntDyn   = step Nothing pntsEvt
 
-        opt = def # _name .~ "ridge-point-adder"
+        toRidgePoint = ridgePoint <<< view _position
+        
+        opt = def # _name     .~ "ridge-point-adder"
                   # _position .~ pure (mkVec3 0.0 0.0 0.1)
-    addedPntEvt <- node opt $ createObjectAdder candPntDyn canShowDyn
-    
-    pure $ ridgePoint <<< view _position <$> addedPntEvt
+                  
+    map toRidgePoint <$> node opt (createObjectAdder candPntDyn canShowDyn)
+
 
 newtype RidgeEditorConf = RidgeEditorConf {
     floor     :: FloorPlan,

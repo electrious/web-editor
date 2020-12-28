@@ -66,11 +66,7 @@ createAdderMarker pDyn = do
 
 -- | create a object adder
 createObjectAdder :: forall e. Dynamic (Maybe CandidatePoint) -> Dynamic Boolean -> Node e (Event CandidatePoint)
-createObjectAdder point canShow = do
-    let -- update candidate point with canShow status
-        pointCanShow true p  = p
-        pointCanShow false _ = Nothing
-
-        pDyn = pointCanShow <$> canShow <*> point
-
-    createAdderMarker pDyn
+createObjectAdder point canShow = createAdderMarker $ pointCanShow <$> canShow <*> point
+    where -- update candidate point with canShow status
+          pointCanShow true p  = p
+          pointCanShow false _ = Nothing
