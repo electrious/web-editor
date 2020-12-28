@@ -9,7 +9,7 @@ import Data.Lens (view, (.~), (^.))
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Editor.Common.Lenses (_face, _mouseMove, _name, _point, _position)
-import Editor.ObjectAdder (createObjectAdder, mkCandidatePoint)
+import Editor.ObjectAdder (_addedPoint, createObjectAdder, mkCandidatePoint)
 import Editor.SceneEvent (SceneMouseMoveEvent)
 import FRP.Dynamic (Dynamic, gateDyn, step)
 import FRP.Event (Event)
@@ -36,9 +36,9 @@ addRidgePoint cfg canShowDyn = do
 
         opt = def # _name .~ "ridge-point-adder"
                   # _position .~ pure (mkVec3 0.0 0.0 0.1)
-    addedPntEvt <- node opt $ createObjectAdder candPntDyn
+    adder <- node opt $ createObjectAdder candPntDyn canShowDyn
     
-    pure $ ridgePoint <<< view _position <$> addedPntEvt
+    pure $ ridgePoint <<< view _position <$> adder ^. _addedPoint
 
 newtype RidgeEditorConf = RidgeEditorConf {
     floor     :: FloorPlan,

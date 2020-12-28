@@ -22,6 +22,15 @@ import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial)
 import Three.Core.Object3D (localToWorld)
 import Three.Math.Vector (Vector3, addScaled, (<+>))
 
+-- | ObjectAdder will be able to let user add new objects
+newtype ObjectAdder = ObjectAdder {
+    addedPoint :: Event CandidatePoint
+}
+
+derive instance newtypeObjectAdder :: Newtype ObjectAdder _
+
+_addedPoint :: forall t a r. Newtype t { addedPoint :: a | r } => Lens' t a
+_addedPoint = _Newtype <<< prop (SProxy :: SProxy "addedPoint")
 
 -- | Candidate point that will allow user to show the adder marker
 newtype CandidatePoint = CandidatePoint {
@@ -43,8 +52,8 @@ adderMarkerMat = unsafePerformEffect (mkMeshBasicMaterial 0x2222ff)
 adderMarkerGeo :: CircleGeometry
 adderMarkerGeo = unsafePerformEffect (mkCircleGeometry 1.0 32)
 
-createObjectAdder :: forall e. Dynamic (Maybe CandidatePoint) -> Node e (Event CandidatePoint)
-createObjectAdder point = do
+createAdderMarker :: forall e. Dynamic (Maybe CandidatePoint) -> Node e (Event CandidatePoint)
+createAdderMarker pDyn = do
     parent <- getParent
 
     let -- get the local position of the candidate point
@@ -55,12 +64,27 @@ createObjectAdder point = do
 
         calcTarget p = localToWorld (p ^. _position <+> p ^. _faceNormal) parent
 
-        posDyn    = calcPos <$> point
-        targetDyn = performDynamic $ traverse calcTarget <$> point
+        posDyn    = calcPos <$> pDyn
+        targetDyn = performDynamic $ traverse calcTarget <$> pDyn
         
     m <- tapMesh (def # _name     .~ "adder-marker"
                       # _position .~ posDyn
                       # _target   .~ targetDyn
-                      # _visible  .~ (isJust <$> point)
+                      # _visible  .~ (isJust <$> pDyn)
                  ) adderMarkerGeo adderMarkerMat
-    pure $ multicast $ compact $ sampleDyn_ point $ m ^. _tapped
+    pure $ compact $ sampleDyn_ pDyn $ m ^. _tapped
+
+-- | create a object adder
+createObjectAdder :: forall e. Dynamic (Maybe CandidatePoint) -> Dynamic Boolean -> Node e ObjectAdder
+createObjectAdder point canShow = do
+    let -- update candidate point with canShow status
+        pointCanShow true p  = p
+        pointCanShow false _ = Nothing
+
+        pDyn = pointCanShow <$> canShow <*> point
+
+    tapPntEvt <- createAdderMarker pDyn
+
+    pure $ ObjectAdder {
+        addedPoint : multicast tapPntEvt
+    }
