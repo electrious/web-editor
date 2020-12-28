@@ -15,22 +15,12 @@ import Editor.Common.Lenses (_name, _position, _tapped)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, performDynamic, sampleDyn_)
 import FRP.Event (Event)
-import FRP.Event.Extra (multicast)
 import Rendering.Node (Node, _target, _visible, getParent, tapMesh)
 import Three.Core.Geometry (CircleGeometry, mkCircleGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial)
 import Three.Core.Object3D (localToWorld)
 import Three.Math.Vector (Vector3, addScaled, (<+>))
 
--- | ObjectAdder will be able to let user add new objects
-newtype ObjectAdder = ObjectAdder {
-    addedPoint :: Event CandidatePoint
-}
-
-derive instance newtypeObjectAdder :: Newtype ObjectAdder _
-
-_addedPoint :: forall t a r. Newtype t { addedPoint :: a | r } => Lens' t a
-_addedPoint = _Newtype <<< prop (SProxy :: SProxy "addedPoint")
 
 -- | Candidate point that will allow user to show the adder marker
 newtype CandidatePoint = CandidatePoint {
@@ -75,7 +65,7 @@ createAdderMarker pDyn = do
     pure $ compact $ sampleDyn_ pDyn $ m ^. _tapped
 
 -- | create a object adder
-createObjectAdder :: forall e. Dynamic (Maybe CandidatePoint) -> Dynamic Boolean -> Node e ObjectAdder
+createObjectAdder :: forall e. Dynamic (Maybe CandidatePoint) -> Dynamic Boolean -> Node e (Event CandidatePoint)
 createObjectAdder point canShow = do
     let -- update candidate point with canShow status
         pointCanShow true p  = p
@@ -83,8 +73,4 @@ createObjectAdder point canShow = do
 
         pDyn = pointCanShow <$> canShow <*> point
 
-    tapPntEvt <- createAdderMarker pDyn
-
-    pure $ ObjectAdder {
-        addedPoint : multicast tapPntEvt
-    }
+    createAdderMarker pDyn

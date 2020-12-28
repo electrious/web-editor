@@ -19,7 +19,7 @@ import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
 import Data.UUIDMap (UUIDMap)
 import Editor.Common.Lenses (_active, _deleted, _face, _id, _mouseMove, _name, _parent, _point, _position, _tapped, _updated)
-import Editor.ObjectAdder (_addedPoint, createObjectAdder, mkCandidatePoint)
+import Editor.ObjectAdder (createObjectAdder, mkCandidatePoint)
 import Editor.SceneEvent (SceneMouseMoveEvent)
 import FRP.Dynamic (Dynamic, gateDyn, latestEvt, step)
 import FRP.Event (Event, fold, sampleOn)
@@ -119,8 +119,8 @@ setupFloorAdder fpsEvt actFloorDyn = do
         opt = def # _name     .~ "poly-adder"
                   # _position .~ pure (mkVec3 0.0 0.0 0.2)
         
-    adder <- node opt $ createObjectAdder candPntDyn canShowAdder
-    pure $ performEvent $ newFloorPlan <<< toVec2 <<< view _position <$> (adder ^. _addedPoint)
+    addedPntEvt <- node opt $ createObjectAdder candPntDyn canShowAdder
+    pure $ performEvent $ newFloorPlan <<< toVec2 <<< view _position <$> addedPntEvt
 
 
 -- | create FloorPlan builder node and setup all events necessary.

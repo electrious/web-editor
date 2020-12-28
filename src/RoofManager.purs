@@ -32,7 +32,7 @@ import Editor.Disposable (class Disposable, dispose)
 import Editor.EditorMode (EditorMode(..))
 import Editor.House (HouseMeshData)
 import Editor.HouseEditor (ArrayEditParam, HouseEditor, _heatmap, performEditorEvent)
-import Editor.ObjectAdder (ObjectAdder, _addedPoint, _faceNormal, createObjectAdder, mkCandidatePoint)
+import Editor.ObjectAdder (CandidatePoint, _faceNormal, createObjectAdder, mkCandidatePoint)
 import Editor.PanelLayer (_currentPanels, _initPanels, _mainOrientation, _roofActive, _serverUpdated)
 import Editor.PanelNode (PanelOpacity(..))
 import Editor.Rendering.PanelRendering (_opacity)
@@ -196,7 +196,7 @@ isRoofEditing :: HouseEditor (Dynamic Boolean)
 isRoofEditing = map ((==) RoofEditing) <<< view _modeDyn <$> ask
 
 -- | function to add the roof recognizer and recognize new roofs
-recognizeNewRoofs :: forall e . HouseMeshData -> Object3D -> Event RoofDict -> Dynamic (Maybe UUID) -> Dynamic Boolean -> Node e ObjectAdder
+recognizeNewRoofs :: forall e . HouseMeshData -> Object3D -> Event RoofDict -> Dynamic (Maybe UUID) -> Dynamic Boolean -> Node e (Event CandidatePoint)
 recognizeNewRoofs meshData wrapper newRoofs activeRoof canEditRoofDyn = createObjectAdder point canShowAdder
     where canShowAdder = (&&) <$> (isNothing <$> activeRoof) <*> canEditRoofDyn
           houseWrapper = meshData ^. _wrapper
@@ -260,9 +260,9 @@ createRoofManager param meshData roofs panels racks = do
         flattened = performEvent $ doFlatten meshData <$> newRoofs
 
     -- recognize new roofs
-    Tuple adder adderDisp <- liftEffect $ runNode (recognizeNewRoofs meshData wrapper newRoofs activeRoofDyn canEditRoofDyn) (mkNodeEnv wrapper unit)
+    Tuple addedPntEvt adderDisp <- liftEffect $ runNode (recognizeNewRoofs meshData wrapper newRoofs activeRoofDyn canEditRoofDyn) (mkNodeEnv wrapper unit)
     let mkRoof p     = newRoofPlate (p ^. _position) (p ^. _faceNormal)
-        addedNewRoof = performEvent $ mkRoof <$> adder ^. _addedPoint
+        addedNewRoof = performEvent $ mkRoof <$> addedPntEvt
         addRoofOp    = RoofOpCreate <$> addedNewRoof
         ops          = addRoofOp <|> deleteRoofOp <|> updateRoofOp
     
