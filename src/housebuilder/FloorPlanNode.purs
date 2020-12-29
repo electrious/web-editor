@@ -3,7 +3,7 @@ module HouseBuilder.FloorPlanNode where
 import Prelude
 
 import Control.Alt ((<|>))
-import Custom.Mesh (TappableMesh)
+import Custom.Mesh (TapMouseMesh)
 import Data.Array (foldl)
 import Data.Default (class Default, def)
 import Data.Lens (Lens', view, (.~), (^.))
@@ -13,8 +13,9 @@ import Data.Maybe (Maybe(..), maybe)
 import Data.Meter (Meter, meter, meterVal)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Editor.Common.Lenses (_active, _height, _id, _name, _polygon, _position, _rotation, _tapped)
+import Editor.Common.Lenses (_active, _height, _id, _mouseMove, _name, _polygon, _position, _rotation, _tapped)
 import Editor.PolygonEditor (_delete, createPolyEditor)
+import Editor.SceneEvent (SceneMouseMoveEvent)
 import FRP.Dynamic (Dynamic, latestEvt, step)
 import FRP.Event (Event, fold)
 import FRP.Event.Extra (multicast)
@@ -54,9 +55,10 @@ _arrowMaterial = _Newtype <<< prop (SProxy :: SProxy "arrowMaterial")
 
 
 newtype FloorPlanNode = FloorPlanNode {
-    updated :: Event FloorPlanOp,
-    deleted :: Event FloorPlanOp,
-    tapped  :: Event FloorPlan
+    updated   :: Event FloorPlanOp,
+    deleted   :: Event FloorPlanOp,
+    tapped    :: Event FloorPlan,
+    mouseMove :: Event SceneMouseMoveEvent
     }
 
 derive instance newtypeFloorPlanNode :: Newtype FloorPlanNode _
@@ -127,7 +129,7 @@ createFloorNode = do
             isActEvt = isActive <$> act
             calcPos p = mkVec3 0.0 0.0 (meterVal $ floorPlanTop p)
         -- render the polygon
-        polyMDyn :: Dynamic TappableMesh <- localEnv (const $ cfg ^. _active) $ renderDynamic fpDyn
+        polyMDyn :: Dynamic TapMouseMesh <- localEnv (const $ cfg ^. _active) $ renderDynamic fpDyn
 
         -- setup the polygon editor
         editor <- node (def # _position .~ (calcPos <$> fpDyn)) $
@@ -143,8 +145,9 @@ createFloorNode = do
             fpEvt = multicast $ fold applyOp opEvt fp
 
             node = FloorPlanNode {
-                updated : FPOUpdate <$> fpEvt,
-                deleted : const (FPODelete $ fp ^. _id) <$> editor ^. _delete,
-                tapped  : const fp <$> (latestEvt $ view _tapped <$> polyMDyn)
+                updated   : FPOUpdate <$> fpEvt,
+                deleted   : const (FPODelete $ fp ^. _id) <$> editor ^. _delete,
+                tapped    : const fp <$> (latestEvt $ view _tapped <$> polyMDyn),
+                mouseMove : latestEvt $ view _mouseMove <$> polyMDyn
                 }
         pure { input : fpEvt, output : node }

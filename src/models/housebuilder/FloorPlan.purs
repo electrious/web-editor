@@ -2,7 +2,7 @@ module Model.HouseBuilder.FloorPlan (FloorPlan(..), newFloorPlan, FloorPlanOp(..
 
 import Prelude
 
-import Custom.Mesh (TappableMesh)
+import Custom.Mesh (TapMouseMesh)
 import Data.Default (class Default, def)
 import Data.Lens (view, (.~), (^.))
 import Data.Meter (Meter, meter, meterVal)
@@ -76,7 +76,7 @@ floorPlanMaterial Inactive = inactiveMat
 floorPlanTop :: FloorPlan -> Meter
 floorPlanTop fp = fp ^. _height + meter 0.02
 
-instance nodeRenderableFloorPlan :: NodeRenderable (Dynamic ActiveMode) FloorPlan TappableMesh where
+instance nodeRenderableFloorPlan :: NodeRenderable (Dynamic ActiveMode) FloorPlan TapMouseMesh where
     render fp = do
         let poly = fp ^. _polygon
             h    = meterVal $ fp ^. _height

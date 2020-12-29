@@ -3,7 +3,7 @@ module Model.Polygon where
 import Prelude
 
 import Control.Monad.Writer (tell)
-import Custom.Mesh (TappableMesh, mkTappableMesh)
+import Custom.Mesh (TapMouseMesh, TappableMesh, mkTappableMesh)
 import Data.Array (fromFoldable, length)
 import Data.Default (class Default, def)
 import Data.Foldable (class Foldable)
@@ -15,7 +15,7 @@ import Editor.Disposable (Disposee(..))
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic, current, subscribeDyn)
-import Rendering.Node (getEnv, tapMesh)
+import Rendering.Node (getEnv, tapMouseMesh)
 import Rendering.NodeRenderable (class NodeRenderable)
 import Three.Core.Geometry (mkShape, mkShapeGeometry)
 import Three.Core.Material (MeshBasicMaterial)
@@ -50,7 +50,7 @@ polygonAround p = newPolygon [p1, p2, p3, p4]
 numOfVerts :: Polygon -> Int
 numOfVerts (Polygon vs) = length vs
 
-instance nodeRenderablePolygon :: NodeRenderable (Dynamic MeshBasicMaterial) Polygon TappableMesh where
+instance nodeRenderablePolygon :: NodeRenderable (Dynamic MeshBasicMaterial) Polygon TapMouseMesh where
     render p = do
         -- get the current material used
         matDyn <- getEnv
@@ -59,7 +59,7 @@ instance nodeRenderablePolygon :: NodeRenderable (Dynamic MeshBasicMaterial) Pol
         shp <- liftEffect $ mkShape $ p ^. _polyVerts
         geo <- liftEffect $ mkShapeGeometry shp
         
-        m <- tapMesh def geo mat
+        m <- tapMouseMesh def geo mat
 
         -- update the material when it changes
         let mesh = m ^. _mesh
