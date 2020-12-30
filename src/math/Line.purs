@@ -10,7 +10,7 @@ import Data.Symbol (SProxy(..))
 import Math.Angle (Angle)
 import Model.Roof.RoofPlate (angleBetween)
 import Prelude ((/), (<), (<<<))
-import Three.Math.Vector (Vector3, (<+>), (<->), (<**>), (<.>), length)
+import Three.Math.Vector (Vector3, length, (<**>), (<+>), (<->), (<.>))
 
 newtype Line = Line {
   start :: Vector3,
@@ -35,6 +35,10 @@ lineVec l = l ^. _end <-> l ^. _start
 -- angle between two lines
 linesAngle :: Line -> Line -> Angle
 linesAngle l1 l2 = angleBetween (lineVec l1) (lineVec l2)
+
+-- get line points
+linePoints :: Line -> Array Vector3
+linePoints l = [l ^. _start, l ^. _end]
 
 -- find the most parallel line to a target line in a list of lines
 mostParaLine :: forall f. Foldable f => Line -> f Line -> Maybe Line

@@ -21,9 +21,9 @@ import Effect (Effect)
 import Effect.Class (class MonadEffect, liftEffect)
 import FRP.Dynamic (Dynamic, subscribeDyn)
 import FRP.Event (Event, create, subscribe)
-import Three.Core.Geometry (class IsGeometry)
-import Three.Core.Material (class IsMaterial)
-import Three.Core.Mesh (Mesh, mkMesh)
+import Three.Core.Geometry (class IsGeometry, mkLineGeometry, setLinePositions)
+import Three.Core.Material (class IsMaterial, LineBasicMaterial)
+import Three.Core.Mesh (Line2, Mesh, mkLine2, mkMesh)
 import Three.Core.Object3D (class IsObject3D, Object3D, add, lookAt, mkObject3D, remove, setCastShadow, setName, setPosition, setReceiveShadow, setRenderOrder, setRotation, setScale, setVisible, toObject3D)
 import Three.Math.Euler (Euler)
 import Three.Math.Vector (Vector3, mkVec3)
@@ -167,6 +167,13 @@ node prop child = mkNode prop mkObject3D >>= runChild child
 
 mesh :: forall geo mat e. IsGeometry geo => IsMaterial mat => Props -> geo -> mat -> Node e Mesh
 mesh prop geo mat = mkNode prop $ mkMesh geo mat
+
+line :: forall e. Props -> Array Vector3 -> LineBasicMaterial -> Node e Line2
+line prop vs mat = mkNode prop $ do
+    geo <- mkLineGeometry
+    setLinePositions vs geo
+
+    mkLine2 geo mat
 
 tapMesh :: forall geo mat e. IsGeometry geo => IsMaterial mat => Props -> geo -> mat -> Node e TappableMesh
 tapMesh prop geo mat = mkNode prop $ mkTappableMesh geo mat
