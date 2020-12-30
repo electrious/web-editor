@@ -110,6 +110,9 @@ _point = _Newtype <<< prop (SProxy :: SProxy "point")
 _canDrag :: forall t a r. Newtype t { canDrag :: a | r } => Lens' t a
 _canDrag = _Newtype <<< prop (SProxy :: SProxy "canDrag")
 
+_dragging :: forall t a r. Newtype t { dragging :: a | r } => Lens' t a
+_dragging = _Newtype <<< prop (SProxy :: SProxy "dragging")
+
 _isDragging :: forall t a r. Newtype t { isDragging :: a | r } => Lens' t a
 _isDragging = _Newtype <<< prop (SProxy :: SProxy "isDragging")
 
