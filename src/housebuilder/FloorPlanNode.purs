@@ -19,6 +19,7 @@ import Editor.SceneEvent (SceneMouseMoveEvent)
 import FRP.Dynamic (Dynamic, latestEvt, step)
 import FRP.Event (Event, fold)
 import FRP.Event.Extra (multicast)
+import HouseBuilder.RidgeBuilder (editRidges)
 import Math (pi)
 import Model.ActiveMode (ActiveMode(..), isActive)
 import Model.Hardware.PanelModel (_isActive)
@@ -138,6 +139,10 @@ createFloorNode = do
 
         -- setup the height editor
         heightEvt <- setupHeightEditor isActEvt $ arrowPos <$> fpDyn
+
+        -- setup the ridge editor
+        _ <- editRidges $ def # _floor     .~ fp
+                              # _mouseMove .~ latestEvt (view _mouseMove <$> polyMDyn)
 
         -- calculate the updated floor plan
         let opEvt = (UpdPoly <$> editor ^. _polygon) <|>

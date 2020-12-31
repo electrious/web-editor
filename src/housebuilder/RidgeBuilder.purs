@@ -22,7 +22,7 @@ import FRP.Dynamic (Dynamic, gateDyn, step)
 import FRP.Event (Event, fold, keepLatest)
 import FRP.Event.Extra (distinct, multicast, performEvent)
 import HouseBuilder.Rendering.HousePoint (RidgePointRendered, _dragEnd)
-import Model.ActiveMode (ActiveMode)
+import Model.ActiveMode (ActiveMode(..))
 import Model.HouseBuilder.FloorPlan (FloorPlan)
 import Model.HouseBuilder.House (_ridges)
 import Model.HouseBuilder.Ridge (Ridge, topRidge)
@@ -100,6 +100,12 @@ newtype RidgeEditorConf = RidgeEditorConf {
 
 derive instance newtypeRidgeEditorConf :: Newtype RidgeEditorConf _
 
+instance defaultRidgeEditorConf :: Default RidgeEditorConf where
+    def = RidgeEditorConf {
+        floor     : def,
+        mode      : pure Active,
+        mouseMove : empty
+        }
 
 dragOp :: Tuple RidgePoint Vector3 -> RidgeOp
 dragOp (Tuple r v) = RODragRidgePoint r (ridgePoint v)
