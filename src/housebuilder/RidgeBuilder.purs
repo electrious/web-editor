@@ -30,6 +30,7 @@ import Model.HouseEditor.HousePoint (RidgePoint, ridgePoint)
 import Rendering.DynamicNode (renderEvent)
 import Rendering.Node (Node, fixNodeE, getParent, node)
 import Three.Core.Face3 (normal)
+import Three.Core.Mesh (Line2)
 import Three.Core.Object3D (worldToLocal)
 import Three.Math.Vector (Vector3, mkVec3)
 
@@ -105,10 +106,21 @@ dragOp (Tuple r v) = RODragRidgePoint r (ridgePoint v)
 
 editRidges :: forall e. RidgeEditorConf -> Node e (Event Unit)
 editRidges conf = fixNodeE \opEvt -> do
-    let stEvt = fold applyOp opEvt def
-
+    let stEvt  = multicast $ fold applyOp opEvt def
+        
+        -- all current ridge points
         rpsEvt = distinct $ view _ridgePoints <$> stEvt
+
+        -- all current ridges
+        rsEvt  = distinct $ view _ridges <$> stEvt
+        -- temporary ridge
+        trEvt  = distinct $ view _tempRidge <$> stEvt
+    -- render all ridge points
     rpNodesEvt :: Event (List RidgePointRendered) <- multicast <$> renderEvent rpsEvt
+    -- render all ridges
+    _ :: Event (List Line2) <- renderEvent rsEvt
+    -- render temp ridge
+    _ :: Event (Maybe Line2) <- renderEvent trEvt
 
     -- let user add new ridge points
     addedPntEvt <- map ROAddRidgePoint <$> addRidgePoint conf (pure true)
