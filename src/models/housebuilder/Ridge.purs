@@ -17,6 +17,10 @@ import Three.Core.Mesh (Line2)
 data Ridge = TopRidge  RidgePoint RidgePoint
            | SideRidge RidgePoint GutterPoint
 
+instance eqRidge :: Eq Ridge where
+    eq (TopRidge p1s p1e) (TopRidge p2s p2e) = (p1s == p2s && p1e == p2e) || (p1s == p2e && p1e == p2s)
+    eq (SideRidge p1 g1) (SideRidge p2 g2)   = p1 == p2 && g1 == g2
+    eq _ _                                   = false
 
 topRidge :: RidgePoint -> RidgePoint -> Ridge
 topRidge p1 p2 = TopRidge p1 p2

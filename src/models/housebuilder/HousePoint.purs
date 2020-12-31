@@ -20,6 +20,7 @@ import Three.Math.Vector (Vector3)
 newtype RidgePoint = RidgePoint Vector3
 
 derive instance newtypeRidgePoint :: Newtype RidgePoint _
+derive instance eqRidgePoint :: Eq RidgePoint
 
 ridgePoint :: Vector3 -> RidgePoint
 ridgePoint = RidgePoint
@@ -31,6 +32,7 @@ _ridgePointPos = _Newtype
 newtype GutterPoint = GutterPoint Vector3
 
 derive instance newtypeGutterPoint :: Newtype GutterPoint _
+derive instance eqGutterPoint :: Eq GutterPoint
 
 gutterPoint :: Vector3 -> GutterPoint
 gutterPoint = GutterPoint

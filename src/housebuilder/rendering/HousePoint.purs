@@ -10,6 +10,7 @@ import Data.Lens.Record (prop)
 import Data.Maybe (fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
+import Data.Tuple (Tuple(..))
 import Editor.Common.Lenses (_isDragging, _position, _tapped)
 import FRP.Event (Event, withLast)
 import Model.Hardware.PanelModel (_isActive)
@@ -22,7 +23,7 @@ import UI.DraggableObject (DragObjCfg, createDraggableObject)
 newtype RidgePointRendered = RidgePointRendered {
     ridgePoint :: RidgePoint,
     deleted    :: Event RidgePoint,
-    dragging   :: Event Vector3,
+    dragging   :: Event (Tuple RidgePoint Vector3),
     dragEnd    :: Event Unit
     }
 
@@ -46,6 +47,6 @@ instance nodeRenderableRidgePoint :: NodeRenderable e RidgePoint RidgePointRende
         pure $ RidgePointRendered {
             ridgePoint : p,
             deleted    : const p <$> dragObj ^. _tapped,
-            dragging   : dragObj ^. _position,
+            dragging   : Tuple p <$> dragObj ^. _position,
             dragEnd    : getEndEvt $ dragObj ^. _isDragging
             }
