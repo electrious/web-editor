@@ -74,11 +74,15 @@ exports.mkLineGeometry = _ => {
 }
 
 exports.setLinePositions = pos => line => _ => {
-    line.setPositions(pos)
+    let positions = []
+    pos.forEach(p => positions.push(p.x, p.y, p.z))
+    line.setPositions(positions)
 }
 
 exports.setLineColors = cls => line => _ => {
-    line.setColors(cls)
+    let colors = []
+    cls.forEach(c => colors.push(c.r, c.g, c.b))
+    line.setColors(colors)
 }
 
 exports.isBufferAttribute = attr => {
