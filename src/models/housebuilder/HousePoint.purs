@@ -6,10 +6,9 @@ import Prelude
 import Data.Default (def)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Lens (Lens', Shop(..), (.~), (^.))
+import Data.Lens (Lens', (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Newtype (class Newtype)
-import Data.Show (class Show)
 import Editor.Common.Lenses (_name, _position)
 import Effect.Unsafe (unsafePerformEffect)
 import Rendering.Node (mesh)
@@ -38,7 +37,10 @@ _ridgePointPos = _Newtype
 newtype GutterPoint = GutterPoint Vector3
 
 derive instance newtypeGutterPoint :: Newtype GutterPoint _
+derive instance genericGutterPoint :: Generic GutterPoint _
 derive instance eqGutterPoint :: Eq GutterPoint
+instance showGutterPoint :: Show GutterPoint where
+    show = genericShow
 
 gutterPoint :: Vector3 -> GutterPoint
 gutterPoint = GutterPoint

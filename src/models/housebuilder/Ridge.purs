@@ -4,6 +4,8 @@ module Model.HouseBuilder.Ridge where
 import Prelude
 
 import Data.Default (def)
+import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Show (genericShow)
 import Data.Lens ((^.))
 import Effect.Unsafe (unsafePerformEffect)
 import Math.Line (Line, linePoints, mkLine)
@@ -17,6 +19,9 @@ import Three.Core.Mesh (Line2)
 data Ridge = TopRidge  RidgePoint RidgePoint
            | SideRidge RidgePoint GutterPoint
 
+derive instance genericRidge :: Generic Ridge _
+instance showRidge :: Show Ridge where
+    show = genericShow
 instance eqRidge :: Eq Ridge where
     eq (TopRidge p1s p1e) (TopRidge p2s p2e) = (p1s == p2s && p1e == p2e) || (p1s == p2e && p1e == p2s)
     eq (SideRidge p1 g1) (SideRidge p2 g2)   = p1 == p2 && g1 == g2
