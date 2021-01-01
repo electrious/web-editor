@@ -6,6 +6,8 @@ import Prelude
 import Control.Alt ((<|>))
 import Control.Plus (empty)
 import Data.Default (class Default, def)
+import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Show (genericShow)
 import Data.Lens (Lens', view, (%~), (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
@@ -81,6 +83,10 @@ data RidgeOp = ROAddRidgePoint RidgePoint
              | RODragRidgePoint RidgePoint RidgePoint
              | ROAddRidge
 
+derive instance genericRidgeOp :: Generic RidgeOp _
+instance showRidgeOp :: Show RidgeOp where
+    show = genericShow
+
 
 applyOp :: RidgeOp -> RidgeEditorState -> RidgeEditorState
 applyOp (ROAddRidgePoint p)     st = st # _ridgePoints %~ Cons p
@@ -115,7 +121,7 @@ editRidges conf = fixNodeE \opEvt -> do
     let stEvt  = multicast $ fold applyOp opEvt def
         
         -- all current ridge points
-        rpsEvt = distinct $ view _ridgePoints <$> stEvt
+        rpsEvt = view _ridgePoints <$> stEvt
 
         -- all current ridges
         rsEvt  = distinct $ view _ridges <$> stEvt

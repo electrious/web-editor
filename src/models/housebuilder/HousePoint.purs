@@ -4,9 +4,12 @@ module Model.HouseEditor.HousePoint where
 import Prelude
 
 import Data.Default (def)
-import Data.Lens (Lens', (.~), (^.))
+import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Show (genericShow)
+import Data.Lens (Lens', Shop(..), (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Newtype (class Newtype)
+import Data.Show (class Show)
 import Editor.Common.Lenses (_name, _position)
 import Effect.Unsafe (unsafePerformEffect)
 import Rendering.Node (mesh)
@@ -20,7 +23,10 @@ import Three.Math.Vector (Vector3)
 newtype RidgePoint = RidgePoint Vector3
 
 derive instance newtypeRidgePoint :: Newtype RidgePoint _
+derive instance genericRidgePoint :: Generic RidgePoint _
 derive instance eqRidgePoint :: Eq RidgePoint
+instance showRidgePoint :: Show RidgePoint where
+    show = genericShow
 
 ridgePoint :: Vector3 -> RidgePoint
 ridgePoint = RidgePoint
