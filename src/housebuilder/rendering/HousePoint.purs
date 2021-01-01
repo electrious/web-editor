@@ -12,7 +12,7 @@ import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple(..))
 import Editor.Common.Lenses (_isDragging, _position, _tapped)
-import FRP.Event (Event, withLast)
+import FRP.Event (Event, gate, withLast)
 import Model.Hardware.PanelModel (_isActive)
 import Model.HouseEditor.HousePoint (RidgePoint, _ridgePointPos)
 import Rendering.NodeRenderable (class NodeRenderable)
@@ -44,9 +44,10 @@ instance nodeRenderableRidgePoint :: NodeRenderable e RidgePoint RidgePointRende
         let cfg = def # _isActive .~ pure true
                       # _position .~ p ^. _ridgePointPos
         dragObj <- createDraggableObject (cfg :: DragObjCfg Geometry)
+        let isDragging = dragObj ^. _isDragging
         pure $ RidgePointRendered {
             ridgePoint : p,
             deleted    : const p <$> dragObj ^. _tapped,
-            dragging   : Tuple p <$> dragObj ^. _position,
-            dragEnd    : getEndEvt $ dragObj ^. _isDragging
+            dragging   : gate isDragging $ Tuple p <$> dragObj ^. _position,
+            dragEnd    : getEndEvt isDragging
             }
