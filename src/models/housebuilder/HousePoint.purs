@@ -1,4 +1,4 @@
-module Model.HouseEditor.HousePoint where
+module Model.HouseBuilder.HousePoint where
 
 
 import Prelude

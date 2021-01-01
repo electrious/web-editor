@@ -9,7 +9,7 @@ import Data.Generic.Rep.Show (genericShow)
 import Data.Lens ((^.))
 import Effect.Unsafe (unsafePerformEffect)
 import Math.Line (Line, linePoints, mkLine)
-import Model.HouseEditor.HousePoint (GutterPoint, RidgePoint, _gutterPointPos, _ridgePointPos)
+import Model.HouseBuilder.HousePoint (GutterPoint, RidgePoint, _gutterPointPos, _ridgePointPos)
 import Rendering.Node (line)
 import Rendering.NodeRenderable (class NodeRenderable)
 import Three.Core.Material (LineBasicMaterial, mkLineBasicMaterial)
@@ -42,3 +42,4 @@ ridgeLineMat = unsafePerformEffect $ mkLineBasicMaterial 0x333333 0.5
     
 instance nodeRenderableRidge :: NodeRenderable e Ridge Line2 where
     render r = line def (linePoints $ ridgeLine r) ridgeLineMat
+
