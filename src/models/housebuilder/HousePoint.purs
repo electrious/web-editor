@@ -59,3 +59,12 @@ instance nodeRenderableGutterPoint :: NodeRenderable e GutterPoint Mesh where
     render p = mesh prop gutterGeo gutterMat
         where prop = def # _name     .~ "gutter-point"
                          # _position .~ pure (p ^. _gutterPointPos)
+
+
+data HousePoint = HPGutter GutterPoint
+                | HPRidge RidgePoint
+
+derive instance genericHousePoint :: Generic HousePoint _
+derive instance eqHousePoint :: Eq HousePoint
+instance showHousePoint :: Show HousePoint where
+    show = genericShow
