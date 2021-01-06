@@ -2,10 +2,11 @@ module Model.HouseBuilder.HouseTop where
 
 import Prelude
 
+import Data.Array (cons)
 import Data.Default (class Default)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Lens (Lens')
+import Data.Lens (Lens', (%~))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
@@ -23,39 +24,10 @@ derive instance eqHouseLine :: Eq HouseLine
 instance showHouseLine :: Show HouseLine where
     show = genericShow
 
--- HouseFace is Triangle with indices to house points
-newtype HouseFace = HouseFace {
-    idxA :: Int,
-    idxB :: Int,
-    idxC :: Int
-    }
-
-derive instance newtypeHouseFace :: Newtype HouseFace _
-derive instance genericHouseFace :: Generic HouseFace _
-derive instance eqHouseFace :: Eq HouseFace
-instance showHouseFace :: Show HouseFace where
-    show = genericShow
-instance defaultHouseFace :: Default HouseFace where
-    def = HouseFace {
-        idxA : 0,
-        idxB : 0,
-        idxC : 0
-        }
-
-_idxA :: forall t a r. Newtype t { idxA :: a | r } => Lens' t a
-_idxA = _Newtype <<< prop (SProxy :: SProxy "idxA")
-
-_idxB :: forall t a r. Newtype t { idxB :: a | r } => Lens' t a
-_idxB = _Newtype <<< prop (SProxy :: SProxy "idxB")
-
-_idxC :: forall t a r. Newtype t { idxC :: a | r } => Lens' t a
-_idxC = _Newtype <<< prop (SProxy :: SProxy "idxC")
-
 -- HouseTop includes all points, lines and faces of the house top part
 newtype HouseTop = HouseTop {
     points :: Array HousePoint,
-    lines  :: Array HouseLine,
-    faces  :: Array HouseFace
+    lines  :: Array HouseLine
     }
 
 derive instance newtypeHouseTop :: Newtype HouseTop _
@@ -66,16 +38,17 @@ instance showHouseTop :: Show HouseTop where
 instance defaultHouseTop :: Default HouseTop where
     def = HouseTop {
         points : [],
-        lines  : [],
-        faces  : []
+        lines  : []
         }
 
 _points :: forall t a r. Newtype t { points :: a | r } => Lens' t a
 _points = _Newtype <<< prop (SProxy :: SProxy "points")
 
-_gutters :: forall t a r. Newtype t { gutters :: a | r } => Lens' t a
-_gutters = _Newtype <<< prop (SProxy :: SProxy "gutters")
+_lines :: forall t a r. Newtype t { lines :: a | r } => Lens' t a
+_lines = _Newtype <<< prop (SProxy :: SProxy "lines")
 
-_faces :: forall t a r . Newtype t { faces :: a | r } => Lens' t a
-_faces = _Newtype <<< prop (SProxy :: SProxy "faces")
+addHousePoint :: HousePoint -> HouseTop -> HouseTop
+addHousePoint p h = h # _points %~ cons p
 
+addHouseLine :: HouseLine -> HouseTop -> HouseTop
+addHouseLine l h = h # _lines %~ cons l
