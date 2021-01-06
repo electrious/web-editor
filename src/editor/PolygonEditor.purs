@@ -32,7 +32,7 @@ import Rendering.Node (Node, _visible, fixNodeE, fixNodeEWith, getParent, tapMes
 import Rendering.NodeRenderable (class NodeRenderable)
 import Three.Core.Geometry (CircleGeometry, Geometry, mkCircleGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial)
-import Three.Math.Vector (Vector2, Vector3, dist, mkVec2, mkVec3, toVec2, vecX, vecY)
+import Three.Math.Vector (class HasX, class HasY, Vector2, Vector3, dist, mkVec2, mkVec3, toVec2, vecX, vecY)
 import UI.DraggableObject (DragObjCfg, createDraggableObject)
 
 -- a data type to modify vectors
@@ -188,7 +188,7 @@ mkMidMarkers active polyEvt = do
 
 
 -- | calculate the center based on polygon
-polyCenter :: Polygon -> Vector3
+polyCenter :: forall v. HasX v => HasY v => Polygon v -> Vector3
 polyCenter (Polygon []) = mkVec3 0.0 0.0 0.01
 polyCenter (Polygon vs) = mkVec3 (tx / l) (ty / l) 0.01
     where tx = sum (vecX <$> vs)
@@ -196,13 +196,13 @@ polyCenter (Polygon vs) = mkVec3 (tx / l) (ty / l) 0.01
           l = toNumber (length vs)
 
 
-newtype PolyEditorConf = PolyEditorConf {
+newtype PolyEditorConf v = PolyEditorConf {
     isActive     :: Dynamic Boolean,
-    polygon      :: Polygon,
+    polygon      :: Polygon v,
     vertModifier :: Modifier
     }
 
-derive instance newtypePolyEditorConf :: Newtype PolyEditorConf _
+derive instance newtypePolyEditorConf :: Newtype (PolyEditorConf v) _
 instance defaultPolyEditorConf :: Default PolyEditorConf where
     def = PolyEditorConf {
         isActive     : pure false,
@@ -213,12 +213,12 @@ instance defaultPolyEditorConf :: Default PolyEditorConf where
 _vertModifier :: forall t a r. Newtype t { vertModifier :: a | r } => Lens' t a
 _vertModifier = _Newtype <<< prop (SProxy :: SProxy "vertModifier")
 
-newtype PolyEditor = PolyEditor {
-    polygon :: Event Polygon,
+newtype PolyEditor v = PolyEditor {
+    polygon :: Event (Polygon v),
     delete  :: Event SceneTapEvent
 }
 
-derive instance newtypePolyEditor :: Newtype PolyEditor _
+derive instance newtypePolyEditor :: Newtype (PolyEditor v) _
 
 _delete :: forall t a r. Newtype t { delete :: a | r } => Lens' t a
 _delete = _Newtype <<< prop (SProxy :: SProxy "delete")

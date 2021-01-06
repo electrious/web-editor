@@ -72,5 +72,10 @@ instance vecVec3 :: Vector Vector3
 
 foreign import applyMatrix :: Matrix4 -> Vector3 -> Vector3
 
-toVec2 :: Vector3 -> Vector2
-toVec2 v = mkVec2 (vecX v) (vecY v)
+class IsVector2 v where
+    toVec2 :: v -> Vector2
+
+instance isVector2Vector2 :: IsVector2 Vector2 where
+    toVec2 = identity
+instance isVector2Vector3 :: IsVector2 Vector3 where
+    toVec2 v = mkVec2 (vecX v) (vecY v)

@@ -20,24 +20,24 @@ import Rendering.NodeRenderable (class NodeRenderable)
 import Three.Core.Geometry (mkShape, mkShapeGeometry)
 import Three.Core.Material (MeshBasicMaterial)
 import Three.Core.Mesh (setMaterial)
-import Three.Math.Vector (Vector2, mkVec2, vecX, vecY)
+import Three.Math.Vector (class IsVector2, Vector2, mkVec2, toVec2, vecX, vecY)
 
-newtype Polygon = Polygon (Array Vector2)
+newtype Polygon v = Polygon (Array v)
 
-derive instance newtypePolygon :: Newtype Polygon _
-derive instance eqPolygon :: Eq Polygon
-instance defaultPolygon :: Default Polygon where
+derive instance newtypePolygon :: Newtype (Polygon v) _
+derive instance eqPolygon :: Eq v => Eq (Polygon v)
+instance defaultPolygon :: Default (Polygon v) where
     def = Polygon []
 
-_polyVerts :: Lens' Polygon (Array Vector2)
+_polyVerts :: forall v. Lens' (Polygon v) (Array v)
 _polyVerts = _Newtype
 
 -- | create a Polygon from a list of Vectors
-newPolygon :: forall f. Foldable f => f Vector2 -> Polygon
+newPolygon :: forall f v. Foldable f => f v -> Polygon v
 newPolygon = fromFoldable >>> Polygon
 
 -- | create a Polygon around a central vector
-polygonAround :: Vector2 -> Polygon
+polygonAround :: Vector2 -> Polygon Vector2
 polygonAround p = newPolygon [p1, p2, p3, p4]
     where x = vecX p
           y = vecY p
@@ -47,16 +47,16 @@ polygonAround p = newPolygon [p1, p2, p3, p4]
           p3 = mkVec2 (x + l) (y + l)
           p4 = mkVec2 (x + l) (y - l)
 
-numOfVerts :: Polygon -> Int
+numOfVerts :: forall v. Polygon v -> Int
 numOfVerts (Polygon vs) = length vs
 
-instance nodeRenderablePolygon :: NodeRenderable (Dynamic MeshBasicMaterial) Polygon TapMouseMesh where
+instance nodeRenderablePolygon :: IsVector2 v => NodeRenderable (Dynamic MeshBasicMaterial) (Polygon v) TapMouseMesh where
     render p = do
         -- get the current material used
         matDyn <- getEnv
         mat <- liftEffect $ current matDyn
         
-        shp <- liftEffect $ mkShape $ p ^. _polyVerts
+        shp <- liftEffect $ mkShape $ toVec2 <$> p ^. _polyVerts
         geo <- liftEffect $ mkShapeGeometry shp
         
         m <- tapMouseMesh def geo mat
@@ -69,12 +69,12 @@ instance nodeRenderablePolygon :: NodeRenderable (Dynamic MeshBasicMaterial) Pol
         pure m
 
 
-renderPolygon :: Polygon -> MeshBasicMaterial -> Effect TappableMesh
+renderPolygon :: forall v. IsVector2 v => Polygon v -> MeshBasicMaterial -> Effect TappableMesh
 renderPolygon p mat = do
-    shp <- mkShape $ p ^. _polyVerts
+    shp <- mkShape $ toVec2 <$> p ^. _polyVerts
     geo <- mkShapeGeometry shp
     mkTappableMesh geo mat
 
 
-class IsPolygon v where
-    toPolygon :: v -> Polygon
+class IsPolygon p v where
+    toPolygon :: p -> Polygon v
