@@ -20,10 +20,11 @@ import Data.Traversable (sum)
 import Data.Tuple (Tuple(..), fst, snd)
 import Editor.Common.Lenses (_index, _isDragging, _name, _polygon, _position, _tapped)
 import Editor.SceneEvent (SceneTapEvent)
+import Effect (Effect)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, dynEvent, step)
 import FRP.Event (Event, keepLatest, sampleOn)
-import FRP.Event.Extra (anyEvt, mergeArray, multicast)
+import FRP.Event.Extra (anyEvt, mergeArray, multicast, performEvent)
 import Model.Hardware.PanelModel (_isActive)
 import Model.Polygon (Polygon(..), numOfVerts)
 import Rendering.DynamicNode (renderEvent)
@@ -34,15 +35,22 @@ import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial)
 import Three.Math.Vector (Vector2, Vector3, dist, mkVec2, mkVec3, toVec2, vecX, vecY)
 import UI.DraggableObject (DragObjCfg, createDraggableObject)
 
+-- a data type to modify vectors
+type Modifier = Vector3 -> Effect Vector3
+
 -----------------------------------------------------------
 -- vertex marker
 newtype VertMarkerPoint = VertMarkerPoint {
     position :: Vector2,
     index    :: Int,
-    isActive :: Dynamic Boolean
+    isActive :: Dynamic Boolean,
+    modifier :: Modifier
 }
 
 derive instance newtypeVertMarkerPoint :: Newtype VertMarkerPoint _
+
+_modifier :: forall t a r. Newtype t { modifier :: a | r } => Lens' t a
+_modifier = _Newtype <<< prop (SProxy :: SProxy "modifier")
 
 newtype VertMarker = VertMarker {
     tapped     :: Event Int,
@@ -57,29 +65,31 @@ instance nodeRenderableVertMarkerPoint :: NodeRenderable e VertMarkerPoint VertM
         let toVec3 v = mkVec3 (vecX v) (vecY v) 0.0
             cfg = def # _isActive .~ m ^. _isActive
                       # _position .~ toVec3 (m ^. _position)
+            mod = m ^. _modifier
         dragObj <- createDraggableObject (cfg :: DragObjCfg Geometry)
         
         pure $ VertMarker {
             tapped     : const (m ^. _index) <$> dragObj ^. _tapped,
-            position   : dragObj ^. _position,
+            position   : performEvent $ mod <$>  dragObj ^. _position,
             isDragging : dragObj ^. _isDragging
         }
 
 -- create a vertex marker point
-mkVertMarkerPoint :: Event Boolean -> Event (Maybe Int) -> Tuple Vector2 Int -> VertMarkerPoint
-mkVertMarkerPoint polyActive actMarker (Tuple pos idx) = VertMarkerPoint {
-                                                             position : pos,
-                                                             index    : idx,
-                                                             isActive : step false isActive
-                                                         }
+mkVertMarkerPoint :: Modifier -> Event Boolean -> Event (Maybe Int) -> Tuple Vector2 Int -> VertMarkerPoint
+mkVertMarkerPoint m polyActive actMarker (Tuple pos idx) = VertMarkerPoint {
+                                                               position : pos,
+                                                               index    : idx,
+                                                               isActive : step false isActive,
+                                                               modifier : m
+                                                               }
     where f act Nothing       = act
           f act (Just actIdx) = act && actIdx == idx
 
           isActive = multicast $ f <$> polyActive <*> actMarker
 
 -- create vertex markers for an array of vertices
-mkVertMarkerPoints :: Event Boolean -> Event (Maybe Int) -> Polygon -> Array VertMarkerPoint
-mkVertMarkerPoints polyActive actMarker (Polygon ps) = mkVertMarkerPoint polyActive actMarker <$> zip ps (range 0 (length ps - 1))
+mkVertMarkerPoints :: Modifier -> Event Boolean -> Event (Maybe Int) -> Polygon -> Array VertMarkerPoint
+mkVertMarkerPoints m polyActive actMarker (Polygon ps) = mkVertMarkerPoint m polyActive actMarker <$> zip ps (range 0 (length ps - 1))
 
 -- | get vertex markers' active status event
 getVertMarkerActiveStatus :: Event (Array VertMarker) -> Event (Maybe Int)
@@ -89,10 +99,10 @@ getVertMarkerActiveStatus ms = statusForDragging <|> statusForNewMarker
           statusForNewMarker = const Nothing <$> ms
 
 
--- create new markers and attach them to the parent object
-setupVertMarkers :: forall e. Event Boolean -> Event (Maybe Int) -> Event Polygon -> Node e (Event (Array VertMarker))
-setupVertMarkers polyActive activeMarker polyEvt = renderEvent vertMarkers
-    where vertMarkers = mkVertMarkerPoints polyActive activeMarker <$> polyEvt
+-- create new vertex markers
+setupVertMarkers :: forall e. Modifier -> Event Boolean -> Event (Maybe Int) -> Event Polygon -> Node e (Event (Array VertMarker))
+setupVertMarkers m polyActive activeMarker polyEvt = renderEvent vertMarkers
+    where vertMarkers = mkVertMarkerPoints m polyActive activeMarker <$> polyEvt
 
 -----------------------------------------------------------
 -- Marker to delete the current polygon
@@ -187,16 +197,21 @@ polyCenter (Polygon vs) = mkVec3 (tx / l) (ty / l) 0.01
 
 
 newtype PolyEditorConf = PolyEditorConf {
-    isActive :: Dynamic Boolean,
-    polygon  :: Polygon
+    isActive     :: Dynamic Boolean,
+    polygon      :: Polygon,
+    vertModifier :: Modifier
     }
 
 derive instance newtypePolyEditorConf :: Newtype PolyEditorConf _
 instance defaultPolyEditorConf :: Default PolyEditorConf where
     def = PolyEditorConf {
-        isActive : pure false,
-        polygon  : def
+        isActive     : pure false,
+        polygon      : def,
+        vertModifier : pure
         }
+
+_vertModifier :: forall t a r. Newtype t { vertModifier :: a | r } => Lens' t a
+_vertModifier = _Newtype <<< prop (SProxy :: SProxy "vertModifier")
 
 newtype PolyEditor = PolyEditor {
     polygon :: Event Polygon,
@@ -233,7 +248,7 @@ createPolyEditor cfg = do
         fixNodeEWith poly \polyEvt ->
             fixNodeE \actMarkerEvt -> do
                 -- pipe the 'active' param event into internal polyActive event
-                vertMarkersEvt <- setupVertMarkers polyActive actMarkerEvt polyEvt
+                vertMarkersEvt <- setupVertMarkers (cfg ^. _vertModifier) polyActive actMarkerEvt polyEvt
 
                 -- event for active vertex marker
                 let newActMarkerEvt = getVertMarkerActiveStatus vertMarkersEvt
