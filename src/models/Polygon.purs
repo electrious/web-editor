@@ -1,9 +1,9 @@
 module Model.Polygon (Polygon, _polyVerts, newPolygon, polygonAround, numOfVerts,
                       addVertexAt, delVertexAt, polyCenter, polygonBBox,
                       renderPolygon, class IsPolygon, class PolyVertex,
-                      toPolygon, updatePos) where
+                      toPolygon, getPos, updatePos, addVert, scale, (.+.), (.**.)) where
 
-import Prelude
+import Prelude hiding (add)
 
 import Control.Monad.Writer (tell)
 import Custom.Mesh (TapMouseMesh, TappableMesh, mkTappableMesh)
@@ -26,7 +26,7 @@ import Rendering.NodeRenderable (class NodeRenderable)
 import Three.Core.Geometry (mkShape, mkShapeGeometry)
 import Three.Core.Material (MeshBasicMaterial)
 import Three.Core.Mesh (setMaterial)
-import Three.Math.Vector (class Vector, Vector2, Vector3, mkVec2, toVec2, vecX, vecY, (<+>), (<**>))
+import Three.Math.Vector (class Vector, Vector2, Vector3, add, mkVec2, mkVec3, multiplyScalar, toVec2, vecX, vecY)
 
 newtype Polygon v = Polygon (Array v)
 
@@ -65,8 +65,8 @@ delVertexAt idx poly = if numOfVerts poly > 3
                        else poly
 
 -- | calculate the center based on polygon
-polyCenter :: forall v. Vector v => Default v => Polygon v -> v
-polyCenter poly = (foldl (<+>) def vs) <**> (1.0 / l)
+polyCenter :: forall v. PolyVertex v => Polygon v -> v
+polyCenter poly = (foldl (.+.) def vs) .**. (1.0 / l)
     where l  = toNumber $ length vs
           vs = poly ^. _polyVerts
 
@@ -111,13 +111,23 @@ class IsPolygon p v where
     toPolygon :: p -> Polygon v
 
 
-class (Vector v, Default v) <= PolyVertex v where
+class Default v <= PolyVertex v where
+    getPos    :: v -> Vector3
     updatePos :: v -> Vector3 -> v
+    addVert   :: v -> v -> v
+    scale     :: v -> Number -> v
 
+infixr 6 addVert as .+.
+infixr 7 scale as .**.
 
 instance polyVertexVector2 :: PolyVertex Vector2 where
+    getPos v       = mkVec3 (vecX v) (vecY v) 0.01
     updatePos _ nv = toVec2 nv
+    addVert        = add
+    scale          = multiplyScalar
 
 instance polyVertexVector3 :: PolyVertex Vector3 where
+    getPos         = identity
     updatePos _ nv = nv
-
+    addVert        = add
+    scale          = multiplyScalar

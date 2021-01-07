@@ -24,13 +24,13 @@ import FRP.Dynamic (Dynamic, dynEvent, step)
 import FRP.Event (Event, keepLatest, sampleOn)
 import FRP.Event.Extra (anyEvt, mergeArray, multicast, performEvent)
 import Model.Hardware.PanelModel (_isActive)
-import Model.Polygon (class PolyVertex, Polygon, _polyVerts, addVertexAt, delVertexAt, newPolygon, polyCenter, updatePos)
+import Model.Polygon (class PolyVertex, Polygon, _polyVerts, addVertexAt, delVertexAt, getPos, newPolygon, polyCenter, updatePos, (.**.), (.+.))
 import Rendering.DynamicNode (renderEvent)
 import Rendering.Node (Node, _visible, fixNodeE, fixNodeEWith, getParent, tapMesh)
 import Rendering.NodeRenderable (class NodeRenderable)
 import Three.Core.Geometry (CircleGeometry, Geometry, mkCircleGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial)
-import Three.Math.Vector (class Vector, dist, mkVec3, toVec2, vecX, vecY, (<**>), (<+>))
+import Three.Math.Vector (dist)
 import UI.DraggableObject (DragObjCfg, createDraggableObject)
 
 -- a data type to modify vectors
@@ -67,9 +67,8 @@ derive instance newtypeVertMarker :: Newtype (VertMarker v) _
 
 instance nodeRenderableVertMarkerPoint :: PolyVertex v => NodeRenderable e (VertMarkerPoint v) (VertMarker v) where
     render m = do
-        let toVec3 v = mkVec3 (vecX v) (vecY v) 0.0
-            cfg = def # _isActive .~ m ^. _isActive
-                      # _position .~ toVec3 (m ^. _position)
+        let cfg = def # _isActive .~ m ^. _isActive
+                      # _position .~ getPos (m ^. _position)
             mod = m ^. _modifier <<< _modifierFunc
         dragObj <- createDraggableObject (cfg :: DragObjCfg Geometry)
         
@@ -93,7 +92,7 @@ mkVertMarkerPoint m polyActive actMarker (Tuple pos idx) = VertMarkerPoint {
           isActive = multicast $ f <$> polyActive <*> actMarker
 
 -- create vertex markers for an array of vertices
-mkVertMarkerPoints :: forall v. Vector v => Modifier v -> Event Boolean -> Event (Maybe Int) -> Polygon v -> Array (VertMarkerPoint v)
+mkVertMarkerPoints :: forall v. Modifier v -> Event Boolean -> Event (Maybe Int) -> Polygon v -> Array (VertMarkerPoint v)
 mkVertMarkerPoints m polyActive actMarker poly = mkVertMarkerPoint m polyActive actMarker <$> zip ps (range 0 (length ps - 1))
     where ps = poly ^. _polyVerts
 
@@ -119,12 +118,11 @@ polyDelGeo :: CircleGeometry
 polyDelGeo = unsafePerformEffect (mkCircleGeometry 0.6 32)
 
 -- | create the polygon delete marker button
-mkPolyDelMarker :: forall e v. Vector v => Event v -> Event Boolean -> Node e TappableMesh
+mkPolyDelMarker :: forall e v. PolyVertex v => Event v -> Event Boolean -> Node e TappableMesh
 mkPolyDelMarker posEvt visEvt = tapMesh (def # _name     .~ "delete-marker"
                                              # _position .~ step def (getPos <$> posEvt)
                                              # _visible  .~ step false visEvt
                                         ) polyDelGeo polyDelMat
-    where getPos p = let vp = toVec2 p in mkVec3 (vecX vp) (vecY vp) 0.01
 
 -----------------------------------------------------------
 -- | internal object for middle marker point data
@@ -149,11 +147,9 @@ midMaterial = unsafePerformEffect (mkMeshBasicMaterial 0x22ff22)
 midGeometry :: CircleGeometry
 midGeometry = unsafePerformEffect (mkCircleGeometry 0.3 32)
 
-instance nodeRenderableMidMarkerPoint :: Vector v => NodeRenderable e (MidMarkerPoint v) (MidMarker v) where
+instance nodeRenderableMidMarkerPoint :: PolyVertex v => NodeRenderable e (MidMarkerPoint v) (MidMarker v) where
     render p = do
         parent <- getParent
-
-        let getPos pos = let vp = toVec2 pos in mkVec3 (vecX vp) (vecY vp) 0.01
         m <- tapMesh (def # _name     .~ "mid-marker"
                           # _position .~ pure (getPos $ p ^. _position)
                           # _visible  .~ (p ^. _isActive)
@@ -162,7 +158,7 @@ instance nodeRenderableMidMarkerPoint :: Vector v => NodeRenderable e (MidMarker
         pure $ MidMarker { tapped : const p <$> m ^. _tapped }
 
 -- | given a list of vertices position, calculate all middle points
-midMarkerPoints :: forall v. Vector v => Dynamic Boolean -> Polygon v -> Array (MidMarkerPoint v)
+midMarkerPoints :: forall v. PolyVertex v => Dynamic Boolean -> Polygon v -> Array (MidMarkerPoint v)
 midMarkerPoints active poly = midMarkers active $ poly ^. _polyVerts
     where midMarkers _ []         = []
           midMarkers _ [a]        = []
@@ -176,18 +172,18 @@ midMarkerPoints active poly = midMarkers active $ poly ^. _polyVerts
                     f v v2 = let idx = fst v
                                  v1 = snd v
                                  point = MidMarkerPoint {
-                                     position : (v1 <+> v2) <**> 0.5,
+                                     position : (v1 .+. v2) .**. 0.5,
                                      index    : idx + 1,
                                      isActive : act
                                      }
-                             in { dist: dist v1 v2, point: point }
+                             in { dist: dist (getPos v1) (getPos v2), point: point }
 
                     d = zipWith f v1List v2List
                     g r = r.dist > 1.0
                     h r = r.point
 
 -- | render all middle markers
-mkMidMarkers :: forall e v. Vector v => Event Boolean -> Event (Polygon v) -> Node e (Event (MidMarkerPoint v))
+mkMidMarkers :: forall e v. PolyVertex v => Event Boolean -> Event (Polygon v) -> Node e (Event (MidMarkerPoint v))
 mkMidMarkers active polyEvt = do
     let actDyn     = step false active
         mPointsEvt = midMarkerPoints actDyn <$> polyEvt
