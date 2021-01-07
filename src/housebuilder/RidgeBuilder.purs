@@ -23,12 +23,9 @@ import Editor.SceneEvent (SceneMouseMoveEvent)
 import FRP.Dynamic (Dynamic, gateDyn, step)
 import FRP.Event (Event, fold, keepLatest)
 import FRP.Event.Extra (distinct, multicast, performEvent)
-import HouseBuilder.Rendering.HousePoint (RidgePointRendered, _dragEnd)
 import Model.ActiveMode (ActiveMode(..))
 import Model.HouseBuilder.FloorPlan (FloorPlan)
-import Model.HouseBuilder.House (_ridges)
-import Model.HouseBuilder.Ridge (Ridge, topRidge)
-import Model.HouseBuilder.HousePoint (RidgePoint, ridgePoint)
+import Model.HouseBuilder.HousePoint (HousePoint(..))
 import Rendering.DynamicNode (renderEvent)
 import Rendering.Node (Node, fixNodeE, getParent, node)
 import Three.Core.Face3 (normal)
@@ -38,7 +35,7 @@ import Three.Math.Vector (Vector3, mkVec3)
 
 
 -- | let user add new ridge point
-addRidgePoint :: forall e. RidgeEditorConf -> Dynamic Boolean -> Node e (Event RidgePoint)
+addRidgePoint :: forall e. RidgeEditorConf -> Dynamic Boolean -> Node e (Event HousePoint)
 addRidgePoint cfg canShowDyn = do
     parent <- getParent
 
@@ -59,7 +56,7 @@ addRidgePoint cfg canShowDyn = do
 
 
 newtype RidgeEditorState = RidgeEditorState {
-    ridgePoints :: List RidgePoint,
+    ridgePoints :: List HousePoint,
     ridges      :: List Ridge,
     tempRidge   :: Maybe Ridge
     }
@@ -78,9 +75,9 @@ _ridgePoints = _Newtype <<< prop (SProxy :: SProxy "ridgePoints")
 _tempRidge :: forall t a r. Newtype t { tempRidge :: a | r } => Lens' t a
 _tempRidge = _Newtype <<< prop (SProxy :: SProxy "tempRidge")
 
-data RidgeOp = ROAddRidgePoint RidgePoint
-             | RODelRidgePoint RidgePoint
-             | RODragRidgePoint RidgePoint RidgePoint
+data RidgeOp = ROAddRidgePoint HousePoint
+             | RODelRidgePoint HousePoint
+             | RODragRidgePoint HousePoint HousePoint
              | ROAddRidge
 
 derive instance genericRidgeOp :: Generic RidgeOp _
@@ -113,7 +110,7 @@ instance defaultRidgeEditorConf :: Default RidgeEditorConf where
         mouseMove : empty
         }
 
-dragOp :: Tuple RidgePoint Vector3 -> RidgeOp
+dragOp :: Tuple HousePoint Vector3 -> RidgeOp
 dragOp (Tuple r v) = RODragRidgePoint r (ridgePoint v)
 
 editRidges :: forall e. RidgeEditorConf -> Node e (Event Unit)
