@@ -20,7 +20,7 @@ import Rendering.NodeRenderable (class NodeRenderable)
 import Three.Core.Geometry (mkShape, mkShapeGeometry)
 import Three.Core.Material (MeshBasicMaterial)
 import Three.Core.Mesh (setMaterial)
-import Three.Math.Vector (class IsVector2, Vector2, mkVec2, toVec2, vecX, vecY)
+import Three.Math.Vector (class Vector, Vector2, Vector3, mkVec2, toVec2, vecX, vecY)
 
 newtype Polygon v = Polygon (Array v)
 
@@ -50,7 +50,7 @@ polygonAround p = newPolygon [p1, p2, p3, p4]
 numOfVerts :: forall v. Polygon v -> Int
 numOfVerts (Polygon vs) = length vs
 
-instance nodeRenderablePolygon :: IsVector2 v => NodeRenderable (Dynamic MeshBasicMaterial) (Polygon v) TapMouseMesh where
+instance nodeRenderablePolygon :: Vector v => NodeRenderable (Dynamic MeshBasicMaterial) (Polygon v) TapMouseMesh where
     render p = do
         -- get the current material used
         matDyn <- getEnv
@@ -69,7 +69,7 @@ instance nodeRenderablePolygon :: IsVector2 v => NodeRenderable (Dynamic MeshBas
         pure m
 
 
-renderPolygon :: forall v. IsVector2 v => Polygon v -> MeshBasicMaterial -> Effect TappableMesh
+renderPolygon :: forall v. Vector v => Polygon v -> MeshBasicMaterial -> Effect TappableMesh
 renderPolygon p mat = do
     shp <- mkShape $ toVec2 <$> p ^. _polyVerts
     geo <- mkShapeGeometry shp
@@ -78,3 +78,15 @@ renderPolygon p mat = do
 
 class IsPolygon p v where
     toPolygon :: p -> Polygon v
+
+
+class (Vector v, Default v) <= PolyVertex v where
+    updatePos :: v -> Vector3 -> v
+
+
+instance polyVertexVector2 :: PolyVertex Vector2 where
+    updatePos _ nv = toVec2 nv
+
+instance polyVertexVector3 :: PolyVertex Vector3 where
+    updatePos _ nv = nv
+

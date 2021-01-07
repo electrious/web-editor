@@ -51,7 +51,7 @@ import Model.RoofSpecific (_value)
 import Rendering.Node (Node, mkNodeEnv, runNode)
 import Three.Core.Face3 (normal)
 import Three.Core.Object3D (class IsObject3D, Object3D, add, mkObject3D, remove, setName, worldToLocal)
-import Three.Math.Vector (mkVec3, (<.>))
+import Three.Math.Vector (mkVec3, toVec2, (<.>))
 
 newtype RoofManager = RoofManager {
     wrapper       :: Object3D,
@@ -207,7 +207,7 @@ recognizeNewRoofs meshData wrapper newRoofs activeRoof canEditRoofDyn = createOb
           
           getCandidatePoint evt rs = do
               np <- worldToLocal (evt ^. _point) houseWrapper
-              if not (underPolygons rs np) && validNormal evt
+              if not (underPolygons rs (toVec2 np)) && validNormal evt
                   then pure $ Just $ mkCandidatePoint np (normal (evt ^. _face))
                   else pure Nothing
         

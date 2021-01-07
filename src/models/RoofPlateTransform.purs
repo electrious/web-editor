@@ -21,7 +21,7 @@ import Math (abs, atan, sqrt)
 import Math.Angle (Angle, cos, degree, degreeVal, radian, sin)
 import Model.Polygon (Polygon, toPolygon)
 import Model.Roof.RoofPlate (RoofPlate, _borderPoints, _coefs)
-import Three.Math.Vector (Vector3, cross, length, mkVec3, normal, toVec2, vecX, vecY, vecZ, (<**>), (<+>), (<->), (<.>))
+import Three.Math.Vector (Vector2, Vector3, cross, length, mkVec3, normal, toVec2, vecX, vecY, vecZ, (<**>), (<+>), (<->), (<.>))
 
 -- data type representing the right and top vectors for a roof plate
 newtype RoofPlateTransform = RoofPlateTransform {
@@ -146,8 +146,8 @@ lineVectors ps = zipWith (<->) pl npl
           npl = fromMaybe Nil $ snoc <$> tail pl <*> head pl
 
 
--- \ check if a polygon contains a point inside.
-wrapAroundPoint :: Polygon -> RoofPlateTransform -> Vector3 -> Boolean
+-- | check if a polygon contains a point inside.
+wrapAroundPoint :: Polygon Vector2 -> RoofPlateTransform -> Vector3 -> Boolean
 wrapAroundPoint poly t = pointInPolygon poly <<< toVec2 <<< transformVector t
 
 -- | check if a Roofplate contains all points in a list. The Points should be in

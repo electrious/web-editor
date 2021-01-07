@@ -30,7 +30,7 @@ import Rendering.Node (Node, fixNodeE, getEnv, localEnv, node)
 import Three.Core.Geometry (Geometry)
 import Three.Core.Material (MeshBasicMaterial)
 import Three.Math.Euler (mkEuler)
-import Three.Math.Vector (Vector3, mkVec3, vecX, vecY, vecZ)
+import Three.Math.Vector (Vector2, Vector3, mkVec3, vecX, vecY, vecZ)
 import UI.DraggableObject (DragObjCfg, DraggableObject, _customMat, _deltaTransform, _validator, createDraggableObject)
 
 newtype FloorPlanConfig = FloorPlanConfig {
@@ -106,7 +106,7 @@ setupHeightEditor actDyn posDyn = do
     pure $ toH <$> (arrow ^. _position)
 
 
-data UpdFloorOp = UpdPoly Polygon
+data UpdFloorOp = UpdPoly (Polygon Vector2)
                 | UpdHeight Meter
 
 

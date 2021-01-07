@@ -21,7 +21,7 @@ import Model.Roof.RoofPlate (RoofPlate, angleBetween)
 import RBush.RBush (BBox, RBush, load, mkRBush, search)
 import Three.Core.Geometry (class IsBufferGeometry, clone, getAttribute, isBufferAttribute, setNeedsUpdate, setXYZ)
 import Three.Core.Mesh (Mesh, setBufferGeometry)
-import Three.Math.Vector (Vector3, addScaled, mkVec2, vecX, vecY, vecZ, (<->), (<.>))
+import Three.Math.Vector (Vector2, Vector3, addScaled, mkVec2, vecX, vecY, vecZ, (<->), (<.>))
 
 
 newtype VertexItem = VertexItem {
@@ -69,7 +69,7 @@ buildRTree vertices normals = do
     pure tree
 
 -- | get the bounding box of a polygon
-polygonBBox :: Polygon -> BBox Unit
+polygonBBox :: Polygon Vector2 -> BBox Unit
 polygonBBox (Polygon vs) = def # _minX .~ fromMaybe 0.0 (minimum xs)
                                # _minY .~ fromMaybe 0.0 (minimum ys)
                                # _maxX .~ fromMaybe 0.0 (maximum xs)
@@ -80,7 +80,7 @@ polygonBBox (Polygon vs) = def # _minX .~ fromMaybe 0.0 (minimum xs)
 newtype RoofFlattener = RoofFlattener {
     normal  :: Vector3,
     center  :: Vector3,
-    polygon :: Polygon
+    polygon :: Polygon Vector2
 }
 
 derive instance newtypeRoofFlattener :: Newtype RoofFlattener _

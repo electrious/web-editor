@@ -24,7 +24,7 @@ import Math.Angle (Angle, acos, atan2, degree, degreeVal)
 import Model.Polygon (class IsPolygon, Polygon(..))
 import Model.Roof.Panel (Alignment(..), Orientation(..))
 import Model.UUID (class HasUUID)
-import Three.Math.Vector (class Vector, Vector3, addScaled, cross, length, mkVec2, mkVec3, vecX, vecY, vecZ, (<.>))
+import Three.Math.Vector (class Vector, Vector2, Vector3, addScaled, cross, length, mkVec2, mkVec3, vecX, vecY, vecZ, (<.>))
 
 -- | define the core RoofPlate type as a record
 newtype RoofPlate = RoofPlate {
@@ -71,7 +71,7 @@ instance defaultRoofPlate :: Default RoofPlate where
         azimuth       : def,
         rotation      : def
     }
-instance isPolygonRoofPlate :: IsPolygon RoofPlate where
+instance isPolygonRoofPlate :: IsPolygon RoofPlate Vector2 where
     toPolygon r = Polygon $ f <$> r ^. _borderPoints
         where f v = mkVec2 (vecX v) (vecY v)
 

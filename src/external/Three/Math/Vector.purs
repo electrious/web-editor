@@ -48,7 +48,7 @@ instance showVector3 :: Show Vector3 where
   show = showVec3
 
 
-class Vector a
+class (HasX a, HasY a) <= Vector a
 
 foreign import dot            :: forall a. Vector a => a -> a      -> Number
 foreign import length         :: forall a. Vector a => a -> Number
@@ -72,10 +72,5 @@ instance vecVec3 :: Vector Vector3
 
 foreign import applyMatrix :: Matrix4 -> Vector3 -> Vector3
 
-class IsVector2 v where
-    toVec2 :: v -> Vector2
-
-instance isVector2Vector2 :: IsVector2 Vector2 where
-    toVec2 = identity
-instance isVector2Vector3 :: IsVector2 Vector3 where
-    toVec2 v = mkVec2 (vecX v) (vecY v)
+toVec2 :: forall v. Vector v => v -> Vector2
+toVec2 v = mkVec2 (vecX v) (vecY v)

@@ -107,7 +107,7 @@ setupFloorAdder fpsEvt actFloorDyn = do
         -- get a candidate point
         getCandPoint evt fps = do
             np <- worldToLocal (evt ^. _point) parent
-            if not $ underPolygons fps np
+            if not $ underPolygons fps (toVec2 np)
                 then pure $ Just $ mkCandidatePoint np (normal $ evt ^. _face)
                 else pure Nothing
 

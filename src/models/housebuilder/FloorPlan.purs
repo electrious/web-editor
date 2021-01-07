@@ -25,7 +25,7 @@ import Three.Math.Vector (Vector2, mkVec3)
 -- | a FloorPlan represent a house part with 2D polygon and height
 newtype FloorPlan = FloorPlan {
     id      :: UUID,
-    polygon :: Polygon,
+    polygon :: Polygon Vector2,
     height  :: Meter
 }
 
@@ -39,7 +39,7 @@ instance defaultFloorPlan        :: Default FloorPlan where
         polygon : def,
         height  : def
         }
-instance isPolygonFloorPlan :: IsPolygon FloorPlan where
+instance isPolygonFloorPlan :: IsPolygon FloorPlan Vector2 where
     toPolygon = view _polygon
 
 newFloorPlan :: Vector2 -> Effect FloorPlan

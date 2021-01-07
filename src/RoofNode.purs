@@ -49,7 +49,7 @@ import Three.Core.Geometry (ShapeGeometry, faces, vertices)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial, setOpacity, setTransparent)
 import Three.Core.Mesh (Mesh, geometry, mkMesh)
 import Three.Core.Object3D (class IsObject3D, Object3D, add, matrix, mkObject3D, remove, rotateX, rotateZ, setName, setPosition, setVisible, updateMatrix, updateMatrixWorld, worldToLocal)
-import Three.Math.Vector (Vector3, applyMatrix, mkVec2, mkVec3, vecX, vecY, vecZ)
+import Three.Math.Vector (class Vector, Vector2, Vector3, applyMatrix, mkVec2, mkVec3, vecX, vecY, vecZ)
 
 newtype RoofNodeConfig = RoofNodeConfig {
     houseId         :: Int,
@@ -137,7 +137,7 @@ getMaterial false true  = defMaterial
 getMaterial _     false = transparentMaterial
 
 -- | create roof mesh
-createRoofMesh :: Polygon -> Boolean -> Boolean -> Effect TappableMesh
+createRoofMesh :: forall v. Vector v => Polygon v -> Boolean -> Boolean -> Effect TappableMesh
 createRoofMesh poly active canEditRoof = do
     let mat = getMaterial active canEditRoof
     m <- renderPolygon poly mat
@@ -151,7 +151,7 @@ updateRoofPlate ps roof = roof # _borderPoints .~ newPs
 
 
 -- test if a polygon is simple or with self-intersections
-testSimplePolygon :: Polygon -> Boolean
+testSimplePolygon :: forall v. Vector v => Polygon v -> Boolean
 testSimplePolygon poly = isSimplePolygon (f <$> poly ^. _polyVerts)
     where f p = [vecX p, vecY p]
 
@@ -185,7 +185,7 @@ setupRoofNode obj content roof = do
 -- only the x, y coordinates
 -- NOTE: the last point will be dropped here because it's the same with the
 -- first one
-getBorderPolygon :: forall a. IsObject3D a => a -> RoofPlate -> Effect Polygon
+getBorderPolygon :: forall a. IsObject3D a => a -> RoofPlate -> Effect (Polygon Vector2)
 getBorderPolygon obj roof = map Polygon $ traverse toLocal $ fromMaybe [] (init $ roof ^. _borderPoints)
     where toLocal p = do
               np <- worldToLocal p obj
@@ -204,7 +204,7 @@ renderMesh obj {last, now} = do
     traverse_ (flip remove obj) last
     add now obj
 
-getNewRoof :: forall a. IsObject3D a => a -> RoofPlate -> Event Polygon -> Effect (Event RoofOperation)
+getNewRoof :: forall a v. Vector v => IsObject3D a => a -> RoofPlate -> Event (Polygon v) -> Effect (Event RoofOperation)
 getNewRoof obj roof polyEvt = do
     let toParent v = applyMatrix (matrix obj) (mkVec3 (vecX v) (vecY v) 0.0)
     pure $ (RoofOpUpdate <<< flip updateRoofPlate roof <<< map toParent <<< view _polyVerts) <$> polyEvt
