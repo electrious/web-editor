@@ -38,7 +38,7 @@ import FRP.Event.Extra (multicast)
 import Math (pi)
 import Math.Angle (degreeVal, radianVal)
 import Model.Hardware.PanelModel (PanelModel, _isActive)
-import Model.Polygon (Polygon(..), _polyVerts, renderPolygon)
+import Model.Polygon (Polygon, _polyVerts, newPolygon, renderPolygon)
 import Model.Roof.Panel (Alignment(..), Orientation(..), Panel)
 import Model.Roof.RoofPlate (RoofOperation(..), RoofPlate, _azimuth, _borderPoints, _unifiedPoints)
 import Model.RoofSpecific (RoofSpecific, mkRoofSpecific)
@@ -186,7 +186,7 @@ setupRoofNode obj content roof = do
 -- NOTE: the last point will be dropped here because it's the same with the
 -- first one
 getBorderPolygon :: forall a. IsObject3D a => a -> RoofPlate -> Effect (Polygon Vector2)
-getBorderPolygon obj roof = map Polygon $ traverse toLocal $ fromMaybe [] (init $ roof ^. _borderPoints)
+getBorderPolygon obj roof = map newPolygon $ traverse toLocal $ fromMaybe [] (init $ roof ^. _borderPoints)
     where toLocal p = do
               np <- worldToLocal p obj
               pure $ mkVec2 (vecX np) (vecY np)

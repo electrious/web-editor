@@ -5,11 +5,10 @@ import Prelude hiding (add)
 import Control.Alt ((<|>))
 import Control.Apply (lift2)
 import Custom.Mesh (TappableMesh)
-import Data.Array (deleteAt, filter, foldl, head, insertAt, length, mapWithIndex, range, snoc, tail, zip, zipWith)
+import Data.Array (filter, head, length, mapWithIndex, range, snoc, tail, zip, zipWith)
 import Data.Compactable (compact)
 import Data.Default (class Default, def)
 import Data.Foldable (class Foldable)
-import Data.Int (toNumber)
 import Data.Lens (Lens', view, (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
@@ -25,7 +24,7 @@ import FRP.Dynamic (Dynamic, dynEvent, step)
 import FRP.Event (Event, keepLatest, sampleOn)
 import FRP.Event.Extra (anyEvt, mergeArray, multicast, performEvent)
 import Model.Hardware.PanelModel (_isActive)
-import Model.Polygon (class PolyVertex, Polygon(..), numOfVerts, updatePos)
+import Model.Polygon (class PolyVertex, Polygon, _polyVerts, addVertexAt, delVertexAt, newPolygon, polyCenter, updatePos)
 import Rendering.DynamicNode (renderEvent)
 import Rendering.Node (Node, _visible, fixNodeE, fixNodeEWith, getParent, tapMesh)
 import Rendering.NodeRenderable (class NodeRenderable)
@@ -95,7 +94,8 @@ mkVertMarkerPoint m polyActive actMarker (Tuple pos idx) = VertMarkerPoint {
 
 -- create vertex markers for an array of vertices
 mkVertMarkerPoints :: forall v. Vector v => Modifier v -> Event Boolean -> Event (Maybe Int) -> Polygon v -> Array (VertMarkerPoint v)
-mkVertMarkerPoints m polyActive actMarker (Polygon ps) = mkVertMarkerPoint m polyActive actMarker <$> zip ps (range 0 (length ps - 1))
+mkVertMarkerPoints m polyActive actMarker poly = mkVertMarkerPoint m polyActive actMarker <$> zip ps (range 0 (length ps - 1))
+    where ps = poly ^. _polyVerts
 
 -- | get vertex markers' active status event
 getVertMarkerActiveStatus :: forall v. Event (Array (VertMarker v)) -> Event (Maybe Int)
@@ -163,27 +163,28 @@ instance nodeRenderableMidMarkerPoint :: Vector v => NodeRenderable e (MidMarker
 
 -- | given a list of vertices position, calculate all middle points
 midMarkerPoints :: forall v. Vector v => Dynamic Boolean -> Polygon v -> Array (MidMarkerPoint v)
-midMarkerPoints _ (Polygon [])         = []
-midMarkerPoints _ (Polygon [a])        = []
-midMarkerPoints act (Polygon vertices) = h <$> filter g d
-    where -- take all vertices and their indices
-          v1List = mapWithIndex Tuple vertices
-          -- a new list with the head put to end
-          v2List = fromMaybe [] $ lift2 snoc (tail vertices) (head vertices)
+midMarkerPoints active poly = midMarkers active $ poly ^. _polyVerts
+    where midMarkers _ []         = []
+          midMarkers _ [a]        = []
+          midMarkers act vertices = h <$> filter g d
+              where -- take all vertices and their indices
+                    v1List = mapWithIndex Tuple vertices
+                    -- a new list with the head put to end
+                    v2List = fromMaybe [] $ lift2 snoc (tail vertices) (head vertices)
 
-          f :: Tuple Int v -> v -> { dist :: Number, point :: MidMarkerPoint v }
-          f v v2 = let idx = fst v
-                       v1 = snd v
-                       point = MidMarkerPoint {
-                                 position : (v1 <+> v2) <**> 0.5,
-                                 index    : idx + 1,
-                                 isActive : act
-                               }
-                    in { dist: dist v1 v2, point: point }
+                    f :: Tuple Int v -> v -> { dist :: Number, point :: MidMarkerPoint v }
+                    f v v2 = let idx = fst v
+                                 v1 = snd v
+                                 point = MidMarkerPoint {
+                                     position : (v1 <+> v2) <**> 0.5,
+                                     index    : idx + 1,
+                                     isActive : act
+                                     }
+                             in { dist: dist v1 v2, point: point }
 
-          d = zipWith f v1List v2List
-          g r = r.dist > 1.0
-          h r = r.point
+                    d = zipWith f v1List v2List
+                    g r = r.dist > 1.0
+                    h r = r.point
 
 -- | render all middle markers
 mkMidMarkers :: forall e v. Vector v => Event Boolean -> Event (Polygon v) -> Node e (Event (MidMarkerPoint v))
@@ -192,12 +193,6 @@ mkMidMarkers active polyEvt = do
         mPointsEvt = midMarkerPoints actDyn <$> polyEvt
     markers :: (Event (Array (MidMarker v))) <- renderEvent mPointsEvt
     pure $ keepLatest $ getTapEvt <$> markers
-
-
--- | calculate the center based on polygon
-polyCenter :: forall v. Vector v => Default v => Polygon v -> v
-polyCenter (Polygon vs) = (foldl (<+>) def vs) <**> (1.0 / l)
-    where l = toNumber (length vs)
 
 newtype PolyEditorConf v = PolyEditorConf {
     isActive     :: Dynamic Boolean,
@@ -228,17 +223,12 @@ _delete = _Newtype <<< prop (SProxy :: SProxy "delete")
 
 -- get new positions after dragging
 getPosition :: forall v. Array (VertMarker v) -> Event (Polygon v)
-getPosition os = Polygon <$> mergeArray (f <$> os)
+getPosition os = newPolygon <$> mergeArray (f <$> os)
     where f o = o ^. _position
 
 -- | merge all tapped events in a foldable list of objects support it.
 getTapEvt :: forall t a r f. Functor f => Foldable f => Newtype t { tapped :: Event a | r } => f t -> Event a
 getTapEvt = anyEvt <<< map (view _tapped)
-
-delMarker :: forall v. Int -> Polygon v -> Polygon v
-delMarker idx poly@(Polygon ps) = if numOfVerts poly > 3
-                                  then Polygon $ fromMaybe [] (deleteAt idx ps)
-                                  else poly
 
 -- | create polygon editor
 createPolyEditor :: forall e v. PolyVertex v => PolyEditorConf v -> Node e (PolyEditor v)
@@ -265,13 +255,13 @@ createPolyEditor cfg = do
                 -- create mid markers for adding new vertices
                 toAddEvt <- mkMidMarkers midActive newPolyEvt
 
-                let addVert p (Polygon pns) = Polygon <$> insertAt (p ^. _index) (p ^. _position) pns
+                let addVert p ply = addVertexAt (p ^. _index) (p ^. _position) ply
                     vertsAfterAdd = compact (sampleOn newPolyEvt $ addVert <$> toAddEvt)
 
                     -- get delete event of tapping on a marker
                     delEvts = keepLatest $ getTapEvt <$> vertMarkersEvt
                     -- calculate new vertices after deleting a vertex
-                    vertsAfterDel = sampleOn newPolyEvt (delMarker <$> delEvts)
+                    vertsAfterDel = sampleOn newPolyEvt (delVertexAt <$> delEvts)
     
                     -- update the real vertex list after adding/deleting
                     polygonEvt = multicast $ vertsAfterAdd <|> vertsAfterDel

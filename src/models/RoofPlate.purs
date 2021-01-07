@@ -21,7 +21,7 @@ import Effect (Effect)
 import Foreign.Generic (class Decode, class Encode, decode, defaultOptions, encode, genericDecode, genericEncode)
 import Math as Math
 import Math.Angle (Angle, acos, atan2, degree, degreeVal)
-import Model.Polygon (class IsPolygon, Polygon(..))
+import Model.Polygon (class IsPolygon, newPolygon)
 import Model.Roof.Panel (Alignment(..), Orientation(..))
 import Model.UUID (class HasUUID)
 import Three.Math.Vector (class Vector, Vector2, Vector3, addScaled, cross, length, mkVec2, mkVec3, vecX, vecY, vecZ, (<.>))
@@ -72,7 +72,7 @@ instance defaultRoofPlate :: Default RoofPlate where
         rotation      : def
     }
 instance isPolygonRoofPlate :: IsPolygon RoofPlate Vector2 where
-    toPolygon r = Polygon $ f <$> r ^. _borderPoints
+    toPolygon r = newPolygon $ f <$> r ^. _borderPoints
         where f v = mkVec2 (vecX v) (vecY v)
 
 _roofIntId :: Lens' RoofPlate Int

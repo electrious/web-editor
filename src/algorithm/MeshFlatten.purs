@@ -5,18 +5,17 @@ import Prelude
 import Algorithm.PointInPolygon (pointInPolygon)
 import Data.Array (concatMap, filter, length, range, zip, zipWith)
 import Data.Default (class Default, def)
-import Data.Foldable (maximum, minimum, sequence_)
+import Data.Foldable (sequence_)
 import Data.Lens (Lens', (^.), (.~))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.Maybe (fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Tuple (fst, snd)
 import Editor.Common.Lenses (_center, _index, _item, _maxX, _maxY, _minX, _minY, _normal, _polygon, _position)
 import Effect (Effect)
 import Math.Angle (degreeVal)
-import Model.Polygon (Polygon(..), toPolygon)
+import Model.Polygon (Polygon, polygonBBox, toPolygon)
 import Model.Roof.RoofPlate (RoofPlate, angleBetween)
 import RBush.RBush (BBox, RBush, load, mkRBush, search)
 import Three.Core.Geometry (class IsBufferGeometry, clone, getAttribute, isBufferAttribute, setNeedsUpdate, setXYZ)
@@ -68,15 +67,6 @@ buildRTree vertices normals = do
     load items tree
     pure tree
 
--- | get the bounding box of a polygon
-polygonBBox :: Polygon Vector2 -> BBox Unit
-polygonBBox (Polygon vs) = def # _minX .~ fromMaybe 0.0 (minimum xs)
-                               # _minY .~ fromMaybe 0.0 (minimum ys)
-                               # _maxX .~ fromMaybe 0.0 (maximum xs)
-                               # _maxY .~ fromMaybe 0.0 (maximum ys)
-    where xs = vecX <$> vs
-          ys = vecY <$> vs
-
 newtype RoofFlattener = RoofFlattener {
     normal  :: Vector3,
     center  :: Vector3,
@@ -125,30 +115,29 @@ applyFlattenedVertex geo fvs = do
 
 -- | Flatten a single roof plate
 flattenRoofplate :: RBush VertexItem -> RoofPlate -> Array FlattenedVertex
-flattenRoofplate tree roof = let flattener = roofFlattener roof
-                                 poly = flattener ^. _polygon
+flattenRoofplate tree roof = flattenF <$> filter f candidates
+    where flattener = roofFlattener roof
+          poly = flattener ^. _polygon
                             
-                                 candidates = search (polygonBBox poly) tree
+          candidates = search (polygonBBox poly) tree
 
-                                 -- check if a candidate is under the roof polygon
-                                 pointInRoof c = let v = c ^. _vertex
-                                                     point = mkVec2 (vecX v) (vecY v)
-                                                 in pointInPolygon poly point
+          -- check if a candidate is under the roof polygon
+          pointInRoof c = let v = c ^. _vertex
+                              point = mkVec2 (vecX v) (vecY v)
+                          in pointInPolygon poly point
                                 
-                                 -- check the distance to the roof and angle between its normal
-                                 -- vector with the roof normal vector.
-                                 checkDistAndAngle c = let angle = angleBetween (flattener ^. _normal) (c ^. _normal)
-                                                           dist = distToRoof flattener (c ^. _vertex)
-                                                       in (dist < 0.5 && dist >= 0.0) || (dist < 0.0 && dist > -1.0 && degreeVal angle < 20.0)
+          -- check the distance to the roof and angle between its normal
+          -- vector with the roof normal vector.
+          checkDistAndAngle c = let angle = angleBetween (flattener ^. _normal) (c ^. _normal)
+                                    dist = distToRoof flattener (c ^. _vertex)
+                                in (dist < 0.5 && dist >= 0.0) || (dist < 0.0 && dist > -1.0 && degreeVal angle < 20.0)
                             
-                                 -- filter function
-                                 f c = pointInRoof c && checkDistAndAngle c
-                                 flattenF c = FlattenedVertex {
-                                     index: c ^. _index,
-                                     position: flatten flattener (c ^. _vertex)
-                                 }
-
-                            in flattenF <$> filter f candidates
+          -- filter function
+          f c = pointInRoof c && checkDistAndAngle c
+          flattenF c = FlattenedVertex {
+              index: c ^. _index,
+              position: flatten flattener (c ^. _vertex)
+              }
 
 
 -- | flatten all roofplates
