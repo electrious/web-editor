@@ -15,6 +15,7 @@ import Data.Lens (Lens', (^.), (.~))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Maybe (Maybe, fromMaybe)
 import Data.Newtype (class Newtype)
+import Data.Traversable (class Traversable)
 import Editor.Common.Lenses (_maxX, _maxY, _mesh, _minX, _minY)
 import Editor.Disposable (Disposee(..))
 import Effect (Effect)
@@ -32,6 +33,8 @@ newtype Polygon v = Polygon (Array v)
 
 derive instance newtypePolygon :: Newtype (Polygon v) _
 derive instance eqPolygon :: Eq v => Eq (Polygon v)
+derive newtype instance functorPolygon :: Functor Polygon
+derive newtype instance traversablePolygon :: Traversable Polygon
 instance defaultPolygon :: Default (Polygon v) where
     def = Polygon []
 

@@ -9,9 +9,12 @@ import Data.Lens.Record (prop)
 import Data.List (List(..), fromFoldable)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
+import Data.Traversable (traverse)
 import Editor.Common.Lenses (_polygon)
-import Model.HouseBuilder.HousePoint (HousePoint, ridgePoints)
-import Model.Polygon (Polygon, _polyVerts)
+import Effect (Effect)
+import Model.HouseBuilder.HousePoint (HousePoint, HousePointType(..), newHousePoint, ridgePoints)
+import Model.Polygon (Polygon, _polyVerts, polygonAround)
+import Three.Math.Vector (Vector3, mkVec3, toVec2, vecX, vecY)
 
 newtype RoofSurface = RoofSurface {
     polygon     :: Polygon HousePoint,
@@ -34,3 +37,8 @@ allPoints s = s ^. _polygon <<< _polyVerts
 newSurface :: Polygon HousePoint -> RoofSurface
 newSurface poly = def # _polygon     .~ poly
                       # _ridgePoints .~ ridgePoints (fromFoldable $ poly ^. _polyVerts)
+
+-- | create a new RoofSurface around a point
+surfaceAround :: Vector3 -> Effect RoofSurface
+surfaceAround p = newSurface <$> traverse mkHP (polygonAround $ toVec2 p)
+    where mkHP v = newHousePoint RidgePoint (mkVec3 (vecX v) (vecY v) 0.01)
