@@ -1,7 +1,7 @@
 module Model.Polygon (Polygon, _polyVerts, newPolygon, polygonAround, numOfVerts,
                       addVertexAt, delVertexAt, polyCenter, polygonBBox,
                       renderPolygon, class IsPolygon, class PolyVertex,
-                      toPolygon, getPos, updatePos, addVert, scale, (.+.), (.**.)) where
+                      toPolygon, getPos, updatePos, addVert, scale, distance, (.+.), (.**.)) where
 
 import Prelude hiding (add)
 
@@ -26,7 +26,7 @@ import Rendering.NodeRenderable (class NodeRenderable)
 import Three.Core.Geometry (mkShape, mkShapeGeometry)
 import Three.Core.Material (MeshBasicMaterial)
 import Three.Core.Mesh (setMaterial)
-import Three.Math.Vector (class Vector, Vector2, Vector3, add, mkVec2, mkVec3, multiplyScalar, toVec2, vecX, vecY)
+import Three.Math.Vector (class Vector, Vector2, Vector3, add, dist, mkVec2, mkVec3, multiplyScalar, toVec2, vecX, vecY)
 
 newtype Polygon v = Polygon (Array v)
 
@@ -116,6 +116,7 @@ class Default v <= PolyVertex v where
     updatePos :: v -> Vector3 -> v
     addVert   :: v -> v -> v
     scale     :: v -> Number -> v
+    distance  :: v -> v -> Number
 
 infixr 6 addVert as .+.
 infixr 7 scale as .**.
@@ -125,9 +126,11 @@ instance polyVertexVector2 :: PolyVertex Vector2 where
     updatePos _ nv = toVec2 nv
     addVert        = add
     scale          = multiplyScalar
+    distance       = dist
 
 instance polyVertexVector3 :: PolyVertex Vector3 where
     getPos         = identity
     updatePos _ nv = nv
     addVert        = add
     scale          = multiplyScalar
+    distance       = dist

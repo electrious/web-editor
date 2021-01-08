@@ -23,7 +23,7 @@ import Rendering.NodeRenderable (class NodeRenderable)
 import Three.Core.Geometry (CircleGeometry, mkCircleGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial)
 import Three.Core.Mesh (Mesh)
-import Three.Math.Vector (Vector3, multiplyScalar, (<+>))
+import Three.Math.Vector (Vector3, dist, multiplyScalar, (<+>))
 
 
 data HousePointType = GutterPoint
@@ -49,7 +49,10 @@ newtype HousePoint = HousePoint {
 
 derive instance newtypeHousePoint :: Newtype HousePoint _
 derive instance genericHousePoint :: Generic HousePoint _
-derive instance eqHousePoint :: Eq HousePoint
+instance eqHousePoint :: Eq HousePoint where
+    eq p1 p2 = p1 ^. _id == p2 ^. _id
+instance ordHousePoint :: Ord HousePoint where
+    compare p1 p2 = (p1 ^. _id) `compare` (p2 ^. _id)
 instance showHousePoint :: Show HousePoint where
     show = genericShow
 instance hasUUIDHousePoint :: HasUUID HousePoint where
@@ -58,13 +61,14 @@ instance defaultHousePoint :: Default HousePoint where
     def = HousePoint {
         id        : emptyUUID,
         position  : def,
-        pointType : GutterPoint
+        pointType : RidgePoint
         }
 instance polyVertexHousePoint :: PolyVertex HousePoint where
-    getPos        = view _position
-    updatePos     = flip (set  _position)
-    addVert p1 p2 = p1 # _position %~ (<+>) (p2 ^. _position)
-    scale p n     = p  # _position %~ flip multiplyScalar n
+    getPos         = view _position
+    updatePos      = flip (set  _position)
+    addVert p1 p2  = p1 # _position %~ (<+>) (p2 ^. _position)
+    scale p n      = p  # _position %~ flip multiplyScalar n
+    distance p1 p2 = dist (p1 ^. _position) (p2 ^. _position)
 instance nodeRenderableHousePoint :: NodeRenderable e HousePoint Mesh where
     render p = mesh prop gutterGeo gutterMat
         where prop = def # _name     .~ "gutter-point"
