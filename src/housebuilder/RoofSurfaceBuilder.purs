@@ -7,6 +7,7 @@ import Data.Default (class Default, def)
 import Data.Lens (Lens', (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
+import Data.List (List)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Editor.Common.Lenses (_polygon)
@@ -41,3 +42,14 @@ editRoofSurface rs = do
     
     pure $ def # _surface .~ (newSurface <$> editor ^. _polygon)
                # _delete  .~ (const unit <$> editor ^. _delete)
+
+
+newtype BuilderState = BuilderState {
+    surfaces :: List RoofSurface
+    }
+
+derive instance newtypeBuilderState :: Newtype BuilderState _
+
+
+_surfaces :: forall t a r. Newtype t { surfaces :: a | r } => Lens' t a
+_surfaces = _Newtype <<< prop (SProxy :: SProxy "surfaces")
