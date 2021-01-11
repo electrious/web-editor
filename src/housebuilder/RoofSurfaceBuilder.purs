@@ -25,8 +25,8 @@ import Editor.RoofManager (foldEvtWith)
 import Editor.SceneEvent (SceneMouseMoveEvent)
 import FRP.Dynamic (Dynamic, gateDyn, step)
 import FRP.Event (Event, fold, keepLatest)
-import FRP.Event.Extra (performEvent)
-import Model.ActiveMode (ActiveMode)
+import FRP.Event.Extra (debug, performEvent)
+import Model.ActiveMode (ActiveMode(..))
 import Model.Hardware.PanelModel (_isActive)
 import Model.HouseBuilder.FloorPlan (FloorPlan)
 import Model.HouseBuilder.RoofSurface (RoofSurface, newSurface, surfaceAround)
@@ -95,6 +95,12 @@ newtype SurfaceBuilderCfg = SurfaceBuilderCfg {
     }
 
 derive instance newtypeSurfaceBuilderCfg :: Newtype SurfaceBuilderCfg _
+instance defaultSurfaceBuilderCfg :: Default SurfaceBuilderCfg where
+    def = SurfaceBuilderCfg {
+        floor     : def,
+        modeDyn   : pure Inactive,
+        mouseMove : empty
+        }
 
 
 newtype BuilderState = BuilderState {
@@ -144,6 +150,6 @@ editSurfaces cfg actDyn = fixNodeE \stEvt -> do
                 (UpdateSurface <$> updEvt)
 
         -- apply operation onto the builder state
-        newStEvt = fold applyOp opEvt def
+        newStEvt = fold applyOp (debug opEvt) def
 
     pure { input : newStEvt, output : empty }

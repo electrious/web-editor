@@ -13,12 +13,13 @@ import Data.Maybe (Maybe(..), maybe)
 import Data.Meter (Meter, meter, meterVal)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Editor.Common.Lenses (_active, _height, _id, _mouseMove, _name, _polygon, _position, _rotation, _tapped)
+import Editor.Common.Lenses (_active, _height, _id, _modeDyn, _mouseMove, _name, _polygon, _position, _rotation, _tapped)
 import Editor.PolygonEditor (_delete, createPolyEditor)
 import Editor.SceneEvent (SceneMouseMoveEvent)
 import FRP.Dynamic (Dynamic, latestEvt, step)
 import FRP.Event (Event, fold)
 import FRP.Event.Extra (multicast)
+import HouseBuilder.RoofSurfaceBuilder (editSurfaces)
 import Math (pi)
 import Model.ActiveMode (ActiveMode(..), isActive)
 import Model.Hardware.PanelModel (_isActive)
@@ -138,6 +139,11 @@ createFloorNode = do
 
         -- setup the height editor
         heightEvt <- setupHeightEditor isActEvt $ arrowPos <$> fpDyn
+
+        let conf = def # _floor     .~ fp
+                       # _modeDyn   .~ pure Active
+                       # _mouseMove .~ latestEvt (view _mouseMove <$> polyMDyn)
+        surfsEvt <- editSurfaces conf (pure true)
 
         -- calculate the updated floor plan
         let opEvt = (UpdPoly <$> editor ^. _polygon) <|>
