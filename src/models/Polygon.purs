@@ -10,6 +10,8 @@ import Custom.Mesh (TapMouseMesh, TappableMesh, mkTappableMesh)
 import Data.Array (deleteAt, fromFoldable, insertAt, length)
 import Data.Default (class Default, def)
 import Data.Foldable (class Foldable, foldl, maximum, minimum)
+import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Show (genericShow)
 import Data.Int (toNumber)
 import Data.Lens (Lens', (^.), (.~))
 import Data.Lens.Iso.Newtype (_Newtype)
@@ -31,10 +33,13 @@ import Three.Math.Vector (class Vector, Vector2, Vector3, add, dist, mkVec2, mkV
 
 newtype Polygon v = Polygon (Array v)
 
+derive instance genericPolygon :: Generic (Polygon v) _
 derive instance newtypePolygon :: Newtype (Polygon v) _
 derive instance eqPolygon :: Eq v => Eq (Polygon v)
 derive newtype instance functorPolygon :: Functor Polygon
 derive newtype instance traversablePolygon :: Traversable Polygon
+instance showPolygon :: Show v => Show (Polygon v) where
+    show = genericShow
 instance defaultPolygon :: Default (Polygon v) where
     def = Polygon []
 

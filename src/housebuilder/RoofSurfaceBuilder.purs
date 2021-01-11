@@ -2,29 +2,37 @@ module HouseBuilder.RoofSurfaceBuilder where
 
 import Prelude
 
+import Control.Alt ((<|>))
 import Control.Plus (empty)
 import Data.Default (class Default, def)
-import Data.Lens (Lens', view, (.~), (^.))
+import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Show (genericShow)
+import Data.Lens (Lens', view, (%~), (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.List (List(..))
+import Data.List (List)
+import Data.Map as M
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
+import Data.UUID (UUID)
+import Data.UUIDMap (UUIDMap)
 import Editor.Common.Lenses (_face, _mouseMove, _name, _point, _polygon, _position)
 import Editor.ObjectAdder (createObjectAdder, mkCandidatePoint)
 import Editor.PolygonEditor (_delete, createPolyEditor)
+import Editor.RoofManager (foldEvtWith)
 import Editor.SceneEvent (SceneMouseMoveEvent)
 import FRP.Dynamic (Dynamic, gateDyn, step)
-import FRP.Event (Event)
+import FRP.Event (Event, fold, keepLatest)
 import FRP.Event.Extra (performEvent)
 import Model.ActiveMode (ActiveMode)
 import Model.Hardware.PanelModel (_isActive)
 import Model.HouseBuilder.FloorPlan (FloorPlan)
 import Model.HouseBuilder.RoofSurface (RoofSurface, newSurface, surfaceAround)
+import Model.UUID (idLens)
 import Rendering.DynamicNode (eventNode)
-import Rendering.Node (Node, fixNodeEWith, getParent, node)
+import Rendering.Node (Node, fixNodeE, getParent, node)
 import Three.Core.Face3 (normal)
 import Three.Core.Object3D (worldToLocal)
 import Three.Math.Vector (mkVec3)
@@ -34,7 +42,7 @@ import Three.Math.Vector (mkVec3)
 
 newtype RoofSurfEditor = RoofSurfEditor {
     surface :: Event RoofSurface,
-    delete  :: Event Unit
+    delete  :: Event UUID
     }
 
 derive instance newtypeRoofSurfEditor :: Newtype RoofSurfEditor _
@@ -54,8 +62,8 @@ editRoofSurface rs = do
                   
     editor <- createPolyEditor cfg
     
-    pure $ def # _surface .~ (newSurface <$> editor ^. _polygon)
-               # _delete  .~ (const unit <$> editor ^. _delete)
+    pure $ def # _surface .~ (performEvent $ newSurface <$> editor ^. _polygon)
+               # _delete  .~ (const (rs ^. idLens) <$> editor ^. _delete)
 
 -- | function to show an ObjectAdder to add a new roof surface
 addSurface :: forall e. SurfaceBuilderCfg -> Dynamic Boolean -> Node e (Event RoofSurface)
@@ -82,7 +90,7 @@ addSurface cfg actDyn = do
 
 newtype SurfaceBuilderCfg = SurfaceBuilderCfg {
     floor     :: FloorPlan,
-    mode      :: Dynamic ActiveMode,
+    modeDyn   :: Dynamic ActiveMode,
     mouseMove :: Event SceneMouseMoveEvent
     }
 
@@ -90,22 +98,52 @@ derive instance newtypeSurfaceBuilderCfg :: Newtype SurfaceBuilderCfg _
 
 
 newtype BuilderState = BuilderState {
-    surfaces :: List RoofSurface
+    surfaces :: UUIDMap RoofSurface
     }
 
 derive instance newtypeBuilderState :: Newtype BuilderState _
 instance defaultBuilderState :: Default BuilderState where
     def = BuilderState {
-        surfaces : Nil
+        surfaces : M.empty
         }
 
 _surfaces :: forall t a r. Newtype t { surfaces :: a | r } => Lens' t a
 _surfaces = _Newtype <<< prop (SProxy :: SProxy "surfaces")
 
-editSurfaces :: forall e. Dynamic Boolean -> Node e (Event (List RoofSurface))
-editSurfaces actDyn = fixNodeEWith def \stEvt -> do
-    let ssEvt = view _surfaces <$> stEvt
 
-    ses <- eventNode $ traverse editRoofSurface <$> ssEvt
+data BuilderOp = AddSurface RoofSurface
+               | DelSurface UUID
+               | UpdateSurface RoofSurface
 
-    pure { input : empty :: Event BuilderState, output : empty }
+derive instance genericBuilderOp :: Generic BuilderOp _
+instance showBuilderOp :: Show BuilderOp where
+    show = genericShow
+
+
+applyOp :: BuilderOp -> BuilderState -> BuilderState
+applyOp (AddSurface surf)    s = s # _surfaces %~ M.insert (surf ^. idLens) surf
+applyOp (DelSurface sid)     s = s # _surfaces %~ M.delete sid
+applyOp (UpdateSurface surf) s = s # _surfaces %~ M.update (const $ Just surf) (surf ^. idLens)
+
+
+editSurfaces :: forall e. SurfaceBuilderCfg -> Dynamic Boolean -> Node e (Event (List RoofSurface))
+editSurfaces cfg actDyn = fixNodeE \stEvt -> do
+    -- render all roof surface editors
+    ses <- eventNode $ (traverse editRoofSurface <<< view _surfaces) <$> stEvt
+
+    let -- get the delete roof surface event
+        delEvt = keepLatest $ foldEvtWith (view _delete) <$> ses
+        -- get the update roof surface event
+        updEvt = keepLatest $ foldEvtWith (view _surface) <$> ses
+
+    -- render surface adder to add new surfaces
+    newSurfEvt <- addSurface cfg actDyn
+
+    let opEvt = (AddSurface <$> newSurfEvt) <|>
+                (DelSurface <$> delEvt)     <|>
+                (UpdateSurface <$> updEvt)
+
+        -- apply operation onto the builder state
+        newStEvt = fold applyOp opEvt def
+
+    pure { input : newStEvt, output : empty }
