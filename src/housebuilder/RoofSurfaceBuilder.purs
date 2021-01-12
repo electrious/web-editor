@@ -150,6 +150,6 @@ editSurfaces cfg actDyn = fixNodeE \stEvt -> do
                 (UpdateSurface <$> updEvt)
 
         -- apply operation onto the builder state
-        newStEvt = fold applyOp (debug opEvt) def
+        newStEvt = fold applyOp opEvt def
 
     pure { input : newStEvt, output : empty }

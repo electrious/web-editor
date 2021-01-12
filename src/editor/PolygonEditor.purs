@@ -22,7 +22,7 @@ import Effect (Effect)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, dynEvent, step)
 import FRP.Event (Event, keepLatest, sampleOn)
-import FRP.Event.Extra (anyEvt, mergeArray, multicast, performEvent)
+import FRP.Event.Extra (anyEvt, mergeArray, multicast, performEvent, skip)
 import Model.Hardware.PanelModel (_isActive)
 import Model.Polygon (class PolyVertex, Polygon, _polyVerts, addVertexAt, delVertexAt, getPos, newPolygon, polyCenter, updatePos, (.**.), (.+.))
 import Rendering.DynamicNode (renderEvent)
@@ -267,7 +267,7 @@ createPolyEditor cfg = do
                 polyDel <- mkPolyDelMarker (polyCenter <$> newPolyEvt) polyActive
 
                 let editor = PolyEditor {
-                    polygon : newPolyEvt,
+                    polygon : skip 1 newPolyEvt,  -- skip the default polygon rendered
                     delete  : multicast $ polyDel ^. _tapped
                     }
                 pure { input: newActMarkerEvt, output: { input: polygonEvt, output : { input: polyActEvt, output: editor } } }
