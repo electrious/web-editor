@@ -140,8 +140,9 @@ createFloorNode = do
         -- setup the height editor
         heightEvt <- setupHeightEditor isActEvt $ arrowPos <$> fpDyn
 
+        -- setup the roof surfaces editor
         let conf = def # _floor     .~ fp
-                       # _modeDyn   .~ pure Active
+                       # _modeDyn   .~ act
                        # _mouseMove .~ latestEvt (view _mouseMove <$> polyMDyn)
         surfsEvt <- editSurfaces conf
 
