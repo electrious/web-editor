@@ -18,15 +18,15 @@ import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
 import Data.UUID (UUID)
 import Data.UUIDMap (UUIDMap)
-import Editor.Common.Lenses (_face, _mouseMove, _name, _point, _polygon, _position)
+import Editor.Common.Lenses (_face, _modeDyn, _mouseMove, _name, _point, _polygon, _position)
 import Editor.ObjectAdder (createObjectAdder, mkCandidatePoint)
 import Editor.PolygonEditor (_delete, createPolyEditor)
 import Editor.RoofManager (foldEvtWith)
 import Editor.SceneEvent (SceneMouseMoveEvent)
 import FRP.Dynamic (Dynamic, gateDyn, step)
 import FRP.Event (Event, fold, keepLatest)
-import FRP.Event.Extra (debug, performEvent)
-import Model.ActiveMode (ActiveMode(..))
+import FRP.Event.Extra (performEvent)
+import Model.ActiveMode (ActiveMode(..), isActive)
 import Model.Hardware.PanelModel (_isActive)
 import Model.HouseBuilder.FloorPlan (FloorPlan)
 import Model.HouseBuilder.RoofSurface (RoofSurface, newSurface, surfaceAround)
@@ -66,8 +66,8 @@ editRoofSurface rs = do
                # _delete  .~ (const (rs ^. idLens) <$> editor ^. _delete)
 
 -- | function to show an ObjectAdder to add a new roof surface
-addSurface :: forall e. SurfaceBuilderCfg -> Dynamic Boolean -> Node e (Event RoofSurface)
-addSurface cfg actDyn = do
+addSurface :: forall e. SurfaceBuilderCfg -> Node e (Event RoofSurface)
+addSurface cfg = do
     parent <- getParent
 
     -- get a candidate point
@@ -75,6 +75,7 @@ addSurface cfg actDyn = do
             np <- worldToLocal (evt ^. _point) parent
             pure $ Just $ mkCandidatePoint np (normal $ evt ^. _face)
 
+        actDyn  = isActive <$> cfg ^. _modeDyn
         pntsEvt = performEvent $ getCandPoint <$> gateDyn actDyn (cfg ^. _mouseMove)
         candPntDyn = step Nothing pntsEvt
 
@@ -132,8 +133,8 @@ applyOp (DelSurface sid)     s = s # _surfaces %~ M.delete sid
 applyOp (UpdateSurface surf) s = s # _surfaces %~ M.update (const $ Just surf) (surf ^. idLens)
 
 
-editSurfaces :: forall e. SurfaceBuilderCfg -> Dynamic Boolean -> Node e (Event (List RoofSurface))
-editSurfaces cfg actDyn = fixNodeE \stEvt -> do
+editSurfaces :: forall e. SurfaceBuilderCfg -> Node e (Event (List RoofSurface))
+editSurfaces cfg = fixNodeE \stEvt -> do
     -- render all roof surface editors
     ses <- eventNode $ (traverse editRoofSurface <<< view _surfaces) <$> stEvt
 
@@ -143,7 +144,7 @@ editSurfaces cfg actDyn = fixNodeE \stEvt -> do
         updEvt = keepLatest $ foldEvtWith (view _surface) <$> ses
 
     -- render surface adder to add new surfaces
-    newSurfEvt <- addSurface cfg actDyn
+    newSurfEvt <- addSurface cfg
 
     let opEvt = (AddSurface <$> newSurfEvt) <|>
                 (DelSurface <$> delEvt)     <|>

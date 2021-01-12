@@ -143,7 +143,7 @@ createFloorNode = do
         let conf = def # _floor     .~ fp
                        # _modeDyn   .~ pure Active
                        # _mouseMove .~ latestEvt (view _mouseMove <$> polyMDyn)
-        surfsEvt <- editSurfaces conf (pure true)
+        surfsEvt <- editSurfaces conf
 
         -- calculate the updated floor plan
         let opEvt = (UpdPoly <$> editor ^. _polygon) <|>
