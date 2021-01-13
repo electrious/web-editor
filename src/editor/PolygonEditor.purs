@@ -257,6 +257,6 @@ createPolyEditor cfg = do
                 let editor = PolyEditor {
                     polygon    : skip 1 newPolyEvt,  -- skip the default polygon rendered
                     delete     : multicast $ polyDel ^. _tapped,
-                    isDragging : getVertMarkerDragging vertMarkersEvt
+                    isDragging : multicast $ getVertMarkerDragging vertMarkersEvt
                     }
                 pure { input: newActMarkerEvt, output: { input: polygonEvt, output : { input: polyActEvt, output: editor } } }

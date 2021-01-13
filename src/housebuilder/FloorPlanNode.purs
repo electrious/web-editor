@@ -124,18 +124,18 @@ createFloorNode = do
 
             fpDyn = step fp newFpEvt
 
-            isActEvt = isActive <$> act
+            isActDyn = isActive <$> act
             calcPos p = mkVec3 0.0 0.0 (meterVal $ floorPlanTop p)
         -- render the polygon
         polyMDyn :: Dynamic TapMouseMesh <- localEnv (const $ cfg ^. _active) $ renderDynamic fpDyn
 
         -- setup the polygon editor
         editor <- node (def # _position .~ (calcPos <$> fpDyn)) $
-                      createPolyEditor $ def # _isActive .~ isActEvt
+                      createPolyEditor $ def # _isActive .~ isActDyn
                                              # _polygon  .~ fp ^. _polygon
 
         -- setup the height editor
-        heightEvt <- setupHeightEditor isActEvt $ arrowPos <$> fpDyn
+        heightEvt <- setupHeightEditor isActDyn $ arrowPos <$> fpDyn
 
         -- setup the roof surfaces editor
         let dragStDyn = step Active $ fromBoolean <<< not <$> editor ^. _isDragging
