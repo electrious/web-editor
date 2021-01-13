@@ -1,5 +1,5 @@
 module Model.Polygon (Polygon, _polyVerts, newPolygon, polygonAround, numOfVerts,
-                      addVertexAt, delVertexAt, polyCenter, polygonBBox,
+                      addVertexAt, delVertexAt, polyCenter, polyMidPoints, polygonBBox,
                       renderPolygon, class IsPolygon, class PolyVertex,
                       toPolygon, getPos, updatePos, addVert, scale, distance, (.+.), (.**.)) where
 
@@ -7,8 +7,9 @@ import Prelude hiding (add)
 
 import Control.Monad.Writer (tell)
 import Custom.Mesh (TapMouseMesh, TappableMesh, mkTappableMesh)
-import Data.Array (deleteAt, fromFoldable, insertAt, length)
+import Data.Array (deleteAt, fromFoldable, head, insertAt, length, mapWithIndex, snoc, tail, zipWith)
 import Data.Default (class Default, def)
+import Data.Filterable (filter)
 import Data.Foldable (class Foldable, foldl, maximum, minimum)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
@@ -18,6 +19,7 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Maybe (Maybe, fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Traversable (class Traversable)
+import Data.Tuple (Tuple(..))
 import Editor.Common.Lenses (_maxX, _maxY, _mesh, _minX, _minY)
 import Editor.Disposable (Disposee(..))
 import Effect (Effect)
@@ -77,6 +79,26 @@ polyCenter :: forall v. PolyVertex v => Polygon v -> v
 polyCenter poly = (foldl (.+.) def vs) .**. (1.0 / l)
     where l  = toNumber $ length vs
           vs = poly ^. _polyVerts
+
+
+-- | calculate all middle points on all edges of a polygon
+polyMidPoints :: forall v. PolyVertex v => Polygon v -> Array (Tuple Int v)
+polyMidPoints poly = if length vs < 2
+                     then []
+                     else toResult <$> filter validDist (zipWith f v1Lst v2Lst)
+    where vs = poly ^. _polyVerts
+          v1Lst = mapWithIndex Tuple vs
+          v2Lst = fromMaybe [] $ snoc <$> (tail vs) <*> (head vs)
+
+          validDist p = p.dist > 1.0
+          toResult  p = Tuple p.index p.position
+
+          f (Tuple idx v1) v2 = {
+              dist     : dist (getPos v1) (getPos v2),
+              position : ((v1 .+. v2) .**. 0.5),
+              index    : idx + 1
+          }
+
 
 -- | get the bounding box of a polygon
 polygonBBox :: forall v. Vector v => Polygon v -> BBox Unit

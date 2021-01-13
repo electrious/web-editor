@@ -5,17 +5,17 @@ import Prelude hiding (add)
 import Control.Alt ((<|>))
 import Control.Apply (lift2)
 import Custom.Mesh (TappableMesh)
-import Data.Array (filter, head, length, mapWithIndex, range, snoc, tail, zip, zipWith)
+import Data.Array (length, mapWithIndex, range, zip)
 import Data.Compactable (compact)
 import Data.Default (class Default, def)
 import Data.Foldable (class Foldable)
 import Data.Lens (Lens', view, (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Data.Tuple (Tuple(..), fst, snd)
+import Data.Tuple (Tuple(..))
 import Editor.Common.Lenses (_index, _isDragging, _name, _polygon, _position, _tapped)
 import Editor.SceneEvent (SceneTapEvent)
 import Effect (Effect)
@@ -24,13 +24,12 @@ import FRP.Dynamic (Dynamic, dynEvent, step)
 import FRP.Event (Event, keepLatest, sampleOn)
 import FRP.Event.Extra (anyEvt, mergeArray, multicast, performEvent, skip)
 import Model.Hardware.PanelModel (_isActive)
-import Model.Polygon (class PolyVertex, Polygon, _polyVerts, addVertexAt, delVertexAt, getPos, newPolygon, polyCenter, updatePos, (.**.), (.+.))
+import Model.Polygon (class PolyVertex, Polygon, _polyVerts, addVertexAt, delVertexAt, getPos, newPolygon, polyCenter, polyMidPoints, updatePos)
 import Rendering.DynamicNode (renderEvent)
 import Rendering.Node (Node, _visible, fixNodeE, fixNodeEWith, getParent, tapMesh)
 import Rendering.NodeRenderable (class NodeRenderable)
 import Three.Core.Geometry (CircleGeometry, Geometry, mkCircleGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial)
-import Three.Math.Vector (dist)
 import UI.DraggableObject (DragObjCfg, createDraggableObject)
 
 -- a data type to modify vectors
@@ -159,28 +158,13 @@ instance nodeRenderableMidMarkerPoint :: PolyVertex v => NodeRenderable e (MidMa
 
 -- | given a list of vertices position, calculate all middle points
 midMarkerPoints :: forall v. PolyVertex v => Dynamic Boolean -> Polygon v -> Array (MidMarkerPoint v)
-midMarkerPoints active poly = midMarkers active $ poly ^. _polyVerts
-    where midMarkers _ []         = []
-          midMarkers _ [a]        = []
-          midMarkers act vertices = h <$> filter g d
-              where -- take all vertices and their indices
-                    v1List = mapWithIndex Tuple vertices
-                    -- a new list with the head put to end
-                    v2List = fromMaybe [] $ lift2 snoc (tail vertices) (head vertices)
+midMarkerPoints active poly = mkPoint <$> polyMidPoints poly
+    where mkPoint (Tuple idx v) = MidMarkerPoint {
+              position : v,
+              index    : idx,
+              isActive : active
+              }
 
-                    f :: Tuple Int v -> v -> { dist :: Number, point :: MidMarkerPoint v }
-                    f v v2 = let idx = fst v
-                                 v1 = snd v
-                                 point = MidMarkerPoint {
-                                     position : (v1 .+. v2) .**. 0.5,
-                                     index    : idx + 1,
-                                     isActive : act
-                                     }
-                             in { dist: dist (getPos v1) (getPos v2), point: point }
-
-                    d = zipWith f v1List v2List
-                    g r = r.dist > 1.0
-                    h r = r.point
 
 -- | render all middle markers
 mkMidMarkers :: forall e v. PolyVertex v => Event Boolean -> Event (Polygon v) -> Node e (Event (MidMarkerPoint v))
