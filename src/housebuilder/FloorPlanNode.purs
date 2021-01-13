@@ -13,7 +13,7 @@ import Data.Maybe (Maybe(..), maybe)
 import Data.Meter (Meter, meter, meterVal)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Editor.Common.Lenses (_active, _height, _id, _modeDyn, _mouseMove, _name, _polygon, _position, _rotation, _tapped)
+import Editor.Common.Lenses (_active, _floor, _height, _id, _isDragging, _modeDyn, _mouseMove, _name, _polygon, _position, _rotation, _tapped)
 import Editor.PolygonEditor (_delete, createPolyEditor)
 import Editor.SceneEvent (SceneMouseMoveEvent)
 import FRP.Dynamic (Dynamic, latestEvt, step)
@@ -21,7 +21,7 @@ import FRP.Event (Event, fold)
 import FRP.Event.Extra (multicast)
 import HouseBuilder.RoofSurfaceBuilder (editSurfaces)
 import Math (pi)
-import Model.ActiveMode (ActiveMode(..), isActive)
+import Model.ActiveMode (ActiveMode(..), fromBoolean, isActive)
 import Model.Hardware.PanelModel (_isActive)
 import Model.HouseBuilder.FloorPlan (FloorPlan, FloorPlanOp(..), floorPlanTop)
 import Model.Polygon (Polygon, _polyVerts)
@@ -47,9 +47,6 @@ instance defaultFloorPlanConfig :: Default FloorPlanConfig where
         active        : pure Active,
         arrowMaterial : Nothing
         }
-
-_floor :: forall t a r. Newtype t { floor :: a | r } => Lens' t a
-_floor = _Newtype <<< prop (SProxy :: SProxy "floor")
 
 _arrowMaterial :: forall t a r. Newtype t { arrowMaterial :: a | r } => Lens' t a
 _arrowMaterial = _Newtype <<< prop (SProxy :: SProxy "arrowMaterial")
@@ -141,8 +138,10 @@ createFloorNode = do
         heightEvt <- setupHeightEditor isActEvt $ arrowPos <$> fpDyn
 
         -- setup the roof surfaces editor
-        let conf = def # _floor     .~ fp
-                       # _modeDyn   .~ act
+        let dragStDyn = step Active $ fromBoolean <<< not <$> editor ^. _isDragging
+            
+            conf = def # _floor     .~ fpDyn
+                       # _modeDyn   .~ ((&&) <$> act <*> dragStDyn)
                        # _mouseMove .~ latestEvt (view _mouseMove <$> polyMDyn)
         surfsEvt <- editSurfaces conf
 

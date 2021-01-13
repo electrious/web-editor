@@ -280,3 +280,6 @@ _deleted = _Newtype <<< prop (SProxy :: SProxy "deleted")
 
 _active :: forall t a r. Newtype t { active :: a | r } => Lens' t a
 _active = _Newtype <<< prop (SProxy :: SProxy "active")
+
+_floor :: forall t a r. Newtype t { floor :: a | r } => Lens' t a
+_floor = _Newtype <<< prop (SProxy :: SProxy "floor")

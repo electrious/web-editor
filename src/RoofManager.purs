@@ -6,7 +6,6 @@ import Algorithm.MeshFlatten (flattenRoofPlates)
 import Algorithm.PointInPolygon (underPolygons)
 import Control.Alt ((<|>))
 import Control.Monad.Reader (ask)
-import Control.Plus (empty)
 import Data.Array as Array
 import Data.Compactable (compact)
 import Data.Default (def)
@@ -52,6 +51,7 @@ import Rendering.Node (Node, mkNodeEnv, runNode)
 import Three.Core.Face3 (normal)
 import Three.Core.Object3D (class IsObject3D, Object3D, add, mkObject3D, remove, setName, worldToLocal)
 import Three.Math.Vector (mkVec3, toVec2, (<.>))
+import Util (foldEvtWith)
 
 newtype RoofManager = RoofManager {
     wrapper       :: Object3D,
@@ -99,10 +99,6 @@ doFlatten meshData rd = flattenRoofPlates (meshData ^. _geometry)
                                           (meshData ^. _verticeTree)
                                           (meshData ^. (_mesh <<< _mesh))
                                           (toUnfoldable $ values rd)
-
--- | accumulate event value in a foldable list of values with the specified retreive function
-foldEvtWith :: forall a b f. Foldable f => Functor f => (a -> Event b) -> f a -> Event b
-foldEvtWith f l = foldl (<|>) empty (f <$> l)
 
 -- | get roofUpdate event from an array of roof nodes
 getRoofUpdate :: forall f. Foldable f => Functor f => f RoofNode -> Event RoofOperation

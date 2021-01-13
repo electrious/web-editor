@@ -31,6 +31,7 @@ import Rendering.NodeRenderable (class NodeRenderable)
 import Three.Core.Geometry (CircleGeometry, Geometry, mkCircleGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial)
 import UI.DraggableObject (DragObjCfg, createDraggableObject)
+import Util (foldEvtWith)
 
 -- a data type to modify vectors
 newtype Modifier v = Modifier (v -> Effect v)
@@ -102,6 +103,8 @@ getVertMarkerActiveStatus ms = statusForDragging <|> statusForNewMarker
           statusForDragging  = keepLatest $ (anyEvt <<< mapWithIndex g) <$> ms
           statusForNewMarker = const Nothing <$> ms
 
+getVertMarkerDragging :: forall v. Event (Array (VertMarker v)) -> Event Boolean
+getVertMarkerDragging ms = keepLatest $ (foldEvtWith (view _isDragging)) <$> ms
 
 -- create new vertex markers
 setupVertMarkers :: forall e v. PolyVertex v => Modifier v -> Event Boolean -> Event (Maybe Int) -> Event (Polygon v) -> Node e (Event (Array (VertMarker v)))
@@ -192,8 +195,9 @@ _vertModifier :: forall t a r. Newtype t { vertModifier :: a | r } => Lens' t a
 _vertModifier = _Newtype <<< prop (SProxy :: SProxy "vertModifier")
 
 newtype PolyEditor v = PolyEditor {
-    polygon :: Event (Polygon v),
-    delete  :: Event SceneTapEvent
+    polygon    :: Event (Polygon v),
+    delete     :: Event SceneTapEvent,
+    isDragging :: Event Boolean
 }
 
 derive instance newtypePolyEditor :: Newtype (PolyEditor v) _
@@ -220,7 +224,7 @@ createPolyEditor cfg = do
         fixNodeEWith poly \polyEvt ->
             fixNodeE \actMarkerEvt -> do
                 -- pipe the 'active' param event into internal polyActive event
-                vertMarkersEvt <- setupVertMarkers (cfg ^. _vertModifier) polyActive actMarkerEvt polyEvt
+                vertMarkersEvt <- multicast <$> setupVertMarkers (cfg ^. _vertModifier) polyActive actMarkerEvt polyEvt
 
                 -- event for active vertex marker
                 let newActMarkerEvt = getVertMarkerActiveStatus vertMarkersEvt
@@ -251,7 +255,8 @@ createPolyEditor cfg = do
                 polyDel <- mkPolyDelMarker (polyCenter <$> newPolyEvt) polyActive
 
                 let editor = PolyEditor {
-                    polygon : skip 1 newPolyEvt,  -- skip the default polygon rendered
-                    delete  : multicast $ polyDel ^. _tapped
+                    polygon    : skip 1 newPolyEvt,  -- skip the default polygon rendered
+                    delete     : multicast $ polyDel ^. _tapped,
+                    isDragging : getVertMarkerDragging vertMarkersEvt
                     }
                 pure { input: newActMarkerEvt, output: { input: polygonEvt, output : { input: polyActEvt, output: editor } } }

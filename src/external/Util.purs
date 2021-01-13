@@ -2,6 +2,9 @@ module Util where
 
 import Prelude
 
+import Control.Alt ((<|>))
+import Control.Plus (empty)
+import Data.Foldable (class Foldable, foldl)
 import Effect (Effect)
 import FRP.Event (Event, create, makeEvent, subscribe)
 
@@ -13,3 +16,8 @@ fixE f = makeEvent \k -> do
     d1 <- subscribe input push
     d2 <- subscribe output k
     pure (d1 *> d2)
+
+
+-- | accumulate event value in a foldable list of values with the specified retreive function
+foldEvtWith :: forall a b f. Foldable f => Functor f => (a -> Event b) -> f a -> Event b
+foldEvtWith f l = foldl (<|>) empty (f <$> l)
