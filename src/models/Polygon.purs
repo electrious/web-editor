@@ -53,11 +53,10 @@ newPolygon :: forall f v. Foldable f => f v -> Polygon v
 newPolygon = fromFoldable >>> Polygon
 
 -- | create a Polygon around a central vector
-polygonAround :: Vector2 -> Polygon Vector2
-polygonAround p = newPolygon [p1, p2, p3, p4]
+polygonAround :: Number -> Vector2 -> Polygon Vector2
+polygonAround l p = newPolygon [p1, p2, p3, p4]
     where x = vecX p
           y = vecY p
-          l = 10.0
           p1 = mkVec2 (x - l) (y - l)
           p2 = mkVec2 (x - l) (y + l)
           p3 = mkVec2 (x + l) (y + l)

@@ -53,5 +53,5 @@ newSurface poly = do
 
 -- | create a new RoofSurface around a point
 surfaceAround :: Vector3 -> Effect RoofSurface
-surfaceAround p = traverse mkHP (polygonAround $ toVec2 p) >>= newSurface
+surfaceAround p = traverse mkHP (polygonAround 3.0 $ toVec2 p) >>= newSurface
     where mkHP v = newHousePoint RidgePoint (mkVec3 (vecX v) (vecY v) 0.01)

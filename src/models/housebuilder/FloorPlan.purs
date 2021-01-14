@@ -47,7 +47,7 @@ newFloorPlan p = do
     i <- genUUID
     pure $ FloorPlan {
         id      : i,
-        polygon : polygonAround p,
+        polygon : polygonAround 10.0 p,
         height  : meter 0.0
         }
 
