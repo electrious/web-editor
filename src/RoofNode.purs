@@ -20,7 +20,7 @@ import Data.Traversable (sequence_, traverse, traverse_)
 import Data.Tuple (Tuple(..))
 import Data.UUID (UUID)
 import Editor.ArrayBuilder (ArrayBuilder, _editorMode, _heatmapMaterial, liftRenderingM)
-import Editor.Common.Lenses (_alignment, _center, _houseId, _id, _mesh, _orientation, _panelType, _polygon, _position, _roof, _rotation, _slope, _tapped)
+import Editor.Common.Lenses (_active, _alignment, _center, _houseId, _id, _mesh, _orientation, _panelType, _polygon, _position, _roof, _rotation, _slope, _tapped)
 import Editor.Disposable (class Disposable, dispose)
 import Editor.EditorMode (EditorMode(..))
 import Editor.HouseEditor (_heatmap)
@@ -37,7 +37,8 @@ import FRP.Event (Event, create, keepLatest)
 import FRP.Event.Extra (multicast)
 import Math (pi)
 import Math.Angle (degreeVal, radianVal)
-import Model.Hardware.PanelModel (PanelModel, _isActive)
+import Model.ActiveMode (fromBoolean)
+import Model.Hardware.PanelModel (PanelModel)
 import Model.Polygon (Polygon, _polyVerts, newPolygon, renderPolygon)
 import Model.Roof.Panel (Alignment(..), Orientation(..), Panel)
 import Model.Roof.RoofPlate (RoofOperation(..), RoofPlate, _azimuth, _borderPoints, _unifiedPoints)
@@ -277,7 +278,7 @@ createRoofNode cfg = do
         -- create the vertex markers editor
         let canEdit = (&&) <$> isActive <*> canEditRoofDyn
             -- PolyEditorConf
-            opt = def # _isActive .~ isActive
+            opt = def # _active   .~ (fromBoolean <$> isActive)
                       # _polygon  .~ poly
         Tuple editor d0 <- runNode (createPolyEditor opt) (mkNodeEnv obj unit)
 

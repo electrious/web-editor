@@ -20,7 +20,7 @@ import Data.Traversable (traverse)
 import Data.Tuple (snd)
 import Data.UUID (UUID)
 import Data.UUIDMap (UUIDMap)
-import Editor.Common.Lenses (_face, _floor, _modeDyn, _mouseMove, _name, _point, _polygon, _position)
+import Editor.Common.Lenses (_active, _face, _floor, _modeDyn, _mouseMove, _name, _point, _polygon, _position)
 import Editor.ObjectAdder (CandidatePoint, createObjectAdder, mkCandidatePoint)
 import Editor.PolygonEditor (_delete, createPolyEditor)
 import Editor.SceneEvent (SceneMouseMoveEvent)
@@ -28,7 +28,6 @@ import FRP.Dynamic (Dynamic, dynEvent, gateDyn, step)
 import FRP.Event (Event, fold, keepLatest)
 import FRP.Event.Extra (performEvent)
 import Model.ActiveMode (ActiveMode(..), isActive)
-import Model.Hardware.PanelModel (_isActive)
 import Model.HouseBuilder.FloorPlan (FloorPlan)
 import Model.HouseBuilder.RoofSurface (RoofSurface, newSurface, surfaceAround)
 import Model.Polygon (class PolyVertex, Polygon, _polyVerts, getPos, polyCenter, polyMidPoints)
@@ -60,8 +59,8 @@ _surface = _Newtype <<< prop (SProxy :: SProxy "surface")
 
 editRoofSurface :: forall e. RoofSurface -> Node e RoofSurfEditor
 editRoofSurface rs = do
-    let cfg = def # _isActive .~ pure true
-                  # _polygon  .~ rs ^. _polygon
+    let cfg = def # _active  .~ pure Active
+                  # _polygon .~ rs ^. _polygon
                   
     editor <- createPolyEditor cfg
     

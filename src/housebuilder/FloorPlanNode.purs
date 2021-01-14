@@ -131,8 +131,8 @@ createFloorNode = do
 
         -- setup the polygon editor
         editor <- node (def # _position .~ (calcPos <$> fpDyn)) $
-                      createPolyEditor $ def # _isActive .~ isActDyn
-                                             # _polygon  .~ fp ^. _polygon
+                      createPolyEditor $ def # _active  .~ (fromBoolean <$> isActDyn)
+                                             # _polygon .~ fp ^. _polygon
 
         -- setup the height editor
         heightEvt <- setupHeightEditor isActDyn $ arrowPos <$> fpDyn

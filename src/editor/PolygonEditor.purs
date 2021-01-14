@@ -16,17 +16,19 @@ import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple(..))
-import Editor.Common.Lenses (_index, _isDragging, _name, _polygon, _position, _tapped)
+import Editor.Common.Lenses (_active, _index, _isDragging, _name, _polygon, _position, _tapped)
 import Editor.SceneEvent (SceneTapEvent)
 import Effect (Effect)
+import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
-import FRP.Dynamic (Dynamic, dynEvent, step)
+import FRP.Dynamic (Dynamic, current, dynEvent, step)
 import FRP.Event (Event, keepLatest, sampleOn)
 import FRP.Event.Extra (anyEvt, mergeArray, multicast, performEvent, skip)
+import Model.ActiveMode (ActiveMode(..), fromBoolean, isActive)
 import Model.Hardware.PanelModel (_isActive)
 import Model.Polygon (class PolyVertex, Polygon, _polyVerts, addVertexAt, delVertexAt, getPos, newPolygon, polyCenter, polyMidPoints, updatePos)
 import Rendering.DynamicNode (renderEvent)
-import Rendering.Node (Node, _visible, fixNodeE, fixNodeEWith, getParent, tapMesh)
+import Rendering.Node (Node, _visible, fixNodeDWith, fixNodeEWith, getParent, tapMesh)
 import Rendering.NodeRenderable (class NodeRenderable)
 import Three.Core.Geometry (CircleGeometry, Geometry, mkCircleGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial)
@@ -48,7 +50,7 @@ _modifierFunc = _Newtype
 newtype VertMarkerPoint v = VertMarkerPoint {
     position :: v,
     index    :: Int,
-    isActive :: Dynamic Boolean,
+    active   :: Dynamic ActiveMode,
     modifier :: Modifier v
 }
 
@@ -67,7 +69,7 @@ derive instance newtypeVertMarker :: Newtype (VertMarker v) _
 
 instance nodeRenderableVertMarkerPoint :: PolyVertex v => NodeRenderable e (VertMarkerPoint v) (VertMarker v) where
     render m = do
-        let cfg = def # _isActive .~ m ^. _isActive
+        let cfg = def # _isActive .~ (isActive <$> m ^. _active)
                       # _position .~ getPos (m ^. _position)
             mod = m ^. _modifier <<< _modifierFunc
         dragObj <- createDraggableObject (cfg :: DragObjCfg Geometry)
@@ -79,20 +81,18 @@ instance nodeRenderableVertMarkerPoint :: PolyVertex v => NodeRenderable e (Vert
         }
 
 -- create a vertex marker point
-mkVertMarkerPoint :: forall v. Modifier v -> Event Boolean -> Event (Maybe Int) -> Tuple v Int -> VertMarkerPoint v
+mkVertMarkerPoint :: forall v. Modifier v -> Dynamic ActiveMode -> Dynamic (Maybe Int) -> Tuple v Int -> VertMarkerPoint v
 mkVertMarkerPoint m polyActive actMarker (Tuple pos idx) = VertMarkerPoint {
                                                                position : pos,
                                                                index    : idx,
-                                                               isActive : step false isActive,
+                                                               active   : f <$> polyActive <*> actMarker,
                                                                modifier : m
                                                                }
     where f act Nothing       = act
-          f act (Just actIdx) = act && actIdx == idx
-
-          isActive = multicast $ f <$> polyActive <*> actMarker
+          f act (Just actIdx) = act && fromBoolean (actIdx == idx)
 
 -- create vertex markers for an array of vertices
-mkVertMarkerPoints :: forall v. Modifier v -> Event Boolean -> Event (Maybe Int) -> Polygon v -> Array (VertMarkerPoint v)
+mkVertMarkerPoints :: forall v. Modifier v -> Dynamic ActiveMode -> Dynamic (Maybe Int) -> Polygon v -> Array (VertMarkerPoint v)
 mkVertMarkerPoints m polyActive actMarker poly = mkVertMarkerPoint m polyActive actMarker <$> zip ps (range 0 (length ps - 1))
     where ps = poly ^. _polyVerts
 
@@ -107,7 +107,7 @@ getVertMarkerDragging :: forall v. Event (Array (VertMarker v)) -> Event Boolean
 getVertMarkerDragging ms = keepLatest $ (foldEvtWith (view _isDragging)) <$> ms
 
 -- create new vertex markers
-setupVertMarkers :: forall e v. PolyVertex v => Modifier v -> Event Boolean -> Event (Maybe Int) -> Event (Polygon v) -> Node e (Event (Array (VertMarker v)))
+setupVertMarkers :: forall e v. PolyVertex v => Modifier v -> Dynamic ActiveMode -> Dynamic (Maybe Int) -> Event (Polygon v) -> Node e (Event (Array (VertMarker v)))
 setupVertMarkers m polyActive activeMarker polyEvt = renderEvent vertMarkers
     where vertMarkers = mkVertMarkerPoints m polyActive activeMarker <$> polyEvt
 
@@ -120,10 +120,10 @@ polyDelGeo :: CircleGeometry
 polyDelGeo = unsafePerformEffect (mkCircleGeometry 0.6 32)
 
 -- | create the polygon delete marker button
-mkPolyDelMarker :: forall e v. PolyVertex v => Event v -> Event Boolean -> Node e TappableMesh
-mkPolyDelMarker posEvt visEvt = tapMesh (def # _name     .~ "delete-marker"
+mkPolyDelMarker :: forall e v. PolyVertex v => Event v -> Dynamic ActiveMode -> Node e TappableMesh
+mkPolyDelMarker posEvt actDyn = tapMesh (def # _name     .~ "delete-marker"
                                              # _position .~ step def (getPos <$> posEvt)
-                                             # _visible  .~ step false visEvt
+                                             # _visible  .~ (isActive <$> actDyn)
                                         ) polyDelGeo polyDelMat
 
 -----------------------------------------------------------
@@ -131,7 +131,7 @@ mkPolyDelMarker posEvt visEvt = tapMesh (def # _name     .~ "delete-marker"
 newtype MidMarkerPoint v = MidMarkerPoint {
     position :: v,
     index    :: Int,
-    isActive :: Dynamic Boolean
+    active   :: Dynamic ActiveMode
 }
 
 derive instance newtypeMidMarkerPoint :: Newtype (MidMarkerPoint v) _
@@ -154,31 +154,30 @@ instance nodeRenderableMidMarkerPoint :: PolyVertex v => NodeRenderable e (MidMa
         parent <- getParent
         m <- tapMesh (def # _name     .~ "mid-marker"
                           # _position .~ pure (getPos $ p ^. _position)
-                          # _visible  .~ (p ^. _isActive)
+                          # _visible  .~ (isActive <$> p ^. _active)
                      ) midGeometry midMaterial
         
         pure $ MidMarker { tapped : const p <$> m ^. _tapped }
 
 -- | given a list of vertices position, calculate all middle points
-midMarkerPoints :: forall v. PolyVertex v => Dynamic Boolean -> Polygon v -> Array (MidMarkerPoint v)
+midMarkerPoints :: forall v. PolyVertex v => Dynamic ActiveMode -> Polygon v -> Array (MidMarkerPoint v)
 midMarkerPoints active poly = mkPoint <$> polyMidPoints poly
     where mkPoint (Tuple idx v) = MidMarkerPoint {
               position : v,
               index    : idx,
-              isActive : active
+              active   : active
               }
 
 
 -- | render all middle markers
-mkMidMarkers :: forall e v. PolyVertex v => Event Boolean -> Event (Polygon v) -> Node e (Event (MidMarkerPoint v))
-mkMidMarkers active polyEvt = do
-    let actDyn     = step false active
-        mPointsEvt = midMarkerPoints actDyn <$> polyEvt
+mkMidMarkers :: forall e v. PolyVertex v => Dynamic ActiveMode -> Event (Polygon v) -> Node e (Event (MidMarkerPoint v))
+mkMidMarkers actDyn polyEvt = do
+    let mPointsEvt = midMarkerPoints actDyn <$> polyEvt
     markers :: (Event (Array (MidMarker v))) <- renderEvent mPointsEvt
     pure $ keepLatest $ getTapEvt <$> markers
 
 newtype PolyEditorConf v = PolyEditorConf {
-    isActive     :: Dynamic Boolean,
+    active       :: Dynamic ActiveMode,
     polygon      :: Polygon v,
     vertModifier :: Modifier v
     }
@@ -186,7 +185,7 @@ newtype PolyEditorConf v = PolyEditorConf {
 derive instance newtypePolyEditorConf :: Newtype (PolyEditorConf v) _
 instance defaultPolyEditorConf :: Default (PolyEditorConf v) where
     def = PolyEditorConf {
-        isActive     : pure false,
+        active       : pure Inactive,
         polygon      : def,
         vertModifier : def
         }
@@ -218,13 +217,15 @@ getTapEvt = anyEvt <<< map (view _tapped)
 createPolyEditor :: forall e v. PolyVertex v => PolyEditorConf v -> Node e (PolyEditor v)
 createPolyEditor cfg = do
     let poly   = cfg ^. _polygon
-        active = cfg ^. _isActive
+        active = cfg ^. _active
+
+    defAct <- liftEffect $ current active
     
-    fixNodeEWith false \polyActive ->
+    fixNodeDWith defAct \polyActive ->
         fixNodeEWith poly \polyEvt ->
-            fixNodeE \actMarkerEvt -> do
+            fixNodeDWith Nothing \actMarkerDyn -> do
                 -- pipe the 'active' param event into internal polyActive event
-                vertMarkersEvt <- multicast <$> setupVertMarkers (cfg ^. _vertModifier) polyActive actMarkerEvt polyEvt
+                vertMarkersEvt <- multicast <$> setupVertMarkers (cfg ^. _vertModifier) polyActive actMarkerDyn polyEvt
 
                 -- event for active vertex marker
                 let newActMarkerEvt = getVertMarkerActiveStatus vertMarkersEvt
@@ -235,7 +236,7 @@ createPolyEditor cfg = do
                     -- merge new vertices after dragging and vertices after adding/deleting
                     newPolyEvt = multicast $ polyEvt <|> vertsAfterDrag
     
-                    midActive = multicast $ lift2 (\pa am -> pa && am == Nothing) polyActive actMarkerEvt
+                    midActive = lift2 (\pa am -> pa && fromBoolean (am == Nothing)) polyActive actMarkerDyn
                 -- create mid markers for adding new vertices
                 toAddEvt <- mkMidMarkers midActive newPolyEvt
 
@@ -250,7 +251,7 @@ createPolyEditor cfg = do
                     -- update the real vertex list after adding/deleting
                     polygonEvt = multicast $ vertsAfterAdd <|> vertsAfterDel
 
-                    polyActEvt = dynEvent active <|> (const true <$> polygonEvt)
+                    polyActEvt = dynEvent active <|> (const Active <$> polygonEvt)
                 -- create the polygon delete button
                 polyDel <- mkPolyDelMarker (polyCenter <$> newPolyEvt) polyActive
 
