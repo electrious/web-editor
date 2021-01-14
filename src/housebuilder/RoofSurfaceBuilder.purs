@@ -5,6 +5,7 @@ import Prelude
 import Control.Alt ((<|>))
 import Control.Plus (empty)
 import Data.Array (concat, find)
+import Data.Compactable (compact)
 import Data.Default (class Default, def)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
@@ -64,7 +65,7 @@ editRoofSurface rs = do
                   
     editor <- createPolyEditor cfg
     
-    pure $ def # _surface .~ (performEvent $ newSurface <$> editor ^. _polygon)
+    pure $ def # _surface .~ performEvent (newSurface <$> editor ^. _polygon)
                # _delete  .~ (const (rs ^. idLens) <$> editor ^. _delete)
 
 
@@ -120,17 +121,22 @@ instance defaultSurfaceBuilderCfg :: Default SurfaceBuilderCfg where
 
 
 newtype BuilderState = BuilderState {
-    surfaces :: UUIDMap RoofSurface
+    surfaces      :: UUIDMap RoofSurface,
+    surfsToRender :: Maybe (UUIDMap RoofSurface)
     }
 
 derive instance newtypeBuilderState :: Newtype BuilderState _
 instance defaultBuilderState :: Default BuilderState where
     def = BuilderState {
-        surfaces : M.empty
+        surfaces      : M.empty,
+        surfsToRender : Nothing
         }
 
 _surfaces :: forall t a r. Newtype t { surfaces :: a | r } => Lens' t a
 _surfaces = _Newtype <<< prop (SProxy :: SProxy "surfaces")
+
+_surfsToRender :: forall t a r. Newtype t { surfsToRender :: a | r } => Lens' t a
+_surfsToRender = _Newtype <<< prop (SProxy :: SProxy "surfsToRender")
 
 
 data BuilderOp = AddSurface RoofSurface
@@ -141,17 +147,21 @@ derive instance genericBuilderOp :: Generic BuilderOp _
 instance showBuilderOp :: Show BuilderOp where
     show = genericShow
 
+renderAll :: BuilderState -> BuilderState
+renderAll st = st # _surfsToRender .~ Just (st ^. _surfaces)
 
 applyOp :: BuilderOp -> BuilderState -> BuilderState
-applyOp (AddSurface surf)    s = s # _surfaces %~ M.insert (surf ^. idLens) surf
-applyOp (DelSurface sid)     s = s # _surfaces %~ M.delete sid
+applyOp (AddSurface surf)    s = renderAll $ s # _surfaces %~ M.insert (surf ^. idLens) surf
+applyOp (DelSurface sid)     s = renderAll $ s # _surfaces %~ M.delete sid
 applyOp (UpdateSurface surf) s = s # _surfaces %~ M.update (const $ Just surf) (surf ^. idLens)
+                                   # _surfsToRender .~ Nothing
 
 
 editSurfaces :: forall e. SurfaceBuilderCfg -> Node e (Event (List RoofSurface))
 editSurfaces cfg = fixNodeE \stEvt -> do
     -- render all roof surface editors
-    ses <- eventNode $ (traverse editRoofSurface <<< view _surfaces) <$> stEvt
+    let surfsToR = compact $ view _surfsToRender <$> stEvt
+    ses <- eventNode $ traverse editRoofSurface <$> surfsToR
 
     let -- get the delete roof surface event
         delEvt = keepLatest $ foldEvtWith (view _delete) <$> ses
