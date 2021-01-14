@@ -19,7 +19,7 @@ import Editor.Common.Lenses (_name, _parent, _position, _rotation, _scale)
 import Editor.Disposable (Disposee(..))
 import Effect (Effect)
 import Effect.Class (class MonadEffect, liftEffect)
-import FRP.Dynamic (Dynamic, subscribeDyn)
+import FRP.Dynamic (Dynamic, step, subscribeDyn)
 import FRP.Event (Event, create, subscribe)
 import Three.Core.Geometry (class IsGeometry, mkLineGeometry, setLinePositions)
 import Three.Core.Material (class IsMaterial, LineBasicMaterial)
@@ -206,4 +206,14 @@ fixNodeEWith v f = do
 
     liftEffect $ pushInput v
 
+    pure out
+
+fixNodeDWith :: forall e i o. i -> (Dynamic i -> Node e { input :: Event i, output :: o }) -> Node e o
+fixNodeDWith v f = do
+    { event: inEvt, push: pushInput } <- liftEffect create
+    let inDyn = step v inEvt
+    { input: newInEvt, output: out } <- f inDyn
+    d <- liftEffect $ subscribe newInEvt pushInput
+    tell $ Disposee d
+    
     pure out
