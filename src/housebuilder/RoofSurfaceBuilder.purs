@@ -33,7 +33,7 @@ import FRP.Event (Event, fold, keepLatest)
 import FRP.Event.Extra (multicast, performEvent)
 import Model.ActiveMode (ActiveMode(..), isActive)
 import Model.HouseBuilder.FloorPlan (FloorPlan)
-import Model.HouseBuilder.RoofSurface (RoofSurface, newSurface, surfaceAround)
+import Model.HouseBuilder.RoofSurface (RoofSurface, newSurfaceWith, surfaceAround)
 import Model.Polygon (class PolyVertex, Polygon, _polyVerts, getPos, polyCenter, polyMidPoints)
 import Model.UUID (idLens)
 import Rendering.DynamicNode (dynamic_, eventNode)
@@ -72,9 +72,10 @@ editRoofSurface rs = do
         
         editor <- createPolyEditor cfg
     
-        let newSurfEvt = multicast $ performEvent $ newSurface <$> editor ^. _polygon
+        let sid = rs ^. idLens
+            newSurfEvt = multicast $ newSurfaceWith sid <$> editor ^. _polygon
             e = def # _surface .~ newSurfEvt
-                    # _delete  .~ (const (rs ^. idLens) <$> editor ^. _delete)
+                    # _delete  .~ (const sid <$> editor ^. _delete)
 
         pure { input: newSurfEvt, output: e }
 

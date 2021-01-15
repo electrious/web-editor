@@ -45,11 +45,12 @@ allPoints :: RoofSurface -> Array HousePoint
 allPoints s = s ^. _polygon <<< _polyVerts
 
 newSurface :: Polygon HousePoint -> Effect RoofSurface
-newSurface poly = do
-    i <- genUUID
-    pure $ def # _id          .~ i
-               # _polygon     .~ poly
-               # _ridgePoints .~ ridgePoints (fromFoldable $ poly ^. _polyVerts)
+newSurface poly = genUUID >>= flip newSurfaceWith poly >>> pure
+
+newSurfaceWith :: UUID -> Polygon HousePoint -> RoofSurface
+newSurfaceWith i poly = def # _id          .~ i
+                            # _polygon     .~ poly
+                            # _ridgePoints .~ ridgePoints (fromFoldable $ poly ^. _polyVerts)
 
 -- | create a new RoofSurface around a point
 surfaceAround :: Vector3 -> Effect RoofSurface
