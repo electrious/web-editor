@@ -2,11 +2,13 @@ module HouseBuilder.RoofSurfaceBuilder where
 
 import Prelude
 
+import Algorithm.PointInPolygon (underPolygons)
 import Control.Alt ((<|>))
 import Control.Plus (empty)
-import Data.Array (concat, find, head, snoc)
+import Data.Array (concat, find, fromFoldable, head, snoc)
 import Data.Compactable (compact)
 import Data.Default (class Default, def)
+import Data.Foldable (class Foldable)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Lens (Lens', view, (%~), (.~), (^.))
@@ -26,7 +28,7 @@ import Editor.ObjectAdder (CandidatePoint, createObjectAdder, mkCandidatePoint)
 import Editor.PolygonEditor (_delete, createPolyEditor)
 import Editor.SceneEvent (SceneMouseMoveEvent)
 import Effect.Unsafe (unsafePerformEffect)
-import FRP.Dynamic (Dynamic, dynEvent, gateDyn, step)
+import FRP.Dynamic (Dynamic, gateDyn, step)
 import FRP.Event (Event, fold, keepLatest)
 import FRP.Event.Extra (multicast, performEvent)
 import Model.ActiveMode (ActiveMode(..), isActive)
@@ -78,16 +80,20 @@ editRoofSurface rs = do
 
 
 -- | get all vertices, mid points and center point to avoid showing surface adder near them
-floorPlanPoints :: forall v. PolyVertex v => Polygon v -> Array v
-floorPlanPoints poly = concat [[polyCenter poly], poly ^. _polyVerts, snd <$> polyMidPoints poly]
+polygonPoints :: forall v. PolyVertex v => Polygon v -> Array v
+polygonPoints poly = concat [[polyCenter poly], poly ^. _polyVerts, snd <$> polyMidPoints poly]
 
-validCandPoint :: forall v. PolyVertex v => CandidatePoint -> Polygon v -> Boolean
-validCandPoint p poly = isNothing $ find f $ floorPlanPoints poly
-    where f v = dist (getPos v) (p ^. _position) < 2.0
+validCandPoint :: forall v f. PolyVertex v => Functor f => Foldable f => CandidatePoint -> f RoofSurface -> Polygon v -> Boolean
+validCandPoint p surfs poly = not (underPolygons surfPolys (p ^. _position)) && isNothing (find f ps)
+    where f v = dist v (p ^. _position) < 2.0
+          -- all points on all surfs
+          surfPolys = (map getPos <<< view _polygon) <$> surfs
+          surfPs    = concat $ fromFoldable $ polygonPoints <$> surfPolys
+          ps        = concat $ [getPos <$> polygonPoints poly, surfPs]
 
 -- | function to show an ObjectAdder to add a new roof surface
-addSurface :: forall e. SurfaceBuilderCfg -> Node e (Event RoofSurface)
-addSurface cfg = do
+addSurface :: forall e f. Functor f => Foldable f => SurfaceBuilderCfg -> Dynamic (f RoofSurface) -> Node e (Event RoofSurface)
+addSurface cfg surfsDyn = do
     parent <- getParent
 
     -- get a candidate point
@@ -98,10 +104,10 @@ addSurface cfg = do
         actDyn  = isActive <$> cfg ^. _modeDyn
         pntsEvt = performEvent $ getCandPoint <$> gateDyn actDyn (cfg ^. _mouseMove)
 
-        f s (Just p) = if validCandPoint p (s ^. _polygon) then Just p else Nothing
-        f _ Nothing  = Nothing
+        f surfs s (Just p) = if validCandPoint p surfs (s ^. _polygon) then Just p else Nothing
+        f surfs _ Nothing  = Nothing
         
-        candPntDyn = step Nothing $ f <$> (dynEvent $ cfg ^. _floor) <*> pntsEvt
+        candPntDyn = f <$> surfsDyn <*> (cfg ^. _floor) <*> (step Nothing pntsEvt)
 
         toSurf = surfaceAround <<< view _position
 
@@ -190,7 +196,7 @@ editSurfaces cfg = fixNodeE \stEvt -> do
         updEvt = keepLatest $ foldEvtWith (view _surface) <$> ses
 
     -- render surface adder to add new surfaces
-    newSurfEvt <- addSurface cfg
+    newSurfEvt <- addSurface cfg (step M.empty $ view _surfaces <$> stEvt)
 
     let opEvt = (AddSurface <$> newSurfEvt) <|>
                 (DelSurface <$> delEvt)     <|>

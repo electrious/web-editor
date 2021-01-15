@@ -140,6 +140,8 @@ renderPolygon p mat = do
 class IsPolygon p v where
     toPolygon :: p -> Polygon v
 
+instance isPolygonBase :: IsPolygon (Polygon v) v where
+    toPolygon = identity
 
 class Default v <= PolyVertex v where
     getPos    :: v -> Vector3
