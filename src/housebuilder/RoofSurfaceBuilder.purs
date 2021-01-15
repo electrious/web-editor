@@ -4,7 +4,7 @@ import Prelude
 
 import Control.Alt ((<|>))
 import Control.Plus (empty)
-import Data.Array (concat, find)
+import Data.Array (concat, find, head, snoc)
 import Data.Compactable (compact)
 import Data.Default (class Default, def)
 import Data.Generic.Rep (class Generic)
@@ -14,7 +14,7 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (List)
 import Data.Map as M
-import Data.Maybe (Maybe(..), isNothing)
+import Data.Maybe (Maybe(..), fromMaybe, isNothing)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
@@ -25,17 +25,19 @@ import Editor.Common.Lenses (_active, _face, _floor, _modeDyn, _mouseMove, _name
 import Editor.ObjectAdder (CandidatePoint, createObjectAdder, mkCandidatePoint)
 import Editor.PolygonEditor (_delete, createPolyEditor)
 import Editor.SceneEvent (SceneMouseMoveEvent)
+import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, dynEvent, gateDyn, step)
 import FRP.Event (Event, fold, keepLatest)
-import FRP.Event.Extra (performEvent)
+import FRP.Event.Extra (multicast, performEvent)
 import Model.ActiveMode (ActiveMode(..), isActive)
 import Model.HouseBuilder.FloorPlan (FloorPlan)
 import Model.HouseBuilder.RoofSurface (RoofSurface, newSurface, surfaceAround)
 import Model.Polygon (class PolyVertex, Polygon, _polyVerts, getPos, polyCenter, polyMidPoints)
 import Model.UUID (idLens)
-import Rendering.DynamicNode (eventNode)
-import Rendering.Node (Node, fixNodeE, getParent, node)
+import Rendering.DynamicNode (dynamic_, eventNode)
+import Rendering.Node (Node, fixNodeDWith, fixNodeE, getParent, line, node)
 import Three.Core.Face3 (normal)
+import Three.Core.Material (LineBasicMaterial, mkLineBasicMaterial)
 import Three.Core.Object3D (worldToLocal)
 import Three.Math.Vector (dist, mkVec3)
 import Util (foldEvtWith)
@@ -62,11 +64,17 @@ editRoofSurface :: forall e. RoofSurface -> Node e RoofSurfEditor
 editRoofSurface rs = do
     let cfg = def # _active  .~ pure Active
                   # _polygon .~ rs ^. _polygon
-                  
-    editor <- createPolyEditor cfg
+
+    fixNodeDWith rs \rsDyn -> do
+        dynamic_ $ renderSurfaceLines <$> rsDyn
+        
+        editor <- createPolyEditor cfg
     
-    pure $ def # _surface .~ performEvent (newSurface <$> editor ^. _polygon)
-               # _delete  .~ (const (rs ^. idLens) <$> editor ^. _delete)
+        let newSurfEvt = multicast $ performEvent $ newSurface <$> editor ^. _polygon
+            e = def # _surface .~ newSurfEvt
+                    # _delete  .~ (const (rs ^. idLens) <$> editor ^. _delete)
+
+        pure { input: newSurfEvt, output: e }
 
 
 -- | get all vertices, mid points and center point to avoid showing surface adder near them
@@ -102,6 +110,19 @@ addSurface cfg = do
     selPntEvt <- node opt (createObjectAdder candPntDyn actDyn)
     pure $ performEvent $ toSurf <$> selPntEvt
 
+
+lineBasicMat :: LineBasicMaterial
+lineBasicMat = unsafePerformEffect $ mkLineBasicMaterial 0x00ee00 20.0
+
+-- | render a single surface as lines
+renderSurfaceLines :: forall e. RoofSurface -> Node e Unit
+renderSurfaceLines s = do
+    let vs = s ^. _polygon <<< _polyVerts
+        nvs = fromMaybe vs $ snoc <$> Just vs <*> head vs
+        prop = def # _name .~ "surface-line"
+    _ <- line prop (getPos <$> nvs) lineBasicMat
+    
+    pure unit
 
 -- | Add/Remove/Update all roof surfaces
 

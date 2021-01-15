@@ -1,5 +1,4 @@
 const three = require('three')
-const line = require('three/examples/jsm/lines/LineGeometry')
 
 exports.clone = _ => g => _ => {
     return g.clone()
@@ -69,20 +68,8 @@ exports.mkExtrudeGeometry = s => opt => _ => {
     return new three.ExtrudeGeometry(s, opt)
 }
 
-exports.mkLineGeometry = _ => {
-    return new line.LineGeometry()
-}
-
-exports.setLinePositions = pos => line => _ => {
-    let positions = []
-    pos.forEach(p => positions.push(p.x, p.y, p.z))
-    line.setPositions(positions)
-}
-
-exports.setLineColors = cls => line => _ => {
-    let colors = []
-    cls.forEach(c => colors.push(c.r, c.g, c.b))
-    line.setColors(colors)
+exports.mkLineGeometry = ps => _ => {
+    return new three.BufferGeometry().setFromPoints(ps)
 }
 
 exports.isBufferAttribute = attr => {

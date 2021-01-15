@@ -21,8 +21,7 @@ foreign import setBufferGeometry :: forall geo. IsBufferGeometry geo => geo -> M
 foreign import setMaterial :: forall mat. IsMaterial mat => mat -> Mesh -> Effect Unit
 
 
-foreign import data Line2 :: Type
-foreign import mkLine2 :: LineGeometry -> LineBasicMaterial -> Effect Line2
-foreign import computeLineDistances :: Line2 -> Effect Unit
-instance isObject3DLine2 :: IsObject3D Line2 where
+foreign import data Line :: Type
+foreign import mkLine :: LineGeometry -> LineBasicMaterial -> Effect Line
+instance isObject3DLine :: IsObject3D Line where
     toObject3D = unsafeCoerce

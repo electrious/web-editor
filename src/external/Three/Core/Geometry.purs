@@ -10,7 +10,6 @@ import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Effect (Effect)
 import Three.Core.Face3 (Face3)
-import Three.Math.Color (Color)
 import Three.Math.Vector (Vector2, Vector3)
 
 class IsGeometry geo
@@ -115,9 +114,7 @@ _bevelSegments = _Newtype <<< prop (SProxy :: SProxy "bevelSegments")
 foreign import mkExtrudeGeometry :: Shape -> ExtrudeSettings -> Effect ExtrudeGeometry
 
 foreign import data LineGeometry :: Type
-foreign import mkLineGeometry :: Effect LineGeometry
-foreign import setLinePositions :: Array Vector3 -> LineGeometry -> Effect Unit
-foreign import setLineColors :: Array Color -> LineGeometry -> Effect Unit
+foreign import mkLineGeometry :: Array Vector3 -> Effect LineGeometry
 
 foreign import data BufferGeometry :: Type
 foreign import data BufferAttribute :: Type
