@@ -39,6 +39,7 @@ derive instance genericPolygon :: Generic (Polygon v) _
 derive instance newtypePolygon :: Newtype (Polygon v) _
 derive instance eqPolygon :: Eq v => Eq (Polygon v)
 derive newtype instance functorPolygon :: Functor Polygon
+derive newtype instance foldablePolygon :: Foldable Polygon
 derive newtype instance traversablePolygon :: Traversable Polygon
 instance showPolygon :: Show v => Show (Polygon v) where
     show = genericShow
@@ -110,13 +111,13 @@ polygonBBox poly = def # _minX .~ fromMaybe 0.0 (minimum xs)
           ys = vecY <$> vs
 
 
-instance nodeRenderablePolygon :: Vector v => NodeRenderable (Dynamic MeshBasicMaterial) (Polygon v) TapMouseMesh where
+instance nodeRenderablePolygon :: PolyVertex v => NodeRenderable (Dynamic MeshBasicMaterial) (Polygon v) TapMouseMesh where
     render p = do
         -- get the current material used
         matDyn <- getEnv
         mat <- liftEffect $ current matDyn
         
-        shp <- liftEffect $ mkShape $ toVec2 <$> p ^. _polyVerts
+        shp <- liftEffect $ mkShape $ (toVec2 <<< getPos) <$> p ^. _polyVerts
         geo <- liftEffect $ mkShapeGeometry shp
         
         m <- tapMouseMesh def geo mat
