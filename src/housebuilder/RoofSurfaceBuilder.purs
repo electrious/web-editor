@@ -28,7 +28,7 @@ import Editor.ObjectAdder (CandidatePoint, createObjectAdder, mkCandidatePoint)
 import Editor.PolygonEditor (_delete, createPolyEditor)
 import Editor.SceneEvent (SceneMouseMoveEvent)
 import Effect.Unsafe (unsafePerformEffect)
-import FRP.Dynamic (Dynamic, gateDyn, step)
+import FRP.Dynamic (Dynamic, gateDyn, sampleDyn, step)
 import FRP.Event (Event, fold, keepLatest)
 import FRP.Event.Extra (multicast, performEvent)
 import Model.ActiveMode (ActiveMode(..), isActive)
@@ -104,10 +104,10 @@ addSurface cfg surfsDyn = do
         actDyn  = isActive <$> cfg ^. _modeDyn
         pntsEvt = performEvent $ getCandPoint <$> gateDyn actDyn (cfg ^. _mouseMove)
 
-        f surfs s (Just p) = if validCandPoint p surfs (s ^. _polygon) then Just p else Nothing
-        f surfs _ Nothing  = Nothing
+        f (Just p) s surfs = if validCandPoint p surfs (s ^. _polygon) then Just p else Nothing
+        f Nothing _ _      = Nothing
         
-        candPntDyn = f <$> surfsDyn <*> (cfg ^. _floor) <*> (step Nothing pntsEvt)
+        candPntDyn = step Nothing $ sampleDyn surfsDyn $ sampleDyn (cfg ^. _floor) $ f <$> pntsEvt
 
         toSurf = surfaceAround <<< view _position
 
