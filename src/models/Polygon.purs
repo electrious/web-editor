@@ -1,7 +1,6 @@
 module Model.Polygon (Polygon, _polyVerts, newPolygon, polygonAround, numOfVerts,
                       addVertexAt, delVertexAt, polyCenter, polyMidPoints, polygonBBox,
-                      renderPolygon, class IsPolygon, class PolyVertex,
-                      toPolygon, getPos, updatePos, addVert, scale, distance, (.+.), (.**.)) where
+                      renderPolygon, class IsPolygon, toPolygon) where
 
 import Prelude hiding (add)
 
@@ -31,7 +30,7 @@ import Rendering.NodeRenderable (class NodeRenderable)
 import Three.Core.Geometry (mkShape, mkShapeGeometry)
 import Three.Core.Material (MeshBasicMaterial)
 import Three.Core.Mesh (setMaterial)
-import Three.Math.Vector (class Vector, Vector2, Vector3, add, dist, mkVec2, mkVec3, multiplyScalar, toVec2, vecX, vecY)
+import Three.Math.Vector (class Vector, Vector2, dist, mkVec2, toVec2, vecX, vecY, (<**>), (<+>))
 
 newtype Polygon v = Polygon (Array v)
 
@@ -75,14 +74,14 @@ delVertexAt idx poly = if numOfVerts poly > 3
                        else poly
 
 -- | calculate the center based on polygon
-polyCenter :: forall v. PolyVertex v => Polygon v -> v
-polyCenter poly = (foldl (.+.) def vs) .**. (1.0 / l)
+polyCenter :: forall v. Default v => Vector v => Polygon v -> v
+polyCenter poly = (foldl (<+>) def vs) <**> (1.0 / l)
     where l  = toNumber $ length vs
           vs = poly ^. _polyVerts
 
 
 -- | calculate all middle points on all edges of a polygon
-polyMidPoints :: forall v. PolyVertex v => Polygon v -> Array (Tuple Int v)
+polyMidPoints :: forall v. Vector v => Polygon v -> Array (Tuple Int v)
 polyMidPoints poly = if length vs < 2
                      then []
                      else toResult <$> filter validDist (zipWith f v1Lst v2Lst)
@@ -94,8 +93,8 @@ polyMidPoints poly = if length vs < 2
           toResult  p = Tuple p.index p.position
 
           f (Tuple idx v1) v2 = {
-              dist     : dist (getPos v1) (getPos v2),
-              position : ((v1 .+. v2) .**. 0.5),
+              dist     : dist v1 v2,
+              position : ((v1 <+> v2) <**> 0.5),
               index    : idx + 1
           }
 
@@ -111,13 +110,13 @@ polygonBBox poly = def # _minX .~ fromMaybe 0.0 (minimum xs)
           ys = vecY <$> vs
 
 
-instance nodeRenderablePolygon :: PolyVertex v => NodeRenderable (Dynamic MeshBasicMaterial) (Polygon v) TapMouseMesh where
+instance nodeRenderablePolygon :: Vector v => NodeRenderable (Dynamic MeshBasicMaterial) (Polygon v) TapMouseMesh where
     render p = do
         -- get the current material used
         matDyn <- getEnv
         mat <- liftEffect $ current matDyn
         
-        shp <- liftEffect $ mkShape $ (toVec2 <<< getPos) <$> p ^. _polyVerts
+        shp <- liftEffect $ mkShape $ toVec2 <$> p ^. _polyVerts
         geo <- liftEffect $ mkShapeGeometry shp
         
         m <- tapMouseMesh def geo mat
@@ -142,27 +141,3 @@ class IsPolygon p v where
 
 instance isPolygonBase :: IsPolygon (Polygon v) v where
     toPolygon = identity
-
-class Default v <= PolyVertex v where
-    getPos    :: v -> Vector3
-    updatePos :: v -> Vector3 -> v
-    addVert   :: v -> v -> v
-    scale     :: v -> Number -> v
-    distance  :: v -> v -> Number
-
-infixr 6 addVert as .+.
-infixr 7 scale as .**.
-
-instance polyVertexVector2 :: PolyVertex Vector2 where
-    getPos v       = mkVec3 (vecX v) (vecY v) 0.01
-    updatePos _ nv = toVec2 nv
-    addVert        = add
-    scale          = multiplyScalar
-    distance       = dist
-
-instance polyVertexVector3 :: PolyVertex Vector3 where
-    getPos         = identity
-    updatePos _ nv = nv
-    addVert        = add
-    scale          = multiplyScalar
-    distance       = dist

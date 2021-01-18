@@ -25,19 +25,29 @@ instance defaultVector2 :: Default Vector2 where
 instance defaultVector3 :: Default Vector3 where
     def = mkVec3 0.0 0.0 0.0
 
-class HasX a
-class HasY a
-class HasZ a
+class HasX v where
+    vecX :: v -> Number
+    
+class HasY v where
+    vecY :: v -> Number
+    
+class HasZ v where
+    vecZ :: v -> Number
 
-foreign import vecX :: forall a. HasX a => a -> Number
-foreign import vecY :: forall a. HasY a => a -> Number
-foreign import vecZ :: forall a. HasZ a => a -> Number
+foreign import jsVecX :: forall v. v -> Number
+foreign import jsVecY :: forall v. v -> Number
+foreign import jsVecZ :: forall v. v -> Number
 
-instance hasXVec2 :: HasX Vector2
-instance hasYVec2 :: HasY Vector2
-instance hasXVec3 :: HasX Vector3
-instance hasYVec3 :: HasY Vector3
-instance hasZVec3 :: HasZ Vector3
+instance hasXVec2 :: HasX Vector2 where
+    vecX = jsVecX
+instance hasYVec2 :: HasY Vector2 where
+    vecY = jsVecY
+instance hasXVec3 :: HasX Vector3 where
+    vecX = jsVecX
+instance hasYVec3 :: HasY Vector3 where
+    vecY = jsVecY
+instance hasZVec3 :: HasZ Vector3 where
+    vecZ = jsVecZ
 
 foreign import showVec2 :: Vector2 -> String
 instance showVector2 :: Show Vector2 where
@@ -71,6 +81,8 @@ class (HasX v, HasY v) <= Vector v where
     sub            :: v -> v -> v
     multiplyScalar :: v -> Number -> v
     normal         :: v -> v
+    getVector      :: v -> Vector3
+    updateVector   :: v -> Vector3 -> v
 
 infixr 5 dot as <.>
 infixr 6 add as <+>
@@ -78,28 +90,31 @@ infixr 6 sub as <->
 infixr 7 multiplyScalar as <**>
 
 instance vecVec2 :: Vector Vector2 where
-    dot            = jsDot
-    length         = jsLength
-    dist           = jsDist
-    clone          = jsClone
-    cross          = jsCross
-    add            = jsAdd
-    addScaled      = jsAddScaled
-    sub            = jsSub
-    multiplyScalar = jsMultiplyScalar
-    normal         = jsNormal
+    dot              = jsDot
+    length           = jsLength
+    dist             = jsDist
+    clone            = jsClone
+    cross            = jsCross
+    add              = jsAdd
+    addScaled        = jsAddScaled
+    sub              = jsSub
+    multiplyScalar   = jsMultiplyScalar
+    normal           = jsNormal
+    getVector    v   = mkVec3 (vecX v) (vecY v) 0.01
+    updateVector _ v = toVec2 v
 instance vecVec3 :: Vector Vector3 where
-    dot            = jsDot
-    length         = jsLength
-    dist           = jsDist
-    clone          = jsClone
-    cross          = jsCross
-    add            = jsAdd
-    addScaled      = jsAddScaled
-    sub            = jsSub
-    multiplyScalar = jsMultiplyScalar
-    normal         = jsNormal
-
+    dot              = jsDot
+    length           = jsLength
+    dist             = jsDist
+    clone            = jsClone
+    cross            = jsCross
+    add              = jsAdd
+    addScaled        = jsAddScaled
+    sub              = jsSub
+    multiplyScalar   = jsMultiplyScalar
+    normal           = jsNormal
+    getVector        = identity
+    updateVector _ v = v
 
 foreign import applyMatrix :: Matrix4 -> Vector3 -> Vector3
 

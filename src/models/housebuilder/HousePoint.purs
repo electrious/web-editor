@@ -16,14 +16,13 @@ import Data.UUID (UUID, emptyUUID, genUUID)
 import Editor.Common.Lenses (_id, _name, _position)
 import Effect (Effect)
 import Effect.Unsafe (unsafePerformEffect)
-import Model.Polygon (class PolyVertex)
 import Model.UUID (class HasUUID)
 import Rendering.Node (mesh)
 import Rendering.NodeRenderable (class NodeRenderable)
 import Three.Core.Geometry (CircleGeometry, mkCircleGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial)
 import Three.Core.Mesh (Mesh)
-import Three.Math.Vector (Vector3, dist, multiplyScalar, (<+>))
+import Three.Math.Vector (class HasX, class HasY, class Vector, Vector3, add, addScaled, clone, cross, dist, dot, getVector, length, multiplyScalar, normal, sub, updateVector, vecX, vecY)
 
 
 data HousePointType = GutterPoint
@@ -63,12 +62,23 @@ instance defaultHousePoint :: Default HousePoint where
         position  : def,
         pointType : RidgePoint
         }
-instance polyVertexHousePoint :: PolyVertex HousePoint where
-    getPos         = view _position
-    updatePos      = flip (set  _position)
-    addVert p1 p2  = p1 # _position %~ (<+>) (p2 ^. _position)
-    scale p n      = p  # _position %~ flip multiplyScalar n
-    distance p1 p2 = dist (p1 ^. _position) (p2 ^. _position)
+instance hasXHousePoint :: HasX HousePoint where
+    vecX = vecX <<< view _position
+instance hasYHousePoint :: HasY HousePoint where
+    vecY = vecY <<< view _position
+instance vectorHousePoint :: Vector HousePoint where
+    dot p1 p2          = (p1 ^. _position) `dot` (p2 ^. _position)
+    length p           = length $ p ^. _position
+    dist p1 p2         = dist (p1 ^. _position) (p2 ^. _position)
+    clone p            = p # _position .~ clone (p ^. _position)
+    cross p1 p2        = p1 # _position .~ cross (p1 ^. _position) (p2 ^. _position)
+    add p1 p2          = p1 # _position .~ add (p1 ^. _position) (p2 ^. _position)
+    addScaled p1 p2 s  = p1 # _position .~ addScaled (p1 ^. _position) (p2 ^. _position) s
+    sub p1 p2          = p1 # _position .~ sub (p1 ^. _position) (p2 ^. _position)
+    multiplyScalar p s = p # _position %~ flip multiplyScalar s
+    normal p           = p # _position %~ normal
+    getVector          = view _position
+    updateVector       = flip (set  _position)
 instance nodeRenderableHousePoint :: NodeRenderable e HousePoint Mesh where
     render p = mesh prop gutterGeo gutterMat
         where prop = def # _name     .~ "gutter-point"
@@ -77,6 +87,9 @@ instance nodeRenderableHousePoint :: NodeRenderable e HousePoint Mesh where
 _pointType :: forall t a r. Newtype t { pointType :: a | r } => Lens' t a
 _pointType = _Newtype <<< prop (SProxy :: SProxy "pointType")
 
+
+funcOver :: forall v. Vector v => (Vector3 -> Vector3 -> Vector3) -> v -> v -> v
+funcOver f v1 v2 = updateVector v1 $ f (getVector v1) (getVector v2)
 
 gutterPoints :: forall f. Filterable f => f HousePoint -> f HousePoint
 gutterPoints = filter ((==) GutterPoint <<< view _pointType)

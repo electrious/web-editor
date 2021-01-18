@@ -34,14 +34,14 @@ import FRP.Event.Extra (multicast, performEvent)
 import Model.ActiveMode (ActiveMode(..), isActive)
 import Model.HouseBuilder.FloorPlan (FloorPlan)
 import Model.HouseBuilder.RoofSurface (RoofSurface, newSurfaceWith, surfaceAround)
-import Model.Polygon (class PolyVertex, Polygon, _polyVerts, getPos, polyCenter, polyMidPoints)
+import Model.Polygon (Polygon, _polyVerts, polyCenter, polyMidPoints)
 import Model.UUID (idLens)
 import Rendering.DynamicNode (dynamic_, eventNode)
 import Rendering.Node (Node, fixNodeDWith, fixNodeE, getParent, line, node)
 import Three.Core.Face3 (normal)
 import Three.Core.Material (LineBasicMaterial, mkLineBasicMaterial)
 import Three.Core.Object3D (worldToLocal)
-import Three.Math.Vector (dist, mkVec3)
+import Three.Math.Vector (class Vector, dist, getVector, mkVec3)
 import Util (foldEvtWith)
 
 
@@ -81,16 +81,16 @@ editRoofSurface rs = do
 
 
 -- | get all vertices, mid points and center point to avoid showing surface adder near them
-polygonPoints :: forall v. PolyVertex v => Polygon v -> Array v
+polygonPoints :: forall v. Default v => Vector v => Polygon v -> Array v
 polygonPoints poly = concat [[polyCenter poly], poly ^. _polyVerts, snd <$> polyMidPoints poly]
 
-validCandPoint :: forall v f. PolyVertex v => Functor f => Foldable f => CandidatePoint -> f RoofSurface -> Polygon v -> Boolean
+validCandPoint :: forall v f. Default v => Vector v => Functor f => Foldable f => CandidatePoint -> f RoofSurface -> Polygon v -> Boolean
 validCandPoint p surfs poly = not (underPolygons surfPolys (p ^. _position)) && isNothing (find f ps)
     where f v = dist v (p ^. _position) < 2.0
           -- all points on all surfs
-          surfPolys = (map getPos <<< view _polygon) <$> surfs
+          surfPolys = (map getVector <<< view _polygon) <$> surfs
           surfPs    = concat $ fromFoldable $ polygonPoints <$> surfPolys
-          ps        = concat $ [getPos <$> polygonPoints poly, surfPs]
+          ps        = concat $ [getVector <$> polygonPoints poly, surfPs]
 
 -- | function to show an ObjectAdder to add a new roof surface
 addSurface :: forall e f. Functor f => Foldable f => SurfaceBuilderCfg -> Dynamic (f RoofSurface) -> Node e (Event RoofSurface)
@@ -127,7 +127,7 @@ renderSurfaceLines s = do
     let vs = s ^. _polygon <<< _polyVerts
         nvs = fromMaybe vs $ snoc <$> Just vs <*> head vs
         prop = def # _name .~ "surface-line"
-    _ <- line prop (getPos <$> nvs) lineBasicMat
+    _ <- line prop (getVector <$> nvs) lineBasicMat
     
     pure unit
 

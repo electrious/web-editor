@@ -8,15 +8,15 @@ exports.mkVec3 = x => y => z => {
     return new three.Vector3(x, y, z)
 }
 
-exports.vecX = _ => v => {
+exports.jsVecX = v => {
     return v.x
 }
 
-exports.vecY = _ => v => {
+exports.jsVecY = v => {
     return v.y
 }
 
-exports.vecZ = _ => v => {
+exports.jsVecZ = v => {
     return v.z
 }
 
