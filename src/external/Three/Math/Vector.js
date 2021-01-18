@@ -28,7 +28,7 @@ exports.showVec3 = v => {
     return '(' + v.x + ', ' + v.y + ', ' + v.z + ')'
 }
 
-exports.clone = _ => v => {
+exports.jsClone = v => {
     return v.clone()
 }
 
@@ -36,50 +36,50 @@ exports.vEq = v1 => v2 => {
     return v1.equals(v2)
 }
 
-exports.length = _ => v => {
+exports.jsLength = v => {
     return v.length()
 }
 
-exports.dist = _ => v1 => v2 => {
+exports.jsDist = v1 => v2 => {
     return v1.distanceTo(v2)
 }
 
-exports.dot = _ => v1 => v2 => {
+exports.jsDot = v1 => v2 => {
     return v1.dot(v2)
 }
 
-exports.cross = _ => v1 => v2 => {
+exports.jsCross = v1 => v2 => {
     const r = v1.clone()
     r.cross(v2)
 
     return r
 }
 
-exports.add = _ => v1 => v2 => {
+exports.jsAdd = v1 => v2 => {
     const r = v1.clone()
     r.add(v2)
     return r
 }
 
-exports.addScaled = _ => v1 => v2 => s => {
+exports.jsAddScaled = v1 => v2 => s => {
     const r = v1.clone()
     r.addScaledVector(v2, s)
     return r
 }
 
-exports.sub = _ => v1 => v2 => {
+exports.jsSub = v1 => v2 => {
     const r = v1.clone()
     r.sub(v2)
     return r
 }
 
-exports.multiplyScalar = _ => v => s => {
+exports.jsMultiplyScalar = v => s => {
     const r = v.clone()
     r.multiplyScalar(s)
     return r
 }
 
-exports.normal = _ => v => {
+exports.jsNormal = v => {
     const r = v.clone()
     r.normalize()
     return r

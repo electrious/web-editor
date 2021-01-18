@@ -47,28 +47,59 @@ foreign import showVec3 :: Vector3 -> String
 instance showVector3 :: Show Vector3 where
   show = showVec3
 
+foreign import jsDot            :: forall a. a -> a      -> Number
+foreign import jsLength         :: forall a. a -> Number
+foreign import jsDist           :: forall a. a -> a      -> Number
+foreign import jsClone          :: forall a. a -> a
+foreign import jsCross          :: forall a. a -> a      -> a
+foreign import jsAdd            :: forall a. a -> a      -> a
 
-class (HasX a, HasY a) <= Vector a
+foreign import jsAddScaled      :: forall a. a -> a      -> Number -> a
+foreign import jsSub            :: forall a. a -> a      -> a
+foreign import jsMultiplyScalar :: forall a. a -> Number -> a
+foreign import jsNormal         :: forall a. a -> a
 
-foreign import dot            :: forall a. Vector a => a -> a      -> Number
-foreign import length         :: forall a. Vector a => a -> Number
-foreign import dist           :: forall a. Vector a => a -> a      -> Number
-foreign import clone          :: forall a. Vector a => a -> a
-foreign import cross          :: forall a. Vector a => a -> a      -> a
-foreign import add            :: forall a. Vector a => a -> a      -> a
 
-foreign import addScaled      :: forall a. Vector a => a -> a      -> Number -> a
-foreign import sub            :: forall a. Vector a => a -> a      -> a
-foreign import multiplyScalar :: forall a. Vector a => a -> Number -> a
-foreign import normal         :: forall a. Vector a => a -> a
+class (HasX v, HasY v) <= Vector v where
+    dot            :: v -> v -> Number
+    length         :: v -> Number
+    dist           :: v -> v -> Number
+    clone          :: v -> v
+    cross          :: v -> v -> v
+    add            :: v -> v -> v
+    addScaled      :: v -> v -> Number -> v
+    sub            :: v -> v -> v
+    multiplyScalar :: v -> Number -> v
+    normal         :: v -> v
 
 infixr 5 dot as <.>
 infixr 6 add as <+>
 infixr 6 sub as <->
 infixr 7 multiplyScalar as <**>
 
-instance vecVec2 :: Vector Vector2
-instance vecVec3 :: Vector Vector3
+instance vecVec2 :: Vector Vector2 where
+    dot            = jsDot
+    length         = jsLength
+    dist           = jsDist
+    clone          = jsClone
+    cross          = jsCross
+    add            = jsAdd
+    addScaled      = jsAddScaled
+    sub            = jsSub
+    multiplyScalar = jsMultiplyScalar
+    normal         = jsNormal
+instance vecVec3 :: Vector Vector3 where
+    dot            = jsDot
+    length         = jsLength
+    dist           = jsDist
+    clone          = jsClone
+    cross          = jsCross
+    add            = jsAdd
+    addScaled      = jsAddScaled
+    sub            = jsSub
+    multiplyScalar = jsMultiplyScalar
+    normal         = jsNormal
+
 
 foreign import applyMatrix :: Matrix4 -> Vector3 -> Vector3
 
