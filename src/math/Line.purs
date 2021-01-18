@@ -10,14 +10,14 @@ import Data.Symbol (SProxy(..))
 import Math.Angle (Angle)
 import Model.Roof.RoofPlate (angleBetween)
 import Prelude ((/), (<), (<<<))
-import Three.Math.Vector (Vector3, length, (<**>), (<+>), (<->), (<.>))
+import Three.Math.Vector (class Vector, length, (<**>), (<+>), (<->), (<.>))
 
-newtype Line = Line {
-  start :: Vector3,
-  end   :: Vector3
+newtype Line v = Line {
+  start :: v,
+  end   :: v
   }
 
-derive instance newtypeLine :: Newtype Line _
+derive instance newtypeLine :: Newtype (Line v) _
 
 _start :: forall t a r. Newtype t { start :: a | r } => Lens' t a
 _start = _Newtype <<< prop (SProxy :: SProxy "start")
@@ -25,23 +25,23 @@ _start = _Newtype <<< prop (SProxy :: SProxy "start")
 _end :: forall t a r. Newtype t { end :: a | r } => Lens' t a
 _end = _Newtype <<< prop (SProxy :: SProxy "end")
 
-mkLine :: Vector3 -> Vector3 -> Line
+mkLine :: forall v. v -> v -> Line v
 mkLine v1 v2 = Line { start : v1, end : v2 }
 
 -- get vector of the line
-lineVec :: Line -> Vector3
+lineVec :: forall v. Vector v => Line v -> v
 lineVec l = l ^. _end <-> l ^. _start
 
 -- angle between two lines
-linesAngle :: Line -> Line -> Angle
+linesAngle :: forall v. Vector v => Line v -> Line v -> Angle
 linesAngle l1 l2 = angleBetween (lineVec l1) (lineVec l2)
 
 -- get line points
-linePoints :: Line -> Array Vector3
+linePoints :: forall v. Line v -> Array v
 linePoints l = [l ^. _start, l ^. _end]
 
 -- find the most parallel line to a target line in a list of lines
-mostParaLine :: forall f. Foldable f => Line -> f Line -> Maybe Line
+mostParaLine :: forall f v. Foldable f => Vector v => Line v -> f (Line v) -> Maybe (Line v)
 mostParaLine target = foldl f Nothing
     where f Nothing l = Just l
           f (Just ll) l = if linesAngle l target < linesAngle ll target
@@ -49,7 +49,7 @@ mostParaLine target = foldl f Nothing
                           else Just ll
 
 -- project point based on the vector line
-projPointWithLine :: Vector3 -> Vector3 -> Line -> Vector3
+projPointWithLine :: forall v. Vector v => v -> v -> Line v -> v
 projPointWithLine sp p l = sp <+> (lv <**> s)
     where lv  = lineVec l
           sv  = p <-> sp

@@ -1,7 +1,7 @@
 module Model.HouseBuilder.HousePoint where
 
 
-import Prelude
+import Prelude hiding (add, sub)
 
 import Data.Default (class Default, def)
 import Data.Filterable (class Filterable, filter)
