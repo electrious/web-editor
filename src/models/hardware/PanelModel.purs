@@ -67,9 +67,6 @@ _power = _Newtype <<< prop (SProxy :: SProxy "power")
 _isDefault :: forall t a r. Newtype t { isDefault :: a | r } => Lens' t a
 _isDefault = _Newtype <<< prop (SProxy :: SProxy "isDefault")
 
-_isActive :: forall t a r. Newtype t { isActive :: a | r } => Lens' t a
-_isActive = _Newtype <<< prop (SProxy :: SProxy "isActive")
-
 _pricePerWatt :: forall t a r. Newtype t { pricePerWatt :: a | r } => Lens' t a
 _pricePerWatt = _Newtype <<< prop (SProxy :: SProxy "pricePerWatt")
 

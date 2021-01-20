@@ -278,6 +278,9 @@ _updated = _Newtype <<< prop (SProxy :: SProxy "updated")
 _deleted :: forall t a r. Newtype t { deleted :: a | r } => Lens' t a
 _deleted = _Newtype <<< prop (SProxy :: SProxy "deleted")
 
+_isActive :: forall t a r. Newtype t { isActive :: a | r } => Lens' t a
+_isActive = _Newtype <<< prop (SProxy :: SProxy "isActive")
+
 _active :: forall t a r. Newtype t { active :: a | r } => Lens' t a
 _active = _Newtype <<< prop (SProxy :: SProxy "active")
 
