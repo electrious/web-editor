@@ -16,7 +16,7 @@ import Data.Tuple (Tuple(..))
 import Editor.Common.Lenses (_active, _index, _isActive, _isDragging, _name, _position, _tapped)
 import Effect (Effect)
 import Effect.Unsafe (unsafePerformEffect)
-import FRP.Dynamic (Dynamic)
+import FRP.Dynamic (Dynamic, dynEvent, latestEvt)
 import FRP.Event (Event, keepLatest)
 import FRP.Event.Extra (anyEvt, performEvent)
 import Model.ActiveMode (ActiveMode, fromBoolean, isActive)
@@ -86,14 +86,14 @@ mkVertMarkerPoint m active actMarker (Tuple pos idx) = VertMarkerPoint {
           f act (Just actIdx) = act && fromBoolean (actIdx == idx)
 
 -- | get vertex markers' active status event
-getVertMarkerActiveStatus :: forall f i v. FunctorWithIndex i f => Foldable f => Event (f (VertMarker i v)) -> Event (Maybe i)
-getVertMarkerActiveStatus ms = statusForDragging <|> statusForNewMarker
+getVertMarkerActiveStatus :: forall f i v. FunctorWithIndex i f => Foldable f => Dynamic (f (VertMarker i v)) -> Event (Maybe i)
+getVertMarkerActiveStatus msDyn = statusForDragging <|> statusForNewMarker
     where g idx m = (if _ then Just idx else Nothing) <$> m ^. _isDragging
-          statusForDragging  = keepLatest $ anyEvt <<< mapWithIndex g <$> ms
-          statusForNewMarker = const Nothing <$> ms
+          statusForDragging  = latestEvt $ anyEvt <<< mapWithIndex g <$> msDyn
+          statusForNewMarker = const Nothing <$> dynEvent msDyn
 
-getVertMarkerDragging :: forall i v f. Functor f => Foldable f => Event (f (VertMarker i v)) -> Event Boolean
-getVertMarkerDragging ms = keepLatest $ foldEvtWith (view _isDragging) <$> ms
+getVertMarkerDragging :: forall i v f. Functor f => Foldable f => Dynamic (f (VertMarker i v)) -> Event Boolean
+getVertMarkerDragging ms = latestEvt $ foldEvtWith (view _isDragging) <$> ms
 
 
 -----------------------------------------------------------

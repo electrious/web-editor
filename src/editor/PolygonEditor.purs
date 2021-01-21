@@ -20,13 +20,13 @@ import Editor.MarkerPoint (MidMarker, MidMarkerPoint, Modifier, VertMarker, Vert
 import Editor.SceneEvent (SceneTapEvent)
 import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
-import FRP.Dynamic (Dynamic, current, dynEvent, step)
+import FRP.Dynamic (Dynamic, current, dynEvent, latestEvt, step)
 import FRP.Event (Event, keepLatest, sampleOn)
 import FRP.Event.Extra (anyEvt, mergeArray, multicast, skip)
 import Model.ActiveMode (ActiveMode(..), fromBoolean, isActive)
 import Model.Polygon (Polygon, _polyVerts, addVertexAt, delVertexAt, newPolygon, polyCenter, polyMidPoints)
-import Rendering.DynamicNode (renderEvent)
-import Rendering.Node (Node, _visible, fixNodeDWith, fixNodeEWith, tapMesh)
+import Rendering.DynamicNode (renderDynamic, renderEvent)
+import Rendering.Node (Node, _visible, fixNodeDWith, tapMesh)
 import Three.Core.Geometry (CircleGeometry, mkCircleGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial)
 import Three.Math.Vector (class Vector, getVector)
@@ -37,8 +37,8 @@ mkVertMarkerPoints m polyActive actMarker poly = mkVertMarkerPoint m polyActive 
     where ps = poly ^. _polyVerts
 
 -- create new vertex markers
-setupVertMarkers :: forall e v. Vector v => Modifier v -> Dynamic ActiveMode -> Dynamic (Maybe Int) -> Event (Polygon v) -> Node e (Event (Array (VertMarker Int v)))
-setupVertMarkers m polyActive activeMarker polyEvt = renderEvent $ mkVertMarkerPoints m polyActive activeMarker <$> polyEvt
+setupVertMarkers :: forall e v. Vector v => Modifier v -> Dynamic ActiveMode -> Dynamic (Maybe Int) -> Dynamic (Polygon v) -> Node e (Dynamic (Array (VertMarker Int v)))
+setupVertMarkers m polyActive activeMarker polyEvt = renderDynamic $ mkVertMarkerPoints m polyActive activeMarker <$> polyEvt
 
 -----------------------------------------------------------
 -- Marker to delete the current polygon
@@ -109,19 +109,19 @@ createPolyEditor cfg = do
     defAct <- liftEffect $ current active
     
     fixNodeDWith defAct \polyActive ->
-        fixNodeEWith poly \polyEvt ->
+        fixNodeDWith poly \polyDyn ->
             fixNodeDWith Nothing \actMarkerDyn -> do
                 -- pipe the 'active' param event into internal polyActive event
-                vertMarkersEvt <- multicast <$> setupVertMarkers (cfg ^. _vertModifier) polyActive actMarkerDyn polyEvt
+                vertMarkersDyn <- setupVertMarkers (cfg ^. _vertModifier) polyActive actMarkerDyn polyDyn
 
                 -- event for active vertex marker
-                let newActMarkerEvt = getVertMarkerActiveStatus vertMarkersEvt
+                let newActMarkerEvt = getVertMarkerActiveStatus vertMarkersDyn
 
                     -- get new positions after dragging
-                    vertsAfterDrag = keepLatest $ getPosition <$> vertMarkersEvt
+                    vertsAfterDrag = latestEvt $ getPosition <$> vertMarkersDyn
 
                     -- merge new vertices after dragging and vertices after adding/deleting
-                    newPolyEvt = multicast $ polyEvt <|> vertsAfterDrag
+                    newPolyEvt = multicast $ dynEvent polyDyn <|> vertsAfterDrag
     
                     midActive = lift2 (\pa am -> pa && fromBoolean (am == Nothing)) polyActive actMarkerDyn
                 -- create mid markers for adding new vertices
@@ -131,7 +131,7 @@ createPolyEditor cfg = do
                     vertsAfterAdd = compact (sampleOn newPolyEvt $ addVert <$> toAddEvt)
 
                     -- get delete event of tapping on a marker
-                    delEvts = keepLatest $ getTapEvt <$> vertMarkersEvt
+                    delEvts = latestEvt $ getTapEvt <$> vertMarkersDyn
                     -- calculate new vertices after deleting a vertex
                     vertsAfterDel = sampleOn newPolyEvt (delVertexAt <$> delEvts)
     
@@ -145,6 +145,6 @@ createPolyEditor cfg = do
                 let editor = PolyEditor {
                     polygon    : skip 1 newPolyEvt,  -- skip the default polygon rendered
                     delete     : multicast $ polyDel ^. _tapped,
-                    isDragging : multicast $ getVertMarkerDragging vertMarkersEvt
+                    isDragging : multicast $ getVertMarkerDragging vertMarkersDyn
                     }
                 pure { input: newActMarkerEvt, output: { input: polygonEvt, output : { input: polyActEvt, output: editor } } }
