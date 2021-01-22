@@ -6,30 +6,33 @@ import Control.Alt ((<|>))
 import Control.Apply (lift2)
 import Control.Plus (empty)
 import Data.Array (foldl)
+import Data.Compactable (compact)
 import Data.Default (class Default, def)
 import Data.FunctorWithIndex (mapWithIndex)
-import Data.Graph (Graph, adjacent, deleteVertex, insertEdge, insertVertex, vertices)
+import Data.Graph (Graph, adjacent, deleteEdge, deleteVertex, insertEdge, insertVertex, vertices)
 import Data.Graph as G
 import Data.Lens (Lens', view, (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (List, concatMap)
-import Data.Map (fromFoldable)
-import Data.Maybe (Maybe(..))
+import Data.Map (fromFoldable, lookup)
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
+import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import Data.UUID (UUID)
+import Data.UUID (UUID, genUUID)
 import Data.UUIDMap (UUIDMap)
 import Editor.Common.Lenses (_active, _position)
-import Editor.MarkerPoint (MidMarker, MidMarkerPoint, Modifier, VertMarker, VertMarkerPoint, getVertMarkerActiveStatus, midMarkerPoints, mkVertMarkerPoint)
+import Editor.MarkerPoint (MidMarker, MidMarkerPoint(..), Modifier, VertMarker, VertMarkerPoint, _vertIdx1, _vertIdx2, getVertMarkerActiveStatus, mkVertMarkerPoint)
 import Editor.PolygonEditor (_vertModifier, getTapEvt)
 import Editor.SceneEvent (SceneTapEvent)
+import Effect (Effect)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic, current, dynEvent, latestEvt, sampleDyn)
-import FRP.Event (Event, keepLatest)
-import FRP.Event.Extra (anyEvt, multicast)
-import Math.Line (Line, lineCenter, mkLine)
+import FRP.Event (Event, keepLatest, sampleOn)
+import FRP.Event.Extra (anyEvt, multicast, performEvent)
+import Math.Line (Line, _end, _start, lineCenter, mkLine)
 import Model.ActiveMode (ActiveMode(..), fromBoolean)
 import Model.UUID (class HasUUID, idLens)
 import Rendering.DynamicNode (renderDynamic, renderEvent)
@@ -74,19 +77,26 @@ mkVertMarkerPoints m act actMarker graph = mapWithIndex (\i v -> mkVertMarkerPoi
     where ivsMap = fromFoldable $ f <$> vertices graph
           f v = Tuple (v ^. idLens) v
 
-setupVertMarkers :: forall e v w. Vector v => HasUUID v => Modifier v -> Dynamic ActiveMode -> Dynamic (Maybe UUID) -> Dynamic (Graph v w) -> Node e (Dynamic (UUIDMap (VertMarker UUID v)))
-setupVertMarkers m act actMarker graphDyn = renderDynamic $ mkVertMarkerPoints m act actMarker <$> graphDyn
+setupVertMarkers :: forall e v w. Vector v => HasUUID v => Dynamic (UUIDMap (VertMarkerPoint UUID v)) -> Node e (Dynamic (UUIDMap (VertMarker UUID v)))
+setupVertMarkers = renderDynamic
 
 
-graphMidPoints :: forall v w. Ord v => HasUUID v => Vector v => Graph v w -> List (Tuple UUID v)
-graphMidPoints = map midP <<< edges
-    where midP l = let c = lineCenter l
-                   in Tuple (c ^. idLens) c
+graphMidPoints :: forall v w. Ord v => HasUUID v => Vector v => Dynamic ActiveMode -> Graph v w -> Effect (List (MidMarkerPoint UUID v))
+graphMidPoints actDyn = traverse midP <<< edges
+    where midP l = do
+              i <- genUUID
+              pure $ MidMarkerPoint {
+                  position : lineCenter l,
+                  index    : i,
+                  vertIdx1 : l ^. _start <<< idLens,
+                  vertIdx2 : l ^. _end <<< idLens,
+                  active   : actDyn
+                  }
 
 -- | render all middle markers
 setupMidMarkers :: forall e v w. Ord v => HasUUID v => Vector v => Dynamic ActiveMode -> Event (Graph v w) -> Node e (Event (MidMarkerPoint UUID v))
 setupMidMarkers actDyn graphEvt = do
-    let mPointsEvt = midMarkerPoints actDyn <<< graphMidPoints <$> graphEvt
+    let mPointsEvt = performEvent $ graphMidPoints actDyn <$> graphEvt
     markers :: (Event (List (MidMarker UUID v))) <- renderEvent mPointsEvt
     pure $ keepLatest $ getTapEvt <$> markers
 
@@ -95,6 +105,18 @@ setupMidMarkers actDyn graphEvt = do
 dragGraphVert :: forall v w. HasUUID v => Ord v => Default w => v -> Graph v w -> Graph v w
 dragGraphVert v g = foldl addEdge (insertVertex v $ deleteVertex v g) (adjacent v g)
     where addEdge g' v' = insertEdge v v' def g'
+
+-- add a new vertex and edges based on clicked midmarker
+addVert :: forall v w. Ord v => Default w => MidMarkerPoint UUID v -> Graph v w -> UUIDMap (VertMarkerPoint UUID v) -> Graph v w
+addVert mp g vertMarkers = let n = mp ^. _position
+                               n1 = view _position <$> lookup (mp ^. _vertIdx1) vertMarkers
+                               n2 = view _position <$> lookup (mp ^. _vertIdx2) vertMarkers
+                               delE g' n1' n2' = deleteEdge n1' n2' g'
+                               -- graph after delete old edge
+                               gAfterDelE = fromMaybe g $ delE g <$> n1 <*> n2
+                               
+                               f g' nn = insertEdge n nn def g'
+                           in foldl f (insertVertex n gAfterDelE) $ compact [n1, n2]
 
 createGraphEditor :: forall e v w. Default v => Ord v => HasUUID v => Vector v => Default w => GraphEditorConf v w -> Node e (GraphEditor v w)
 createGraphEditor cfg = do
@@ -107,7 +129,8 @@ createGraphEditor cfg = do
         fixNodeDWith graph \graphDyn ->
             fixNodeDWith Nothing \actMarkerDyn -> do
                 -- setup vertices markers
-                vertMarkersDyn <- setupVertMarkers (cfg ^. _vertModifier) graphActive actMarkerDyn graphDyn
+                let vertMarkerPntsDyn = mkVertMarkerPoints (cfg ^. _vertModifier) graphActive actMarkerDyn <$> graphDyn
+                vertMarkersDyn <- setupVertMarkers vertMarkerPntsDyn
 
                 -- events for active vertex marker
                 let newActMarkerEvt = getVertMarkerActiveStatus vertMarkersDyn
@@ -123,7 +146,7 @@ createGraphEditor cfg = do
 
                 -- create mid markers for adding new vertices
                 toAddEvt <- setupMidMarkers midActive newGraphEvt
-
+                let graphAfterAdd = sampleDyn vertMarkerPntsDyn $ sampleOn newGraphEvt $ addVert <$> toAddEvt
                 
                 let editor = GraphEditor {
                         graph      : empty,

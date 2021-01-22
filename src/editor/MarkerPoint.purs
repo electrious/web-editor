@@ -17,7 +17,7 @@ import Editor.Common.Lenses (_active, _index, _isActive, _isDragging, _name, _po
 import Effect (Effect)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, dynEvent, latestEvt)
-import FRP.Event (Event, keepLatest)
+import FRP.Event (Event)
 import FRP.Event.Extra (anyEvt, performEvent)
 import Model.ActiveMode (ActiveMode, fromBoolean, isActive)
 import Rendering.Node (_visible, getParent, tapMesh)
@@ -101,10 +101,18 @@ getVertMarkerDragging ms = latestEvt $ foldEvtWith (view _isDragging) <$> ms
 newtype MidMarkerPoint i v = MidMarkerPoint {
     position :: v,
     index    :: i,
+    vertIdx1 :: i,
+    vertIdx2 :: i,
     active   :: Dynamic ActiveMode
 }
 
 derive instance newtypeMidMarkerPoint :: Newtype (MidMarkerPoint i v) _
+
+_vertIdx1 :: forall t a r. Newtype t { vertIdx1 :: a | r } => Lens' t a
+_vertIdx1 = _Newtype <<< prop (SProxy :: SProxy "vertIdx1")
+
+_vertIdx2 :: forall t a r. Newtype t { vertIdx2 :: a | r } => Lens' t a
+_vertIdx2 = _Newtype <<< prop (SProxy :: SProxy "vertIdx2")
 
 newtype MidMarker i v = MidMarker {
     tapped :: Event (MidMarkerPoint i v)
@@ -129,12 +137,4 @@ instance nodeRenderableMidMarkerPoint :: Vector v => NodeRenderable e (MidMarker
         
         pure $ MidMarker { tapped : const p <$> m ^. _tapped }
 
--- | given a list of vertices position, calculate all middle points
-midMarkerPoints :: forall i v f. Vector v => Functor f => Dynamic ActiveMode -> f (Tuple i v) -> f (MidMarkerPoint i v)
-midMarkerPoints active = map mkPoint
-    where mkPoint (Tuple idx v) = MidMarkerPoint {
-              position : v,
-              index    : idx,
-              active   : active
-              }
 

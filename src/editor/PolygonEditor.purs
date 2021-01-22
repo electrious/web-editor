@@ -15,8 +15,9 @@ import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
+import Data.Tuple (Tuple(..))
 import Editor.Common.Lenses (_active, _index, _name, _polygon, _position, _tapped)
-import Editor.MarkerPoint (MidMarker, MidMarkerPoint, Modifier, VertMarker, VertMarkerPoint, getVertMarkerActiveStatus, getVertMarkerDragging, midMarkerPoints, mkVertMarkerPoint)
+import Editor.MarkerPoint (MidMarker, MidMarkerPoint(..), Modifier, VertMarker, VertMarkerPoint, getVertMarkerActiveStatus, getVertMarkerDragging, mkVertMarkerPoint)
 import Editor.SceneEvent (SceneTapEvent)
 import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
@@ -55,6 +56,17 @@ mkPolyDelMarker posEvt actDyn = tapMesh (def # _name     .~ "delete-marker"
                                              # _visible  .~ (isActive <$> actDyn)
                                         ) polyDelGeo polyDelMat
 
+
+-- | given a list of vertices position, calculate all middle points
+midMarkerPoints :: forall v f. Vector v => Functor f => Dynamic ActiveMode -> f (Tuple Int v) -> f (MidMarkerPoint Int v)
+midMarkerPoints active = map mkPoint
+    where mkPoint (Tuple idx v) = MidMarkerPoint {
+              position : v,
+              index    : idx,
+              vertIdx1 : idx - 1,
+              vertIdx2 : idx,
+              active   : active
+              }
 
 -- | render all middle markers
 setupMidMarkers :: forall e v. Vector v => Dynamic ActiveMode -> Event (Polygon v) -> Node e (Event (MidMarkerPoint Int v))
