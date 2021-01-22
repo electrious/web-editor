@@ -32,6 +32,10 @@ mkLine v1 v2 = Line { start : v1, end : v2 }
 lineVec :: forall v. Vector v => Line v -> v
 lineVec l = l ^. _end <-> l ^. _start
 
+-- get center of the line
+lineCenter :: forall v. Vector v => Line v -> v
+lineCenter l = (l ^. _start <+> l ^. _end) <**> 0.5
+
 -- angle between two lines
 linesAngle :: forall v. Vector v => Line v -> Line v -> Angle
 linesAngle l1 l2 = angleBetween (lineVec l1) (lineVec l2)
