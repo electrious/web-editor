@@ -4,14 +4,15 @@ import Prelude
 
 import Control.Alt ((<|>))
 import Control.Apply (lift2)
-import Control.Plus (empty)
+import Custom.Mesh (TappableMesh)
 import Data.Array (foldl)
 import Data.Compactable (compact)
 import Data.Default (class Default, def)
 import Data.FunctorWithIndex (mapWithIndex)
-import Data.Graph (Graph, adjacent, deleteEdge, deleteVertex, insertEdge, insertVertex, vertices)
+import Data.Graph (Graph, adjacent, deleteEdge, deleteVertex, insertEdge, insertVertex, size, vertices)
 import Data.Graph as G
-import Data.Lens (Lens', view, (^.))
+import Data.Int (toNumber)
+import Data.Lens (Lens', view, (^.), (.~))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (List, concatMap)
@@ -23,26 +24,34 @@ import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Data.UUID (UUID, genUUID)
 import Data.UUIDMap (UUIDMap)
-import Editor.Common.Lenses (_active, _position)
-import Editor.MarkerPoint (MidMarker, MidMarkerPoint(..), Modifier, VertMarker, VertMarkerPoint, _vertIdx1, _vertIdx2, getVertMarkerActiveStatus, mkVertMarkerPoint)
+import Editor.Common.Lenses (_active, _name, _position, _tapped)
+import Editor.MarkerPoint (MidMarker, MidMarkerPoint(..), Modifier, VertMarker, VertMarkerPoint, _vertIdx1, _vertIdx2, getVertMarkerActiveStatus, getVertMarkerDragging, mkVertMarkerPoint)
 import Editor.PolygonEditor (_vertModifier, getTapEvt)
 import Editor.SceneEvent (SceneTapEvent)
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import FRP.Dynamic (Dynamic, current, dynEvent, latestEvt, sampleDyn)
+import Effect.Unsafe (unsafePerformEffect)
+import FRP.Dynamic (Dynamic, current, dynEvent, latestEvt, sampleDyn, step)
 import FRP.Event (Event, keepLatest, sampleOn)
-import FRP.Event.Extra (anyEvt, multicast, performEvent)
+import FRP.Event.Extra (anyEvt, multicast, performEvent, skip)
 import Math.Line (Line, _end, _start, lineCenter, mkLine)
-import Model.ActiveMode (ActiveMode(..), fromBoolean)
+import Model.ActiveMode (ActiveMode(..), fromBoolean, isActive)
 import Model.UUID (class HasUUID, idLens)
 import Rendering.DynamicNode (renderDynamic, renderEvent)
-import Rendering.Node (Node, fixNodeDWith)
-import Three.Math.Vector (class Vector)
+import Rendering.Node (Node, _visible, fixNodeDWith, tapMesh)
+import Three.Core.Geometry (CircleGeometry, mkCircleGeometry)
+import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial)
+import Three.Math.Vector (class Vector, getVector, (<**>), (<+>))
 
 -- | get all edges in the graph
 edges :: forall a w. Ord a => Graph a w -> List (Line a)
 edges g = concatMap f $ vertices g
     where f v = mkLine v <$> adjacent v g
+
+
+graphCenter :: forall v w. Default v => Vector v =>  Graph v w -> v
+graphCenter g = (foldl (<+>) def (vertices g)) <**> (1.0 / l)
+    where l = toNumber $ size g
 
 
 newtype GraphEditorConf v w = GraphEditorConf {
@@ -77,7 +86,7 @@ mkVertMarkerPoints m act actMarker graph = mapWithIndex (\i v -> mkVertMarkerPoi
     where ivsMap = fromFoldable $ f <$> vertices graph
           f v = Tuple (v ^. idLens) v
 
-setupVertMarkers :: forall e v w. Vector v => HasUUID v => Dynamic (UUIDMap (VertMarkerPoint UUID v)) -> Node e (Dynamic (UUIDMap (VertMarker UUID v)))
+setupVertMarkers :: forall e v. Vector v => HasUUID v => Dynamic (UUIDMap (VertMarkerPoint UUID v)) -> Node e (Dynamic (UUIDMap (VertMarker UUID v)))
 setupVertMarkers = renderDynamic
 
 
@@ -101,6 +110,22 @@ setupMidMarkers actDyn graphEvt = do
     pure $ keepLatest $ getTapEvt <$> markers
 
 
+-----------------------------------------------------------
+-- Marker to delete the current polygon
+polyDelMat :: MeshBasicMaterial
+polyDelMat = unsafePerformEffect (mkMeshBasicMaterial 0xffaa22)
+
+polyDelGeo :: CircleGeometry
+polyDelGeo = unsafePerformEffect (mkCircleGeometry 0.6 32)
+
+-- | create the graph delete marker button
+mkPolyDelMarker :: forall e v. Vector v => Event v -> Dynamic ActiveMode -> Node e TappableMesh
+mkPolyDelMarker posEvt actDyn = tapMesh (def # _name     .~ "delete-marker"
+                                             # _position .~ step def (getVector <$> posEvt)
+                                             # _visible  .~ (isActive <$> actDyn)
+                                        ) polyDelGeo polyDelMat
+
+                                
 -- update a vertex in a graph
 dragGraphVert :: forall v w. HasUUID v => Ord v => Default w => v -> Graph v w -> Graph v w
 dragGraphVert v g = foldl addEdge (insertVertex v $ deleteVertex v g) (adjacent v g)
@@ -117,6 +142,11 @@ addVert mp g vertMarkers = let n = mp ^. _position
                                
                                f g' nn = insertEdge n nn def g'
                            in foldl f (insertVertex n gAfterDelE) $ compact [n1, n2]
+
+
+delVert :: forall v w. Ord v => UUID -> Graph v w -> UUIDMap (VertMarkerPoint UUID v) -> Graph v w
+delVert i g vertMarkers = let v = view _position <$> lookup i vertMarkers
+                          in fromMaybe g $ flip deleteVertex g <$> v
 
 createGraphEditor :: forall e v w. Default v => Ord v => HasUUID v => Vector v => Default w => GraphEditorConf v w -> Node e (GraphEditor v w)
 createGraphEditor cfg = do
@@ -147,11 +177,23 @@ createGraphEditor cfg = do
                 -- create mid markers for adding new vertices
                 toAddEvt <- setupMidMarkers midActive newGraphEvt
                 let graphAfterAdd = sampleDyn vertMarkerPntsDyn $ sampleOn newGraphEvt $ addVert <$> toAddEvt
+
+                    -- get delete event of tapping on a marker
+                    delEvts = latestEvt $ getTapEvt <$> vertMarkersDyn
+                    graphAfterDel = sampleDyn vertMarkerPntsDyn $ sampleOn newGraphEvt $ delVert <$> delEvts
+
+                    -- update the real graph after adding/deleting vertex
+                    graphEvt = multicast $ graphAfterAdd <|> graphAfterDel
+
+                    graphActEvt = dynEvent active <|> (const Active <$> graphEvt)
+
+                -- create the graph delete button
+                graphDel <- mkPolyDelMarker (graphCenter <$> newGraphEvt) graphActive
                 
                 let editor = GraphEditor {
-                        graph      : empty,
-                        delete     : empty,
-                        isDragging : empty
+                        graph      : skip 1 newGraphEvt,
+                        delete     : multicast $ graphDel ^. _tapped,
+                        isDragging : multicast $ getVertMarkerDragging vertMarkersDyn
                         }
-                pure { input: empty, output : { input: empty, output : { input: empty, output : editor }}}
+                pure { input: newActMarkerEvt, output : { input: graphEvt, output : { input: graphActEvt, output : editor }}}
     
