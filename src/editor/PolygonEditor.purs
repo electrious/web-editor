@@ -15,7 +15,7 @@ import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Data.Tuple (Tuple(..))
+import Data.Tuple (Tuple(..), fst)
 import Editor.Common.Lenses (_active, _index, _name, _polygon, _position, _tapped)
 import Editor.MarkerPoint (MidMarker, MidMarkerPoint(..), Modifier, VertMarker, VertMarkerPoint, getVertMarkerActiveStatus, getVertMarkerDragging, mkVertMarkerPoint)
 import Editor.SceneEvent (SceneTapEvent)
@@ -63,8 +63,8 @@ midMarkerPoints active = map mkPoint
     where mkPoint (Tuple idx v) = MidMarkerPoint {
               position : v,
               index    : idx,
-              vertIdx1 : idx - 1,
-              vertIdx2 : idx,
+              vert1    : v,  -- init these two values with the provided v, it's useless in PolygonEditor
+              vert2    : v,
               active   : active
               }
 
@@ -143,7 +143,7 @@ createPolyEditor cfg = do
                     vertsAfterAdd = compact (sampleOn newPolyEvt $ addVert <$> toAddEvt)
 
                     -- get delete event of tapping on a marker
-                    delEvts = latestEvt $ getTapEvt <$> vertMarkersDyn
+                    delEvts = map fst $ latestEvt $ getTapEvt <$> vertMarkersDyn
                     -- calculate new vertices after deleting a vertex
                     vertsAfterDel = sampleOn newPolyEvt (delVertexAt <$> delEvts)
     

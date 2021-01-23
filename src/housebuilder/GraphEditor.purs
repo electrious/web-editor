@@ -6,7 +6,6 @@ import Control.Alt ((<|>))
 import Control.Apply (lift2)
 import Custom.Mesh (TappableMesh)
 import Data.Array (foldl)
-import Data.Compactable (compact)
 import Data.Default (class Default, def)
 import Data.FunctorWithIndex (mapWithIndex)
 import Data.Graph (Graph, adjacent, deleteEdge, deleteVertex, insertEdge, insertVertex, size, vertices)
@@ -16,16 +15,16 @@ import Data.Lens (Lens', view, (^.), (.~))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (List, concatMap)
-import Data.Map (fromFoldable, lookup)
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Map (fromFoldable)
+import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
-import Data.Tuple (Tuple(..))
+import Data.Tuple (Tuple(..), snd)
 import Data.UUID (UUID, genUUID)
 import Data.UUIDMap (UUIDMap)
 import Editor.Common.Lenses (_active, _name, _position, _tapped)
-import Editor.MarkerPoint (MidMarker, MidMarkerPoint(..), Modifier, VertMarker, VertMarkerPoint, _vertIdx1, _vertIdx2, getVertMarkerActiveStatus, getVertMarkerDragging, mkVertMarkerPoint)
+import Editor.MarkerPoint (MidMarker, MidMarkerPoint(..), Modifier, VertMarker, VertMarkerPoint, _vert1, _vert2, getVertMarkerActiveStatus, getVertMarkerDragging, mkVertMarkerPoint)
 import Editor.PolygonEditor (_vertModifier, getTapEvt)
 import Editor.SceneEvent (SceneTapEvent)
 import Effect (Effect)
@@ -97,8 +96,8 @@ graphMidPoints actDyn = traverse midP <<< edges
               pure $ MidMarkerPoint {
                   position : lineCenter l,
                   index    : i,
-                  vertIdx1 : l ^. _start <<< idLens,
-                  vertIdx2 : l ^. _end <<< idLens,
+                  vert1    : l ^. _start,
+                  vert2    : l ^. _end,
                   active   : actDyn
                   }
 
@@ -132,21 +131,11 @@ dragGraphVert v g = foldl addEdge (insertVertex v $ deleteVertex v g) (adjacent 
     where addEdge g' v' = insertEdge v v' def g'
 
 -- add a new vertex and edges based on clicked midmarker
-addVert :: forall v w. Ord v => Default w => MidMarkerPoint UUID v -> Graph v w -> UUIDMap (VertMarkerPoint UUID v) -> Graph v w
-addVert mp g vertMarkers = let n = mp ^. _position
-                               n1 = view _position <$> lookup (mp ^. _vertIdx1) vertMarkers
-                               n2 = view _position <$> lookup (mp ^. _vertIdx2) vertMarkers
-                               delE g' n1' n2' = deleteEdge n1' n2' g'
-                               -- graph after delete old edge
-                               gAfterDelE = fromMaybe g $ delE g <$> n1 <*> n2
-                               
-                               f g' nn = insertEdge n nn def g'
-                           in foldl f (insertVertex n gAfterDelE) $ compact [n1, n2]
-
-
-delVert :: forall v w. Ord v => UUID -> Graph v w -> UUIDMap (VertMarkerPoint UUID v) -> Graph v w
-delVert i g vertMarkers = let v = view _position <$> lookup i vertMarkers
-                          in fromMaybe g $ flip deleteVertex g <$> v
+addVert :: forall v w. Ord v => Default w => MidMarkerPoint UUID v -> Graph v w -> Graph v w
+addVert mp g = let n = mp ^. _position
+                   n1 = mp ^. _vert1
+                   n2 = mp ^. _vert2
+               in insertEdge n n1 def $ insertEdge n n2 def $ insertVertex n $ deleteEdge n1 n2 g
 
 createGraphEditor :: forall e v w. Default v => Ord v => HasUUID v => Vector v => Default w => GraphEditorConf v w -> Node e (GraphEditor v w)
 createGraphEditor cfg = do
@@ -176,11 +165,11 @@ createGraphEditor cfg = do
 
                 -- create mid markers for adding new vertices
                 toAddEvt <- setupMidMarkers midActive newGraphEvt
-                let graphAfterAdd = sampleDyn vertMarkerPntsDyn $ sampleOn newGraphEvt $ addVert <$> toAddEvt
+                let graphAfterAdd = sampleOn newGraphEvt $ addVert <$> toAddEvt
 
                     -- get delete event of tapping on a marker
-                    delEvts = latestEvt $ getTapEvt <$> vertMarkersDyn
-                    graphAfterDel = sampleDyn vertMarkerPntsDyn $ sampleOn newGraphEvt $ delVert <$> delEvts
+                    delEvts = map snd $ latestEvt $ getTapEvt <$> vertMarkersDyn
+                    graphAfterDel = sampleOn newGraphEvt $ deleteVertex <$> delEvts
 
                     -- update the real graph after adding/deleting vertex
                     graphEvt = multicast $ graphAfterAdd <|> graphAfterDel

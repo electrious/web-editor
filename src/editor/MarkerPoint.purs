@@ -54,7 +54,7 @@ _modifier :: forall t a r. Newtype t { modifier :: a | r } => Lens' t a
 _modifier = _Newtype <<< prop (SProxy :: SProxy "modifier")
 
 newtype VertMarker i v = VertMarker {
-    tapped     :: Event i,
+    tapped     :: Event (Tuple i v),
     position   :: Event v,
     isDragging :: Event Boolean
 }
@@ -69,7 +69,7 @@ instance nodeRenderableVertMarkerPoint :: Vector v => NodeRenderable e (VertMark
         dragObj <- createDraggableObject (cfg :: DragObjCfg Geometry)
         
         pure $ VertMarker {
-            tapped     : const (m ^. _index) <$> dragObj ^. _tapped,
+            tapped     : const (Tuple (m ^. _index) (m ^. _position)) <$> dragObj ^. _tapped,
             position   : performEvent $ (mod <<< updateVector (m ^. _position)) <$> dragObj ^. _position,
             isDragging : dragObj ^. _isDragging
         }
@@ -101,18 +101,18 @@ getVertMarkerDragging ms = latestEvt $ foldEvtWith (view _isDragging) <$> ms
 newtype MidMarkerPoint i v = MidMarkerPoint {
     position :: v,
     index    :: i,
-    vertIdx1 :: i,
-    vertIdx2 :: i,
+    vert1    :: v,
+    vert2    :: v,
     active   :: Dynamic ActiveMode
 }
 
 derive instance newtypeMidMarkerPoint :: Newtype (MidMarkerPoint i v) _
 
-_vertIdx1 :: forall t a r. Newtype t { vertIdx1 :: a | r } => Lens' t a
-_vertIdx1 = _Newtype <<< prop (SProxy :: SProxy "vertIdx1")
+_vert1 :: forall t a r. Newtype t { vert1 :: a | r } => Lens' t a
+_vert1 = _Newtype <<< prop (SProxy :: SProxy "vert1")
 
-_vertIdx2 :: forall t a r. Newtype t { vertIdx2 :: a | r } => Lens' t a
-_vertIdx2 = _Newtype <<< prop (SProxy :: SProxy "vertIdx2")
+_vert2 :: forall t a r. Newtype t { vert2 :: a | r } => Lens' t a
+_vert2 = _Newtype <<< prop (SProxy :: SProxy "vert2")
 
 newtype MidMarker i v = MidMarker {
     tapped :: Event (MidMarkerPoint i v)
