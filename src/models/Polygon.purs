@@ -30,7 +30,7 @@ import Rendering.NodeRenderable (class NodeRenderable)
 import Three.Core.Geometry (mkShape, mkShapeGeometry)
 import Three.Core.Material (MeshBasicMaterial)
 import Three.Core.Mesh (setMaterial)
-import Three.Math.Vector (class Vector, Vector2, dist, mkVec2, toVec2, vecX, vecY, (<**>), (<+>))
+import Three.Math.Vector (class Vector, dist, getVector, mkVec3, toVec2, updateVector, vecX, vecY, vecZ, (<**>), (<+>))
 
 newtype Polygon v = Polygon (Array v)
 
@@ -53,14 +53,17 @@ newPolygon :: forall f v. Foldable f => f v -> Polygon v
 newPolygon = fromFoldable >>> Polygon
 
 -- | create a Polygon around a central vector
-polygonAround :: Number -> Vector2 -> Polygon Vector2
-polygonAround l p = newPolygon [p1, p2, p3, p4]
+polygonAround :: forall v. Vector v => Number -> v -> Polygon v
+polygonAround l p = newPolygon $ updateVector p <$> [p1, p2, p3, p4]
     where x = vecX p
           y = vecY p
-          p1 = mkVec2 (x - l) (y - l)
-          p2 = mkVec2 (x - l) (y + l)
-          p3 = mkVec2 (x + l) (y + l)
-          p4 = mkVec2 (x + l) (y - l)
+          v = getVector p
+          z = vecZ v
+          
+          p1 = mkVec3 (x - l) (y - l) z
+          p2 = mkVec3 (x - l) (y + l) z
+          p3 = mkVec3 (x + l) (y + l) z
+          p4 = mkVec3 (x + l) (y - l) z
 
 numOfVerts :: forall v. Polygon v -> Int
 numOfVerts (Polygon vs) = length vs

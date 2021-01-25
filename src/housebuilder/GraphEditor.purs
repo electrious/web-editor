@@ -3,6 +3,7 @@ module Editor.HouseBuilder.GraphEditor where
 import Prelude
 
 import Control.Alt ((<|>))
+import Control.Alternative (empty)
 import Control.Apply (lift2)
 import Custom.Mesh (TappableMesh)
 import Data.Array (foldl)
@@ -23,24 +24,28 @@ import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..), snd)
 import Data.UUID (UUID, genUUID)
 import Data.UUIDMap (UUIDMap)
-import Editor.Common.Lenses (_active, _name, _position, _tapped)
+import Editor.Common.Lenses (_active, _face, _mouseMove, _name, _point, _position, _tapped)
 import Editor.MarkerPoint (MidMarker, MidMarkerPoint(..), Modifier, VertMarker, VertMarkerPoint, _vert1, _vert2, getVertMarkerActiveStatus, getVertMarkerDragging, mkVertMarkerPoint)
+import Editor.ObjectAdder (createObjectAdder, mkCandidatePoint)
 import Editor.PolygonEditor (_vertModifier, getTapEvt)
-import Editor.SceneEvent (SceneTapEvent)
+import Editor.SceneEvent (SceneMouseMoveEvent, SceneTapEvent)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
-import FRP.Dynamic (Dynamic, current, dynEvent, latestEvt, sampleDyn, step)
+import FRP.Dynamic (Dynamic, current, dynEvent, gateDyn, latestEvt, sampleDyn, step)
 import FRP.Event (Event, keepLatest, sampleOn)
 import FRP.Event.Extra (anyEvt, multicast, performEvent, skip)
 import Math.Line (Line, _end, _start, lineCenter, mkLine)
 import Model.ActiveMode (ActiveMode(..), fromBoolean, isActive)
+import Model.Polygon (Polygon, polygonAround)
 import Model.UUID (class HasUUID, idLens)
 import Rendering.DynamicNode (renderDynamic, renderEvent)
-import Rendering.Node (Node, _visible, fixNodeDWith, tapMesh)
+import Rendering.Node (Node, _visible, fixNodeDWith, getParent, node, tapMesh)
+import Three.Core.Face3 (normal)
 import Three.Core.Geometry (CircleGeometry, mkCircleGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial)
-import Three.Math.Vector (class Vector, getVector, (<**>), (<+>))
+import Three.Core.Object3D (worldToLocal)
+import Three.Math.Vector (class Vector, getVector, mkVec3, updateVector, (<**>), (<+>))
 
 -- | get all edges in the graph
 edges :: forall a w. Ord a => Graph a w -> List (Line a)
@@ -56,7 +61,8 @@ graphCenter g = (foldl (<+>) def (vertices g)) <**> (1.0 / l)
 newtype GraphEditorConf v w = GraphEditorConf {
     active       :: Dynamic ActiveMode,
     graph        :: Graph v w,
-    vertModifier :: Modifier v
+    vertModifier :: Modifier v,
+    mouseMove    :: Event SceneMouseMoveEvent
     }
 
 derive instance newtypeGraphEditorConf :: Newtype (GraphEditorConf v w) _
@@ -64,7 +70,8 @@ instance defaultGraphEditorConf :: Ord v => Default (GraphEditorConf v w) where
     def = GraphEditorConf {
         active       : pure Inactive,
         graph        : G.empty,
-        vertModifier : def
+        vertModifier : def,
+        mouseMove    : empty
         }
 
 newtype GraphEditor v w = GraphEditor {
@@ -124,7 +131,33 @@ mkPolyDelMarker posEvt actDyn = tapMesh (def # _name     .~ "delete-marker"
                                              # _visible  .~ (isActive <$> actDyn)
                                         ) polyDelGeo polyDelMat
 
-                                
+
+-----------------------------------------------------------
+-- setup RoofSurface Adder to add new surface to the roof graph
+setupSurfAdder :: forall e v w. Default v => Vector v => GraphEditorConf v w -> Node e (Event (Polygon v))
+setupSurfAdder conf = do
+    parent <- getParent
+    
+    let canShowAdder = isActive <$> conf ^. _active
+
+        -- get a candidate point
+        getCandPoint evt = do
+            np <- worldToLocal (evt ^. _point) parent
+            pure $ Just $ mkCandidatePoint np (normal $ evt ^. _face)
+
+        mouseEvt = conf ^. _mouseMove
+
+        -- candidate point dynamic
+        candPntDyn = step Nothing $ performEvent $ getCandPoint <$> gateDyn canShowAdder mouseEvt
+
+        opt = def # _name     .~ "poly-adder"
+                  # _position .~ pure (mkVec3 0.0 0.0 0.2)
+
+    addedPntEvt <- node opt $ createObjectAdder candPntDyn canShowAdder
+    
+    pure $ polygonAround 1.0 <<< updateVector def <<< view _position <$> addedPntEvt
+
+
 -- update a vertex in a graph
 dragGraphVert :: forall v w. HasUUID v => Ord v => Default w => v -> Graph v w -> Graph v w
 dragGraphVert v g = foldl addEdge (insertVertex v $ deleteVertex v g) (adjacent v g)
@@ -136,6 +169,11 @@ addVert mp g = let n = mp ^. _position
                    n1 = mp ^. _vert1
                    n2 = mp ^. _vert2
                in insertEdge n n1 def $ insertEdge n n2 def $ insertVertex n $ deleteEdge n1 n2 g
+
+
+-- add a new polygon to the graph
+--addPolygon :: forall v w. 
+
 
 createGraphEditor :: forall e v w. Default v => Ord v => HasUUID v => Vector v => Default w => GraphEditorConf v w -> Node e (GraphEditor v w)
 createGraphEditor cfg = do
