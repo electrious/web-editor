@@ -19,21 +19,21 @@ import Rendering.Node (Node, _target, _visible, getParent, tapMesh)
 import Three.Core.Geometry (CircleGeometry, mkCircleGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial)
 import Three.Core.Object3D (localToWorld)
-import Three.Math.Vector (Vector3, addScaled, (<+>))
+import Three.Math.Vector (class Vector, Vector3, addScaled, getVector, (<+>))
 
 
 -- | Candidate point that will allow user to show the adder marker
-newtype CandidatePoint = CandidatePoint {
-    position   :: Vector3,
+newtype CandidatePoint v = CandidatePoint {
+    position   :: v,
     faceNormal :: Vector3
 }
 
-derive instance newtypeCandidatePoint :: Newtype CandidatePoint _
+derive instance newtypeCandidatePoint :: Newtype (CandidatePoint v) _
 
 _faceNormal :: forall t a r. Newtype t { faceNormal :: a | r } => Lens' t a
 _faceNormal = _Newtype <<< prop (SProxy :: SProxy "faceNormal")
 
-mkCandidatePoint :: Vector3 -> Vector3 -> CandidatePoint
+mkCandidatePoint :: forall v. v -> Vector3 -> CandidatePoint v
 mkCandidatePoint p n = CandidatePoint { position : p, faceNormal : n }
 
 adderMarkerMat :: MeshBasicMaterial
@@ -42,17 +42,18 @@ adderMarkerMat = unsafePerformEffect (mkMeshBasicMaterial 0x2222ff)
 adderMarkerGeo :: CircleGeometry
 adderMarkerGeo = unsafePerformEffect (mkCircleGeometry 1.0 32)
 
-createAdderMarker :: forall e. Dynamic (Maybe CandidatePoint) -> Node e (Event CandidatePoint)
+createAdderMarker :: forall e v. Vector v => Dynamic (Maybe (CandidatePoint v)) -> Node e (Event (CandidatePoint v))
 createAdderMarker pDyn = do
     parent <- getParent
 
-    let -- get the local position of the candidate point
+    let posV p = getVector $ p ^. _position
+        -- get the local position of the candidate point
         -- and move it along the normal vector a bit.
         -- then used as the new position of the marker
         calcPos Nothing  = def
-        calcPos (Just p) = addScaled (p ^. _position) (p ^. _faceNormal) 0.03
+        calcPos (Just p) = addScaled (posV p) (p ^. _faceNormal) 0.03
 
-        calcTarget p = localToWorld (p ^. _position <+> p ^. _faceNormal) parent
+        calcTarget p = localToWorld (posV p <+> p ^. _faceNormal) parent
 
         posDyn    = calcPos <$> pDyn
         targetDyn = performDynamic $ traverse calcTarget <$> pDyn
@@ -65,7 +66,7 @@ createAdderMarker pDyn = do
     pure $ compact $ sampleDyn_ pDyn $ m ^. _tapped
 
 -- | create a object adder
-createObjectAdder :: forall e. Dynamic (Maybe CandidatePoint) -> Dynamic Boolean -> Node e (Event CandidatePoint)
+createObjectAdder :: forall e v. Vector v => Dynamic (Maybe (CandidatePoint v)) -> Dynamic Boolean -> Node e (Event (CandidatePoint v))
 createObjectAdder point canShow = createAdderMarker $ pointCanShow <$> canShow <*> point
     where -- update candidate point with canShow status
           pointCanShow true p  = p

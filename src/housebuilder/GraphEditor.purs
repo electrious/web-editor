@@ -143,7 +143,8 @@ setupSurfAdder conf = do
         -- get a candidate point
         getCandPoint evt = do
             np <- worldToLocal (evt ^. _point) parent
-            pure $ Just $ mkCandidatePoint np (normal $ evt ^. _face)
+            let c = updateVector def np
+            pure $ Just $ mkCandidatePoint c (normal $ evt ^. _face)
 
         mouseEvt = conf ^. _mouseMove
 
@@ -155,7 +156,7 @@ setupSurfAdder conf = do
 
     addedPntEvt <- node opt $ createObjectAdder candPntDyn canShowAdder
     
-    pure $ polygonAround 1.0 <<< updateVector def <<< view _position <$> addedPntEvt
+    pure $ polygonAround 1.0 <<< view _position <$> addedPntEvt
 
 
 -- update a vertex in a graph

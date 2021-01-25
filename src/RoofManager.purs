@@ -50,7 +50,7 @@ import Model.RoofSpecific (_value)
 import Rendering.Node (Node, mkNodeEnv, runNode)
 import Three.Core.Face3 (normal)
 import Three.Core.Object3D (class IsObject3D, Object3D, add, mkObject3D, remove, setName, worldToLocal)
-import Three.Math.Vector (mkVec3, toVec2, (<.>))
+import Three.Math.Vector (Vector3, mkVec3, toVec2, (<.>))
 import Util (foldEvtWith)
 
 newtype RoofManager = RoofManager {
@@ -192,7 +192,7 @@ isRoofEditing :: HouseEditor (Dynamic Boolean)
 isRoofEditing = map ((==) RoofEditing) <<< view _modeDyn <$> ask
 
 -- | function to add the roof recognizer and recognize new roofs
-recognizeNewRoofs :: forall e . HouseMeshData -> Object3D -> Event RoofDict -> Dynamic (Maybe UUID) -> Dynamic Boolean -> Node e (Event CandidatePoint)
+recognizeNewRoofs :: forall e . HouseMeshData -> Object3D -> Event RoofDict -> Dynamic (Maybe UUID) -> Dynamic Boolean -> Node e (Event (CandidatePoint Vector3))
 recognizeNewRoofs meshData wrapper newRoofs activeRoof canEditRoofDyn = createObjectAdder point canShowAdder
     where canShowAdder = (&&) <$> (isNothing <$> activeRoof) <*> canEditRoofDyn
           houseWrapper = meshData ^. _wrapper

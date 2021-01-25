@@ -112,7 +112,7 @@ setupFloorAdder fpsEvt actFloorDyn = do
                 else pure Nothing
 
         mouseEvt   = conf ^. _mouseMove
-        -- candidate point dynamic
+        -- candidate point dynamic4
         candPntDyn = step Nothing $ performEvent $ sampleOn fpsEvt $ getCandPoint <$> gateDyn canShowAdder mouseEvt
         -- add PolygonAdder
 
