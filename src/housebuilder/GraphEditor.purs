@@ -37,7 +37,7 @@ import FRP.Event (Event, keepLatest, sampleOn)
 import FRP.Event.Extra (anyEvt, multicast, performEvent, skip)
 import Math.Line (Line, _end, _start, lineCenter, mkLine)
 import Model.ActiveMode (ActiveMode(..), fromBoolean, isActive)
-import Model.Polygon (Polygon, polygonAround)
+import Model.Polygon (Polygon, _polyVerts, polyEdges, polygonAround)
 import Model.UUID (class HasUUID, idLens)
 import Rendering.DynamicNode (renderDynamic, renderEvent)
 import Rendering.Node (Node, _visible, fixNodeDWith, getParent, node, tapMesh)
@@ -173,7 +173,10 @@ addVert mp g = let n = mp ^. _position
 
 
 -- add a new polygon to the graph
---addPolygon :: forall v w. 
+addPolygon :: forall v w. Ord v => Vector v => Default w => Polygon v -> Graph v w -> Graph v w
+addPolygon poly = addEdges (polyEdges poly) <<< addVerts (poly ^. _polyVerts)
+    where addEdges = flip (foldl (\g (Tuple p1 p2) -> insertEdge p1 p2 def g))
+          addVerts = flip (foldl (flip insertVertex))
 
 
 createGraphEditor :: forall e v w. Default v => Ord v => HasUUID v => Vector v => Default w => GraphEditorConf v w -> Node e (GraphEditor v w)

@@ -1,12 +1,12 @@
 module Model.Polygon (Polygon, _polyVerts, newPolygon, polygonAround, numOfVerts,
-                      addVertexAt, delVertexAt, polyCenter, polyMidPoints, polygonBBox,
+                      addVertexAt, delVertexAt, polyCenter, polyEdges, polyMidPoints, polygonBBox,
                       renderPolygon, class IsPolygon, toPolygon) where
 
 import Prelude hiding (add)
 
 import Control.Monad.Writer (tell)
 import Custom.Mesh (TapMouseMesh, TappableMesh, mkTappableMesh)
-import Data.Array (deleteAt, fromFoldable, head, insertAt, length, mapWithIndex, snoc, tail, zipWith)
+import Data.Array (deleteAt, fromFoldable, head, insertAt, length, mapWithIndex, snoc, tail, zip, zipWith)
 import Data.Default (class Default, def)
 import Data.Filterable (filter)
 import Data.Foldable (class Foldable, foldl, maximum, minimum)
@@ -81,6 +81,15 @@ polyCenter :: forall v. Default v => Vector v => Polygon v -> v
 polyCenter poly = (foldl (<+>) def vs) <**> (1.0 / l)
     where l  = toNumber $ length vs
           vs = poly ^. _polyVerts
+
+
+-- | get all edges of the polygon
+polyEdges :: forall v. Vector v => Polygon v -> Array (Tuple v v)
+polyEdges poly = if length vs < 2
+                 then []
+                 else zip vs v2Lst
+    where vs    = poly ^. _polyVerts
+          v2Lst = fromMaybe [] $ snoc <$> tail vs <*> head vs
 
 
 -- | calculate all middle points on all edges of a polygon
