@@ -2,12 +2,14 @@ module Editor.HouseBuilder.GraphEditor where
 
 import Prelude
 
+import Algorithm.PointInPolygon (underPolygons)
 import Control.Alt ((<|>))
 import Control.Alternative (empty)
 import Control.Apply (lift2)
 import Custom.Mesh (TappableMesh)
 import Data.Array (foldl)
 import Data.Default (class Default, def)
+import Data.Foldable (class Foldable, find)
 import Data.FunctorWithIndex (mapWithIndex)
 import Data.Graph (Graph, adjacent, deleteEdge, deleteVertex, insertEdge, insertVertex, size, vertices)
 import Data.Graph as G
@@ -17,16 +19,16 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (List, concatMap)
 import Data.Map (fromFoldable)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), isNothing)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..), snd)
 import Data.UUID (UUID, genUUID)
 import Data.UUIDMap (UUIDMap)
-import Editor.Common.Lenses (_active, _face, _mouseMove, _name, _point, _position, _tapped)
+import Editor.Common.Lenses (_active, _face, _floor, _mouseMove, _name, _point, _position, _tapped)
 import Editor.MarkerPoint (MidMarker, MidMarkerPoint(..), Modifier, VertMarker, VertMarkerPoint, _vert1, _vert2, getVertMarkerActiveStatus, getVertMarkerDragging, mkVertMarkerPoint)
-import Editor.ObjectAdder (createObjectAdder, mkCandidatePoint)
+import Editor.ObjectAdder (CandidatePoint, createObjectAdder, mkCandidatePoint)
 import Editor.PolygonEditor (_vertModifier, getTapEvt)
 import Editor.SceneEvent (SceneMouseMoveEvent, SceneTapEvent)
 import Effect (Effect)
@@ -37,6 +39,7 @@ import FRP.Event (Event, keepLatest, sampleOn)
 import FRP.Event.Extra (anyEvt, multicast, performEvent, skip)
 import Math.Line (Line, _end, _start, lineCenter, mkLine)
 import Model.ActiveMode (ActiveMode(..), fromBoolean, isActive)
+import Model.HouseBuilder.FloorPlan (FloorPlan, floorPlanHousePoints)
 import Model.Polygon (Polygon, _polyVerts, polyEdges, polygonAround)
 import Model.UUID (class HasUUID, idLens)
 import Rendering.DynamicNode (renderDynamic, renderEvent)
@@ -45,21 +48,26 @@ import Three.Core.Face3 (normal)
 import Three.Core.Geometry (CircleGeometry, mkCircleGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial)
 import Three.Core.Object3D (worldToLocal)
-import Three.Math.Vector (class Vector, getVector, mkVec3, updateVector, (<**>), (<+>))
+import Three.Math.Vector (class Vector, dist, getVector, mkVec3, updateVector, (<**>), (<+>))
 
 -- | get all edges in the graph
 edges :: forall a w. Ord a => Graph a w -> List (Line a)
 edges g = concatMap f $ vertices g
     where f v = mkLine v <$> adjacent v g
 
-
+-- | get center point of the graph
 graphCenter :: forall v w. Default v => Vector v =>  Graph v w -> v
 graphCenter g = (foldl (<+>) def (vertices g)) <**> (1.0 / l)
     where l = toNumber $ size g
 
+-- | get all vertice and edge mid points in a graph
+graphPoints :: forall v w. Ord v => Vector v => Graph v w -> List v
+graphPoints g = vertices g <> (center <$> edges g)
+    where center l = (l ^. _start <+> l ^. _end) <**> 0.5
 
 newtype GraphEditorConf v w = GraphEditorConf {
     active       :: Dynamic ActiveMode,
+    floor        :: Dynamic FloorPlan,
     graph        :: Graph v w,
     vertModifier :: Modifier v,
     mouseMove    :: Event SceneMouseMoveEvent
@@ -69,6 +77,7 @@ derive instance newtypeGraphEditorConf :: Newtype (GraphEditorConf v w) _
 instance defaultGraphEditorConf :: Ord v => Default (GraphEditorConf v w) where
     def = GraphEditorConf {
         active       : pure Inactive,
+        floor        : pure def,
         graph        : G.empty,
         vertModifier : def,
         mouseMove    : empty
@@ -134,8 +143,20 @@ mkPolyDelMarker posEvt actDyn = tapMesh (def # _name     .~ "delete-marker"
 
 -----------------------------------------------------------
 -- setup RoofSurface Adder to add new surface to the roof graph
-setupSurfAdder :: forall e v w. Default v => Vector v => GraphEditorConf v w -> Node e (Event (Polygon v))
-setupSurfAdder conf = do
+validCandPoint :: forall v f. Default v =>
+                              Vector v =>
+                              Functor f =>
+                              Foldable f =>
+                              CandidatePoint v -> Polygon v -> f v -> Boolean
+validCandPoint p poly pnts = not (underPolygons [poly] (p ^. _position)) && isNothing (find f pnts)
+    where f v = dist v (p ^. _position) < 2.0
+
+setupPolyAdder :: forall e f v w. Functor f
+                  => Foldable f
+                  => Default v
+                  => Vector v
+                  => Dynamic (Polygon v) -> Dynamic (f v) -> GraphEditorConf v w -> Node e (Event (Polygon v))
+setupPolyAdder polyDyn pntsDyn conf = do
     parent <- getParent
     
     let canShowAdder = isActive <$> conf ^. _active
@@ -146,13 +167,16 @@ setupSurfAdder conf = do
             let c = updateVector def np
             pure $ Just $ mkCandidatePoint c (normal $ evt ^. _face)
 
-        mouseEvt = conf ^. _mouseMove
+        pntsEvt = performEvent $ getCandPoint <$> gateDyn canShowAdder (conf ^. _mouseMove)
 
+        f (Just p) poly pnts = if validCandPoint p poly pnts then Just p else Nothing
+        f Nothing _ _        = Nothing
+        
         -- candidate point dynamic
-        candPntDyn = step Nothing $ performEvent $ getCandPoint <$> gateDyn canShowAdder mouseEvt
+        candPntDyn = step Nothing $ sampleDyn pntsDyn $ sampleDyn polyDyn $ f <$> pntsEvt
 
         opt = def # _name     .~ "poly-adder"
-                  # _position .~ pure (mkVec3 0.0 0.0 0.2)
+                  # _position .~ pure (mkVec3 0.0 0.0 0.1)
 
     addedPntEvt <- node opt $ createObjectAdder candPntDyn canShowAdder
     
@@ -189,6 +213,11 @@ createGraphEditor cfg = do
     fixNodeDWith defAct \graphActive ->
         fixNodeDWith graph \graphDyn ->
             fixNodeDWith Nothing \actMarkerDyn -> do
+
+                -- setup the polygon adder
+                let floorPolyDyn = floorPlanHousePoints <$> cfg ^. _floor
+                newPolyEvt <- setupPolyAdder floorPolyDyn (graphPoints <$> graphDyn) cfg
+                
                 -- setup vertices markers
                 let vertMarkerPntsDyn = mkVertMarkerPoints (cfg ^. _vertModifier) graphActive actMarkerDyn <$> graphDyn
                 vertMarkersDyn <- setupVertMarkers vertMarkerPntsDyn
