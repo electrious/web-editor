@@ -212,12 +212,7 @@ createGraphEditor cfg = do
     
     fixNodeDWith defAct \graphActive ->
         fixNodeDWith graph \graphDyn ->
-            fixNodeDWith Nothing \actMarkerDyn -> do
-
-                -- setup the polygon adder
-                let floorPolyDyn = floorPlanHousePoints <$> cfg ^. _floor
-                newPolyEvt <- setupPolyAdder floorPolyDyn (graphPoints <$> graphDyn) cfg
-                
+            fixNodeDWith Nothing \actMarkerDyn -> do                
                 -- setup vertices markers
                 let vertMarkerPntsDyn = mkVertMarkerPoints (cfg ^. _vertModifier) graphActive actMarkerDyn <$> graphDyn
                 vertMarkersDyn <- setupVertMarkers vertMarkerPntsDyn
@@ -234,16 +229,21 @@ createGraphEditor cfg = do
 
                     midActive = lift2 (\pa am -> pa && fromBoolean (am == Nothing)) graphActive actMarkerDyn
 
+                    floorPolyDyn = floorPlanHousePoints <$> cfg ^. _floor
                 -- create mid markers for adding new vertices
                 toAddEvt <- setupMidMarkers midActive newGraphEvt
+                -- setup the polygon adder
+                newPolyEvt <- setupPolyAdder floorPolyDyn (graphPoints <$> graphDyn) cfg
+
                 let graphAfterAdd = sampleOn newGraphEvt $ addVert <$> toAddEvt
+                    graphAfterAddPoly = sampleOn newGraphEvt $ addPolygon <$> newPolyEvt
 
                     -- get delete event of tapping on a marker
                     delEvts = map snd $ latestEvt $ getTapEvt <$> vertMarkersDyn
                     graphAfterDel = sampleOn newGraphEvt $ deleteVertex <$> delEvts
 
                     -- update the real graph after adding/deleting vertex
-                    graphEvt = multicast $ graphAfterAdd <|> graphAfterDel
+                    graphEvt = multicast $ graphAfterAdd <|> graphAfterDel <|> graphAfterAddPoly
 
                     graphActEvt = dynEvent active <|> (const Active <$> graphEvt)
 
