@@ -6,6 +6,7 @@ import Control.Alt ((<|>))
 import Custom.Mesh (TapMouseMesh)
 import Data.Array (foldl)
 import Data.Default (class Default, def)
+import Data.Graph (Graph)
 import Data.Lens (Lens', view, (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
@@ -14,14 +15,17 @@ import Data.Meter (Meter, meter, meterVal)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Editor.Common.Lenses (_active, _floor, _height, _id, _isActive, _mouseMove, _name, _polygon, _position, _rotation, _tapped)
+import Editor.HouseBuilder.GraphEditor (_graph, createGraphEditor)
 import Editor.PolygonEditor (_delete, createPolyEditor)
 import Editor.SceneEvent (SceneMouseMoveEvent)
+import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic, latestEvt, step)
 import FRP.Event (Event, fold)
 import FRP.Event.Extra (multicast)
 import Math (pi)
 import Model.ActiveMode (ActiveMode(..), fromBoolean, isActive)
-import Model.HouseBuilder.FloorPlan (FloorPlan, FloorPlanOp(..), floorPlanTop)
+import Model.HouseBuilder.FloorPlan (FloorPlan, FloorPlanOp(..), floorGraph, floorPlanTop)
+import Model.HouseBuilder.HousePoint (HousePoint)
 import Model.Polygon (Polygon, _polyVerts)
 import Rendering.DynamicNode (renderDynamic)
 import Rendering.Node (Node, fixNodeE, getEnv, localEnv, node)
@@ -134,6 +138,13 @@ createFloorNode = do
 
         -- setup the height editor
         heightEvt <- setupHeightEditor isActDyn $ arrowPos <$> fpDyn
+
+        -- graph editor for the roof top
+        g :: Graph HousePoint Int <- liftEffect $ floorGraph fp
+        roofTopEvt <- createGraphEditor $ def # _active    .~ act
+                                              # _floor     .~ fpDyn
+                                              # _graph     .~ g
+                                              # _mouseMove .~ (latestEvt $ view _mouseMove <$> polyMDyn)
 
         -- calculate the updated floor plan
         let opEvt = (UpdPoly <$> editor ^. _polygon) <|>

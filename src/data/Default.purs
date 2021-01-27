@@ -6,5 +6,9 @@ import Prelude
 class Default a where
     def :: a
 
+instance defaultInt :: Default Int where
+    def = 0
+instance defaultNumber :: Default Number where
+    def = 0.0
 instance defaultUnit :: Default Unit where
     def = unit

@@ -1,13 +1,14 @@
-module Model.HouseBuilder.FloorPlan (FloorPlan(..), newFloorPlan, FloorPlanOp(..), floorPlanTop, floorPlanHousePoints) where
+module Model.HouseBuilder.FloorPlan (FloorPlan(..), newFloorPlan, FloorPlanOp(..), floorPlanTop, floorPlanHousePoints, floorGraph) where
 
 import Prelude
 
 import Custom.Mesh (TapMouseMesh)
 import Data.Default (class Default, def)
+import Data.Graph (Graph, empty)
+import Data.Graph.Extra (addPolygon)
 import Data.Lens (view, (.~), (^.))
 import Data.Meter (Meter, meter, meterVal)
 import Data.Newtype (class Newtype)
-import Data.Traversable (traverse)
 import Data.UUID (UUID, emptyUUID, genUUID)
 import Editor.Common.Lenses (_height, _id, _name, _polygon, _position)
 import Effect (Effect)
@@ -15,9 +16,9 @@ import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic)
 import Model.ActiveMode (ActiveMode(..))
-import Model.HouseBuilder.HousePoint (HousePoint, HousePointType(..), _pointType)
+import Model.HouseBuilder.HousePoint (HousePoint)
 import Model.Polygon (class IsPolygon, Polygon, _polyVerts, polygonAround)
-import Model.UUID (class HasUUID)
+import Model.UUID (class HasUUID, assignNewIds)
 import Rendering.Node (localEnv, mesh, node)
 import Rendering.NodeRenderable (class NodeRenderable, render)
 import Three.Core.Geometry (_bevelEnabled, _depth, mkExtrudeGeometry, mkShape)
@@ -84,6 +85,12 @@ floorPlanHousePoints :: forall v. Default v => Vector v => FloorPlan -> Polygon 
 floorPlanHousePoints fp = f <$> fp ^. _polygon
     where h = meterVal $ fp ^. _height
           f v = updateVector def $ mkVec3 (vecX v) (vecY v) h
+
+-- | convert floorplan to a default graph
+floorGraph :: forall w. Default w => FloorPlan -> Effect (Graph HousePoint w)
+floorGraph fp = do
+    poly <- assignNewIds $ floorPlanHousePoints fp
+    pure $ addPolygon poly empty
 
 instance nodeRenderableFloorPlan :: NodeRenderable (Dynamic ActiveMode) FloorPlan TapMouseMesh where
     render fp = do

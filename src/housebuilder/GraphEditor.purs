@@ -11,13 +11,13 @@ import Data.Array (foldl)
 import Data.Default (class Default, def)
 import Data.Foldable (class Foldable, find)
 import Data.FunctorWithIndex (mapWithIndex)
-import Data.Graph (Graph, adjacent, deleteEdge, deleteVertex, insertEdge, insertVertex, size, vertices)
+import Data.Graph (Graph, adjacent, deleteEdge, deleteVertex, insertEdge, insertVertex, vertices)
 import Data.Graph as G
-import Data.Int (toNumber)
+import Data.Graph.Extra (addPolygon, edges, graphCenter, graphPoints)
 import Data.Lens (Lens', view, (^.), (.~))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.List (List, concatMap)
+import Data.List (List)
 import Data.Map (fromFoldable)
 import Data.Maybe (Maybe(..), isNothing)
 import Data.Newtype (class Newtype)
@@ -37,10 +37,10 @@ import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, current, dynEvent, gateDyn, latestEvt, sampleDyn, step)
 import FRP.Event (Event, keepLatest, sampleOn)
 import FRP.Event.Extra (anyEvt, multicast, performEvent, skip)
-import Math.Line (Line, _end, _start, lineCenter, mkLine)
+import Math.Line (_end, _start, lineCenter)
 import Model.ActiveMode (ActiveMode(..), fromBoolean, isActive)
 import Model.HouseBuilder.FloorPlan (FloorPlan, floorPlanHousePoints)
-import Model.Polygon (Polygon, _polyVerts, polyEdges, polygonAround)
+import Model.Polygon (Polygon, polygonAround)
 import Model.UUID (class HasUUID, idLens)
 import Rendering.DynamicNode (renderDynamic, renderEvent)
 import Rendering.Node (Node, _visible, fixNodeDWith, getParent, node, tapMesh)
@@ -48,22 +48,8 @@ import Three.Core.Face3 (normal)
 import Three.Core.Geometry (CircleGeometry, mkCircleGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial)
 import Three.Core.Object3D (worldToLocal)
-import Three.Math.Vector (class Vector, dist, getVector, mkVec3, updateVector, (<**>), (<+>))
+import Three.Math.Vector (class Vector, dist, getVector, mkVec3, updateVector)
 
--- | get all edges in the graph
-edges :: forall a w. Ord a => Graph a w -> List (Line a)
-edges g = concatMap f $ vertices g
-    where f v = mkLine v <$> adjacent v g
-
--- | get center point of the graph
-graphCenter :: forall v w. Default v => Vector v =>  Graph v w -> v
-graphCenter g = (foldl (<+>) def (vertices g)) <**> (1.0 / l)
-    where l = toNumber $ size g
-
--- | get all vertice and edge mid points in a graph
-graphPoints :: forall v w. Ord v => Vector v => Graph v w -> List v
-graphPoints g = vertices g <> (center <$> edges g)
-    where center l = (l ^. _start <+> l ^. _end) <**> 0.5
 
 newtype GraphEditorConf v w = GraphEditorConf {
     active       :: Dynamic ActiveMode,
@@ -194,13 +180,6 @@ addVert mp g = let n = mp ^. _position
                    n1 = mp ^. _vert1
                    n2 = mp ^. _vert2
                in insertEdge n n1 def $ insertEdge n n2 def $ insertVertex n $ deleteEdge n1 n2 g
-
-
--- add a new polygon to the graph
-addPolygon :: forall v w. Ord v => Vector v => Default w => Polygon v -> Graph v w -> Graph v w
-addPolygon poly = addEdges (polyEdges poly) <<< addVerts (poly ^. _polyVerts)
-    where addEdges = flip (foldl (\g (Tuple p1 p2) -> insertEdge p1 p2 def g))
-          addVerts = flip (foldl (flip insertVertex))
 
 
 createGraphEditor :: forall e v w. Default v => Ord v => HasUUID v => Vector v => Default w => GraphEditorConf v w -> Node e (GraphEditor v w)
