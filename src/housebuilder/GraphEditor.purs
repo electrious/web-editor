@@ -9,7 +9,7 @@ import Control.Apply (lift2)
 import Custom.Mesh (TappableMesh)
 import Data.Array (foldl)
 import Data.Default (class Default, def)
-import Data.Foldable (class Foldable, find)
+import Data.Foldable (class Foldable, find, traverse_)
 import Data.FunctorWithIndex (mapWithIndex)
 import Data.Graph (Graph, adjacent, deleteEdge, deleteVertex, insertEdge, insertVertex, vertices)
 import Data.Graph as G
@@ -42,11 +42,11 @@ import Model.ActiveMode (ActiveMode(..), fromBoolean, isActive)
 import Model.HouseBuilder.FloorPlan (FloorPlan, floorPlanHousePoints)
 import Model.Polygon (Polygon, polygonAround)
 import Model.UUID (class HasUUID, assignNewIds, idLens)
-import Rendering.DynamicNode (renderDynamic, renderEvent)
-import Rendering.Node (Node, _visible, fixNodeDWith, getParent, node, tapMesh)
+import Rendering.DynamicNode (eventNode_, renderDynamic, renderEvent)
+import Rendering.Node (Node, _visible, fixNodeDWith, getParent, line, node, tapMesh)
 import Three.Core.Face3 (normal)
 import Three.Core.Geometry (CircleGeometry, mkCircleGeometry)
-import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial)
+import Three.Core.Material (LineBasicMaterial, MeshBasicMaterial, mkLineBasicMaterial, mkMeshBasicMaterial)
 import Three.Core.Object3D (worldToLocal)
 import Three.Math.Vector (class Vector, dist, getVector, mkVec3, updateVector)
 
@@ -169,6 +169,16 @@ setupPolyAdder polyDyn pntsDyn conf = do
     pure $ performEvent $ assignNewIds <<< polygonAround 3.0 <<< view _position <$> addedPntEvt
 
 
+lineMat :: LineBasicMaterial
+lineMat = unsafePerformEffect $ mkLineBasicMaterial 0x333333 2.0
+
+-- render graph edges with lines
+renderGraph :: forall e v w. Vector v => Ord v => Graph v w -> Node e Unit
+renderGraph = traverse_ renderLine <<< edges
+    where renderLine l = do
+              let vs = getVector <$> [l ^. _start, l ^. _end]
+              line (def # _name .~ "graph-edge") vs lineMat
+
 -- update a vertex in a graph
 dragGraphVert :: forall v w. HasUUID v => Ord v => Default w => v -> Graph v w -> Graph v w
 dragGraphVert v g = foldl addEdge (insertVertex v $ deleteVertex v g) (adjacent v g)
@@ -191,7 +201,7 @@ createGraphEditor cfg = do
     
     fixNodeDWith defAct \graphActive ->
         fixNodeDWith graph \graphDyn ->
-            fixNodeDWith Nothing \actMarkerDyn -> do                
+            fixNodeDWith Nothing \actMarkerDyn -> do
                 -- setup vertices markers
                 let vertMarkerPntsDyn = mkVertMarkerPoints (cfg ^. _vertModifier) graphActive actMarkerDyn <$> graphDyn
                 vertMarkersDyn <- setupVertMarkers vertMarkerPntsDyn
@@ -209,6 +219,10 @@ createGraphEditor cfg = do
                     midActive = lift2 (\pa am -> pa && fromBoolean (am == Nothing)) graphActive actMarkerDyn
 
                     floorPolyDyn = floorPlanHousePoints <$> cfg ^. _floor
+
+                -- render graph lines
+                eventNode_ $ renderGraph <$> newGraphEvt
+
                 -- create mid markers for adding new vertices
                 toAddEvt <- setupMidMarkers midActive newGraphEvt
                 -- setup the polygon adder
