@@ -151,12 +151,11 @@ setupPolyAdder polyDyn pntsDyn conf = do
         getCandPoint evt = do
             np <- worldToLocal (evt ^. _point) parent
             let c = updateVector def np
-            pure $ Just $ mkCandidatePoint c (normal $ evt ^. _face)
+            pure $ mkCandidatePoint c (normal $ evt ^. _face)
 
         pntsEvt = performEvent $ getCandPoint <$> gateDyn canShowAdder (conf ^. _mouseMove)
 
-        f (Just p) poly pnts = if validCandPoint p poly pnts then Just p else Nothing
-        f Nothing _ _        = Nothing
+        f p poly pnts = if validCandPoint p poly pnts then Just p else Nothing
         
         -- candidate point dynamic
         candPntDyn = step Nothing $ sampleDyn pntsDyn $ sampleDyn polyDyn $ f <$> pntsEvt
