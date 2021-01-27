@@ -41,7 +41,7 @@ import Math.Line (_end, _start, lineCenter)
 import Model.ActiveMode (ActiveMode(..), fromBoolean, isActive)
 import Model.HouseBuilder.FloorPlan (FloorPlan, floorPlanHousePoints)
 import Model.Polygon (Polygon, polygonAround)
-import Model.UUID (class HasUUID, idLens)
+import Model.UUID (class HasUUID, assignNewIds, idLens)
 import Rendering.DynamicNode (renderDynamic, renderEvent)
 import Rendering.Node (Node, _visible, fixNodeDWith, getParent, node, tapMesh)
 import Three.Core.Face3 (normal)
@@ -141,6 +141,7 @@ setupPolyAdder :: forall e f v w. Functor f
                   => Foldable f
                   => Default v
                   => Vector v
+                  => HasUUID v
                   => Dynamic (Polygon v) -> Dynamic (f v) -> GraphEditorConf v w -> Node e (Event (Polygon v))
 setupPolyAdder polyDyn pntsDyn conf = do
     parent <- getParent
@@ -165,7 +166,7 @@ setupPolyAdder polyDyn pntsDyn conf = do
 
     addedPntEvt <- node opt $ createObjectAdder candPntDyn canShowAdder
     
-    pure $ polygonAround 1.0 <<< view _position <$> addedPntEvt
+    pure $ performEvent $ assignNewIds <<< polygonAround 3.0 <<< view _position <$> addedPntEvt
 
 
 -- update a vertex in a graph
