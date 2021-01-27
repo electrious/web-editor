@@ -134,7 +134,7 @@ validCandPoint :: forall v f. Default v =>
                               Functor f =>
                               Foldable f =>
                               CandidatePoint v -> Polygon v -> f v -> Boolean
-validCandPoint p poly pnts = not (underPolygons [poly] (p ^. _position)) && isNothing (find f pnts)
+validCandPoint p poly pnts = underPolygons [poly] (p ^. _position) && isNothing (find f pnts)
     where f v = dist v (p ^. _position) < 2.0
 
 setupPolyAdder :: forall e f v w. Functor f
