@@ -4,11 +4,11 @@ import Prelude
 
 import Custom.Mesh (TapMouseMesh)
 import Data.Default (class Default, def)
-import Data.Graph (Graph, empty)
-import Data.Graph.Extra (addPolygon)
 import Data.Lens (view, (.~), (^.))
 import Data.Meter (Meter, meter, meterVal)
 import Data.Newtype (class Newtype)
+import Data.UGraph (UGraph, addPolygon)
+import Data.UGraph as UG
 import Data.UUID (UUID, emptyUUID, genUUID)
 import Editor.Common.Lenses (_height, _id, _name, _polygon, _position)
 import Effect (Effect)
@@ -87,10 +87,10 @@ floorPlanHousePoints fp = f <$> fp ^. _polygon
           f v = updateVector def $ mkVec3 (vecX v) (vecY v) h
 
 -- | convert floorplan to a default graph
-floorGraph :: forall w. Default w => FloorPlan -> Effect (Graph HousePoint w)
+floorGraph :: forall w. Default w => FloorPlan -> Effect (UGraph HousePoint w)
 floorGraph fp = do
     poly <- assignNewIds $ floorPlanHousePoints fp
-    pure $ addPolygon poly empty
+    pure $ addPolygon poly UG.empty
 
 instance nodeRenderableFloorPlan :: NodeRenderable (Dynamic ActiveMode) FloorPlan TapMouseMesh where
     render fp = do

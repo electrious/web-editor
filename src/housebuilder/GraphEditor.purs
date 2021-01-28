@@ -11,9 +11,8 @@ import Data.Array (foldl)
 import Data.Default (class Default, def)
 import Data.Foldable (class Foldable, find, traverse_)
 import Data.FunctorWithIndex (mapWithIndex)
-import Data.Graph (Graph, adjacent, deleteEdge, deleteVertex, insertEdge, insertVertex, vertices)
+import Data.Graph (adjacent, vertices)
 import Data.Graph as G
-import Data.Graph.Extra (addPolygon, edges, graphCenter, graphPoints)
 import Data.Lens (Lens', view, (^.), (.~))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
@@ -24,6 +23,7 @@ import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..), snd)
+import Data.UGraph (UGraph, addPolygon, deleteEdge, deleteVertex, edges, graphCenter, graphPoints, insertEdge, insertVertex)
 import Data.UUID (UUID, genUUID)
 import Data.UUIDMap (UUIDMap)
 import Editor.Common.Lenses (_active, _face, _floor, _mouseMove, _name, _point, _position, _tapped)
@@ -54,7 +54,7 @@ import Three.Math.Vector (class Vector, dist, getVector, mkVec3, updateVector)
 newtype GraphEditorConf v w = GraphEditorConf {
     active       :: Dynamic ActiveMode,
     floor        :: Dynamic FloorPlan,
-    graph        :: Graph v w,
+    graph        :: UGraph v w,
     vertModifier :: Modifier v,
     mouseMove    :: Event SceneMouseMoveEvent
     }
@@ -70,7 +70,7 @@ instance defaultGraphEditorConf :: Ord v => Default (GraphEditorConf v w) where
         }
 
 newtype GraphEditor v w = GraphEditor {
-    graph      :: Event (Graph v w),
+    graph      :: Event (UGraph v w),
     delete     :: Event SceneTapEvent,
     isDragging :: Event Boolean
     }
@@ -82,7 +82,7 @@ _graph = _Newtype <<< prop (SProxy :: SProxy "graph")
 
 
 -- create vertex markers for an array of vertices
-mkVertMarkerPoints :: forall v w. HasUUID v => Modifier v -> Dynamic ActiveMode -> Dynamic (Maybe UUID) -> Graph v w -> UUIDMap (VertMarkerPoint UUID v)
+mkVertMarkerPoints :: forall v w. HasUUID v => Modifier v -> Dynamic ActiveMode -> Dynamic (Maybe UUID) -> UGraph v w -> UUIDMap (VertMarkerPoint UUID v)
 mkVertMarkerPoints m act actMarker graph = mapWithIndex (\i v -> mkVertMarkerPoint m act actMarker (Tuple v i)) ivsMap
     where ivsMap = fromFoldable $ f <$> vertices graph
           f v = Tuple (v ^. idLens) v
@@ -91,7 +91,7 @@ setupVertMarkers :: forall e v. Vector v => HasUUID v => Dynamic (UUIDMap (VertM
 setupVertMarkers = renderDynamic
 
 
-graphMidPoints :: forall v w. Ord v => HasUUID v => Vector v => Dynamic ActiveMode -> Graph v w -> Effect (List (MidMarkerPoint UUID v))
+graphMidPoints :: forall v w. Ord v => HasUUID v => Vector v => Dynamic ActiveMode -> UGraph v w -> Effect (List (MidMarkerPoint UUID v))
 graphMidPoints actDyn = traverse midP <<< edges
     where midP l = do
               i <- genUUID
@@ -104,7 +104,7 @@ graphMidPoints actDyn = traverse midP <<< edges
                   }
 
 -- | render all middle markers
-setupMidMarkers :: forall e v w. Ord v => HasUUID v => Vector v => Dynamic ActiveMode -> Event (Graph v w) -> Node e (Event (MidMarkerPoint UUID v))
+setupMidMarkers :: forall e v w. Ord v => HasUUID v => Vector v => Dynamic ActiveMode -> Event (UGraph v w) -> Node e (Event (MidMarkerPoint UUID v))
 setupMidMarkers actDyn graphEvt = do
     let mPointsEvt = performEvent $ graphMidPoints actDyn <$> graphEvt
     markers :: (Event (List (MidMarker UUID v))) <- renderEvent mPointsEvt
@@ -173,19 +173,19 @@ lineMat :: LineBasicMaterial
 lineMat = unsafePerformEffect $ mkLineBasicMaterial 0x333333 2.0
 
 -- render graph edges with lines
-renderGraph :: forall e v w. Vector v => Ord v => Graph v w -> Node e Unit
+renderGraph :: forall e v w. Vector v => Ord v => UGraph v w -> Node e Unit
 renderGraph = traverse_ renderLine <<< edges
     where renderLine l = do
               let vs = getVector <$> [l ^. _start, l ^. _end]
               line (def # _name .~ "graph-edge") vs lineMat
 
 -- update a vertex in a graph
-dragGraphVert :: forall v w. HasUUID v => Ord v => Default w => v -> Graph v w -> Graph v w
+dragGraphVert :: forall v w. HasUUID v => Ord v => Default w => v -> UGraph v w -> UGraph v w
 dragGraphVert v g = foldl addEdge (insertVertex v $ deleteVertex v g) (adjacent v g)
     where addEdge g' v' = insertEdge v v' def g'
 
 -- add a new vertex and edges based on clicked midmarker
-addVert :: forall v w. Ord v => Default w => MidMarkerPoint UUID v -> Graph v w -> Graph v w
+addVert :: forall v w. Ord v => Default w => MidMarkerPoint UUID v -> UGraph v w -> UGraph v w
 addVert mp g = let n = mp ^. _position
                    n1 = mp ^. _vert1
                    n2 = mp ^. _vert2
