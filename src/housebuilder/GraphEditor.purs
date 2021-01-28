@@ -12,7 +12,6 @@ import Data.Default (class Default, def)
 import Data.Foldable (class Foldable, find, traverse_)
 import Data.FunctorWithIndex (mapWithIndex)
 import Data.Graph (adjacent, vertices)
-import Data.Graph as G
 import Data.Lens (Lens', view, (^.), (.~))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
@@ -24,6 +23,7 @@ import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..), snd)
 import Data.UGraph (UGraph, addPolygon, deleteEdge, deleteVertex, edges, graphCenter, graphPoints, insertEdge, insertVertex)
+import Data.UGraph as UG
 import Data.UUID (UUID, genUUID)
 import Data.UUIDMap (UUIDMap)
 import Editor.Common.Lenses (_active, _face, _floor, _mouseMove, _name, _point, _position, _tapped)
@@ -64,7 +64,7 @@ instance defaultGraphEditorConf :: Ord v => Default (GraphEditorConf v w) where
     def = GraphEditorConf {
         active       : pure Inactive,
         floor        : pure def,
-        graph        : G.empty,
+        graph        : UG.empty,
         vertModifier : def,
         mouseMove    : empty
         }
