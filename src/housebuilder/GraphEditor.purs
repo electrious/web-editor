@@ -35,14 +35,14 @@ import Effect (Effect)
 import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, current, dynEvent, gateDyn, latestEvt, sampleDyn, step)
-import FRP.Event (Event, keepLatest, sampleOn)
+import FRP.Event (Event, keepLatest)
 import FRP.Event.Extra (anyEvt, multicast, performEvent, skip)
 import Math.Line (_end, _start, lineCenter)
 import Model.ActiveMode (ActiveMode(..), fromBoolean, isActive)
 import Model.HouseBuilder.FloorPlan (FloorPlan, floorPlanHousePoints)
 import Model.Polygon (Polygon, polygonAround)
 import Model.UUID (class HasUUID, assignNewIds, idLens)
-import Rendering.DynamicNode (eventNode_, renderDynamic, renderEvent)
+import Rendering.DynamicNode (dynamic_, renderDynamic, renderEvent)
 import Rendering.Node (Node, _visible, fixNodeDWith, getParent, line, node, tapMesh)
 import Three.Core.Face3 (normal)
 import Three.Core.Geometry (CircleGeometry, mkCircleGeometry)
@@ -200,53 +200,54 @@ createGraphEditor cfg = do
     defAct <- liftEffect $ current active
     
     fixNodeDWith defAct \graphActive ->
-        fixNodeDWith graph \graphDyn ->
-            fixNodeDWith Nothing \actMarkerDyn -> do
-                -- setup vertices markers
-                let vertMarkerPntsDyn = mkVertMarkerPoints (cfg ^. _vertModifier) graphActive actMarkerDyn <$> graphDyn
-                vertMarkersDyn <- setupVertMarkers vertMarkerPntsDyn
+        fixNodeDWith graph \noDragGraphDyn -> -- this is the graph only updated after add/delete vertices, dragging won't affect it
+            fixNodeDWith graph \graphDyn ->   -- this is the graph updated with all operations applied
+                fixNodeDWith Nothing \actMarkerDyn -> do
+                    -- setup vertices markers
+                    let vertMarkerPntsDyn = mkVertMarkerPoints (cfg ^. _vertModifier) graphActive actMarkerDyn <$> noDragGraphDyn
+                    vertMarkersDyn <- setupVertMarkers vertMarkerPntsDyn
 
-                -- events for active vertex marker
-                let newActMarkerEvt = getVertMarkerActiveStatus vertMarkersDyn
-                    dragEvt = latestEvt $ anyEvt <<< map (view _position) <$> vertMarkersDyn
+                    -- events for active vertex marker
+                    let newActMarkerEvt = getVertMarkerActiveStatus vertMarkersDyn
+                        dragEvt = latestEvt $ anyEvt <<< map (view _position) <$> vertMarkersDyn
 
-                    -- apply the dragged new vertex to the graph
-                    graphAfterDragEvt = sampleDyn graphDyn $ dragGraphVert <$> dragEvt
+                        -- apply the dragged new vertex to the graph
+                        -- Node: this will be triggered after first render automatically
+                        graphAfterDragEvt = sampleDyn graphDyn $ dragGraphVert <$> dragEvt
 
-                    -- new graph after dragging and adding/deleting
-                    newGraphEvt = multicast $ dynEvent graphDyn <|> graphAfterDragEvt
+                        midActive = lift2 (\pa am -> pa && fromBoolean (am == Nothing)) graphActive actMarkerDyn
 
-                    midActive = lift2 (\pa am -> pa && fromBoolean (am == Nothing)) graphActive actMarkerDyn
+                        floorPolyDyn = floorPlanHousePoints <$> cfg ^. _floor
 
-                    floorPolyDyn = floorPlanHousePoints <$> cfg ^. _floor
+                    -- render graph lines
+                    dynamic_ $ renderGraph <$> graphDyn
 
-                -- render graph lines
-                eventNode_ $ renderGraph <$> newGraphEvt
+                    -- create mid markers for adding new vertices
+                    toAddEvt <- setupMidMarkers midActive (dynEvent graphDyn)
+                    -- setup the polygon adder
+                    newPolyEvt <- setupPolyAdder floorPolyDyn (graphPoints <$> graphDyn) cfg
 
-                -- create mid markers for adding new vertices
-                toAddEvt <- setupMidMarkers midActive newGraphEvt
-                -- setup the polygon adder
-                newPolyEvt <- setupPolyAdder floorPolyDyn (graphPoints <$> graphDyn) cfg
+                    let graphAfterAdd = sampleDyn graphDyn $ addVert <$> toAddEvt
+                        graphAfterAddPoly = sampleDyn graphDyn $ addPolygon <$> newPolyEvt
 
-                let graphAfterAdd = sampleOn newGraphEvt $ addVert <$> toAddEvt
-                    graphAfterAddPoly = sampleOn newGraphEvt $ addPolygon <$> newPolyEvt
+                        -- get delete event of tapping on a marker
+                        delEvts = map snd $ latestEvt $ getTapEvt <$> vertMarkersDyn
+                        graphAfterDel = sampleDyn graphDyn $ deleteVertex <$> delEvts
 
-                    -- get delete event of tapping on a marker
-                    delEvts = map snd $ latestEvt $ getTapEvt <$> vertMarkersDyn
-                    graphAfterDel = sampleOn newGraphEvt $ deleteVertex <$> delEvts
+                        -- update the real graph after adding/deleting vertex
+                        graphEvt = multicast $ graphAfterAdd <|> graphAfterDel <|> graphAfterAddPoly
+                        -- new graph after all kinds of changes
+                        allNewGraphEvt = multicast $ graphEvt <|> graphAfterDragEvt
 
-                    -- update the real graph after adding/deleting vertex
-                    graphEvt = multicast $ graphAfterAdd <|> graphAfterDel <|> graphAfterAddPoly
+                        graphActEvt = dynEvent active <|> (const Active <$> graphEvt)
 
-                    graphActEvt = dynEvent active <|> (const Active <$> graphEvt)
-
-                -- create the graph delete button
-                graphDel <- mkPolyDelMarker (graphCenter <$> newGraphEvt) graphActive
+                    -- create the graph delete button
+                    graphDel <- mkPolyDelMarker (graphCenter <$> allNewGraphEvt) graphActive
                 
-                let editor = GraphEditor {
-                        graph      : skip 1 newGraphEvt,
-                        delete     : multicast $ graphDel ^. _tapped,
-                        isDragging : multicast $ getVertMarkerDragging vertMarkersDyn
-                        }
-                pure { input: newActMarkerEvt, output : { input: graphEvt, output : { input: graphActEvt, output : editor }}}
+                    let editor = GraphEditor {
+                            graph      : skip 1 allNewGraphEvt,
+                            delete     : multicast $ graphDel ^. _tapped,
+                            isDragging : multicast $ getVertMarkerDragging vertMarkersDyn
+                            }
+                    pure { input: newActMarkerEvt, output : { input: allNewGraphEvt, output: { input: graphEvt, output : { input: graphActEvt, output : editor }}}}
     
