@@ -3,6 +3,7 @@ module Data.UGraph where
 import Prelude
 
 import Data.Default (class Default, def)
+import Data.Filterable (filter)
 import Data.Foldable (foldl)
 import Data.Graph as G
 import Data.Int (toNumber)
@@ -53,3 +54,12 @@ addPolygon :: forall v w. Ord v => Vector v => Default w => Polygon v -> UGraph 
 addPolygon poly = addEdges (polyEdges poly) <<< addVerts (poly ^. _polyVerts)
     where addEdges = flip (foldl (\g (Tuple p1 p2) -> insertEdge p1 p2 def g))
           addVerts = flip (foldl (flip G.insertVertex))
+
+
+-- merge two vertices in a graph
+mergeVertices :: forall v w. Ord v => Default w => v -> v -> v -> UGraph v w -> UGraph v w
+mergeVertices v1 v2 v g = let ns1 = G.adjacent v1 g
+                              ns2 = G.adjacent v2 g
+                              ns  = filter (\v' -> v' /= v1 && v' /= v2) $ ns1 <> ns2
+                              addEdges = flip (foldl (\g' nv -> insertEdge v nv def g'))
+                          in addEdges ns $ insertVertex v $ deleteVertex v1 $ deleteVertex v2 g
