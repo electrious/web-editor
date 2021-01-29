@@ -36,7 +36,7 @@ import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, current, dynEvent, gateDyn, latestEvt, sampleDyn, step)
 import FRP.Event (Event, keepLatest)
-import FRP.Event.Extra (anyEvt, multicast, performEvent, skip)
+import FRP.Event.Extra (multicast, performEvent, skip)
 import Math.Line (_end, _start, lineCenter)
 import Model.ActiveMode (ActiveMode(..), fromBoolean, isActive)
 import Model.HouseBuilder.FloorPlan (FloorPlan, floorPlanHousePoints)
@@ -49,6 +49,7 @@ import Three.Core.Geometry (CircleGeometry, mkCircleGeometry)
 import Three.Core.Material (LineBasicMaterial, MeshBasicMaterial, mkLineBasicMaterial, mkMeshBasicMaterial)
 import Three.Core.Object3D (worldToLocal)
 import Three.Math.Vector (class Vector, dist, getVector, mkVec3, updateVector)
+import Util (latestAnyEvtWith)
 
 
 newtype GraphEditorConf v w = GraphEditorConf {
@@ -209,7 +210,7 @@ createGraphEditor cfg = do
 
                     -- events for active vertex marker
                     let newActMarkerEvt = getVertMarkerActiveStatus vertMarkersDyn
-                        dragEvt = latestEvt $ anyEvt <<< map (view _position) <$> vertMarkersDyn
+                        dragEvt = latestAnyEvtWith (view _position) vertMarkersDyn
 
                         -- apply the dragged new vertex to the graph
                         -- Node: this will be triggered after first render automatically

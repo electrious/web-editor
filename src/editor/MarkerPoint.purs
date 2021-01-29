@@ -5,7 +5,7 @@ import Prelude
 import Control.Alt ((<|>))
 import Data.Default (class Default, def)
 import Data.Foldable (class Foldable)
-import Data.FunctorWithIndex (class FunctorWithIndex, mapWithIndex)
+import Data.FunctorWithIndex (class FunctorWithIndex)
 import Data.Lens (Lens', view, (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
@@ -16,9 +16,9 @@ import Data.Tuple (Tuple(..))
 import Editor.Common.Lenses (_active, _index, _isActive, _isDragging, _name, _position, _tapped)
 import Effect (Effect)
 import Effect.Unsafe (unsafePerformEffect)
-import FRP.Dynamic (Dynamic, dynEvent, latestEvt)
+import FRP.Dynamic (Dynamic, dynEvent)
 import FRP.Event (Event)
-import FRP.Event.Extra (anyEvt, performEvent)
+import FRP.Event.Extra (performEvent)
 import Model.ActiveMode (ActiveMode, fromBoolean, isActive)
 import Rendering.Node (_visible, getParent, tapMesh)
 import Rendering.NodeRenderable (class NodeRenderable)
@@ -26,7 +26,7 @@ import Three.Core.Geometry (CircleGeometry, Geometry, mkCircleGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial)
 import Three.Math.Vector (class Vector, getVector, updateVector)
 import UI.DraggableObject (DragObjCfg, createDraggableObject)
-import Util (foldEvtWith)
+import Util (latestAnyEvtWith, latestAnyEvtWithIdx)
 
 
 -- a data type to modify vectors
@@ -89,12 +89,11 @@ mkVertMarkerPoint m active actMarker (Tuple pos idx) = VertMarkerPoint {
 getVertMarkerActiveStatus :: forall f i v. FunctorWithIndex i f => Foldable f => Dynamic (f (VertMarker i v)) -> Event (Maybe i)
 getVertMarkerActiveStatus msDyn = statusForDragging <|> statusForNewMarker
     where g idx m = (if _ then Just idx else Nothing) <$> m ^. _isDragging
-          statusForDragging  = latestEvt $ anyEvt <<< mapWithIndex g <$> msDyn
+          statusForDragging  = latestAnyEvtWithIdx g msDyn
           statusForNewMarker = const Nothing <$> dynEvent msDyn
 
 getVertMarkerDragging :: forall i v f. Functor f => Foldable f => Dynamic (f (VertMarker i v)) -> Event Boolean
-getVertMarkerDragging ms = latestEvt $ foldEvtWith (view _isDragging) <$> ms
-
+getVertMarkerDragging = latestAnyEvtWith (view _isDragging)
 
 -----------------------------------------------------------
 -- | internal object for middle marker point data
