@@ -17,7 +17,7 @@ import Editor.SceneEvent (isDragEnd, isDragStart)
 import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, step)
-import FRP.Event (Event)
+import FRP.Event (Event, gate)
 import FRP.Event.Extra (foldWithDef, multicast, performEvent)
 import Rendering.Node (Node, Props, _renderOrder, _visible, dragMesh, fixNodeE, getParent, node, tapDragMesh)
 import Three.Core.Geometry (class IsGeometry, CircleGeometry, mkCircleGeometry)
@@ -174,7 +174,7 @@ createDraggableObject cfg =
                     
                     dragObj = DraggableObject {
                         tapped     : const unit <$> mesh ^. _tapped,
-                        position   : newPos,
+                        position   : gate dragging newPos,
                         isDragging : dragging
                     }
                 pure { input : dragging, output: { input : newPos, output: dragObj } }
