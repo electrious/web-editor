@@ -9,25 +9,26 @@ import Control.Apply (lift2)
 import Custom.Mesh (TappableMesh)
 import Data.Array (foldl)
 import Data.Default (class Default, def)
+import Data.Filterable (filter)
 import Data.Foldable (class Foldable, find, traverse_)
 import Data.FunctorWithIndex (mapWithIndex)
-import Data.Graph (adjacent, vertices)
+import Data.Graph (Graph, adjacent, vertices)
 import Data.Lens (Lens', view, (^.), (.~))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.List (List)
+import Data.List (List, head)
 import Data.Map (fromFoldable)
-import Data.Maybe (Maybe(..), isNothing)
+import Data.Maybe (Maybe(..), fromMaybe, isNothing)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..), snd)
-import Data.UGraph (UGraph, addPolygon, deleteEdge, deleteVertex, edges, graphCenter, graphPoints, insertEdge, insertVertex)
+import Data.UGraph (UGraph, addPolygon, deleteEdge, deleteVertex, edges, graphCenter, graphPoints, insertEdge, insertVertex, mergeVertices)
 import Data.UGraph as UG
 import Data.UUID (UUID, genUUID)
 import Data.UUIDMap (UUIDMap)
 import Editor.Common.Lenses (_active, _face, _floor, _mouseMove, _name, _point, _position, _tapped)
-import Editor.MarkerPoint (MidMarker, MidMarkerPoint(..), Modifier, VertMarker, VertMarkerPoint, _vert1, _vert2, getVertMarkerActiveStatus, getVertMarkerDragging, mkVertMarkerPoint)
+import Editor.MarkerPoint (MidMarker, MidMarkerPoint(..), Modifier, VertMarker, VertMarkerPoint, _dragEndPos, _vert1, _vert2, getVertMarkerActiveStatus, getVertMarkerDragging, mkVertMarkerPoint)
 import Editor.ObjectAdder (CandidatePoint, createObjectAdder, mkCandidatePoint)
 import Editor.PolygonEditor (_vertModifier, getTapEvt)
 import Editor.SceneEvent (SceneMouseMoveEvent, SceneTapEvent)
@@ -51,12 +52,23 @@ import Three.Core.Object3D (worldToLocal)
 import Three.Math.Vector (class Vector, dist, getVector, mkVec3, updateVector)
 import Util (latestAnyEvtWith)
 
+-- a data type for functions to merge two graph vertices
+newtype VertMerger v = VertMerger (v -> v -> Effect v)
+
+derive instance newtypeVertMerger :: Newtype (VertMerger v) _
+-- a default merger will return the second argument
+instance defaultVertMerger :: Default (VertMerger v) where
+    def = VertMerger (\v1 v2 -> pure v2)
+
+mergeWith :: forall v.VertMerger v -> v -> v -> Effect v
+mergeWith (VertMerger f) v1 v2 = f v1 v2
 
 newtype GraphEditorConf v w = GraphEditorConf {
     active       :: Dynamic ActiveMode,
     floor        :: Dynamic FloorPlan,
     graph        :: UGraph v w,
     vertModifier :: Modifier v,
+    vertMerger   :: VertMerger v,
     mouseMove    :: Event SceneMouseMoveEvent
     }
 
@@ -67,6 +79,7 @@ instance defaultGraphEditorConf :: Ord v => Default (GraphEditorConf v w) where
         floor        : pure def,
         graph        : UG.empty,
         vertModifier : def,
+        vertMerger   : def,
         mouseMove    : empty
         }
 
@@ -81,6 +94,8 @@ derive instance newtypeGraphEditor :: Newtype (GraphEditor v w) _
 _graph :: forall t a r. Newtype t { graph :: a | r } => Lens' t a
 _graph = _Newtype <<< prop (SProxy :: SProxy "graph")
 
+_vertMerger :: forall t a r. Newtype t { vertMerger :: a | r } => Lens' t a
+_vertMerger = _Newtype <<< prop (SProxy :: SProxy "vertMerger")
 
 -- create vertex markers for an array of vertices
 mkVertMarkerPoints :: forall v w. HasUUID v => Modifier v -> Dynamic ActiveMode -> Dynamic (Maybe UUID) -> UGraph v w -> UUIDMap (VertMarkerPoint UUID v)
@@ -193,10 +208,18 @@ addVert mp g = let n = mp ^. _position
                in insertEdge n n1 def $ insertEdge n n2 def $ insertVertex n $ deleteEdge n1 n2 g
 
 
+checkAndMerge :: forall v w. Ord v => Vector v => HasUUID v => Default w => (v -> v -> Effect v) -> v -> Graph v w -> Effect (Graph v w)
+checkAndMerge f v g = fromMaybe g <$> traverse merge cn
+    where cn = head $ filter (\v' -> v' /= v && dist v v' < 2.0) $ vertices g
+          merge vv = do
+              nv <- f v vv
+              pure $ mergeVertices v vv nv g
+
 createGraphEditor :: forall e v w. Default v => Ord v => HasUUID v => Vector v => Default w => GraphEditorConf v w -> Node e (GraphEditor v w)
 createGraphEditor cfg = do
     let graph  = cfg ^. _graph
         active = cfg ^. _active
+        merger = cfg ^. _vertMerger
 
     defAct <- liftEffect $ current active
     
@@ -210,11 +233,13 @@ createGraphEditor cfg = do
 
                     -- events for active vertex marker
                     let newActMarkerEvt = getVertMarkerActiveStatus vertMarkersDyn
-                        dragEvt = latestAnyEvtWith (view _position) vertMarkersDyn
+                        dragEvt         = latestAnyEvtWith (view _position) vertMarkersDyn
+                        dragEndPosEvt   = latestAnyEvtWith (view _dragEndPos) vertMarkersDyn
 
                         -- apply the dragged new vertex to the graph
                         -- Node: this will be triggered after first render automatically
                         graphAfterDragEvt = sampleDyn graphDyn $ dragGraphVert <$> dragEvt
+                        graphAfterDragEndEvt = performEvent $ sampleDyn graphDyn $ checkAndMerge (mergeWith merger) <$> dragEndPosEvt
 
                         midActive = lift2 (\pa am -> pa && fromBoolean (am == Nothing)) graphActive actMarkerDyn
 
@@ -236,7 +261,7 @@ createGraphEditor cfg = do
                         graphAfterDel = sampleDyn graphDyn $ deleteVertex <$> delEvts
 
                         -- update the real graph after adding/deleting vertex
-                        graphEvt = multicast $ graphAfterAdd <|> graphAfterDel <|> graphAfterAddPoly
+                        graphEvt = multicast $ graphAfterAdd <|> graphAfterDel <|> graphAfterAddPoly <|> graphAfterDragEndEvt
                         -- new graph after all kinds of changes
                         allNewGraphEvt = multicast $ graphEvt <|> graphAfterDragEvt
 

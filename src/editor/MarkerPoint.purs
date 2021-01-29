@@ -4,6 +4,7 @@ import Prelude
 
 import Control.Alt ((<|>))
 import Data.Default (class Default, def)
+import Data.Filterable (filter)
 import Data.Foldable (class Foldable)
 import Data.FunctorWithIndex (class FunctorWithIndex)
 import Data.Lens (Lens', view, (.~), (^.))
@@ -17,7 +18,7 @@ import Editor.Common.Lenses (_active, _index, _isActive, _isDragging, _name, _po
 import Effect (Effect)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, dynEvent)
-import FRP.Event (Event)
+import FRP.Event (Event, sampleOn_)
 import FRP.Event.Extra (performEvent)
 import Model.ActiveMode (ActiveMode, fromBoolean, isActive)
 import Rendering.Node (_visible, getParent, tapMesh)
@@ -56,10 +57,14 @@ _modifier = _Newtype <<< prop (SProxy :: SProxy "modifier")
 newtype VertMarker i v = VertMarker {
     tapped     :: Event (Tuple i v),
     position   :: Event v,
-    isDragging :: Event Boolean
+    isDragging :: Event Boolean,
+    dragEndPos :: Event v
 }
 
 derive instance newtypeVertMarker :: Newtype (VertMarker i v) _
+
+_dragEndPos :: forall t a r. Newtype t { dragEndPos :: a | r } => Lens' t a
+_dragEndPos = _Newtype <<< prop (SProxy :: SProxy "dragEndPos")
 
 instance nodeRenderableVertMarkerPoint :: Vector v => NodeRenderable e (VertMarkerPoint i v) (VertMarker i v) where
     render m = do
@@ -67,11 +72,13 @@ instance nodeRenderableVertMarkerPoint :: Vector v => NodeRenderable e (VertMark
                       # _position .~ (getVector $ m ^. _position)
             mod = m ^. _modifier <<< _modifierFunc
         dragObj <- createDraggableObject (cfg :: DragObjCfg Geometry)
-        
+        let posEvt   = performEvent $ (mod <<< updateVector (m ^. _position)) <$> dragObj ^. _position
+            dragging = dragObj ^. _isDragging
         pure $ VertMarker {
             tapped     : const (Tuple (m ^. _index) (m ^. _position)) <$> dragObj ^. _tapped,
-            position   : performEvent $ (mod <<< updateVector (m ^. _position)) <$> dragObj ^. _position,
-            isDragging : dragObj ^. _isDragging
+            position   : posEvt,
+            isDragging : dragging,
+            dragEndPos : sampleOn_ posEvt $ filter not dragging
         }
 
 -- create a vertex marker point
