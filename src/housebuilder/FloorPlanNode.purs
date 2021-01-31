@@ -128,23 +128,28 @@ createFloorNode = do
 
             isActDyn = isActive <$> act
             calcPos p = mkVec3 0.0 0.0 (meterVal $ floorPlanTop p)
+
+            topPosDyn = calcPos <$> fpDyn
         -- render the polygon
         polyMDyn :: Dynamic TapMouseMesh <- localEnv (const $ cfg ^. _active) $ renderDynamic fpDyn
 
         -- setup the polygon editor
-        editor <- node (def # _position .~ (calcPos <$> fpDyn)) $
+        editor <- node (def # _position .~ topPosDyn) do
+                      -- graph editor for the roof top
+                      g :: Graph HousePoint Int <- liftEffect $ floorGraph fp
+                      roofTopEvt <- createGraphEditor $ def # _active    .~ act
+                                                            # _floor     .~ fpDyn
+                                                            # _graph     .~ g
+                                                            # _mouseMove .~ (latestEvt $ view _mouseMove <$> polyMDyn)
+
+            
                       createPolyEditor $ def # _active  .~ (fromBoolean <$> isActDyn)
                                              # _polygon .~ fp ^. _polygon
+
 
         -- setup the height editor
         heightEvt <- setupHeightEditor isActDyn $ arrowPos <$> fpDyn
 
-        -- graph editor for the roof top
-        g :: Graph HousePoint Int <- liftEffect $ floorGraph fp
-        roofTopEvt <- createGraphEditor $ def # _active    .~ act
-                                              # _floor     .~ fpDyn
-                                              # _graph     .~ g
-                                              # _mouseMove .~ (latestEvt $ view _mouseMove <$> polyMDyn)
 
         -- calculate the updated floor plan
         let opEvt = (UpdPoly <$> editor ^. _polygon) <|>

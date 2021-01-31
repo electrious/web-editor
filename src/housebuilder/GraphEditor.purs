@@ -23,11 +23,11 @@ import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..), snd)
-import Data.UGraph (UGraph, addPolygon, deleteEdge, deleteVertex, edges, graphCenter, graphPoints, insertEdge, insertVertex, mergeVertices)
+import Data.UGraph (UGraph, addPolygon, deleteEdge, deleteVertex, edges, graphPoints, insertEdge, insertVertex, mergeVertices)
 import Data.UGraph as UG
 import Data.UUID (UUID, genUUID)
 import Data.UUIDMap (UUIDMap)
-import Editor.Common.Lenses (_active, _face, _floor, _mouseMove, _name, _point, _position, _tapped)
+import Editor.Common.Lenses (_active, _face, _floor, _mouseMove, _name, _point, _position)
 import Editor.MarkerPoint (MidMarker, MidMarkerPoint(..), Modifier, VertMarker, VertMarkerPoint, _dragEndPos, _vert1, _vert2, getVertMarkerActiveStatus, getVertMarkerDragging, mkVertMarkerPoint)
 import Editor.ObjectAdder (CandidatePoint, createObjectAdder, mkCandidatePoint)
 import Editor.PolygonEditor (_vertModifier, getTapEvt)
@@ -268,11 +268,11 @@ createGraphEditor cfg = do
                         graphActEvt = dynEvent active <|> (const Active <$> graphEvt)
 
                     -- create the graph delete button
-                    graphDel <- mkPolyDelMarker (graphCenter <$> allNewGraphEvt) graphActive
+                    --graphDel <- mkPolyDelMarker (graphCenter <$> allNewGraphEvt) graphActive
                 
                     let editor = GraphEditor {
                             graph      : skip 1 allNewGraphEvt,
-                            delete     : multicast $ graphDel ^. _tapped,
+                            delete     : empty, --multicast $ graphDel ^. _tapped,
                             isDragging : multicast $ getVertMarkerDragging vertMarkersDyn
                             }
                     pure { input: newActMarkerEvt, output : { input: allNewGraphEvt, output: { input: graphEvt, output : { input: graphActEvt, output : editor }}}}
