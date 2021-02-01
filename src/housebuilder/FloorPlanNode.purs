@@ -17,7 +17,7 @@ import Editor.PanelAPIInterpreter (_finished)
 import Editor.PolygonEditor (_delete, _showFinish, createPolyEditor)
 import Editor.SceneEvent (SceneMouseMoveEvent)
 import Effect.Class (liftEffect)
-import FRP.Dynamic (Dynamic, current, dynEvent, latestEvt, step)
+import FRP.Dynamic (Dynamic, current, dynEvent, latestEvt, performDynamic, step)
 import FRP.Event (Event, fold)
 import FRP.Event.Extra (multicast)
 import Model.ActiveMode (ActiveMode(..), isActive)
@@ -90,10 +90,11 @@ createFloorNode = do
         editor <- node (def # _position .~ topPosDyn) $
                       fixNodeE \finishedEvt -> do
                           -- graph editor for the roof top
-                          g :: Graph HousePoint Int <- liftEffect $ floorGraph fp
+                          let gDyn :: Dynamic (Graph HousePoint Int)
+                              gDyn = performDynamic $ floorGraph <$> fpDyn
                           roofTopEvt <- createGraphEditor $ def # _active         .~ step Inactive (const Active <$> finishedEvt)
                                                                 # _floor          .~ fpDyn
-                                                                # _graph          .~ g
+                                                                # _graph          .~ gDyn
                                                                 # _mouseMove      .~ latestEvt (view _mouseMove <$> polyMDyn)
                                                                 # _vertMerger     .~ VertMerger mergeHousePoint
                                                                 # _heightEditable .~ ((==) RidgePoint <<< view _pointType)

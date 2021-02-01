@@ -68,7 +68,7 @@ mergeWith (VertMerger f) v1 v2 = f v1 v2
 newtype GraphEditorConf v w = GraphEditorConf {
     active         :: Dynamic ActiveMode,
     floor          :: Dynamic FloorPlan,
-    graph          :: UGraph v w,
+    graph          :: Dynamic (UGraph v w),
     vertModifier   :: Modifier v,
     vertMerger     :: VertMerger v,
     heightEditable :: v -> Boolean,
@@ -80,7 +80,7 @@ instance defaultGraphEditorConf :: Ord v => Default (GraphEditorConf v w) where
     def = GraphEditorConf {
         active         : pure Inactive,
         floor          : pure def,
-        graph          : UG.empty,
+        graph          : pure UG.empty,
         vertModifier   : def,
         vertMerger     : def,
         heightEditable : const true,
@@ -237,11 +237,11 @@ heightEditableVerts f = filter f <<< vertices
 
 createGraphEditor :: forall e v w. Default v => Ord v => HasUUID v => Vector v => Default w => GraphEditorConf v w -> Node e (GraphEditor v w)
 createGraphEditor cfg = do
-    let graph  = cfg ^. _graph
-        active = cfg ^. _active
+    let active = cfg ^. _active
         merger = cfg ^. _vertMerger
 
     defAct <- liftEffect $ current active
+    graph  <- liftEffect $ current $ cfg ^. _graph
     
     fixNodeDWith defAct \graphActive ->
         fixNodeDWith graph \noDragGraphDyn -> -- this is the graph only updated after add/delete vertices, dragging won't affect it
@@ -291,7 +291,12 @@ createGraphEditor cfg = do
                         graphAfterDel = sampleDyn graphDyn $ deleteVertex <$> delEvts
 
                         -- update the real graph after adding/deleting vertex
-                        graphEvt = multicast $ graphAfterAdd <|> graphAfterDel <|> graphAfterAddPoly <|> graphAfterDragEndEvt <|> graphAfterHeight
+                        graphEvt = multicast $ graphAfterAdd <|>
+                                               graphAfterDel <|>
+                                               graphAfterAddPoly <|>
+                                               graphAfterDragEndEvt <|>
+                                               graphAfterHeight <|>
+                                               dynEvent (cfg ^. _graph)
                         -- new graph after all kinds of changes
                         allNewGraphEvt = multicast $ graphEvt <|> graphAfterDragEvt
 
