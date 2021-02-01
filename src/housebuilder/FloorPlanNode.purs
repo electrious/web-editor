@@ -7,14 +7,12 @@ import Custom.Mesh (TapMouseMesh)
 import Data.Array (foldl)
 import Data.Default (class Default, def)
 import Data.Graph (Graph)
-import Data.Lens (Lens', view, (.~), (^.))
-import Data.Lens.Iso.Newtype (_Newtype)
-import Data.Lens.Record (prop)
+import Data.Lens (view, (.~), (^.))
 import Data.Maybe (Maybe(..), maybe)
-import Data.Meter (Meter, meter, meterVal)
+import Data.Meter (Meter, meterVal)
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
-import Editor.Common.Lenses (_active, _floor, _height, _id, _isActive, _mouseMove, _name, _polygon, _position, _rotation, _tapped)
+import Editor.Common.Lenses (_active, _floor, _height, _id, _mouseMove, _name, _polygon, _position, _tapped)
+import Editor.HeightEditor (_arrowMaterial, mkDragArrowConf, setupHeightEditor)
 import Editor.HouseBuilder.GraphEditor (VertMerger(..), _graph, _vertMerger, createGraphEditor)
 import Editor.PolygonEditor (_delete, createPolyEditor)
 import Editor.SceneEvent (SceneMouseMoveEvent)
@@ -22,18 +20,14 @@ import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic, latestEvt, step)
 import FRP.Event (Event, fold)
 import FRP.Event.Extra (multicast)
-import Math (pi)
 import Model.ActiveMode (ActiveMode(..), fromBoolean, isActive)
 import Model.HouseBuilder.FloorPlan (FloorPlan, FloorPlanOp(..), floorGraph, floorPlanTop)
 import Model.HouseBuilder.HousePoint (HousePoint, mergeHousePoint)
 import Model.Polygon (Polygon, _polyVerts)
 import Rendering.DynamicNode (renderDynamic)
 import Rendering.Node (Node, fixNodeE, getEnv, localEnv, node)
-import Three.Core.Geometry (Geometry)
 import Three.Core.Material (MeshBasicMaterial)
-import Three.Math.Euler (mkEuler)
-import Three.Math.Vector (Vector2, Vector3, mkVec3, vecX, vecY, vecZ)
-import UI.DraggableObject (DragObjCfg, DraggableObject, _customMat, _deltaTransform, _validator, createDraggableObject)
+import Three.Math.Vector (Vector2, Vector3, mkVec3, vecX, vecY)
 
 newtype FloorPlanConfig = FloorPlanConfig {
     floor         :: FloorPlan,
@@ -50,9 +44,6 @@ instance defaultFloorPlanConfig :: Default FloorPlanConfig where
         arrowMaterial : Nothing
         }
 
-_arrowMaterial :: forall t a r. Newtype t { arrowMaterial :: a | r } => Lens' t a
-_arrowMaterial = _Newtype <<< prop (SProxy :: SProxy "arrowMaterial")
-
 
 newtype FloorPlanNode = FloorPlanNode {
     updated   :: Event FloorPlanOp,
@@ -62,8 +53,6 @@ newtype FloorPlanNode = FloorPlanNode {
     }
 
 derive instance newtypeFloorPlanNode :: Newtype FloorPlanNode _
-
-type DragArrow = DraggableObject
 
 -- | calculate position for drag Arrow based on all floor plan vertices
 arrowPos :: FloorPlan -> Vector3
@@ -78,31 +67,6 @@ arrowPos fp = mkVec3 x y 0.5
           x = maybe 2.0 (((+) 2.0) <<< vecX) mv
           y = maybe 0.0 vecY mv
 
-
--- | create the drag arrow to drag the Floor Plan to form the house
-dragArrow :: Dynamic Boolean -> Dynamic Vector3 -> Node FloorPlanConfig DragArrow
-dragArrow actDyn posDyn = do
-    mat <- view _arrowMaterial <$> getEnv
-    
-    let -- make sure the arrow can only be dragged between 0 and 20 in Z axis
-        validator pos = let z = vecZ pos in z >= 0.0 && z <= 20.0
-        -- make sure the arrow only can be dragged along Z axis
-        transF d = mkVec3 0.0 0.0 (vecZ d)
-        
-        cfg = def # _isActive       .~ actDyn
-                  # _customMat      .~ mat
-                  # _validator      .~ validator
-                  # _deltaTransform .~ Just transF
-                  # _rotation       .~ mkEuler (pi / 2.0) 0.0 0.0
-    node (def # _position .~ posDyn) $ createDraggableObject (cfg :: DragObjCfg Geometry)
-
-
--- | setup drag arrow to edit the house height
-setupHeightEditor :: Dynamic Boolean -> Dynamic Vector3 -> Node FloorPlanConfig (Event Meter)
-setupHeightEditor actDyn posDyn = do
-    arrow <- dragArrow actDyn posDyn
-    let toH = meter <<< vecZ
-    pure $ toH <$> (arrow ^. _position)
 
 
 data UpdFloorOp = UpdPoly (Polygon Vector2)
@@ -149,7 +113,7 @@ createFloorNode = do
 
 
         -- setup the height editor
-        heightEvt <- setupHeightEditor isActDyn $ arrowPos <$> fpDyn
+        heightEvt <- localEnv (view _arrowMaterial >>> mkDragArrowConf) $ setupHeightEditor isActDyn $ arrowPos <$> fpDyn
 
 
         -- calculate the updated floor plan
