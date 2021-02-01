@@ -26,7 +26,7 @@ import Rendering.NodeRenderable (class NodeRenderable)
 import Three.Core.Geometry (CircleGeometry, Geometry, mkCircleGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial)
 import Three.Math.Vector (class Vector, getVector, updateVector)
-import UI.DraggableObject (DragObjCfg, createDraggableObject)
+import UI.DraggableObject (DragObjCfg, createDraggableObject, incZ)
 import Util (latestAnyEvtWith, latestAnyEvtWithIdx)
 
 
@@ -137,7 +137,7 @@ instance nodeRenderableMidMarkerPoint :: Vector v => NodeRenderable e (MidMarker
     render p = do
         parent <- getParent
         m <- tapMesh (def # _name     .~ "mid-marker"
-                          # _position .~ pure (getVector $ p ^. _position)
+                          # _position .~ pure (incZ $ getVector $ p ^. _position)
                           # _visible  .~ (isActive <$> p ^. _active)
                      ) midGeometry midMaterial
         
