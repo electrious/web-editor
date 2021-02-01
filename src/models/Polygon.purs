@@ -1,12 +1,12 @@
 module Model.Polygon (Polygon, _polyVerts, newPolygon, polygonAround, numOfVerts,
-                      addVertexAt, delVertexAt, polyCenter, polyEdges, polyMidPoints, polygonBBox,
+                      addVertexAt, delVertexAt, updateVertAt, polyCenter, polyEdges, polyMidPoints, polygonBBox,
                       renderPolygon, class IsPolygon, toPolygon) where
 
 import Prelude hiding (add)
 
 import Control.Monad.Writer (tell)
 import Custom.Mesh (TapMouseMesh, TappableMesh, mkTappableMesh)
-import Data.Array (deleteAt, fromFoldable, head, insertAt, length, mapWithIndex, snoc, tail, zip, zipWith)
+import Data.Array (deleteAt, fromFoldable, head, insertAt, length, mapWithIndex, snoc, tail, updateAt, zip, zipWith)
 import Data.Default (class Default, def)
 import Data.Filterable (filter)
 import Data.Foldable (class Foldable, foldl, maximum, minimum)
@@ -76,6 +76,9 @@ delVertexAt idx poly = if numOfVerts poly > 3
                        then Polygon $ fromMaybe [] (deleteAt idx $ poly ^. _polyVerts)
                        else poly
 
+updateVertAt :: forall v. Int -> v -> Polygon v -> Polygon v
+updateVertAt idx p poly@(Polygon pns) = fromMaybe poly $ Polygon <$> updateAt idx p pns
+    
 -- | calculate the center based on polygon
 polyCenter :: forall v. Default v => Vector v => Polygon v -> v
 polyCenter poly = (foldl (<+>) def vs) <**> (1.0 / l)

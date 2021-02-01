@@ -249,7 +249,7 @@ createGraphEditor cfg = do
 
                     -- events for active vertex marker
                     let newActMarkerEvt = getVertMarkerActiveStatus vertMarkersDyn
-                        dragEvt         = latestAnyEvtWith (view _position) vertMarkersDyn
+                        dragEvt         = snd <$> latestAnyEvtWith (view _position) vertMarkersDyn
                         dragEndPosEvt   = latestAnyEvtWith (view _dragEndPos) vertMarkersDyn
 
                         -- apply the dragged new vertex to the graph

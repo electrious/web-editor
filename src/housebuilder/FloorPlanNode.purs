@@ -19,7 +19,7 @@ import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic, latestEvt, step)
 import FRP.Event (Event, fold)
 import FRP.Event.Extra (multicast)
-import Model.ActiveMode (ActiveMode(..), fromBoolean, isActive)
+import Model.ActiveMode (ActiveMode(..), isActive)
 import Model.HouseBuilder.FloorPlan (FloorPlan, FloorPlanOp(..), floorGraph, floorPlanTop)
 import Model.HouseBuilder.HousePoint (HousePoint, HousePointType(..), _pointType, mergeHousePoint)
 import Model.Polygon (Polygon, _polyVerts)
@@ -89,15 +89,14 @@ createFloorNode = do
         editor <- node (def # _position .~ topPosDyn) do
                       -- graph editor for the roof top
                       g :: Graph HousePoint Int <- liftEffect $ floorGraph fp
-                      roofTopEvt <- createGraphEditor $ def # _active    .~ act
-                                                            # _floor     .~ fpDyn
-                                                            # _graph     .~ g
-                                                            # _mouseMove .~ (latestEvt $ view _mouseMove <$> polyMDyn)
-                                                            # _vertMerger .~ VertMerger mergeHousePoint
+                      roofTopEvt <- createGraphEditor $ def # _active         .~ pure Inactive
+                                                            # _floor          .~ fpDyn
+                                                            # _graph          .~ g
+                                                            # _mouseMove      .~ latestEvt (view _mouseMove <$> polyMDyn)
+                                                            # _vertMerger     .~ VertMerger mergeHousePoint
                                                             # _heightEditable .~ ((==) RidgePoint <<< view _pointType)
-
             
-                      createPolyEditor $ def # _active  .~ (fromBoolean <$> isActDyn)
+                      createPolyEditor $ def # _active  .~ act
                                              # _polygon .~ fp ^. _polygon
 
 

@@ -56,7 +56,7 @@ _modifier = _Newtype <<< prop (SProxy :: SProxy "modifier")
 
 newtype VertMarker i v = VertMarker {
     tapped     :: Event (Tuple i v),
-    position   :: Event v,
+    position   :: Event (Tuple i v),
     isDragging :: Event Boolean,
     dragEndPos :: Event v
 }
@@ -76,7 +76,7 @@ instance nodeRenderableVertMarkerPoint :: Vector v => NodeRenderable e (VertMark
             dragging = dragObj ^. _isDragging
         pure $ VertMarker {
             tapped     : const (Tuple (m ^. _index) (m ^. _position)) <$> dragObj ^. _tapped,
-            position   : posEvt,
+            position   : Tuple (m ^. _index) <$> posEvt,
             isDragging : dragging,
             dragEndPos : sampleOn_ posEvt $ filter not dragging
         }
