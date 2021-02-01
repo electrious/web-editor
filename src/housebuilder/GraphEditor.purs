@@ -29,7 +29,7 @@ import Data.UGraph as UG
 import Data.UUID (UUID, genUUID)
 import Data.UUIDMap (UUIDMap)
 import Editor.Common.Lenses (_active, _face, _floor, _mouseMove, _name, _point, _position)
-import Editor.HeightEditor (dragArrowPos, setupHeightEditor)
+import Editor.HeightEditor (_arrowMaterial, dragArrowPos, setupHeightEditor)
 import Editor.MarkerPoint (MidMarker, MidMarkerPoint(..), Modifier, VertMarker, VertMarkerPoint, _dragEndPos, _vert1, _vert2, getVertMarkerActiveStatus, getVertMarkerDragging, mkVertMarkerPoint)
 import Editor.ObjectAdder (CandidatePoint, createObjectAdder, mkCandidatePoint)
 import Editor.PolygonEditor (_vertModifier, getTapEvt)
@@ -235,6 +235,9 @@ checkAndMerge f v g = fromMaybe g <$> traverse merge cn
 heightEditableVerts :: forall v w. (v -> Boolean) -> Graph v w -> List v
 heightEditableVerts f = filter f <<< vertices
 
+heightMarkerMat :: MeshBasicMaterial
+heightMarkerMat = unsafePerformEffect $ mkMeshBasicMaterial 0xFFA500
+
 createGraphEditor :: forall e v w. Default v => Ord v => HasUUID v => Vector v => Default w => GraphEditorConf v w -> Node e (GraphEditor v w)
 createGraphEditor cfg = do
     let active = cfg ^. _active
@@ -279,7 +282,8 @@ createGraphEditor cfg = do
                     newPolyEvt <- setupPolyAdder floorPolyDyn (graphPoints <$> graphDyn) cfg
 
                     -- setup the height editor
-                    heightEvt <- localEnv (const def) $ setupHeightEditor hEditorActDyn (dragArrowPos <$> hVertsDyn)
+                    heightEvt <- localEnv (const $ def # _arrowMaterial .~ Just heightMarkerMat) $
+                                     setupHeightEditor hEditorActDyn (dragArrowPos <$> hVertsDyn)
 
                     let graphAfterAdd = sampleDyn graphDyn $ addVert <$> toAddEvt
                         graphAfterAddPoly = sampleDyn graphDyn $ addPolygon <$> newPolyEvt
