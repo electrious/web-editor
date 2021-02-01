@@ -4,7 +4,7 @@ import Prelude hiding (add)
 
 import Control.Alt ((<|>))
 import Control.Apply (lift2)
-import Custom.Mesh (TappableMesh)
+import Custom.Mesh (TappableMesh(..))
 import Data.Array (length, range, zip)
 import Data.Compactable (compact)
 import Data.Default (class Default, def)
@@ -21,7 +21,7 @@ import Editor.MarkerPoint (MidMarker, MidMarkerPoint(..), Modifier, VertMarker, 
 import Editor.SceneEvent (SceneTapEvent)
 import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
-import FRP.Dynamic (Dynamic, current, dynEvent, latestEvt, sampleDyn)
+import FRP.Dynamic (Dynamic(..), current, dynEvent, latestEvt, sampleDyn)
 import FRP.Event (Event)
 import FRP.Event.Extra (anyEvt, multicast)
 import Model.ActiveMode (ActiveMode(..), fromBoolean, isActive)
@@ -30,7 +30,7 @@ import Rendering.DynamicNode (renderDynamic)
 import Rendering.Node (Node, _visible, fixNodeDWith, tapMesh)
 import Three.Core.Geometry (CircleGeometry, mkCircleGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial)
-import Three.Math.Vector (class Vector, getVector)
+import Three.Math.Vector (class Vector, getVector, incX)
 import Util (latestAnyEvtWith)
 
 -- create vertex markers for an array of vertices
@@ -57,6 +57,15 @@ mkPolyDelMarker posDyn actDyn = tapMesh (def # _name     .~ "delete-marker"
                                              # _visible  .~ (isActive <$> actDyn)
                                         ) polyDelGeo polyDelMat
 
+polyFinMat :: MeshBasicMaterial
+polyFinMat = unsafePerformEffect $ mkMeshBasicMaterial 0x22ff22
+
+-- | create a finish marker button
+mkPolyFinMarker :: forall e v. Vector v => Dynamic v -> Dynamic ActiveMode -> Node e TappableMesh
+mkPolyFinMarker posDyn actDyn = tapMesh (def # _name     .~ "finish-marker"
+                                             # _position .~ (getVector <$> posDyn)
+                                             # _visible  .~ (isActive <$> actDyn)
+                                        ) polyDelGeo polyFinMat
 
 -- | given a list of vertices position, calculate all middle points
 midMarkerPoints :: forall v f. Vector v => Functor f => Dynamic ActiveMode -> f (Tuple Int v) -> f (MidMarkerPoint Int v)
@@ -79,7 +88,8 @@ setupMidMarkers actDyn polyDyn = do
 newtype PolyEditorConf v = PolyEditorConf {
     active       :: Dynamic ActiveMode,
     polygon      :: Polygon v,
-    vertModifier :: Modifier v
+    vertModifier :: Modifier v,
+    showFinish   :: Boolean
     }
 
 derive instance newtypePolyEditorConf :: Newtype (PolyEditorConf v) _
@@ -87,15 +97,20 @@ instance defaultPolyEditorConf :: Default (PolyEditorConf v) where
     def = PolyEditorConf {
         active       : pure Inactive,
         polygon      : def,
-        vertModifier : def
+        vertModifier : def,
+        showFinish   : false
         }
 
 _vertModifier :: forall t a r. Newtype t { vertModifier :: a | r } => Lens' t a
 _vertModifier = _Newtype <<< prop (SProxy :: SProxy "vertModifier")
 
+_showFinish :: forall t a r. Newtype t { showFinish :: a | r } => Lens' t a
+_showFinish = _Newtype <<< prop (SProxy :: SProxy "showFinish")
+
 newtype PolyEditor v = PolyEditor {
     polygon    :: Event (Polygon v),
     delete     :: Event SceneTapEvent,
+    finished   :: Event Unit,
     isDragging :: Event Boolean
 }
 
@@ -152,12 +167,17 @@ createPolyEditor cfg = do
                         allPolyEvt = multicast $ polygonEvt <|> vertsAfterDrag
 
                         polyActEvt = dynEvent active <|> (const Active <$> polygonEvt)
+
+                        centerPosDyn = polyCenter <$> polyDyn
+                        finBtnPosDyn = incX 3.0 <$> centerPosDyn
                     -- create the polygon delete button
-                    polyDel <- mkPolyDelMarker (polyCenter <$> polyDyn) polyActive
+                    polyDel <- mkPolyDelMarker centerPosDyn polyActive
+                    polyFin <- mkPolyFinMarker finBtnPosDyn polyActive
 
                     let editor = PolyEditor {
                             polygon    : allPolyEvt,  -- skip the default polygon rendered
                             delete     : multicast $ polyDel ^. _tapped,
+                            finished   : multicast $ const unit <$> polyFin ^. _tapped,
                             isDragging : multicast $ getVertMarkerDragging vertMarkersDyn
                             }
                     pure { input: newActMarkerEvt, output: { input: polygonEvt, output : { input: allPolyEvt, output : { input: polyActEvt, output: editor } } } }

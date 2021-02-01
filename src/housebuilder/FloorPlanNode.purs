@@ -13,10 +13,11 @@ import Data.Newtype (class Newtype)
 import Editor.Common.Lenses (_active, _floor, _height, _id, _mouseMove, _name, _polygon, _position, _tapped)
 import Editor.HeightEditor (_arrowMaterial, dragArrowPos, mkDragArrowConf, setupHeightEditor)
 import Editor.HouseBuilder.GraphEditor (VertMerger(..), _graph, _heightEditable, _vertMerger, createGraphEditor)
-import Editor.PolygonEditor (_delete, createPolyEditor)
+import Editor.PanelAPIInterpreter (_finished)
+import Editor.PolygonEditor (_delete, _showFinish, createPolyEditor)
 import Editor.SceneEvent (SceneMouseMoveEvent)
 import Effect.Class (liftEffect)
-import FRP.Dynamic (Dynamic, latestEvt, step)
+import FRP.Dynamic (Dynamic, current, dynEvent, latestEvt, step)
 import FRP.Event (Event, fold)
 import FRP.Event.Extra (multicast)
 import Model.ActiveMode (ActiveMode(..), isActive)
@@ -86,18 +87,22 @@ createFloorNode = do
         polyMDyn :: Dynamic TapMouseMesh <- localEnv (const $ cfg ^. _active) $ renderDynamic fpDyn
 
         -- setup the polygon editor
-        editor <- node (def # _position .~ topPosDyn) do
-                      -- graph editor for the roof top
-                      g :: Graph HousePoint Int <- liftEffect $ floorGraph fp
-                      roofTopEvt <- createGraphEditor $ def # _active         .~ pure Inactive
-                                                            # _floor          .~ fpDyn
-                                                            # _graph          .~ g
-                                                            # _mouseMove      .~ latestEvt (view _mouseMove <$> polyMDyn)
-                                                            # _vertMerger     .~ VertMerger mergeHousePoint
-                                                            # _heightEditable .~ ((==) RidgePoint <<< view _pointType)
-            
-                      createPolyEditor $ def # _active  .~ act
-                                             # _polygon .~ fp ^. _polygon
+        editor <- node (def # _position .~ topPosDyn) $
+                      fixNodeE \finishedEvt -> do
+                          -- graph editor for the roof top
+                          g :: Graph HousePoint Int <- liftEffect $ floorGraph fp
+                          roofTopEvt <- createGraphEditor $ def # _active         .~ step Inactive (const Active <$> finishedEvt)
+                                                                # _floor          .~ fpDyn
+                                                                # _graph          .~ g
+                                                                # _mouseMove      .~ latestEvt (view _mouseMove <$> polyMDyn)
+                                                                # _vertMerger     .~ VertMerger mergeHousePoint
+                                                                # _heightEditable .~ ((==) RidgePoint <<< view _pointType)
+
+                          defAct <- liftEffect $ current act
+                          editor <- createPolyEditor $ def # _active     .~ step defAct (dynEvent act <|> (const Inactive <$> finishedEvt))
+                                                           # _polygon    .~ fp ^. _polygon
+                                                           # _showFinish .~ true
+                          pure { input : editor ^. _finished, output : editor }
 
 
         -- setup the height editor

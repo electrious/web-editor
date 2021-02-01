@@ -120,3 +120,7 @@ foreign import applyMatrix :: Matrix4 -> Vector3 -> Vector3
 
 toVec2 :: forall v. Vector v => v -> Vector2
 toVec2 v = mkVec2 (vecX v) (vecY v)
+
+incX :: forall v. Vector v => Number -> v -> v
+incX d v = updateVector v (f $ getVector v)
+    where f v' = mkVec3 (vecX v' + d) (vecY v') (vecZ v')
