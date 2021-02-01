@@ -15,7 +15,7 @@ import Data.Meter (Meter, meter, meterVal)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Editor.Common.Lenses (_active, _floor, _height, _id, _isActive, _mouseMove, _name, _polygon, _position, _rotation, _tapped)
-import Editor.HouseBuilder.GraphEditor (_graph, createGraphEditor)
+import Editor.HouseBuilder.GraphEditor (VertMerger(..), _graph, _vertMerger, createGraphEditor)
 import Editor.PolygonEditor (_delete, createPolyEditor)
 import Editor.SceneEvent (SceneMouseMoveEvent)
 import Effect.Class (liftEffect)
@@ -25,7 +25,7 @@ import FRP.Event.Extra (multicast)
 import Math (pi)
 import Model.ActiveMode (ActiveMode(..), fromBoolean, isActive)
 import Model.HouseBuilder.FloorPlan (FloorPlan, FloorPlanOp(..), floorGraph, floorPlanTop)
-import Model.HouseBuilder.HousePoint (HousePoint)
+import Model.HouseBuilder.HousePoint (HousePoint, mergeHousePoint)
 import Model.Polygon (Polygon, _polyVerts)
 import Rendering.DynamicNode (renderDynamic)
 import Rendering.Node (Node, fixNodeE, getEnv, localEnv, node)
@@ -141,6 +141,7 @@ createFloorNode = do
                                                             # _floor     .~ fpDyn
                                                             # _graph     .~ g
                                                             # _mouseMove .~ (latestEvt $ view _mouseMove <$> polyMDyn)
+                                                            # _vertMerger .~ VertMerger mergeHousePoint
 
             
                       createPolyEditor $ def # _active  .~ (fromBoolean <$> isActDyn)

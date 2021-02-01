@@ -1,7 +1,7 @@
 module Model.HouseBuilder.HousePoint where
 
 
-import Prelude hiding (add, sub)
+import Prelude hiding (add,sub)
 
 import Data.Default (class Default, def)
 import Data.Filterable (class Filterable, filter)
@@ -16,7 +16,7 @@ import Data.UUID (UUID, emptyUUID, genUUID)
 import Editor.Common.Lenses (_id, _name, _position)
 import Effect (Effect)
 import Effect.Unsafe (unsafePerformEffect)
-import Model.UUID (class HasUUID)
+import Model.UUID (class HasUUID, assignNewId)
 import Rendering.Node (mesh)
 import Rendering.NodeRenderable (class NodeRenderable)
 import Three.Core.Geometry (CircleGeometry, mkCircleGeometry)
@@ -105,3 +105,10 @@ newHousePoint t pos = do
         position  : pos,
         pointType : t
         }
+
+-- merge two HousePoints into one. It will use the second point's position
+mergeHousePoint :: HousePoint -> HousePoint -> Effect HousePoint
+mergeHousePoint p1 p2 = assignNewId $ p2 # _pointType %~ f (p1 ^. _pointType)
+    where f GutterPoint _ = GutterPoint
+          f _ GutterPoint = GutterPoint
+          f _ _           = RidgePoint
