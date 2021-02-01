@@ -227,7 +227,7 @@ updateHeight f h g = foldl upd g $ heightEditableVerts f g
 
 checkAndMerge :: forall v w. Ord v => Vector v => HasUUID v => Default w => (v -> v -> Effect v) -> v -> Graph v w -> Effect (Graph v w)
 checkAndMerge f v g = fromMaybe g <$> traverse merge cn
-    where cn = head $ filter (\v' -> v' /= v && dist v v' < 2.0) $ vertices g
+    where cn = head $ filter (\v' -> v' /= v && dist v v' < 1.5) $ vertices g
           merge vv = do
               nv <- f v vv
               pure $ mergeVertices v vv nv g
