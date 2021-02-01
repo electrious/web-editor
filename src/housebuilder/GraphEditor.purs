@@ -203,6 +203,10 @@ renderGraph = traverse_ renderLine <<< edges
               let vs = getVector <$> [l ^. _start, l ^. _end]
               line (def # _name .~ "graph-edge") vs lineMat
 
+renderGraphDyn :: forall e v w. Vector v => Ord v => Dynamic ActiveMode -> Dynamic (UGraph v w) -> Node e Unit
+renderGraphDyn active graphDyn = node (def # _name    .~ "graph-line"
+                                           # _visible .~ (isActive <$> active)) $ dynamic_ $ renderGraph <$> graphDyn
+
 -- update a vertex in a graph
 updateVert :: forall v w. HasUUID v => Ord v => Default w => v -> UGraph v w -> UGraph v w
 updateVert v g = foldl addEdge (insertVertex v $ deleteVertex v g) (adjacent v g)
@@ -267,7 +271,7 @@ createGraphEditor cfg = do
                         hEditorActDyn = (&&) <$> midActive <*> (fromBoolean <<< not <<< null <$> hVertsDyn)
 
                     -- render graph lines
-                    dynamic_ $ renderGraph <$> graphDyn
+                    renderGraphDyn active graphDyn
 
                     -- create mid markers for adding new vertices
                     toAddEvt <- setupMidMarkers midActive (dynEvent graphDyn)
