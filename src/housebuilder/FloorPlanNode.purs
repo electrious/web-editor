@@ -4,16 +4,15 @@ import Prelude
 
 import Control.Alt ((<|>))
 import Custom.Mesh (TapMouseMesh)
-import Data.Array (foldl)
 import Data.Default (class Default, def)
 import Data.Graph (Graph)
 import Data.Lens (view, (.~), (^.))
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (Maybe(..))
 import Data.Meter (Meter, meterVal)
 import Data.Newtype (class Newtype)
 import Editor.Common.Lenses (_active, _floor, _height, _id, _mouseMove, _name, _polygon, _position, _tapped)
-import Editor.HeightEditor (_arrowMaterial, mkDragArrowConf, setupHeightEditor)
-import Editor.HouseBuilder.GraphEditor (VertMerger(..), _graph, _vertMerger, createGraphEditor)
+import Editor.HeightEditor (_arrowMaterial, dragArrowPos, mkDragArrowConf, setupHeightEditor)
+import Editor.HouseBuilder.GraphEditor (VertMerger(..), _graph, _heightEditable, _vertMerger, createGraphEditor)
 import Editor.PolygonEditor (_delete, createPolyEditor)
 import Editor.SceneEvent (SceneMouseMoveEvent)
 import Effect.Class (liftEffect)
@@ -22,12 +21,12 @@ import FRP.Event (Event, fold)
 import FRP.Event.Extra (multicast)
 import Model.ActiveMode (ActiveMode(..), fromBoolean, isActive)
 import Model.HouseBuilder.FloorPlan (FloorPlan, FloorPlanOp(..), floorGraph, floorPlanTop)
-import Model.HouseBuilder.HousePoint (HousePoint, mergeHousePoint)
+import Model.HouseBuilder.HousePoint (HousePoint, HousePointType(..), _pointType, mergeHousePoint)
 import Model.Polygon (Polygon, _polyVerts)
 import Rendering.DynamicNode (renderDynamic)
 import Rendering.Node (Node, fixNodeE, getEnv, localEnv, node)
 import Three.Core.Material (MeshBasicMaterial)
-import Three.Math.Vector (Vector2, Vector3, mkVec3, vecX, vecY)
+import Three.Math.Vector (Vector2, Vector3, mkVec3)
 
 newtype FloorPlanConfig = FloorPlanConfig {
     floor         :: FloorPlan,
@@ -56,18 +55,7 @@ derive instance newtypeFloorPlanNode :: Newtype FloorPlanNode _
 
 -- | calculate position for drag Arrow based on all floor plan vertices
 arrowPos :: FloorPlan -> Vector3
-arrowPos fp = mkVec3 x y 0.5
-    where vs = fp ^. _polygon <<< _polyVerts
-
-          f Nothing v   = Just v
-          f (Just ov) v = if vecX v > vecX ov then Just v else Just ov
-
-          mv = foldl f Nothing vs
-
-          x = maybe 2.0 (((+) 2.0) <<< vecX) mv
-          y = maybe 0.0 vecY mv
-
-
+arrowPos fp = dragArrowPos (fp ^. _polygon <<< _polyVerts)
 
 data UpdFloorOp = UpdPoly (Polygon Vector2)
                 | UpdHeight Meter
@@ -106,6 +94,7 @@ createFloorNode = do
                                                             # _graph     .~ g
                                                             # _mouseMove .~ (latestEvt $ view _mouseMove <$> polyMDyn)
                                                             # _vertMerger .~ VertMerger mergeHousePoint
+                                                            # _heightEditable .~ ((==) RidgePoint <<< view _pointType)
 
             
                       createPolyEditor $ def # _active  .~ (fromBoolean <$> isActDyn)
@@ -113,7 +102,7 @@ createFloorNode = do
 
 
         -- setup the height editor
-        heightEvt <- localEnv (view _arrowMaterial >>> mkDragArrowConf) $ setupHeightEditor isActDyn $ arrowPos <$> fpDyn
+        heightEvt <- localEnv (view _arrowMaterial >>> mkDragArrowConf) $ setupHeightEditor act $ arrowPos <$> fpDyn
 
 
         -- calculate the updated floor plan

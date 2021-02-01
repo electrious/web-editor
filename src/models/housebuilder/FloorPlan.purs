@@ -16,7 +16,7 @@ import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic)
 import Model.ActiveMode (ActiveMode(..))
-import Model.HouseBuilder.HousePoint (HousePoint)
+import Model.HouseBuilder.HousePoint (HousePoint, HousePointType(..), _pointType)
 import Model.Polygon (class IsPolygon, Polygon, _polyVerts, polygonAround)
 import Model.UUID (class HasUUID, assignNewIds)
 import Rendering.Node (localEnv, mesh, node)
@@ -86,10 +86,11 @@ floorPlanHousePoints fp = f <$> fp ^. _polygon
     where h = meterVal $ fp ^. _height
           f v = updateVector def $ mkVec3 (vecX v) (vecY v) h
 
--- | convert floorplan to a default graph
+-- | convert floorplan to a default graph with all vertices set to GutterPoint
 floorGraph :: forall w. Default w => FloorPlan -> Effect (UGraph HousePoint w)
 floorGraph fp = do
-    poly <- assignNewIds $ floorPlanHousePoints fp
+    let setType p = p # _pointType .~ GutterPoint
+    poly <- assignNewIds $ setType <$> floorPlanHousePoints fp
     pure $ addPolygon poly UG.empty
 
 instance nodeRenderableFloorPlan :: NodeRenderable (Dynamic ActiveMode) FloorPlan TapMouseMesh where
