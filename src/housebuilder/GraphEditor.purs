@@ -42,7 +42,7 @@ import Math.Line (_end, _start, lineCenter)
 import Model.ActiveMode (ActiveMode(..), fromBoolean, isActive)
 import Model.HouseBuilder.FloorPlan (FloorPlan, floorPlanHousePoints)
 import Model.Polygon (Polygon, polygonAround)
-import Model.UUID (class HasUUID, assignNewIds, idLens)
+import Model.UUID (class HasUUID, assignNewId, assignNewIds, idLens)
 import Rendering.DynamicNode (dynamic_, renderDynamic, renderEvent)
 import Rendering.Node (Node, _visible, fixNodeDWith, getParent, line, node, tapMesh)
 import Three.Core.Face3 (normal)
@@ -111,9 +111,10 @@ graphMidPoints :: forall v w. Ord v => HasUUID v => Vector v => Dynamic ActiveMo
 graphMidPoints actDyn = traverse midP <<< edges
     where midP l = do
               i <- genUUID
+              pos <- assignNewId $ lineCenter l
               pure $ MidMarkerPoint {
-                  position : lineCenter l,
-                  index    : i,
+                  position : pos,
+                  index    : pos ^. idLens,
                   vert1    : l ^. _start,
                   vert2    : l ^. _end,
                   active   : actDyn
