@@ -21,7 +21,7 @@ import Editor.MarkerPoint (MidMarker, MidMarkerPoint(..), Modifier, VertMarker, 
 import Editor.SceneEvent (SceneTapEvent)
 import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
-import FRP.Dynamic (Dynamic, current, dynEvent, latestEvt, sampleDyn, step)
+import FRP.Dynamic (Dynamic, current, dynEvent, latestEvt, sampleDyn)
 import FRP.Event (Event)
 import FRP.Event.Extra (anyEvt, multicast)
 import Model.ActiveMode (ActiveMode(..), fromBoolean, isActive)
@@ -51,9 +51,9 @@ polyDelGeo :: CircleGeometry
 polyDelGeo = unsafePerformEffect (mkCircleGeometry 0.6 32)
 
 -- | create the polygon delete marker button
-mkPolyDelMarker :: forall e v. Vector v => Event v -> Dynamic ActiveMode -> Node e TappableMesh
-mkPolyDelMarker posEvt actDyn = tapMesh (def # _name     .~ "delete-marker"
-                                             # _position .~ step def (getVector <$> posEvt)
+mkPolyDelMarker :: forall e v. Vector v => Dynamic v -> Dynamic ActiveMode -> Node e TappableMesh
+mkPolyDelMarker posDyn actDyn = tapMesh (def # _name     .~ "delete-marker"
+                                             # _position .~ (getVector <$> posDyn)
                                              # _visible  .~ (isActive <$> actDyn)
                                         ) polyDelGeo polyDelMat
 
@@ -153,7 +153,7 @@ createPolyEditor cfg = do
 
                         polyActEvt = dynEvent active <|> (const Active <$> polygonEvt)
                     -- create the polygon delete button
-                    polyDel <- mkPolyDelMarker (polyCenter <$> allPolyEvt) polyActive
+                    polyDel <- mkPolyDelMarker (polyCenter <$> polyDyn) polyActive
 
                     let editor = PolyEditor {
                             polygon    : allPolyEvt,  -- skip the default polygon rendered
