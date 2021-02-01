@@ -83,8 +83,7 @@ floorPlanTop fp = fp ^. _height + meter 0.02
 -- | get all floorplan vertices as any Vector value
 floorPlanHousePoints :: forall v. Default v => Vector v => FloorPlan -> Polygon v
 floorPlanHousePoints fp = f <$> fp ^. _polygon
-    where h = meterVal $ fp ^. _height
-          f v = updateVector def $ mkVec3 (vecX v) (vecY v) h
+    where f v = updateVector def $ mkVec3 (vecX v) (vecY v) 0.0
 
 -- | convert floorplan to a default graph with all vertices set to GutterPoint
 floorGraph :: forall w. Default w => FloorPlan -> Effect (UGraph HousePoint w)
