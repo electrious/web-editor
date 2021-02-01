@@ -10,7 +10,7 @@ import Custom.Mesh (TappableMesh)
 import Data.Array (foldl)
 import Data.Default (class Default, def)
 import Data.Filterable (filter)
-import Data.Foldable (class Foldable, find, traverse_)
+import Data.Foldable (class Foldable, find, null, traverse_)
 import Data.FunctorWithIndex (mapWithIndex)
 import Data.Graph (Graph, adjacent, vertices)
 import Data.Lens (Lens', view, (^.), (.~))
@@ -264,6 +264,7 @@ createGraphEditor cfg = do
                         -- height editable vertices
                         hFilter = cfg ^. _heightEditable
                         hVertsDyn = heightEditableVerts hFilter <$> graphDyn
+                        hEditorActDyn = (&&) <$> midActive <*> (fromBoolean <<< not <<< null <$> hVertsDyn)
 
                     -- render graph lines
                     dynamic_ $ renderGraph <$> graphDyn
@@ -274,7 +275,7 @@ createGraphEditor cfg = do
                     newPolyEvt <- setupPolyAdder floorPolyDyn (graphPoints <$> graphDyn) cfg
 
                     -- setup the height editor
-                    heightEvt <- localEnv (const def) $ setupHeightEditor midActive (dragArrowPos <$> hVertsDyn)
+                    heightEvt <- localEnv (const def) $ setupHeightEditor hEditorActDyn (dragArrowPos <$> hVertsDyn)
 
                     let graphAfterAdd = sampleDyn graphDyn $ addVert <$> toAddEvt
                         graphAfterAddPoly = sampleDyn graphDyn $ addPolygon <$> newPolyEvt
