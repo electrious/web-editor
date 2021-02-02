@@ -37,15 +37,15 @@ import Editor.SceneEvent (SceneMouseMoveEvent, SceneTapEvent)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
-import FRP.Dynamic (Dynamic, current, dynEvent, gateDyn, latestEvt, sampleDyn, step)
-import FRP.Event (Event, keepLatest)
+import FRP.Dynamic (Dynamic, current, dynEvent, gateDyn, latestEvt, performDynamic, sampleDyn, step)
+import FRP.Event (Event)
 import FRP.Event.Extra (multicast, performEvent, skip)
 import Math.Line (Line, _end, _start)
 import Model.ActiveMode (ActiveMode(..), fromBoolean, isActive)
 import Model.HouseBuilder.FloorPlan (FloorPlan, floorPlanHousePoints)
 import Model.Polygon (Polygon, polygonAround)
 import Model.UUID (class HasUUID, assignNewIds, idLens)
-import Rendering.DynamicNode (dynamic_, renderDynamic, renderEvent)
+import Rendering.DynamicNode (dynamic_, renderDynamic)
 import Rendering.Node (Node, _visible, fixNodeDWith, getParent, line, localEnv, node, tapMesh)
 import Three.Core.Face3 (normal)
 import Three.Core.Geometry (CircleGeometry, mkCircleGeometry)
@@ -142,11 +142,10 @@ graphMidPoints flt lineCenter actDyn = traverse midP <<< edges
                   }
 
 -- | render all middle markers
-setupMidMarkers :: forall e v w. Ord v => HasUUID v => Vector v => (v -> Boolean) -> (Line v -> Effect v) -> Dynamic ActiveMode -> Event (UGraph v w) -> Node e (Event (MidMarkerPoint UUID v))
-setupMidMarkers flt lineCenter actDyn graphEvt = do
-    let mPointsEvt = performEvent $ graphMidPoints flt lineCenter actDyn <$> graphEvt
-    markers :: (Event (List (MidMarker UUID v))) <- renderEvent mPointsEvt
-    pure $ keepLatest $ getTapEvt <$> markers
+setupMidMarkers :: forall e v. Ord v => HasUUID v => Vector v => Dynamic (List (MidMarkerPoint UUID v)) -> Node e (Event (MidMarkerPoint UUID v))
+setupMidMarkers mPointsDyn = do
+    markers :: (Dynamic (List (MidMarker UUID v))) <- renderDynamic mPointsDyn
+    pure $ latestEvt $ getTapEvt <$> markers
 
 
 -----------------------------------------------------------
@@ -239,12 +238,22 @@ updateHeight f h g = foldl upd g $ heightEditableVerts f g
           updateZ v = updateVector v $ setZ (meterVal h) (getVector v)
           setZ z v = mkVec3 (vecX v) (vecY v) z
 
-checkAndMerge :: forall v w. Ord v => Vector v => HasUUID v => Default w => (v -> v -> Effect v) -> v -> Graph v w -> Effect (Graph v w)
-checkAndMerge f v g = fromMaybe g <$> traverse merge cn
-    where cn = head $ filter (\v' -> v' /= v && dist v v' < 1.5) $ vertices g
-          merge vv = do
-              nv <- f v vv
-              pure $ mergeVertices v vv nv g
+checkAndMerge :: forall v w. Ord v => Vector v => HasUUID v => Default w => (v -> v -> Effect v) -> v -> List v -> Graph v w -> Effect (Graph v w)
+checkAndMerge f v midPs g = do
+    let flt v' = v' /= v && dist v v' < 1.5
+        cn = head $ filter flt $ vertices g  -- possible vertex to merge
+        mn = head $ filter flt midPs         -- possible mid points to add new vertex at
+
+        -- merge nearby vertex with the dragged vertex
+        merge v' = do
+            nv <- f v v'
+            pure $ mergeVertices v v' nv g
+
+        updV v' = updateVert (updateVector v (getVector v')) g
+        g2 = updV <$> mn
+    g1 <- traverse merge cn
+    pure $ fromMaybe g (g1 <|> g2)
+    
 
 heightEditableVerts :: forall v w. (v -> Boolean) -> Graph v w -> List v
 heightEditableVerts f = filter f <<< vertices
@@ -277,7 +286,6 @@ createGraphEditor cfg = do
                         -- apply the dragged new vertex to the graph
                         -- Node: this will be triggered after first render automatically
                         graphAfterDragEvt = sampleDyn graphDyn $ updateVert <$> dragEvt
-                        graphAfterDragEndEvt = performEvent $ sampleDyn graphDyn $ checkAndMerge (mergeWith merger) <$> dragEndPosEvt
 
                         midActive = lift2 (\pa am -> pa && fromBoolean (am == Nothing)) graphActive actMarkerDyn
 
@@ -291,7 +299,12 @@ createGraphEditor cfg = do
                     renderGraphDyn active graphDyn
 
                     -- create mid markers for adding new vertices
-                    toAddEvt <- setupMidMarkers hFilter (cfg ^. _lineCenter) midActive (dynEvent graphDyn)
+                    let midPointsDyn = performDynamic $ graphMidPoints hFilter (cfg ^. _lineCenter) midActive <$> graphDyn
+                        midPointValsDyn = map (view _position) <$> midPointsDyn
+                        graphAfterDragEndEvt = performEvent $ sampleDyn graphDyn $ sampleDyn midPointValsDyn $ checkAndMerge (mergeWith merger) <$> dragEndPosEvt
+                    
+                    toAddEvt <- setupMidMarkers midPointsDyn
+                    
                     -- setup the polygon adder
                     newPolyEvt <- setupPolyAdder floorPolyDyn (graphPoints <$> graphDyn) cfg
 
