@@ -26,7 +26,7 @@ import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..), snd)
 import Data.UGraph (UGraph, addPolygon, deleteEdge, deleteVertex, edges, graphPoints, insertEdge, insertVertex, mergeVertices)
 import Data.UGraph as UG
-import Data.UUID (UUID, genUUID)
+import Data.UUID (UUID)
 import Data.UUIDMap (UUIDMap)
 import Editor.Common.Lenses (_active, _enabled, _face, _floor, _index, _mouseMove, _name, _point, _position)
 import Editor.HeightEditor (_arrowMaterial, dragArrowPos, setupHeightEditor)
@@ -40,11 +40,11 @@ import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, current, dynEvent, gateDyn, latestEvt, sampleDyn, step)
 import FRP.Event (Event, keepLatest)
 import FRP.Event.Extra (multicast, performEvent, skip)
-import Math.Line (_end, _start, lineCenter)
+import Math.Line (Line, _end, _start)
 import Model.ActiveMode (ActiveMode(..), fromBoolean, isActive)
 import Model.HouseBuilder.FloorPlan (FloorPlan, floorPlanHousePoints)
 import Model.Polygon (Polygon, polygonAround)
-import Model.UUID (class HasUUID, assignNewId, assignNewIds, idLens)
+import Model.UUID (class HasUUID, assignNewIds, idLens)
 import Rendering.DynamicNode (dynamic_, renderDynamic, renderEvent)
 import Rendering.Node (Node, _visible, fixNodeDWith, getParent, line, localEnv, node, tapMesh)
 import Three.Core.Face3 (normal)
@@ -72,6 +72,7 @@ newtype GraphEditorConf v w = GraphEditorConf {
     vertModifier   :: Modifier v,
     vertMerger     :: VertMerger v,
     heightEditable :: v -> Boolean,
+    lineCenter     :: Line v -> Effect v,
     mouseMove      :: Event SceneMouseMoveEvent
     }
 
@@ -84,6 +85,7 @@ instance defaultGraphEditorConf :: Ord v => Default (GraphEditorConf v w) where
         vertModifier   : def,
         vertMerger     : def,
         heightEditable : const true,
+        lineCenter     : pure <<< view _start,
         mouseMove      : empty
         }
 
@@ -104,6 +106,9 @@ _vertMerger = _Newtype <<< prop (SProxy :: SProxy "vertMerger")
 _heightEditable :: forall t a r. Newtype t { heightEditable :: a | r } => Lens' t a
 _heightEditable = _Newtype <<< prop (SProxy :: SProxy "heightEditable")
 
+_lineCenter :: forall t a r. Newtype t { lineCenter :: a | r } => Lens' t a
+_lineCenter = _Newtype <<< prop (SProxy :: SProxy "lineCenter")
+
 -- create vertex markers for an array of vertices
 mkVertMarkerPoints :: forall v w. Default v => HasUUID v => Modifier v -> (v -> Boolean) -> Dynamic ActiveMode -> Dynamic (Maybe UUID) -> UGraph v w -> UUIDMap (VertMarkerPoint UUID v)
 mkVertMarkerPoints m flt act actMarker graph = mapWithIndex mkV ivsMap
@@ -121,13 +126,12 @@ setupVertMarkers :: forall e v. Vector v => HasUUID v => Dynamic (UUIDMap (VertM
 setupVertMarkers = renderDynamic
 
 
-graphMidPoints :: forall v w. Ord v => HasUUID v => Vector v => (v -> Boolean) -> Dynamic ActiveMode -> UGraph v w -> Effect (List (MidMarkerPoint UUID v))
-graphMidPoints flt actDyn = traverse midP <<< edges
+graphMidPoints :: forall v w. Ord v => HasUUID v => Vector v => (v -> Boolean) -> (Line v -> Effect v) -> Dynamic ActiveMode -> UGraph v w -> Effect (List (MidMarkerPoint UUID v))
+graphMidPoints flt lineCenter actDyn = traverse midP <<< edges
     where midP l = do
-              i <- genUUID
-              pos <- assignNewId $ lineCenter l
               let s = l ^. _start
                   e = l ^. _end
+              pos <- lineCenter l
               pure $ MidMarkerPoint {
                   position : pos,
                   index    : pos ^. idLens,
@@ -138,9 +142,9 @@ graphMidPoints flt actDyn = traverse midP <<< edges
                   }
 
 -- | render all middle markers
-setupMidMarkers :: forall e v w. Ord v => HasUUID v => Vector v => (v -> Boolean) -> Dynamic ActiveMode -> Event (UGraph v w) -> Node e (Event (MidMarkerPoint UUID v))
-setupMidMarkers flt actDyn graphEvt = do
-    let mPointsEvt = performEvent $ graphMidPoints flt actDyn <$> graphEvt
+setupMidMarkers :: forall e v w. Ord v => HasUUID v => Vector v => (v -> Boolean) -> (Line v -> Effect v) -> Dynamic ActiveMode -> Event (UGraph v w) -> Node e (Event (MidMarkerPoint UUID v))
+setupMidMarkers flt lineCenter actDyn graphEvt = do
+    let mPointsEvt = performEvent $ graphMidPoints flt lineCenter actDyn <$> graphEvt
     markers :: (Event (List (MidMarker UUID v))) <- renderEvent mPointsEvt
     pure $ keepLatest $ getTapEvt <$> markers
 
@@ -287,7 +291,7 @@ createGraphEditor cfg = do
                     renderGraphDyn active graphDyn
 
                     -- create mid markers for adding new vertices
-                    toAddEvt <- setupMidMarkers hFilter midActive (dynEvent graphDyn)
+                    toAddEvt <- setupMidMarkers hFilter (cfg ^. _lineCenter) midActive (dynEvent graphDyn)
                     -- setup the polygon adder
                     newPolyEvt <- setupPolyAdder floorPolyDyn (graphPoints <$> graphDyn) cfg
 
