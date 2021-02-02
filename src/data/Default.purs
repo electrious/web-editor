@@ -2,6 +2,8 @@ module Data.Default where
 
 import Prelude
 
+import Data.UUID (UUID, emptyUUID)
+
 -- | class to represent types that have a default value
 class Default a where
     def :: a
@@ -12,3 +14,5 @@ instance defaultNumber :: Default Number where
     def = 0.0
 instance defaultUnit :: Default Unit where
     def = unit
+instance defaultUUID :: Default UUID where
+    def = emptyUUID

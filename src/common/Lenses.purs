@@ -284,5 +284,8 @@ _isActive = _Newtype <<< prop (SProxy :: SProxy "isActive")
 _active :: forall t a r. Newtype t { active :: a | r } => Lens' t a
 _active = _Newtype <<< prop (SProxy :: SProxy "active")
 
+_enabled :: forall t a r. Newtype t { enabled :: a | r } => Lens' t a
+_enabled = _Newtype <<< prop (SProxy :: SProxy "enabled")
+
 _floor :: forall t a r. Newtype t { floor :: a | r } => Lens' t a
 _floor = _Newtype <<< prop (SProxy :: SProxy "floor")

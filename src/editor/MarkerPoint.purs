@@ -14,13 +14,13 @@ import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple(..))
-import Editor.Common.Lenses (_active, _index, _isActive, _isDragging, _name, _position, _tapped)
+import Editor.Common.Lenses (_active, _enabled, _index, _isActive, _isDragging, _name, _position, _tapped)
 import Effect (Effect)
 import Effect.Unsafe (unsafePerformEffect)
-import FRP.Dynamic (Dynamic, dynEvent)
+import FRP.Dynamic (Dynamic, dynEvent, gateDyn)
 import FRP.Event (Event, sampleOn_)
 import FRP.Event.Extra (performEvent)
-import Model.ActiveMode (ActiveMode, fromBoolean, isActive)
+import Model.ActiveMode (ActiveMode(..), isActive)
 import Rendering.Node (_visible, getParent, tapMesh)
 import Rendering.NodeRenderable (class NodeRenderable)
 import Three.Core.Geometry (CircleGeometry, Geometry, mkCircleGeometry)
@@ -46,10 +46,19 @@ newtype VertMarkerPoint i v = VertMarkerPoint {
     position :: v,
     index    :: i,
     active   :: Dynamic ActiveMode,
+    enabled  :: Dynamic Boolean,
     modifier :: Modifier v
 }
 
 derive instance newtypeVertMarkerPoint :: Newtype (VertMarkerPoint i v) _
+instance defaultVertMarkerPoint :: (Default i, Default v) => Default (VertMarkerPoint i v) where
+    def = VertMarkerPoint {
+        position : def,
+        index    : def,
+        active   : pure Active,
+        enabled  : pure true,
+        modifier : def
+        }
 
 _modifier :: forall t a r. Newtype t { modifier :: a | r } => Lens' t a
 _modifier = _Newtype <<< prop (SProxy :: SProxy "modifier")
@@ -68,29 +77,20 @@ _dragEndPos = _Newtype <<< prop (SProxy :: SProxy "dragEndPos")
 
 instance nodeRenderableVertMarkerPoint :: Vector v => NodeRenderable e (VertMarkerPoint i v) (VertMarker i v) where
     render m = do
-        let cfg = def # _isActive .~ (isActive <$> m ^. _active)
+        let enabled = m ^. _enabled
+            cfg = def # _isActive .~ (isActive <$> m ^. _active)
+                      # _enabled  .~ enabled
                       # _position .~ (getVector $ m ^. _position)
             mod = m ^. _modifier <<< _modifierFunc
         dragObj <- createDraggableObject (cfg :: DragObjCfg Geometry)
         let posEvt   = performEvent $ (mod <<< updateVector (m ^. _position)) <$> dragObj ^. _position
             dragging = dragObj ^. _isDragging
         pure $ VertMarker {
-            tapped     : const (Tuple (m ^. _index) (m ^. _position)) <$> dragObj ^. _tapped,
+            tapped     : const (Tuple (m ^. _index) (m ^. _position)) <$> gateDyn enabled (dragObj ^. _tapped),
             position   : Tuple (m ^. _index) <$> posEvt,
             isDragging : dragging,
             dragEndPos : sampleOn_ posEvt $ filter not dragging
         }
-
--- create a vertex marker point
-mkVertMarkerPoint :: forall i v. Eq i => Modifier v -> Dynamic ActiveMode -> Dynamic (Maybe i) -> Tuple v i -> VertMarkerPoint i v
-mkVertMarkerPoint m active actMarker (Tuple pos idx) = VertMarkerPoint {
-    position : pos,
-    index    : idx,
-    active   : f <$> active <*> actMarker,
-    modifier : m
-    }
-    where f act Nothing       = act
-          f act (Just actIdx) = act && fromBoolean (actIdx == idx)
 
 -- | get vertex markers' active status event
 getVertMarkerActiveStatus :: forall f i v. FunctorWithIndex i f => Foldable f => Dynamic (f (VertMarker i v)) -> Event (Maybe i)
@@ -109,7 +109,8 @@ newtype MidMarkerPoint i v = MidMarkerPoint {
     index    :: i,
     vert1    :: v,
     vert2    :: v,
-    active   :: Dynamic ActiveMode
+    active   :: Dynamic ActiveMode,
+    enabled  :: Dynamic Boolean
 }
 
 derive instance newtypeMidMarkerPoint :: Newtype (MidMarkerPoint i v) _
@@ -141,6 +142,6 @@ instance nodeRenderableMidMarkerPoint :: Vector v => NodeRenderable e (MidMarker
                           # _visible  .~ (isActive <$> p ^. _active)
                      ) midGeometry midMaterial
         
-        pure $ MidMarker { tapped : const p <$> m ^. _tapped }
+        pure $ MidMarker { tapped : const p <$> gateDyn (p ^. _enabled) (m ^. _tapped) }
 
 

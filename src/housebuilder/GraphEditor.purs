@@ -28,9 +28,9 @@ import Data.UGraph (UGraph, addPolygon, deleteEdge, deleteVertex, edges, graphPo
 import Data.UGraph as UG
 import Data.UUID (UUID, genUUID)
 import Data.UUIDMap (UUIDMap)
-import Editor.Common.Lenses (_active, _face, _floor, _mouseMove, _name, _point, _position)
+import Editor.Common.Lenses (_active, _enabled, _face, _floor, _index, _mouseMove, _name, _point, _position)
 import Editor.HeightEditor (_arrowMaterial, dragArrowPos, setupHeightEditor)
-import Editor.MarkerPoint (MidMarker, MidMarkerPoint(..), Modifier, VertMarker, VertMarkerPoint, _dragEndPos, _vert1, _vert2, getVertMarkerActiveStatus, getVertMarkerDragging, mkVertMarkerPoint)
+import Editor.MarkerPoint (MidMarker, MidMarkerPoint(..), Modifier, VertMarker, VertMarkerPoint, _dragEndPos, _modifier, _vert1, _vert2, getVertMarkerActiveStatus, getVertMarkerDragging)
 import Editor.ObjectAdder (CandidatePoint, createObjectAdder, mkCandidatePoint)
 import Editor.PolygonEditor (_vertModifier, getTapEvt)
 import Editor.SceneEvent (SceneMouseMoveEvent, SceneTapEvent)
@@ -105,32 +105,42 @@ _heightEditable :: forall t a r. Newtype t { heightEditable :: a | r } => Lens' 
 _heightEditable = _Newtype <<< prop (SProxy :: SProxy "heightEditable")
 
 -- create vertex markers for an array of vertices
-mkVertMarkerPoints :: forall v w. HasUUID v => Modifier v -> Dynamic ActiveMode -> Dynamic (Maybe UUID) -> UGraph v w -> UUIDMap (VertMarkerPoint UUID v)
-mkVertMarkerPoints m act actMarker graph = mapWithIndex (\i v -> mkVertMarkerPoint m act actMarker (Tuple v i)) ivsMap
+mkVertMarkerPoints :: forall v w. Default v => HasUUID v => Modifier v -> (v -> Boolean) -> Dynamic ActiveMode -> Dynamic (Maybe UUID) -> UGraph v w -> UUIDMap (VertMarkerPoint UUID v)
+mkVertMarkerPoints m flt act actMarker graph = mapWithIndex mkV ivsMap
     where ivsMap = fromFoldable $ f <$> vertices graph
           f v = Tuple (v ^. idLens) v
+          mkV i v = def # _position .~ v
+                        # _index    .~ i
+                        # _active   .~ (g i <$> act <*> actMarker)
+                        # _enabled  .~ pure (flt v)
+                        # _modifier .~ m
+          g i act' Nothing       = act'
+          g i act' (Just actIdx) = act' && fromBoolean (actIdx == i)
 
 setupVertMarkers :: forall e v. Vector v => HasUUID v => Dynamic (UUIDMap (VertMarkerPoint UUID v)) -> Node e (Dynamic (UUIDMap (VertMarker UUID v)))
 setupVertMarkers = renderDynamic
 
 
-graphMidPoints :: forall v w. Ord v => HasUUID v => Vector v => Dynamic ActiveMode -> UGraph v w -> Effect (List (MidMarkerPoint UUID v))
-graphMidPoints actDyn = traverse midP <<< edges
+graphMidPoints :: forall v w. Ord v => HasUUID v => Vector v => (v -> Boolean) -> Dynamic ActiveMode -> UGraph v w -> Effect (List (MidMarkerPoint UUID v))
+graphMidPoints flt actDyn = traverse midP <<< edges
     where midP l = do
               i <- genUUID
               pos <- assignNewId $ lineCenter l
+              let s = l ^. _start
+                  e = l ^. _end
               pure $ MidMarkerPoint {
                   position : pos,
                   index    : pos ^. idLens,
-                  vert1    : l ^. _start,
-                  vert2    : l ^. _end,
-                  active   : actDyn
+                  vert1    : s,
+                  vert2    : e,
+                  active   : actDyn,
+                  enabled  : pure $ flt s || flt e
                   }
 
 -- | render all middle markers
-setupMidMarkers :: forall e v w. Ord v => HasUUID v => Vector v => Dynamic ActiveMode -> Event (UGraph v w) -> Node e (Event (MidMarkerPoint UUID v))
-setupMidMarkers actDyn graphEvt = do
-    let mPointsEvt = performEvent $ graphMidPoints actDyn <$> graphEvt
+setupMidMarkers :: forall e v w. Ord v => HasUUID v => Vector v => (v -> Boolean) -> Dynamic ActiveMode -> Event (UGraph v w) -> Node e (Event (MidMarkerPoint UUID v))
+setupMidMarkers flt actDyn graphEvt = do
+    let mPointsEvt = performEvent $ graphMidPoints flt actDyn <$> graphEvt
     markers :: (Event (List (MidMarker UUID v))) <- renderEvent mPointsEvt
     pure $ keepLatest $ getTapEvt <$> markers
 
@@ -240,8 +250,9 @@ heightMarkerMat = unsafePerformEffect $ mkMeshBasicMaterial 0xFFA500
 
 createGraphEditor :: forall e v w. Default v => Ord v => HasUUID v => Vector v => Default w => GraphEditorConf v w -> Node e (GraphEditor v w)
 createGraphEditor cfg = do
-    let active = cfg ^. _active
-        merger = cfg ^. _vertMerger
+    let active  = cfg ^. _active
+        merger  = cfg ^. _vertMerger
+        hFilter = cfg ^. _heightEditable
 
     defAct <- liftEffect $ current active
     graph  <- liftEffect $ current $ cfg ^. _graph
@@ -251,7 +262,7 @@ createGraphEditor cfg = do
             fixNodeDWith graph \graphDyn ->   -- this is the graph updated with all operations applied
                 fixNodeDWith Nothing \actMarkerDyn -> do
                     -- setup vertices markers
-                    let vertMarkerPntsDyn = mkVertMarkerPoints (cfg ^. _vertModifier) graphActive actMarkerDyn <$> noDragGraphDyn
+                    let vertMarkerPntsDyn = mkVertMarkerPoints (cfg ^. _vertModifier) hFilter graphActive actMarkerDyn <$> noDragGraphDyn
                     vertMarkersDyn <- setupVertMarkers vertMarkerPntsDyn
 
                     -- events for active vertex marker
@@ -269,7 +280,6 @@ createGraphEditor cfg = do
                         floorPolyDyn = floorPlanHousePoints <$> cfg ^. _floor
 
                         -- height editable vertices
-                        hFilter = cfg ^. _heightEditable
                         hVertsDyn = heightEditableVerts hFilter <$> graphDyn
                         hEditorActDyn = (&&) <$> midActive <*> (fromBoolean <<< not <<< null <$> hVertsDyn)
 
@@ -277,7 +287,7 @@ createGraphEditor cfg = do
                     renderGraphDyn active graphDyn
 
                     -- create mid markers for adding new vertices
-                    toAddEvt <- setupMidMarkers midActive (dynEvent graphDyn)
+                    toAddEvt <- setupMidMarkers hFilter midActive (dynEvent graphDyn)
                     -- setup the polygon adder
                     newPolyEvt <- setupPolyAdder floorPolyDyn (graphPoints <$> graphDyn) cfg
 

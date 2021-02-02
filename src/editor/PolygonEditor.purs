@@ -4,7 +4,7 @@ import Prelude hiding (add)
 
 import Control.Alt ((<|>))
 import Control.Apply (lift2)
-import Custom.Mesh (TappableMesh(..))
+import Custom.Mesh (TappableMesh)
 import Data.Array (length, range, zip)
 import Data.Compactable (compact)
 import Data.Default (class Default, def)
@@ -17,11 +17,11 @@ import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple(..), fst)
 import Editor.Common.Lenses (_active, _index, _name, _polygon, _position, _tapped)
-import Editor.MarkerPoint (MidMarker, MidMarkerPoint(..), Modifier, VertMarker, VertMarkerPoint, getVertMarkerActiveStatus, getVertMarkerDragging, mkVertMarkerPoint)
+import Editor.MarkerPoint (MidMarker, MidMarkerPoint(..), Modifier, VertMarker, VertMarkerPoint, _modifier, getVertMarkerActiveStatus, getVertMarkerDragging)
 import Editor.SceneEvent (SceneTapEvent)
 import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
-import FRP.Dynamic (Dynamic(..), current, dynEvent, latestEvt, sampleDyn)
+import FRP.Dynamic (Dynamic, current, dynEvent, latestEvt, sampleDyn)
 import FRP.Event (Event)
 import FRP.Event.Extra (anyEvt, multicast)
 import Model.ActiveMode (ActiveMode(..), fromBoolean, isActive)
@@ -34,12 +34,18 @@ import Three.Math.Vector (class Vector, getVector, incX)
 import Util (latestAnyEvtWith)
 
 -- create vertex markers for an array of vertices
-mkVertMarkerPoints :: forall v. Modifier v -> Dynamic ActiveMode -> Dynamic (Maybe Int) -> Polygon v -> Array (VertMarkerPoint Int v)
-mkVertMarkerPoints m polyActive actMarker poly = mkVertMarkerPoint m polyActive actMarker <$> zip ps (range 0 (length ps - 1))
+mkVertMarkerPoints :: forall v. Default v => Modifier v -> Dynamic ActiveMode -> Dynamic (Maybe Int) -> Polygon v -> Array (VertMarkerPoint Int v)
+mkVertMarkerPoints m polyActive actMarker poly = mkV <$> zip ps (range 0 (length ps - 1))
     where ps = poly ^. _polyVerts
+          mkV (Tuple pos idx) = def # _position .~ pos
+                                    # _index    .~ idx
+                                    # _active   .~ (f idx <$> polyActive <*> actMarker)
+                                    # _modifier .~ m
+          f idx act Nothing       = act
+          f idx act (Just actIdx) = act && fromBoolean (actIdx == idx)
 
 -- create new vertex markers
-setupVertMarkers :: forall e v. Vector v => Modifier v -> Dynamic ActiveMode -> Dynamic (Maybe Int) -> Dynamic (Polygon v) -> Node e (Dynamic (Array (VertMarker Int v)))
+setupVertMarkers :: forall e v. Default v => Vector v => Modifier v -> Dynamic ActiveMode -> Dynamic (Maybe Int) -> Dynamic (Polygon v) -> Node e (Dynamic (Array (VertMarker Int v)))
 setupVertMarkers m polyActive activeMarker polyEvt = renderDynamic $ mkVertMarkerPoints m polyActive activeMarker <$> polyEvt
 
 -----------------------------------------------------------
@@ -75,7 +81,8 @@ midMarkerPoints active = map mkPoint
               index    : idx,
               vert1    : v,  -- init these two values with the provided v, it's useless in PolygonEditor
               vert2    : v,
-              active   : active
+              active   : active,
+              enabled  : pure true
               }
 
 -- | render all middle markers

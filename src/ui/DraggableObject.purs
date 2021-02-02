@@ -12,11 +12,11 @@ import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Editor.Common.Lenses (_dragged, _isActive, _name, _position, _rotation, _tapped)
+import Editor.Common.Lenses (_dragged, _enabled, _isActive, _name, _position, _rotation, _tapped)
 import Editor.SceneEvent (isDragEnd, isDragStart)
 import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
-import FRP.Dynamic (Dynamic, step)
+import FRP.Dynamic (Dynamic, gateDyn, step)
 import FRP.Event (Event, gate)
 import FRP.Event.Extra (foldWithDef, multicast, performEvent)
 import Rendering.Node (Node, Props, _renderOrder, _visible, dragMesh, fixNodeE, getParent, node, tapDragMesh)
@@ -29,6 +29,7 @@ import Unsafe.Coerce (unsafeCoerce)
 
 newtype DragObjCfg geo = DragObjCfg {
     isActive       :: Dynamic Boolean,
+    enabled        :: Dynamic Boolean,
     position       :: Vector3,
     rotation       :: Euler,
     customGeo      :: Maybe geo,
@@ -42,6 +43,7 @@ derive instance newtypeDragObjCfg :: Newtype (DragObjCfg geo) _
 instance defaultDragObjCfg :: Default (DragObjCfg geo) where
     def = DragObjCfg {
         isActive       : pure false,
+        enabled        : pure true,
         position       : def,
         rotation       : def,
         customGeo      : Nothing,
@@ -150,7 +152,7 @@ createDraggableObject cfg =
                                              )
 
                 let dragEvts = multicast $ mesh ^. _dragged <|> invCircle ^. _dragged
-                    evts     = multicast $ validateDrag dragEvts
+                    evts     = multicast $ gateDyn (cfg ^. _enabled) $ validateDrag dragEvts
                     startEvt = filter isDragStart evts
                     endEvt   = filter isDragEnd evts
 
