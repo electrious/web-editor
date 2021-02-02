@@ -5,7 +5,6 @@ import Prelude
 import Algorithm.PointInPolygon (underPolygons)
 import Control.Alt ((<|>))
 import Control.Alternative (empty)
-import Control.Apply (lift2)
 import Custom.Mesh (TappableMesh)
 import Data.Array (foldl)
 import Data.Default (class Default, def)
@@ -28,18 +27,18 @@ import Data.UGraph (UGraph, addPolygon, deleteEdge, deleteVertex, edges, graphPo
 import Data.UGraph as UG
 import Data.UUID (UUID)
 import Data.UUIDMap (UUIDMap)
-import Editor.Common.Lenses (_active, _enabled, _face, _floor, _index, _mouseMove, _name, _point, _position)
+import Editor.Common.Lenses (_active, _enabled, _face, _floor, _index, _mouseMove, _name, _point, _position, _tapped)
 import Editor.HeightEditor (_arrowMaterial, dragArrowPos, setupHeightEditor)
 import Editor.MarkerPoint (MidMarker, MidMarkerPoint(..), Modifier, VertMarker, VertMarkerPoint, _dragEndPos, _modifier, _vert1, _vert2, getVertMarkerActiveStatus, getVertMarkerDragging)
 import Editor.ObjectAdder (CandidatePoint, createObjectAdder, mkCandidatePoint)
-import Editor.PolygonEditor (_vertModifier, getTapEvt)
-import Editor.SceneEvent (SceneMouseMoveEvent, SceneTapEvent)
+import Editor.PolygonEditor (_vertModifier)
+import Editor.SceneEvent (SceneMouseMoveEvent)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
-import FRP.Dynamic (Dynamic, current, dynEvent, gateDyn, latestEvt, performDynamic, sampleDyn, step)
+import FRP.Dynamic (Dynamic, current, dynEvent, gateDyn, performDynamic, sampleDyn, step)
 import FRP.Event (Event)
-import FRP.Event.Extra (multicast, performEvent, skip)
+import FRP.Event.Extra (multicast, performEvent)
 import Math.Line (Line, _end, _start)
 import Model.ActiveMode (ActiveMode(..), fromBoolean, isActive)
 import Model.HouseBuilder.FloorPlan (FloorPlan, floorPlanHousePoints)
@@ -91,7 +90,6 @@ instance defaultGraphEditorConf :: Ord v => Default (GraphEditorConf v w) where
 
 newtype GraphEditor v w = GraphEditor {
     graph      :: Event (UGraph v w),
-    delete     :: Event SceneTapEvent,
     isDragging :: Event Boolean
     }
 
@@ -145,7 +143,7 @@ graphMidPoints flt lineCenter actDyn = traverse midP <<< edges
 setupMidMarkers :: forall e v. Ord v => HasUUID v => Vector v => Dynamic (List (MidMarkerPoint UUID v)) -> Node e (Event (MidMarkerPoint UUID v))
 setupMidMarkers mPointsDyn = do
     markers :: (Dynamic (List (MidMarker UUID v))) <- renderDynamic mPointsDyn
-    pure $ latestEvt $ getTapEvt <$> markers
+    pure $ latestAnyEvtWith (view _tapped) markers
 
 
 -----------------------------------------------------------
@@ -282,64 +280,57 @@ createGraphEditor cfg = do
                     let newActMarkerEvt = getVertMarkerActiveStatus vertMarkersDyn
                         dragEvt         = snd <$> latestAnyEvtWith (view _position) vertMarkersDyn
                         dragEndPosEvt   = latestAnyEvtWith (view _dragEndPos) vertMarkersDyn
-
+                        -- get delete event of tapping on a marker
+                        delEvts         = map snd $ latestAnyEvtWith (view _tapped) vertMarkersDyn
+                        isDragging      = multicast $ getVertMarkerDragging vertMarkersDyn
+                        
                         -- apply the dragged new vertex to the graph
-                        -- Node: this will be triggered after first render automatically
                         graphAfterDragEvt = sampleDyn graphDyn $ updateVert <$> dragEvt
 
-                        midActive = lift2 (\pa am -> pa && fromBoolean (am == Nothing)) graphActive actMarkerDyn
-
-                        floorPolyDyn = floorPlanHousePoints <$> cfg ^. _floor
-
-                        -- height editable vertices
-                        hVertsDyn = heightEditableVerts hFilter <$> graphDyn
-                        hEditorActDyn = (&&) <$> midActive <*> (fromBoolean <<< not <<< null <$> hVertsDyn)
+                        midActive = (\pa am -> pa && fromBoolean (am == Nothing)) <$> graphActive <*> actMarkerDyn
 
                     -- render graph lines
                     renderGraphDyn active graphDyn
 
                     -- create mid markers for adding new vertices
-                    let midPointsDyn = performDynamic $ graphMidPoints hFilter (cfg ^. _lineCenter) midActive <$> graphDyn
-                        midPointValsDyn = map (view _position) <$> midPointsDyn
+                    let midPointsDyn         = performDynamic $ graphMidPoints hFilter (cfg ^. _lineCenter) midActive <$> graphDyn
+                        midPointValsDyn      = map (view _position) <$> midPointsDyn
                         graphAfterDragEndEvt = performEvent $ sampleDyn graphDyn $ sampleDyn midPointValsDyn $ checkAndMerge (mergeWith merger) <$> dragEndPosEvt
                     
                     toAddEvt <- setupMidMarkers midPointsDyn
                     
                     -- setup the polygon adder
+                    let floorPolyDyn = floorPlanHousePoints <$> cfg ^. _floor
                     newPolyEvt <- setupPolyAdder floorPolyDyn (graphPoints <$> graphDyn) cfg
 
                     -- setup the height editor
+                    -- height editable vertices
+                    let hVertsDyn = heightEditableVerts hFilter <$> graphDyn
+                        hEditorActDyn = (&&) <$> midActive <*> (fromBoolean <<< not <<< null <$> hVertsDyn)
                     heightEvt <- localEnv (const $ def # _arrowMaterial .~ Just heightMarkerMat) $
                                      setupHeightEditor hEditorActDyn (dragArrowPos <$> hVertsDyn)
 
-                    let graphAfterAdd = sampleDyn graphDyn $ addVert <$> toAddEvt
+                    let graphAfterAdd     = sampleDyn graphDyn $ addVert <$> toAddEvt
                         graphAfterAddPoly = sampleDyn graphDyn $ addPolygon <$> newPolyEvt
-                    
-                        graphAfterHeight = sampleDyn graphDyn $ updateHeight hFilter <$> heightEvt
-
-                        -- get delete event of tapping on a marker
-                        delEvts = map snd $ latestEvt $ getTapEvt <$> vertMarkersDyn
-                        graphAfterDel = sampleDyn graphDyn $ deleteVertex <$> delEvts
+                        graphAfterHeight  = sampleDyn graphDyn $ updateHeight hFilter <$> heightEvt
+                        graphAfterDel     = sampleDyn graphDyn $ deleteVertex <$> delEvts
 
                         -- update the real graph after adding/deleting vertex
-                        graphEvt = multicast $ graphAfterAdd <|>
-                                               graphAfterDel <|>
-                                               graphAfterAddPoly <|>
+                        graphEvt = multicast $ graphAfterAdd        <|>
+                                               graphAfterDel        <|>
+                                               graphAfterAddPoly    <|>
                                                graphAfterDragEndEvt <|>
-                                               graphAfterHeight <|>
+                                               graphAfterHeight     <|>
                                                dynEvent (cfg ^. _graph)
+                                               
                         -- new graph after all kinds of changes
                         allNewGraphEvt = multicast $ graphEvt <|> graphAfterDragEvt
 
                         graphActEvt = dynEvent active <|> (const Active <$> graphEvt)
 
-                    -- create the graph delete button
-                    --graphDel <- mkPolyDelMarker (graphCenter <$> allNewGraphEvt) graphActive
-                
                     let editor = GraphEditor {
-                            graph      : skip 1 allNewGraphEvt,
-                            delete     : empty, --multicast $ graphDel ^. _tapped,
-                            isDragging : multicast $ getVertMarkerDragging vertMarkersDyn
+                            graph      : allNewGraphEvt,
+                            isDragging : isDragging
                             }
                     pure { input: newActMarkerEvt, output : { input: allNewGraphEvt, output: { input: graphEvt, output : { input: graphActEvt, output : editor }}}}
     

@@ -8,7 +8,6 @@ import Custom.Mesh (TappableMesh)
 import Data.Array (length, range, zip)
 import Data.Compactable (compact)
 import Data.Default (class Default, def)
-import Data.Foldable (class Foldable)
 import Data.Lens (Lens', view, (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
@@ -21,9 +20,9 @@ import Editor.MarkerPoint (MidMarker, MidMarkerPoint(..), Modifier, VertMarker, 
 import Editor.SceneEvent (SceneTapEvent)
 import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
-import FRP.Dynamic (Dynamic, current, dynEvent, latestEvt, sampleDyn)
+import FRP.Dynamic (Dynamic, current, dynEvent, sampleDyn)
 import FRP.Event (Event)
-import FRP.Event.Extra (anyEvt, multicast)
+import FRP.Event.Extra (multicast)
 import Model.ActiveMode (ActiveMode(..), fromBoolean, isActive)
 import Model.Polygon (Polygon, _polyVerts, addVertexAt, delVertexAt, polyCenter, polyMidPoints, updateVertAt)
 import Rendering.DynamicNode (renderDynamic)
@@ -90,7 +89,7 @@ setupMidMarkers :: forall e v. Vector v => Dynamic ActiveMode -> Dynamic (Polygo
 setupMidMarkers actDyn polyDyn = do
     let mPointsDyn = midMarkerPoints actDyn <<< polyMidPoints <$> polyDyn
     markers :: (Dynamic (Array (MidMarker Int v))) <- renderDynamic mPointsDyn
-    pure $ latestEvt $ getTapEvt <$> markers
+    pure $ latestAnyEvtWith (view _tapped) markers
 
 newtype PolyEditorConf v = PolyEditorConf {
     active       :: Dynamic ActiveMode,
@@ -126,10 +125,6 @@ derive instance newtypePolyEditor :: Newtype (PolyEditor v) _
 _delete :: forall t a r. Newtype t { delete :: a | r } => Lens' t a
 _delete = _Newtype <<< prop (SProxy :: SProxy "delete")
 
--- | merge all tapped events in a foldable list of objects support it.
-getTapEvt :: forall t a r f. Functor f => Foldable f => Newtype t { tapped :: Event a | r } => f t -> Event a
-getTapEvt = anyEvt <<< map (view _tapped)
-
 updateVertex :: forall v. Tuple Int v -> Polygon v -> Polygon v
 updateVertex (Tuple i v) p = updateVertAt i v p
 
@@ -163,7 +158,7 @@ createPolyEditor cfg = do
                         vertsAfterAdd = compact (sampleDyn polyDyn $ addVert <$> toAddEvt)
 
                         -- get delete event of tapping on a marker
-                        delEvts = map fst $ latestEvt $ getTapEvt <$> vertMarkersDyn
+                        delEvts = map fst $ latestAnyEvtWith (view _tapped) vertMarkersDyn
                         -- calculate new vertices after deleting a vertex
                         vertsAfterDel = sampleDyn polyDyn (delVertexAt <$> delEvts)
     
