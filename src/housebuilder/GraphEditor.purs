@@ -23,7 +23,7 @@ import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..), snd)
-import Data.UGraph (UGraph, addPolygon, deleteEdge, deleteVertex, edges, graphPoints, insertEdge, insertVertex, mergeVertices, updateVert)
+import Data.UGraph (UGraph, addPolygon, deleteEdge, deleteVertex, edges, graphPoints, insertEdge, insertVertex, mergeVertices, snapToParallel, updateVert)
 import Data.UGraph as UG
 import Data.UUID (UUID)
 import Data.UUIDMap (UUIDMap)
@@ -245,7 +245,7 @@ checkAndMerge f v midPs g = do
         updV v' = updateVert (updateVector v (getVector v')) g
         g2 = updV <$> mn
     g1 <- traverse merge cn
-    pure $ fromMaybe g (g1 <|> g2)
+    pure $ fromMaybe (snapToParallel v g) (g1 <|> g2)
     
 
 heightEditableVerts :: forall v w. (v -> Boolean) -> Graph v w -> List v
