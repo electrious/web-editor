@@ -2,17 +2,21 @@ module Data.UGraph where
 
 import Prelude
 
+import Data.Compactable (compact)
 import Data.Default (class Default, def)
 import Data.Filterable (filter)
-import Data.Foldable (foldl)
+import Data.Foldable (class Foldable, foldl)
+import Data.Graph (adjacent)
 import Data.Graph as G
 import Data.Int (toNumber)
 import Data.Lens ((^.))
-import Data.List (List(..))
-import Data.Tuple (Tuple(..), snd)
-import Math.Line (Line, _end, _start, mkLine)
+import Data.List (List(..), difference, head)
+import Data.Maybe (Maybe, fromMaybe)
+import Data.Tuple (Tuple(..), fst, snd)
+import Math.Angle (degreeVal)
+import Math.Line (Line, _end, _start, mkLine, mostParaLine, projPointWithLine)
 import Model.Polygon (Polygon, _polyVerts, polyEdges)
-import Three.Math.Vector (class Vector, (<+>), (<**>))
+import Three.Math.Vector (class Vector, getVector, updateVector, (<**>), (<+>))
 
 type UGraph = G.Graph
 
@@ -30,6 +34,11 @@ insertEdge v1 v2 w g = G.insertEdge v1 v2 w $ G.insertEdge v2 v1 w g
 
 deleteEdge :: forall v w. Ord v => v -> v -> UGraph v w -> UGraph v w
 deleteEdge v1 v2 g = G.deleteEdge v1 v2 $ G.deleteEdge v2 v1 g
+
+-- update a vertex in a graph
+updateVert :: forall v w. Ord v => Default w => v -> UGraph v w -> UGraph v w
+updateVert v g = foldl addEdge (insertVertex v $ deleteVertex v g) (adjacent v g)
+    where addEdge g' v' = insertEdge v v' def g'
 
 -- | get all edges in the graph and remove all duplicated edge
 edges :: forall v w. Ord v => UGraph v w -> List (Line v)
@@ -63,3 +72,22 @@ mergeVertices v1 v2 v g = let ns1 = G.adjacent v1 g
                               ns  = filter (\v' -> v' /= v1 && v' /= v2) $ ns1 <> ns2
                               addEdges = flip (foldl (\g' nv -> insertEdge v nv def g'))
                           in addEdges ns $ insertVertex v $ deleteVertex v1 $ deleteVertex v2 g
+
+
+-- find out if there's a nearby point so that the dragged vertex
+-- can snap to to make an edge paralell to another edge in the graph
+snapToParallel :: forall v w. Eq v => Ord v => Vector v => Default w => v -> UGraph v w -> UGraph v w
+snapToParallel v g =
+    let ls = mkLine v <$> adjacent v g  -- new edges lines start from v
+        es = difference (edges g) ls    -- all other edges
+        -- find a new V after snapping
+        nps = head $ compact $ (flip (snapVertToPara v) es <$> ls)
+        f v' = updateVert (updateVector v $ getVector v') g
+    in fromMaybe g $ f <$> nps
+
+
+snapVertToPara :: forall f v. Foldable f => Vector v => v -> Line v -> f (Line v) -> Maybe v
+snapVertToPara v line lines = 
+    let f (Tuple _ a) = degreeVal a < 5.0
+        pl = fst <$> filter f (mostParaLine line lines)
+    in projPointWithLine (line ^. _end) (line ^. _start) <$> pl

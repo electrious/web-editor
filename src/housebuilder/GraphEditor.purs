@@ -11,7 +11,7 @@ import Data.Default (class Default, def)
 import Data.Filterable (filter)
 import Data.Foldable (class Foldable, find, null, traverse_)
 import Data.FunctorWithIndex (mapWithIndex)
-import Data.Graph (Graph, adjacent, vertices)
+import Data.Graph (Graph, vertices)
 import Data.Lens (Lens', view, (^.), (.~))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
@@ -23,7 +23,7 @@ import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..), snd)
-import Data.UGraph (UGraph, addPolygon, deleteEdge, deleteVertex, edges, graphPoints, insertEdge, insertVertex, mergeVertices)
+import Data.UGraph (UGraph, addPolygon, deleteEdge, deleteVertex, edges, graphPoints, insertEdge, insertVertex, mergeVertices, updateVert)
 import Data.UGraph as UG
 import Data.UUID (UUID)
 import Data.UUIDMap (UUIDMap)
@@ -217,11 +217,6 @@ renderGraph = traverse_ renderLine <<< edges
 renderGraphDyn :: forall e v w. Vector v => Ord v => Dynamic ActiveMode -> Dynamic (UGraph v w) -> Node e Unit
 renderGraphDyn active graphDyn = node (def # _name    .~ "graph-line"
                                            # _visible .~ (isActive <$> active)) $ dynamic_ $ renderGraph <$> graphDyn
-
--- update a vertex in a graph
-updateVert :: forall v w. HasUUID v => Ord v => Default w => v -> UGraph v w -> UGraph v w
-updateVert v g = foldl addEdge (insertVertex v $ deleteVertex v g) (adjacent v g)
-    where addEdge g' v' = insertEdge v v' def g'
 
 -- add a new vertex and edges based on clicked midmarker
 addVert :: forall v w. Ord v => Default w => MidMarkerPoint UUID v -> UGraph v w -> UGraph v w
