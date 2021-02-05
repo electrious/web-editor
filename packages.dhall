@@ -136,8 +136,8 @@ let additions =
         }
       , digraph =
         { dependencies = [ "newtype", "ordered-collections", "pqueue", "lists" ]
-        , repo = "https://github.com/nullobject/purescript-digraph.git"
-        , version = "v2.0.0"
+        , repo = "https://github.com/manyoo/purescript-digraph.git"
+        , version = "master"
         }
       , pqueue =
         { dependencies = [ "newtype", "ordered-collections", "lists" ]
