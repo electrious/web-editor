@@ -12,7 +12,7 @@ import Data.Tuple (Tuple(..))
 import Math.Angle (Angle)
 import Model.Roof.RoofPlate (angleBetween)
 import Prelude (($), (&&), (/), (<), (<<<), (==), (||))
-import Three.Math.Vector (class Vector, length, (<**>), (<+>), (<->), (<.>))
+import Three.Math.Vector (class Vector, length, normal, (<**>), (<+>), (<->), (<.>))
 
 newtype Line v = Line {
   start :: v,
@@ -59,6 +59,6 @@ mostParaLine target = foldl f Nothing
 -- project point based on the vector line
 projPointWithLine :: forall v. Vector v => v -> v -> Line v -> v
 projPointWithLine sp p l = sp <+> (lv <**> s)
-    where lv  = lineVec l
+    where lv  = normal $ lineVec l
           sv  = p <-> sp
           s   = (lv <.> sv) / length lv

@@ -88,6 +88,6 @@ snapToParallel v g =
 
 snapVertToPara :: forall f v. Foldable f => Vector v => v -> Line v -> f (Line v) -> Maybe v
 snapVertToPara v line lines = 
-    let f (Tuple _ a) = degreeVal a < 5.0
+    let f (Tuple _ a) = degreeVal a < 10.0
         pl = fst <$> filter f (mostParaLine line lines)
     in projPointWithLine (line ^. _end) (line ^. _start) <$> pl
