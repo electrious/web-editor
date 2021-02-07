@@ -6,12 +6,19 @@ import Data.Compactable (compact)
 import Data.Default (class Default, def)
 import Data.Filterable (filter)
 import Data.Foldable (class Foldable, foldl)
-import Data.Graph (adjacent)
+import Data.Graph (adjacent, vertices)
 import Data.Graph as G
 import Data.Int (toNumber)
-import Data.Lens ((^.))
-import Data.List (List(..), difference, head)
+import Data.Lens (Lens', view, (%~), (^.))
+import Data.Lens.Iso.Newtype (_Newtype)
+import Data.Lens.Record (prop)
+import Data.List (List(..), (:), difference, head)
+import Data.List as L
 import Data.Maybe (Maybe, fromMaybe)
+import Data.Newtype (class Newtype)
+import Data.Set (Set)
+import Data.Set as S
+import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple(..), fst, snd)
 import Math.Angle (degreeVal)
 import Math.Line (Line, _end, _start, mkLine, mostParaLine, projPointWithLine)
@@ -91,3 +98,39 @@ snapVertToPara v line lines =
     let f (Tuple _ a) = degreeVal a < 10.0
         pl = fst <$> filter f (mostParaLine line lines)
     in projPointWithLine (line ^. _end) (line ^. _start) <$> pl
+
+
+newtype CircleState v = CircleState {
+    visited :: Set v,
+    circles :: List (List v)
+    }
+
+derive instance newtypeCircleState :: Newtype (CircleState v) _
+instance defaultCirlceState :: Default (CircleState v) where
+    def = CircleState {
+        visited : S.empty,
+        circles : Nil
+        }
+
+_visited :: forall t a r. Newtype t { visited :: a | r } => Lens' t a
+_visited = _Newtype <<< prop (SProxy :: SProxy "visited")
+
+_circles :: forall t a r. Newtype t { circles :: a | r } => Lens' t a
+_circles = _Newtype <<< prop (SProxy :: SProxy "circles")
+
+-- detect all circles in a graph
+allCircles :: forall v w. Ord v => UGraph v w -> List (List v)
+allCircles g = view _circles $ foldl (circlesFrom g) def $ vertices g
+
+
+circlesFrom :: forall v w. Ord v => UGraph v w -> CircleState v -> v -> CircleState v
+circlesFrom g s from
+    | G.elem from g =
+        let go Nil s' path    = s'
+            go (v:vs) s' path
+                | S.member v (s' ^. _visited) = go vs s' path
+                | L.elem v path = s' # _circles %~ (:) path
+                                     # _visited %~ S.insert v
+                | otherwise     = go (G.adjacent v g <> vs) (s' # _visited %~ S.insert v) (v:path)
+        in go (L.singleton from) s Nil
+    | otherwise = s
