@@ -23,7 +23,7 @@ import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..), snd)
-import Data.UGraph (UGraph, addPolygon, deleteEdge, deleteVertex, edges, graphPoints, insertEdge, insertVertex, mergeVertices, snapToParallel, updateVert)
+import Data.UGraph (UGraph, addPolygon, allPolygons, deleteEdge, deleteVertex, edges, graphPoints, insertEdge, insertVertex, mergeVertices, snapToParallel, updateVert)
 import Data.UGraph as UG
 import Data.UUID (UUID)
 import Data.UUIDMap (UUIDMap)
@@ -39,13 +39,14 @@ import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, current, dynEvent, gateDyn, performDynamic, sampleDyn, step)
 import FRP.Event (Event)
 import FRP.Event.Extra (multicast, performEvent)
+import HouseBuilder.PolyGeometry (mkPolyGeometry)
 import Math.Line (Line, _end, _start)
 import Model.ActiveMode (ActiveMode(..), fromBoolean, isActive)
 import Model.HouseBuilder.FloorPlan (FloorPlan, floorPlanHousePoints)
 import Model.Polygon (Polygon, polygonAround)
 import Model.UUID (class HasUUID, assignNewIds, idLens)
 import Rendering.DynamicNode (dynamic_, renderDynamic)
-import Rendering.Node (Node, _visible, fixNodeDWith, getParent, line, localEnv, node, tapMesh)
+import Rendering.Node (Node, _visible, fixNodeDWith, getParent, line, localEnv, mesh, node, tapMesh)
 import Three.Core.Face3 (normal)
 import Three.Core.Geometry (CircleGeometry, mkCircleGeometry)
 import Three.Core.Material (LineBasicMaterial, MeshBasicMaterial, mkLineBasicMaterial, mkMeshBasicMaterial)
@@ -207,12 +208,19 @@ setupPolyAdder polyDyn pntsDyn conf = do
 lineMat :: LineBasicMaterial
 lineMat = unsafePerformEffect $ mkLineBasicMaterial 0x333333 2.0
 
+polyMat :: MeshBasicMaterial
+polyMat = unsafePerformEffect $ mkMeshBasicMaterial 0xaa0000
+
 -- render graph edges with lines
 renderGraph :: forall e v w. Vector v => Ord v => UGraph v w -> Node e Unit
-renderGraph = traverse_ renderLine <<< edges
+renderGraph g = traverse_ renderLine (edges g) *> traverse_ renderPoly (allPolygons g)
     where renderLine l = do
               let vs = getVector <$> [l ^. _start, l ^. _end]
               line (def # _name .~ "graph-edge") vs lineMat
+          renderPoly p = do
+              geo <- liftEffect $ mkPolyGeometry p
+              mesh (def # _name .~ "graph-poly") geo polyMat
+              
 
 renderGraphDyn :: forall e v w. Vector v => Ord v => Dynamic ActiveMode -> Dynamic (UGraph v w) -> Node e Unit
 renderGraphDyn active graphDyn = node (def # _name    .~ "graph-line"

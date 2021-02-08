@@ -22,7 +22,7 @@ import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple(..), fst, snd)
 import Math.Angle (degreeVal)
 import Math.Line (Line, _end, _start, mkLine, mostParaLine, projPointWithLine)
-import Model.Polygon (Polygon, _polyVerts, polyEdges)
+import Model.Polygon (Polygon, _polyVerts, newPolygon, polyEdges)
 import Three.Math.Vector (class Vector, getVector, updateVector, (<**>), (<+>))
 
 type UGraph = G.Graph
@@ -118,9 +118,9 @@ _visited = _Newtype <<< prop (SProxy :: SProxy "visited")
 _circles :: forall t a r. Newtype t { circles :: a | r } => Lens' t a
 _circles = _Newtype <<< prop (SProxy :: SProxy "circles")
 
--- detect all circles in a graph
-allCircles :: forall v w. Ord v => UGraph v w -> List (List v)
-allCircles g = view _circles $ foldl (circlesFrom g) def $ vertices g
+-- detect all polygons in a graph
+allPolygons :: forall v w. Ord v => UGraph v w -> List (Polygon v)
+allPolygons g = newPolygon <$> view _circles (foldl (circlesFrom g) def $ vertices g)
 
 
 circlesFrom :: forall v w. Ord v => UGraph v w -> CircleState v -> v -> CircleState v
