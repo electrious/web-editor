@@ -126,11 +126,11 @@ allCircles g = view _circles $ foldl (circlesFrom g) def $ vertices g
 circlesFrom :: forall v w. Ord v => UGraph v w -> CircleState v -> v -> CircleState v
 circlesFrom g s from
     | G.elem from g =
-        let go Nil s' path    = s'
+        let go Nil s' path = s'
             go (v:vs) s' path
                 | S.member v (s' ^. _visited) = go vs s' path
                 | L.elem v path = s' # _circles %~ (:) path
                                      # _visited %~ S.insert v
-                | otherwise     = go (G.adjacent v g <> vs) (s' # _visited %~ S.insert v) (v:path)
+                | otherwise     = go (adjacent v g <> vs) (s' # _visited %~ S.insert v) (v:path)
         in go (L.singleton from) s Nil
     | otherwise = s

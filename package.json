@@ -32,6 +32,7 @@
   "dependencies": {
     "axios": "^0.19.2",
     "clipper-lib": "^6.4.2",
+    "earcut": "^2.2.2",
     "google-protobuf": "^3.12.2",
     "rbush": "^3.0.1",
     "shamos-hoey": "^1.1.0",
