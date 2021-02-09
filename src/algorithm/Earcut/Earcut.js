@@ -1,8 +1,8 @@
-const e = require('earcut')
+const earcut = require('earcut')
 const three = require('three')
 
 exports.earcut = vs => {
-    const idxs = e.earcut(vs, null, 3)
+    const idxs = earcut(vs, null, 3)
     let faces = []
 
     let l = idxs.length
