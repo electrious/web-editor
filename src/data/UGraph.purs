@@ -12,7 +12,7 @@ import Data.Int (toNumber)
 import Data.Lens (Lens', view, (%~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.List (List(..), (:), difference, head)
+import Data.List (List(..), difference, head, (:))
 import Data.List as L
 import Data.Maybe (Maybe, fromMaybe)
 import Data.Newtype (class Newtype)
@@ -120,17 +120,13 @@ _circles = _Newtype <<< prop (SProxy :: SProxy "circles")
 
 -- detect all polygons in a graph
 allPolygons :: forall v w. Ord v => UGraph v w -> List (Polygon v)
-allPolygons g = newPolygon <$> view _circles (foldl (circlesFrom g) def $ vertices g)
-
+allPolygons g = newPolygon <$> view _circles (foldl (circlesFrom g) def (vertices g))
 
 circlesFrom :: forall v w. Ord v => UGraph v w -> CircleState v -> v -> CircleState v
-circlesFrom g s from
-    | G.elem from g =
-        let go Nil s' path = s'
-            go (v:vs) s' path
-                | S.member v (s' ^. _visited) = go vs s' path
-                | L.elem v path = s' # _circles %~ (:) path
-                                     # _visited %~ S.insert v
-                | otherwise     = go (adjacent v g <> vs) (s' # _visited %~ S.insert v) (v:path)
-        in go (L.singleton from) s Nil
-    | otherwise = s
+circlesFrom g s from = if S.member from (s ^. _visited)
+                       then s
+                       else go (L.singleton from) s Nil
+    where go Nil s' path = s'
+          go (v:vs) s' path
+              | L.elem v path = go vs (s' # _circles %~ (:) path) path
+              | otherwise     = go (adjacent v g <> vs) (s' # _visited %~ S.insert v) (v:path)
