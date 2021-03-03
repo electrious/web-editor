@@ -4,14 +4,15 @@ import Custom.Mesh (TapMouseMesh)
 import Data.Default (class Default, def)
 import Data.Lens (view, (.~), (^.))
 import Data.Newtype (class Newtype)
-import Editor.Common.Lenses (_leadId, _mouseMove, _name, _tapped)
+import Editor.Common.Lenses (_leadId, _mouseMove, _name)
 import Editor.Editor (Editor)
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import HouseBuilder.FloorPlanBuilder (_canEdit, buildFloorPlan)
+import HouseBuilder.FloorPlanBuilder (_canEdit)
 import Prelude (class Eq, Unit, bind, const, discard, pure, show, unit, void, (#), ($), (<$>), (<>), (==))
 import Rendering.Node (Node, getEnv, localEnv, mkNodeEnv, node, runNode, tapMouseMesh)
 import Rendering.TextureLoader (loadTextureFromUrl)
+import SmartHouse.HouseTracer (traceHouse)
 import Three.Core.Geometry (mkPlaneGeometry)
 import Three.Core.Material (mkMeshBasicMaterialWithTexture)
 import Three.Loader.TextureLoader (clampToEdgeWrapping, repeatWrapping, setRepeat, setWrapS, setWrapT)
@@ -60,9 +61,9 @@ createHouseBuilder = node (def # _name .~ "house-builder") do
         cfg = def # _mouseMove .~ helper ^. _mouseMove
                   # _canEdit   .~ ((==) AddFloorPlan <$> modeDyn)
 
-        bgTapEvt = const unit <$> helper ^. _tapped
+        --bgTapEvt = const unit <$> helper ^. _tapped
     
-    floorPlanEvt <- localEnv (const cfg) $ buildFloorPlan bgTapEvt
+    floorPlanEvt <- localEnv (const cfg) $ traceHouse
     
     pure unit
 
