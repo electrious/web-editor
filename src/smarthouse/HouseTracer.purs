@@ -92,7 +92,7 @@ tempLineTo :: Maybe Vector3 -> TracerState -> Maybe (Line Vector3)
 tempLineTo t s = mkLine <$> t <*> lastVert s
 
 lineMat :: LineBasicMaterial
-lineMat = unsafePerformEffect $ mkLineBasicMaterial 0x333333 2.0
+lineMat = unsafePerformEffect $ mkLineBasicMaterial 0xeeeeee 2.0
 
 renderLine :: forall e. Line Vector3 -> Node e Unit
 renderLine l = void $ line (def # _name .~ "vert-adder-line") vs lineMat
