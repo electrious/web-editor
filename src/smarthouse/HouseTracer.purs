@@ -10,25 +10,27 @@ import Data.Foldable (traverse_)
 import Data.Lens (Lens', view, (%~), (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.List (List(..), head)
+import Data.List (List(..), head, (:))
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Editor.Common.Lenses (_face, _mouseMove, _name, _parent, _point, _position)
 import Editor.ObjectAdder (createObjectAdder, mkCandidatePoint)
+import Editor.RoofEditor (toVec2)
 import Editor.SceneEvent (SceneMouseMoveEvent)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, gateDyn, sampleDyn, step)
 import FRP.Event (Event)
 import FRP.Event.Extra (performEvent)
-import Math.Line (Line, _end, _start, mkLine)
+import Math.Angle (degreeVal)
+import Math.Line (Line, _end, _start, linesAngle, mkLine, perpendicularLine)
 import Rendering.DynamicNode (dynamic_)
 import Rendering.Node (Node, _env, fixNodeE, line, mesh, node)
 import Three.Core.Face3 (normal)
 import Three.Core.Geometry (CircleGeometry, mkCircleGeometry)
-import Three.Core.Material (LineBasicMaterial, MeshBasicMaterial, mkLineBasicMaterial, mkMeshBasicMaterial)
+import Three.Core.Material (LineBasicMaterial, LineDashedMaterial, MeshBasicMaterial, mkLineBasicMaterial, mkLineDashedMaterial, mkMeshBasicMaterial)
 import Three.Core.Object3D (worldToLocal)
-import Three.Math.Vector (Vector3, getVector, mkVec3)
+import Three.Math.Vector (Vector3, mkVec3, toVec3)
 
 newtype HouseTracerConf = HouseTracerConf {
     mouseMove :: Event SceneMouseMoveEvent,
@@ -64,6 +66,11 @@ addNewVert v s = s # _tracedVerts %~ Cons v
 lastVert :: TracerState -> Maybe Vector3
 lastVert s = head $ s ^. _tracedVerts
 
+lastLine :: TracerState -> Maybe (Line Vector3)
+lastLine st = f $ st ^. _tracedVerts
+    where f (v1:v2:_) = Just $ mkLine v1 v2
+          f _         = Nothing
+
 --------------------------------------------------------
 -- render the tracer state
 --------------------------------------------------------
@@ -96,11 +103,57 @@ lineMat = unsafePerformEffect $ mkLineBasicMaterial 0xeeeeee 2.0
 
 renderLine :: forall e. Line Vector3 -> Node e Unit
 renderLine l = void $ line (def # _name .~ "vert-adder-line") vs lineMat
-    where vs = getVector <$> [l ^. _start, l ^. _end]
+    where vs = [l ^. _start, l ^. _end]
 
 renderMaybeLine :: forall e. Maybe (Line Vector3) -> Node e Unit
 renderMaybeLine Nothing  = pure unit
 renderMaybeLine (Just l) = renderLine l
+--------------------------------------------------------
+
+
+--------------------------------------------------------
+-- helper lines
+--------------------------------------------------------
+
+-- calculate the perpendicular helper line to the last polygon line
+perpHelperLine :: TracerState -> Maybe (Line Vector3)
+perpHelperLine = lastLine >>> map (map toVec2 >>> perpendicularLine >>> map (flip toVec3 0.0))
+
+-- check whether the temp line is close to the perpendicular line
+-- enough to show the helper line
+canShowPerpLine :: Maybe (Line Vector3) -> Maybe (Line Vector3) -> Boolean
+canShowPerpLine (Just l1) (Just l2) = degreeVal (linesAngle l1 l2) < 10.0
+canShowPerpLine _ _                 = false
+
+
+-- render helper lines
+helperLineMat :: LineDashedMaterial
+helperLineMat = unsafePerformEffect $ mkLineDashedMaterial 0xe28743 2.0 1.0 3.0 1.0
+
+renderHelperLine :: forall e. Line Vector3 -> Node e Unit
+renderHelperLine l = void $ line (def # _name .~ "helper-line") vs helperLineMat
+    where vs = [l ^. _start, l ^. _end]
+
+renderMaybeHelperLine :: forall e. Maybe (Line Vector3) -> Node e Unit
+renderMaybeHelperLine Nothing  = pure unit
+renderMaybeHelperLine (Just l) = renderHelperLine l
+
+
+helperLines :: forall e. Dynamic TracerState -> Dynamic (Maybe Vector3) -> Node e Unit
+helperLines stDyn pDyn = do
+    let tempLineDyn = tempLineTo <$> pDyn <*> stDyn
+        -- calculate the perpendicular helper line to render
+        perpLineDyn = perpHelperLine <$> stDyn
+
+        procPerpLine t p = if canShowPerpLine t p then  p else Nothing
+        showPerpDyn = procPerpLine <$> tempLineDyn <*> perpLineDyn
+        
+    -- render temp line
+    dynamic_ $ renderMaybeLine <$> tempLineDyn
+
+    -- render the perpendicular helper line
+    dynamic_ $ renderMaybeHelperLine <$> perpLineDyn
+
 --------------------------------------------------------
 
 vertAdder :: Dynamic TracerState -> Node HouseTracerConf (Event Vector3)
@@ -119,10 +172,8 @@ vertAdder stDyn = do
 
         candPntDyn = step Nothing $ performEvent $ getCandPoint <$> gateDyn canEdit mouseEvt
         candVecDyn = map (view _position) <$> candPntDyn
-        tempLineDyn = tempLineTo <$> candVecDyn <*> stDyn
 
-    -- render temp line
-    dynamic_ $ renderMaybeLine <$> tempLineDyn
+    helperLines stDyn candVecDyn
     
     -- render the object adder
     let opt = def # _name .~ "vert-adder"

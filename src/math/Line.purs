@@ -12,7 +12,6 @@ import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple(..))
 import Math.Angle (Angle)
 import Model.Roof.RoofPlate (angleBetween)
-import Prelude (($), (&&), (/), (<), (<<<), (==), (||))
 import Three.Math.Vector (class Vector, Vector2, addScaled, cross, length, mkVec3, normal, toVec2, toVec3, (<**>), (<+>), (<->), (<.>))
 
 newtype Line v = Line {
@@ -23,6 +22,8 @@ newtype Line v = Line {
 derive instance newtypeLine :: Newtype (Line v) _
 instance eqLine :: Eq v => Eq (Line v) where
     eq (Line { start: s1, end: e1}) (Line { start: s2, end: e2 }) = (s1 == s2 && e1 == e2) || (s1 == e2 && e1 == s2)
+instance functorLine :: Functor Line where
+    map f (Line { start: sl, end: el}) = Line { start: f sl, end: f el }
 
 _start :: forall t a r. Newtype t { start :: a | r } => Lens' t a
 _start = _Newtype <<< prop (SProxy :: SProxy "start")
