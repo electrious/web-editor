@@ -16,6 +16,10 @@ exports.mkLineBasicMaterial = c => w => _ => {
     return new three.LineBasicMaterial({ color: c, linewidth: w })
 }
 
+exports.mkLineDashedMaterial = c => w => s => ds => gs => _ => {
+    return new three.LineDashedMaterial({ color: c, linewidth: w, scale: s, dashSize: ds, gapSize: gs })
+}
+
 exports.setTransparent = _ => t => mat => _ => {
     mat.transparent = t
 }

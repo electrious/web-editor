@@ -24,6 +24,6 @@ exports.setMaterial = _ => mat => mesh => _ => [
     mesh.material = mat
 ]
 
-exports.mkLine = geo => mat => _ => {
+exports.mkLine = _ => geo => mat => _ => {
     return new three.Line(geo, mat)
 }

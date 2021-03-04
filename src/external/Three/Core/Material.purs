@@ -9,6 +9,7 @@ foreign import data Material :: Type
 foreign import data MeshBasicMaterial :: Type
 foreign import data MeshPhongMaterial :: Type
 foreign import data LineBasicMaterial :: Type
+foreign import data LineDashedMaterial :: Type
 
 foreign import mkMeshBasicMaterial :: Int -> Effect MeshBasicMaterial
 foreign import mkMeshBasicMaterialWithTexture :: Texture -> Effect MeshBasicMaterial
@@ -16,12 +17,19 @@ foreign import mkMeshPhongMaterial :: Int -> Effect MeshPhongMaterial
 
 -- create LineBasicMaterial with color and line width
 foreign import mkLineBasicMaterial :: Int -> Number -> Effect LineBasicMaterial
+-- create LineDashedMaterial with color, line width, scale, dash size and gap size
+foreign import mkLineDashedMaterial :: Int -> Number -> Number -> Number -> Number -> Effect LineDashedMaterial
 
 class IsMaterial a
 
 instance isMaterialMaterial :: IsMaterial Material
 instance isMaterialMeshBasicMaterial :: IsMaterial MeshBasicMaterial
 instance isMaterialMeshPhongMaterial :: IsMaterial MeshPhongMaterial
+
+class IsLineMaterial a
+
+instance isLineMatLineBasicMaterial :: IsLineMaterial LineBasicMaterial
+instance isLineMatLineDashedMaterial :: IsLineMaterial LineDashedMaterial
 
 foreign import setTransparent :: forall mat. IsMaterial mat => Boolean -> mat -> Effect Unit
 

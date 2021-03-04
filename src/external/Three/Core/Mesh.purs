@@ -4,7 +4,7 @@ import Prelude
 
 import Effect (Effect)
 import Three.Core.Geometry (class IsBufferGeometry, class IsGeometry, LineGeometry)
-import Three.Core.Material (class IsMaterial, LineBasicMaterial)
+import Three.Core.Material (class IsLineMaterial, class IsMaterial)
 import Three.Core.Object3D (class IsObject3D)
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -22,6 +22,6 @@ foreign import setMaterial :: forall mat. IsMaterial mat => mat -> Mesh -> Effec
 
 
 foreign import data Line :: Type
-foreign import mkLine :: LineGeometry -> LineBasicMaterial -> Effect Line
+foreign import mkLine :: forall mat. IsLineMaterial mat => LineGeometry -> mat -> Effect Line
 instance isObject3DLine :: IsObject3D Line where
     toObject3D = unsafeCoerce
