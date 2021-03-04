@@ -1,6 +1,7 @@
 module Math.Line where
 
-import Data.Eq (class Eq)
+import Prelude
+
 import Data.Foldable (class Foldable, foldl)
 import Data.Lens (Lens', (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
@@ -12,7 +13,7 @@ import Data.Tuple (Tuple(..))
 import Math.Angle (Angle)
 import Model.Roof.RoofPlate (angleBetween)
 import Prelude (($), (&&), (/), (<), (<<<), (==), (||))
-import Three.Math.Vector (class Vector, length, normal, (<**>), (<+>), (<->), (<.>))
+import Three.Math.Vector (class Vector, Vector2, addScaled, cross, length, mkVec3, normal, toVec2, toVec3, (<**>), (<+>), (<->), (<.>))
 
 newtype Line v = Line {
   start :: v,
@@ -62,3 +63,16 @@ projPointWithLine sp p l = sp <+> (lv <**> s)
     where lv  = normal $ lineVec l
           sv  = p <-> sp
           s   = (lv <.> sv) / length lv
+
+
+-- perpendicular line of the specified line l, crossing start point of l, in 2D
+perpendicularLine :: Line Vector2 -> Line Vector2
+perpendicularLine l = mkLine ns ne
+    where s = l ^. _start
+          e = l ^. _end
+          v = toVec3 (e <-> s) 0.0
+          vt = mkVec3 0.0 0.0 1.0
+          nv = toVec2 $ cross v vt
+
+          ns = addScaled s nv (-20.0)
+          ne = addScaled s nv 20.0

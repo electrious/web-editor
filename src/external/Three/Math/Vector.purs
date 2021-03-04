@@ -124,3 +124,6 @@ toVec2 v = mkVec2 (vecX v) (vecY v)
 incX :: forall v. Vector v => Number -> v -> v
 incX d v = updateVector v (f $ getVector v)
     where f v' = mkVec3 (vecX v' + d) (vecY v') (vecZ v')
+
+toVec3 :: Vector2 -> Number -> Vector3
+toVec3 v z = mkVec3 (vecX v) (vecY v) z
