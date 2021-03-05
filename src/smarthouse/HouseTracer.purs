@@ -6,7 +6,7 @@ import Control.Alternative (empty)
 import Control.Monad.Reader (ask)
 import Data.Array (fromFoldable)
 import Data.Default (class Default, def)
-import Data.Foldable (traverse_)
+import Data.Foldable (foldl, traverse_)
 import Data.Lens (Lens', view, (%~), (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
@@ -14,6 +14,7 @@ import Data.List (List(..), head, (:))
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
+import Data.Tuple (Tuple(..), fst)
 import Editor.Common.Lenses (_face, _mouseMove, _name, _parent, _point, _position)
 import Editor.ObjectAdder (createObjectAdder, mkCandidatePoint)
 import Editor.SceneEvent (SceneMouseMoveEvent)
@@ -22,14 +23,14 @@ import FRP.Dynamic (Dynamic, gateDyn, sampleDyn, step)
 import FRP.Event (Event)
 import FRP.Event.Extra (performEvent)
 import Math.Angle (degreeVal)
-import Math.Line (Line, _end, _start, linesAngle, mkLine, perpendicularLine)
+import Math.Line (Line, _end, _start, lineVec, linesAngle, mkLine, perpendicularLine)
 import Rendering.DynamicNode (dynamic_)
 import Rendering.Node (Node, _env, fixNodeE, line, mesh, node)
 import Three.Core.Face3 (normal)
 import Three.Core.Geometry (CircleGeometry, mkCircleGeometry)
 import Three.Core.Material (LineBasicMaterial, LineDashedMaterial, MeshBasicMaterial, mkLineBasicMaterial, mkLineDashedMaterial, mkMeshBasicMaterial)
 import Three.Core.Object3D (worldToLocal)
-import Three.Math.Vector (Vector3, mkVec3, toVec2, toVec3)
+import Three.Math.Vector (Vector3, addScaled, mkVec3, toVec2, toVec3)
 
 newtype HouseTracerConf = HouseTracerConf {
     mouseMove :: Event SceneMouseMoveEvent,
@@ -69,6 +70,11 @@ lastLine :: TracerState -> Maybe (Line Vector3)
 lastLine st = f $ st ^. _tracedVerts
     where f (v1:v2:_) = Just $ mkLine v1 v2
           f _         = Nothing
+
+allLines :: TracerState -> List (Line Vector3)
+allLines st = fst $ foldl f (Tuple Nil Nothing) $ st ^. _tracedVerts
+    where f (Tuple r Nothing) v = Tuple r (Just v)
+          f (Tuple r (Just lv)) v = Tuple (mkLine v lv : r) (Just v)
 
 --------------------------------------------------------
 -- render the tracer state
@@ -121,9 +127,30 @@ perpHelperLine = lastLine >>> map (map toVec2 >>> perpendicularLine >>> map (fli
 -- check whether the temp line is close to the perpendicular line
 -- enough to show the helper line
 canShowPerpLine :: Maybe (Line Vector3) -> Maybe (Line Vector3) -> Boolean
-canShowPerpLine (Just l1) (Just l2) = let a = degreeVal (linesAngle l1 l2) in a < 10.0 || a > 170.0
+canShowPerpLine (Just l1) (Just l2) = almostParallel l1 l2
 canShowPerpLine _ _                 = false
 
+-- check if two lines is almost parallel or not
+almostParallel :: Line Vector3 -> Line Vector3 -> Boolean
+almostParallel l1 l2 = let a = degreeVal (linesAngle l1 l2) in a < 10.0 || a > 170.0
+
+-- check if a point is close to the vector of the specified line
+pointCloseToLine :: Vector3 -> Line Vector3 -> Boolean
+pointCloseToLine v l = almostParallel l nl
+    where nl = mkLine v (l ^. _start)
+
+-- find the most parallel edge in the polygon to the specified point
+paraHelperLine :: TracerState -> Maybe Vector3 -> Maybe (Line Vector3)
+paraHelperLine st Nothing  = Nothing
+paraHelperLine st (Just p) = foldl f Nothing $ allLines st
+    where f Nothing l    = if pointCloseToLine p l then Just (extendLine l) else Nothing
+          f v@(Just _) _ = v
+
+          extendLine l = let s = l ^. _start
+                             v = lineVec l
+                             ns = addScaled s v (-20.0)
+                             ne = addScaled s v 20.0
+                         in mkLine ns ne
 
 -- render helper lines
 helperLineMat :: LineDashedMaterial
@@ -146,12 +173,18 @@ helperLines stDyn pDyn = do
 
         procPerpLine t p = if canShowPerpLine t p then  p else Nothing
         perpLineShowDyn = procPerpLine <$> tempLineDyn <*> perpLineDyn
+
+        -- parallel helper lines
+        paraLineDyn = paraHelperLine <$> stDyn <*> pDyn
         
     -- render temp line
     dynamic_ $ renderMaybeLine <$> tempLineDyn
 
     -- render the perpendicular helper line
     dynamic_ $ renderMaybeHelperLine <$> perpLineShowDyn
+
+    -- render the parallel helper line
+    dynamic_ $ renderMaybeHelperLine <$> paraLineDyn
 
 --------------------------------------------------------
 
