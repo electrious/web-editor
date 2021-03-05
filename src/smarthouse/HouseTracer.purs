@@ -16,7 +16,6 @@ import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Editor.Common.Lenses (_face, _mouseMove, _name, _parent, _point, _position)
 import Editor.ObjectAdder (createObjectAdder, mkCandidatePoint)
-import Editor.RoofEditor (toVec2)
 import Editor.SceneEvent (SceneMouseMoveEvent)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, gateDyn, sampleDyn, step)
@@ -30,7 +29,7 @@ import Three.Core.Face3 (normal)
 import Three.Core.Geometry (CircleGeometry, mkCircleGeometry)
 import Three.Core.Material (LineBasicMaterial, LineDashedMaterial, MeshBasicMaterial, mkLineBasicMaterial, mkLineDashedMaterial, mkMeshBasicMaterial)
 import Three.Core.Object3D (worldToLocal)
-import Three.Math.Vector (Vector3, mkVec3, toVec3)
+import Three.Math.Vector (Vector3, mkVec3, toVec2, toVec3)
 
 newtype HouseTracerConf = HouseTracerConf {
     mouseMove :: Event SceneMouseMoveEvent,
@@ -122,7 +121,7 @@ perpHelperLine = lastLine >>> map (map toVec2 >>> perpendicularLine >>> map (fli
 -- check whether the temp line is close to the perpendicular line
 -- enough to show the helper line
 canShowPerpLine :: Maybe (Line Vector3) -> Maybe (Line Vector3) -> Boolean
-canShowPerpLine (Just l1) (Just l2) = degreeVal (linesAngle l1 l2) < 10.0
+canShowPerpLine (Just l1) (Just l2) = let a = degreeVal (linesAngle l1 l2) in a < 10.0 || a > 170.0
 canShowPerpLine _ _                 = false
 
 
@@ -146,13 +145,13 @@ helperLines stDyn pDyn = do
         perpLineDyn = perpHelperLine <$> stDyn
 
         procPerpLine t p = if canShowPerpLine t p then  p else Nothing
-        showPerpDyn = procPerpLine <$> tempLineDyn <*> perpLineDyn
+        perpLineShowDyn = procPerpLine <$> tempLineDyn <*> perpLineDyn
         
     -- render temp line
     dynamic_ $ renderMaybeLine <$> tempLineDyn
 
     -- render the perpendicular helper line
-    dynamic_ $ renderMaybeHelperLine <$> perpLineDyn
+    dynamic_ $ renderMaybeHelperLine <$> perpLineShowDyn
 
 --------------------------------------------------------
 
