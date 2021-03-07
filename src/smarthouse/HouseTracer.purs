@@ -5,32 +5,33 @@ import Prelude
 import Control.Alternative (empty)
 import Control.Monad.Reader (ask)
 import Data.Array (fromFoldable)
+import Data.Compactable (compact)
 import Data.Default (class Default, def)
 import Data.Foldable (foldl, traverse_)
 import Data.Lens (Lens', view, (%~), (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (List(..), head, (:))
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple(..), fst)
 import Editor.Common.Lenses (_face, _mouseMove, _name, _parent, _point, _position)
-import Editor.ObjectAdder (createObjectAdder, mkCandidatePoint)
+import Editor.ObjectAdder (CandidatePoint, createObjectAdder, mkCandidatePoint)
 import Editor.SceneEvent (SceneMouseMoveEvent)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, gateDyn, sampleDyn, step)
 import FRP.Event (Event)
 import FRP.Event.Extra (performEvent)
 import Math.Angle (degreeVal)
-import Math.Line (Line, _end, _start, lineVec, linesAngle, mkLine, perpendicularLine)
+import Math.Line (Line, _end, _start, distToLine, intersection, lineVec, linesAngle, mkLine, perpendicularLine, projPointWithLine)
 import Rendering.DynamicNode (dynamic_)
 import Rendering.Node (Node, _env, fixNodeE, line, mesh, node)
 import Three.Core.Face3 (normal)
 import Three.Core.Geometry (CircleGeometry, mkCircleGeometry)
 import Three.Core.Material (LineBasicMaterial, LineDashedMaterial, MeshBasicMaterial, mkLineBasicMaterial, mkLineDashedMaterial, mkMeshBasicMaterial)
 import Three.Core.Object3D (worldToLocal)
-import Three.Math.Vector (Vector3, addScaled, mkVec3, toVec2, toVec3)
+import Three.Math.Vector (Vector3, addScaled, dist, mkVec3, toVec2, toVec3, vecZ)
 
 newtype HouseTracerConf = HouseTracerConf {
     mouseMove :: Event SceneMouseMoveEvent,
@@ -165,17 +166,22 @@ renderMaybeHelperLine Nothing  = pure unit
 renderMaybeHelperLine (Just l) = renderHelperLine l
 
 
-helperLines :: forall e. Dynamic TracerState -> Dynamic (Maybe Vector3) -> Node e Unit
+helperLines :: forall e. Dynamic TracerState -> Dynamic (Maybe Vector3) -> Node e (Dynamic (Maybe Vector3))
 helperLines stDyn pDyn = do
     let tempLineDyn = tempLineTo <$> pDyn <*> stDyn
         -- calculate the perpendicular helper line to render
         perpLineDyn = perpHelperLine <$> stDyn
 
-        procPerpLine t p = if canShowPerpLine t p then  p else Nothing
+        procPerpLine t p = if canShowPerpLine t p then p else Nothing
         perpLineShowDyn = procPerpLine <$> tempLineDyn <*> perpLineDyn
 
         -- parallel helper lines
         paraLineDyn = paraHelperLine <$> stDyn <*> pDyn
+
+        f (Just p) st perpL paraL = Just $ snapPoint p st perpL paraL
+        f Nothing _ _ _ = Nothing
+
+        spDyn = f <$> pDyn <*> stDyn <*> perpLineShowDyn <*> paraLineDyn
         
     -- render temp line
     dynamic_ $ renderMaybeLine <$> tempLineDyn
@@ -186,6 +192,43 @@ helperLines stDyn pDyn = do
     -- render the parallel helper line
     dynamic_ $ renderMaybeHelperLine <$> paraLineDyn
 
+    pure $ spDyn
+
+--------------------------------------------------------
+
+--------------------------------------------------------
+-- point snapping
+--------------------------------------------------------
+snapPoint :: Vector3 -> TracerState -> Maybe (Line Vector3) -> Maybe (Line Vector3) -> Vector3
+snapPoint p st Nothing Nothing           = fromMaybe p $ snapToVert p st
+snapPoint p st (Just l) Nothing          = fromMaybe p $ snapToLine p st l
+snapPoint p st Nothing (Just l)          = fromMaybe p $ snapToLine p st l
+snapPoint p st (Just perpL) (Just paraL) = fromMaybe p $ snapToCrossing p st perpL paraL
+
+snapToVert :: Vector3 -> TracerState -> Maybe Vector3
+snapToVert p st = fst $ foldl f (Tuple Nothing 0.0) $ st ^. _tracedVerts
+    where f o@(Tuple Nothing _) v = let d = dist p v
+                                    in if d < 0.5 then Tuple (Just v) d else o
+          f o@(Tuple (Just _) od) v = let d = dist p v
+                                      in if d < od then Tuple (Just v) d else o
+
+snapToLine :: Vector3 -> TracerState -> Line Vector3 -> Maybe Vector3
+snapToLine p st l = f <$> lastVert st
+    where f v = if distToLine p l < 0.3
+                then projPointWithLine v p l
+                else p
+
+snapToCrossing :: Vector3 -> TracerState -> Line Vector3 -> Line Vector3 -> Maybe Vector3
+snapToCrossing p st perpL paraL = let v1 = snapToLine p st perpL
+                                      v2 = snapToLine p st paraL
+                                      v3 = toVec3 (intersection (toVec2 <$> perpL) (toVec2 <$> paraL)) (vecZ p)
+                                      g (Tuple Nothing _) v = Tuple (Just v) (dist p v)
+                                      g o@(Tuple (Just _) od) v = let nd = dist p v
+                                                                  in if nd < od
+                                                                     then Tuple (Just v) nd
+                                                                     else o
+                                  in fst $ foldl g (Tuple Nothing 0.0) $ compact [v1, v2, Just v3]
+    
 --------------------------------------------------------
 
 vertAdder :: Dynamic TracerState -> Node HouseTracerConf (Event Vector3)
@@ -205,12 +248,18 @@ vertAdder stDyn = do
         candPntDyn = step Nothing $ performEvent $ getCandPoint <$> gateDyn canEdit mouseEvt
         candVecDyn = map (view _position) <$> candPntDyn
 
-    helperLines stDyn candVecDyn
-    
+    newPDyn <- helperLines stDyn candVecDyn
+
+    let newCandPDyn = updPos <$> candPntDyn <*> newPDyn
+        updPos :: forall v. Maybe (CandidatePoint v) -> Maybe v -> Maybe (CandidatePoint v)
+        updPos (Just cand) (Just p) = Just $ cand # _position .~ p
+        updPos v Nothing = v
+        updPos Nothing _ = Nothing
+
     -- render the object adder
     let opt = def # _name .~ "vert-adder"
                   # _position .~ pure (mkVec3 0.0 0.0 0.2)
-    addedPntEvt <- node opt $ createObjectAdder candPntDyn canEdit
+    addedPntEvt <- node opt $ createObjectAdder newCandPDyn canEdit
     
     pure $ view _position <$> addedPntEvt
 

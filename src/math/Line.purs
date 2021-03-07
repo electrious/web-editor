@@ -12,7 +12,7 @@ import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple(..))
 import Math.Angle (Angle)
 import Model.Roof.RoofPlate (angleBetween)
-import Three.Math.Vector (class Vector, Vector2, addScaled, cross, length, mkVec3, normal, toVec2, toVec3, (<**>), (<+>), (<->), (<.>))
+import Three.Math.Vector (class Vector, Vector2, addScaled, cross, length, mkVec2, mkVec3, normal, toVec2, toVec3, vecX, vecY, (<**>), (<+>), (<->), (<.>))
 
 newtype Line v = Line {
   start :: v,
@@ -41,6 +41,9 @@ lineVec l = l ^. _end <-> l ^. _start
 -- get center of the line
 lineCenter :: forall v. Vector v => Line v -> v
 lineCenter l = (l ^. _start <+> l ^. _end) <**> 0.5
+
+lineLength :: forall v. Vector v => Line v -> Number
+lineLength = length <<< lineVec
 
 -- angle between two lines
 linesAngle :: forall v. Vector v => Line v -> Line v -> Angle
@@ -77,3 +80,26 @@ perpendicularLine l = mkLine ns ne
 
           ns = addScaled s nv (-20.0)
           ne = addScaled s nv 20.0
+
+-- calculate the perpendicular distance between point p to line l
+distToLine :: forall v. Vector v => v -> Line v -> Number
+distToLine p l = let lv = normal $ lineVec l
+                     sv = (l ^. _start) <-> p
+                 in length $ sv <-> (lv <**> (sv <.> lv))
+
+-- 2D line intersection point
+intersection :: Line Vector2 -> Line Vector2 -> Vector2
+intersection (Line { start: s1, end: e1 }) (Line { start: s2, end: e2 }) = mkVec2 x y
+    where x1 = vecX s1
+          y1 = vecY s1
+          x2 = vecX e1
+          y2 = vecY e1
+          x3 = vecX s2
+          y3 = vecY s2
+          x4 = vecX e2
+          y4 = vecY e2
+          d = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
+          n1 = x1 * y2 - y1 * x2
+          n2 = x3 * y4 - y3 * x4
+          x = (n1 * (x3 - x4) - (x1 - x2) * n2) / d
+          y = (n1 * (y3 - y4) - (y1 - y2) * n2) / d
