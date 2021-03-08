@@ -7,7 +7,10 @@ import Control.Monad.Reader (ask)
 import Data.Array (fromFoldable)
 import Data.Compactable (compact)
 import Data.Default (class Default, def)
+import Data.Filterable (filter)
 import Data.Foldable (foldl, traverse_)
+import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Show (genericShow)
 import Data.Lens (Lens', view, (%~), (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
@@ -17,14 +20,16 @@ import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple(..), fst)
 import Editor.Common.Lenses (_face, _mouseMove, _name, _parent, _point, _position)
-import Editor.ObjectAdder (CandidatePoint, createObjectAdder, mkCandidatePoint)
+import Editor.ObjectAdder (createObjectAdder, mkCandidatePoint)
+import Editor.PanelAPIInterpreter (_finished)
 import Editor.SceneEvent (SceneMouseMoveEvent)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, gateDyn, sampleDyn, step)
 import FRP.Event (Event)
-import FRP.Event.Extra (performEvent)
+import FRP.Event.Extra (multicast, performEvent)
 import Math.Angle (degreeVal)
 import Math.Line (Line, _end, _start, distToLine, intersection, lineVec, linesAngle, mkLine, perpendicularLine, projPointWithLine)
+import Model.Polygon (Polygon, newPolygon)
 import Rendering.DynamicNode (dynamic_)
 import Rendering.Node (Node, _env, fixNodeE, line, mesh, node)
 import Three.Core.Face3 (normal)
@@ -49,20 +54,36 @@ _canEdit :: forall t a r. Newtype t { canEdit :: a | r } => Lens' t a
 _canEdit = _Newtype <<< prop (SProxy :: SProxy "canEdit")
 
 newtype TracerState = TracerState {
-    tracedVerts :: List Vector3    -- all traced points in reverse order
+    tracedVerts :: List Vector3,    -- all traced points in reverse order
+    firstVert   :: Maybe Vector3,
+    finished    :: Boolean
     }
 
 derive instance newtypeTracerState :: Newtype TracerState _
+derive instance genericTracerState :: Generic TracerState _
 instance defaultTracerState :: Default TracerState where
     def = TracerState {
-        tracedVerts : Nil
+        tracedVerts : Nil,
+        firstVert   : Nothing,
+        finished    : false
         }
+instance showTracerState :: Show TracerState where
+    show = genericShow
 
 _tracedVerts :: forall t a r. Newtype t { tracedVerts :: a | r } => Lens' t a
 _tracedVerts = _Newtype <<< prop (SProxy :: SProxy "tracedVerts")
 
+_firstVert :: forall t a r. Newtype t { firstVert :: a | r } => Lens' t a
+_firstVert = _Newtype <<< prop (SProxy :: SProxy "firstVert")
+
 addNewVert :: Vector3 -> TracerState -> TracerState
-addNewVert v s = s # _tracedVerts %~ Cons v
+addNewVert v s = case s ^. _firstVert of
+    Just fv -> if dist v fv < 0.2
+               then s # _finished .~ true
+                      # _tracedVerts %~ Cons v
+               else s # _tracedVerts %~ Cons v
+    Nothing -> s # _tracedVerts %~ Cons v
+                 # _firstVert   .~ Just v
 
 lastVert :: TracerState -> Maybe Vector3
 lastVert s = head $ s ^. _tracedVerts
@@ -251,7 +272,7 @@ vertAdder stDyn = do
     newPDyn <- helperLines stDyn candVecDyn
 
     let newCandPDyn = updPos <$> candPntDyn <*> newPDyn
-        updPos :: forall v. Maybe (CandidatePoint v) -> Maybe v -> Maybe (CandidatePoint v)
+        
         updPos (Just cand) (Just p) = Just $ cand # _position .~ p
         updPos v Nothing = v
         updPos Nothing _ = Nothing
@@ -264,7 +285,7 @@ vertAdder stDyn = do
     pure $ view _position <$> addedPntEvt
 
 
-traceHouse :: Node HouseTracerConf (Event Unit)
+traceHouse :: Node HouseTracerConf (Event (Polygon Vector3))
 traceHouse = node (def # _name .~ "house-tracer") $
     fixNodeE \stEvt -> do
         let stDyn = step def stEvt
@@ -274,6 +295,7 @@ traceHouse = node (def # _name .~ "house-tracer") $
         -- render the vertex adder
         newVertEvt <- vertAdder stDyn
 
-        let newStEvt = sampleDyn stDyn $ addNewVert <$> newVertEvt
+        let newStEvt = multicast $ sampleDyn stDyn $ addNewVert <$> newVertEvt
+            polyEvt = multicast $ newPolygon <<< view _tracedVerts <$> filter (view _finished) newStEvt
 
-        pure { input: newStEvt, output: empty }
+        pure { input: newStEvt, output: polyEvt }

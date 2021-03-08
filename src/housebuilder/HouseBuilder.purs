@@ -1,5 +1,7 @@
 module HouseBuilder.HouseBuilder (buildHouse, HouseBuilderConfig) where
 
+import Prelude
+
 import Custom.Mesh (TapMouseMesh)
 import Data.Default (class Default, def)
 import Data.Lens (view, (.~), (^.))
@@ -8,9 +10,12 @@ import Editor.Common.Lenses (_leadId, _mouseMove, _name)
 import Editor.Editor (Editor)
 import Effect (Effect)
 import Effect.Class (liftEffect)
+import Effect.Class.Console (log)
+import FRP.Dynamic (step)
+import FRP.Event (subscribe)
 import HouseBuilder.FloorPlanBuilder (_canEdit)
 import Prelude (class Eq, Unit, bind, const, discard, pure, show, unit, void, (#), ($), (<$>), (<>), (==))
-import Rendering.Node (Node, getEnv, localEnv, mkNodeEnv, node, runNode, tapMouseMesh)
+import Rendering.Node (Node, fixNodeE, getEnv, localEnv, mkNodeEnv, node, runNode, tapMouseMesh)
 import Rendering.TextureLoader (loadTextureFromUrl)
 import SmartHouse.HouseTracer (traceHouse)
 import Three.Core.Geometry (mkPlaneGeometry)
@@ -53,19 +58,23 @@ mkHelperPlane = do
     tapMouseMesh (def # _name .~ "helper-plane") geo mat
 
 createHouseBuilder :: Node HouseBuilderConfig Unit
-createHouseBuilder = node (def # _name .~ "house-builder") do
-    -- add helper plane that accepts tap and drag events
-    helper <- mkHelperPlane
+createHouseBuilder = node (def # _name .~ "house-builder") $
+    fixNodeE \newModeEvt -> do
+        -- add helper plane that accepts tap and drag events
+        helper <- mkHelperPlane
 
-    let modeDyn = pure AddFloorPlan
-        cfg = def # _mouseMove .~ helper ^. _mouseMove
-                  # _canEdit   .~ ((==) AddFloorPlan <$> modeDyn)
+        let modeDyn = step AddFloorPlan newModeEvt
+            cfg = def # _mouseMove .~ helper ^. _mouseMove
+                      # _canEdit   .~ ((==) AddFloorPlan <$> modeDyn)
 
-        --bgTapEvt = const unit <$> helper ^. _tapped
+            --bgTapEvt = const unit <$> helper ^. _tapped
     
-    floorPlanEvt <- localEnv (const cfg) $ traceHouse
-    
-    pure unit
+        floorPlanEvt <- localEnv (const cfg) $ traceHouse
+
+        _ <- liftEffect $ subscribe floorPlanEvt (show >>> log)
+        let nModeEvt = const AddRoofs <$> floorPlanEvt
+        
+        pure { input: nModeEvt, output : unit}
 
 
 -- | external API to build a 3D house for 2D lead
