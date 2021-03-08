@@ -80,7 +80,7 @@ addNewVert :: Vector3 -> TracerState -> TracerState
 addNewVert v s = case s ^. _firstVert of
     Just fv -> if dist v fv < 0.2
                then s # _finished .~ true
-                      # _tracedVerts %~ Cons v
+                      # _tracedVerts %~ Cons fv
                else s # _tracedVerts %~ Cons v
     Nothing -> s # _tracedVerts %~ Cons v
                  # _firstVert   .~ Just v
