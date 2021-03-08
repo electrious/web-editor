@@ -186,9 +186,11 @@ renderMaybeHelperLine :: forall e. Maybe (Line Vector3) -> Node e Unit
 renderMaybeHelperLine Nothing  = pure unit
 renderMaybeHelperLine (Just l) = renderHelperLine l
 
+procShow :: forall t42. Boolean -> Maybe t42 -> Maybe t42
+procShow s v = if s then v else Nothing
 
-helperLines :: forall e. Dynamic TracerState -> Dynamic (Maybe Vector3) -> Node e (Dynamic (Maybe Vector3))
-helperLines stDyn pDyn = do
+helperLines :: forall e. Dynamic Boolean -> Dynamic TracerState -> Dynamic (Maybe Vector3) -> Node e (Dynamic (Maybe Vector3))
+helperLines showDyn stDyn pDyn = do
     let tempLineDyn = tempLineTo <$> pDyn <*> stDyn
         -- calculate the perpendicular helper line to render
         perpLineDyn = perpHelperLine <$> stDyn
@@ -205,13 +207,13 @@ helperLines stDyn pDyn = do
         spDyn = f <$> pDyn <*> stDyn <*> perpLineShowDyn <*> paraLineDyn
         
     -- render temp line
-    dynamic_ $ renderMaybeLine <$> tempLineDyn
+    dynamic_ $ renderMaybeLine <$> (procShow <$> showDyn <*> tempLineDyn)
 
     -- render the perpendicular helper line
-    dynamic_ $ renderMaybeHelperLine <$> perpLineShowDyn
+    dynamic_ $ renderMaybeHelperLine <$> (procShow <$> showDyn <*> perpLineShowDyn)
 
     -- render the parallel helper line
-    dynamic_ $ renderMaybeHelperLine <$> paraLineDyn
+    dynamic_ $ renderMaybeHelperLine <$> (procShow <$> showDyn <*> paraLineDyn)
 
     pure $ spDyn
 
@@ -269,7 +271,7 @@ vertAdder stDyn = do
         candPntDyn = step Nothing $ performEvent $ getCandPoint <$> gateDyn canEdit mouseEvt
         candVecDyn = map (view _position) <$> candPntDyn
 
-    newPDyn <- helperLines stDyn candVecDyn
+    newPDyn <- helperLines canEdit stDyn candVecDyn
 
     let newCandPDyn = updPos <$> candPntDyn <*> newPDyn
         
