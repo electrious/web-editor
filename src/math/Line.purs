@@ -3,6 +3,8 @@ module Math.Line where
 import Prelude
 
 import Data.Foldable (class Foldable, foldl)
+import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Show (genericShow)
 import Data.Lens (Lens', (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
@@ -20,6 +22,9 @@ newtype Line v = Line {
   }
 
 derive instance newtypeLine :: Newtype (Line v) _
+derive instance genericLine :: Generic (Line v) _
+instance showLine :: Show v => Show (Line v) where
+    show = genericShow
 instance eqLine :: Eq v => Eq (Line v) where
     eq (Line { start: s1, end: e1}) (Line { start: s2, end: e2 }) = (s1 == s2 && e1 == e2) || (s1 == e2 && e1 == s2)
 instance functorLine :: Functor Line where
