@@ -6,7 +6,7 @@ import Prelude hiding (add)
 
 import Control.Monad.Writer (tell)
 import Custom.Mesh (TapMouseMesh, TappableMesh, mkTappableMesh)
-import Data.Array (deleteAt, fromFoldable, head, insertAt, length, mapWithIndex, snoc, tail, updateAt, zip, zipWith)
+import Data.Array (deleteAt, fromFoldable, head, insertAt, length, mapWithIndex, reverse, snoc, tail, updateAt, zip, zipWith)
 import Data.Default (class Default, def)
 import Data.Filterable (filter)
 import Data.Foldable (class Foldable, foldl, maximum, minimum)
@@ -30,7 +30,7 @@ import Rendering.NodeRenderable (class NodeRenderable)
 import Three.Core.Geometry (mkShape, mkShapeGeometry)
 import Three.Core.Material (MeshBasicMaterial)
 import Three.Core.Mesh (setMaterial)
-import Three.Math.Vector (class Vector, dist, getVector, mkVec3, toVec2, updateVector, vecX, vecY, vecZ, (<**>), (<+>))
+import Three.Math.Vector (class Vector, Vector2, dist, getVector, mkVec3, toVec2, updateVector, vecX, vecY, vecZ, (<**>), (<+>))
 
 newtype Polygon v = Polygon (Array v)
 
@@ -64,6 +64,12 @@ polygonAround l p = newPolygon $ updateVector p <$> [p1, p2, p3, p4]
           p2 = mkVec3 (x - l) (y + l) z
           p3 = mkVec3 (x + l) (y + l) z
           p4 = mkVec3 (x + l) (y - l) z
+
+-- make a polygon in counter clockwise orientation
+counterClockPoly :: Polygon Vector2 -> Polygon Vector2
+counterClockPoly poly = case polygonOrient poly of
+    Clockwise -> Polygon $ reverse $ poly ^. _polyVerts
+    CounterClockwise -> poly
 
 numOfVerts :: forall v. Polygon v -> Int
 numOfVerts (Polygon vs) = length vs
@@ -156,3 +162,21 @@ class IsPolygon p v where
 
 instance isPolygonBase :: IsPolygon (Polygon v) v where
     toPolygon = identity
+
+
+data PolyOrient = Clockwise
+                | CounterClockwise
+
+derive instance eqPolyOrient :: Eq PolyOrient
+derive instance ordPolyOrient :: Ord PolyOrient
+derive instance genericPolyOrient :: Generic PolyOrient _
+instance showPolyOrient :: Show PolyOrient where
+    show = genericShow
+
+
+-- get polygon orient for a 2d polygon
+polygonOrient :: Polygon Vector2 -> PolyOrient
+polygonOrient poly = toOrient $ foldl f 0.0 $ polyEdges poly
+    where f n (Tuple s e) = n + (vecX e - vecX s) * (vecY s + vecY e)
+          toOrient v | v >= 0.0  = Clockwise
+                     | otherwise = CounterClockwise
