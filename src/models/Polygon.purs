@@ -1,12 +1,13 @@
 module Model.Polygon (Polygon, _polyVerts, newPolygon, polygonAround, numOfVerts,
-                      addVertexAt, delVertexAt, updateVertAt, polyCenter, polyEdges, polyMidPoints, polygonBBox,
-                      renderPolygon, class IsPolygon, toPolygon) where
+                      addVertexAt, delVertexAt, updateVertAt, polyCenter, polyEdges, polyWindows,
+                      polyMidPoints, polygonBBox, counterClockPoly,
+                      renderPolygon, class IsPolygon, toPolygon, PolyOrient(..), polygonOrient) where
 
 import Prelude hiding (add)
 
 import Control.Monad.Writer (tell)
 import Custom.Mesh (TapMouseMesh, TappableMesh, mkTappableMesh)
-import Data.Array (deleteAt, fromFoldable, head, insertAt, length, mapWithIndex, reverse, snoc, tail, updateAt, zip, zipWith)
+import Data.Array (cons, deleteAt, fromFoldable, head, init, insertAt, last, length, mapWithIndex, reverse, snoc, tail, updateAt, zip, zipWith)
 import Data.Default (class Default, def)
 import Data.Filterable (filter)
 import Data.Foldable (class Foldable, foldl, maximum, minimum)
@@ -18,6 +19,7 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Maybe (Maybe, fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Traversable (class Traversable)
+import Data.Triple (Triple(..))
 import Data.Tuple (Tuple(..))
 import Editor.Common.Lenses (_maxX, _maxY, _mesh, _minX, _minY)
 import Editor.Disposable (Disposee(..))
@@ -99,6 +101,16 @@ polyEdges poly = if length vs < 2
                  else zip vs v2Lst
     where vs    = poly ^. _polyVerts
           v2Lst = fromMaybe [] $ snoc <$> tail vs <*> head vs
+
+-- | for each vertex, get a triple with its left and right neighbor vertices
+polyWindows :: forall v. Polygon v -> Array (Triple v v v)
+polyWindows (Polygon vs) = if length vs < 3
+                           then []
+                           else zipWith f prevs $ zip vs nexts
+    where prevs = fromMaybe vs $ cons <$> last vs <*> init vs
+          nexts = fromMaybe vs $ snoc <$> tail vs <*> head vs
+
+          f p (Tuple v n) = Triple p v n
 
 
 -- | calculate all middle points on all edges of a polygon
