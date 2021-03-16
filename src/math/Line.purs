@@ -21,6 +21,7 @@ newtype Line v = Line {
 
 derive instance newtypeLine :: Newtype (Line v) _
 derive instance genericLine :: Generic (Line v) _
+derive instance eqLine :: Eq v => Eq (Line v)
 instance showLine :: Show v => Show (Line v) where
     show = genericShow
     
@@ -29,6 +30,9 @@ _origin = _Newtype <<< prop (SProxy :: SProxy "origin")
 
 _direction :: forall t a r. Newtype t { direction :: a | r } => Lens' t a
 _direction = _Newtype <<< prop (SProxy :: SProxy "direction")
+
+line :: forall v. v -> v -> Line v
+line o d = Line { origin : o, direction : d }
 
 lineFromSeg :: forall v. Vector v => LineSeg v -> Line v
 lineFromSeg s = Line {

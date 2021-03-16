@@ -9,23 +9,16 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
+import Math.Line (Line, line)
 import Math.LineSeg (LineSeg, lineVec)
-import Three.Math.Vector (class Vector, Vector2, Vector3, normal, toVec2, vecX, vecY, (<**>), (<+>))
+import Three.Math.Vector (class Vector, Vector3, normal, vecX, vecY, (<**>), (<+>))
 
-newtype Ray = Ray {
-    start     :: Vector2,
-    direction :: Vector2
-    }
 
-derive instance newtypeRay :: Newtype Ray _
-derive instance genericRay :: Generic Ray _
-derive instance eqRay :: Eq Ray
-instance showRay :: Show Ray where
-    show = genericShow
+type Ray = Line Vector3
 
-ray :: Vector2 -> Vector2 -> Ray
-ray s d = Ray { start : s, direction : d }
-
+ray :: Vector3 -> Vector3 -> Ray
+ray = line
+    
 newtype Vertex = Vertex {
     index     :: Int,
     position  :: Vector3,
@@ -69,5 +62,5 @@ vertexFrom idx p leftEdge rightEdge =
         leftEdge  : leftEdge,
         rightEdge : rightEdge,
         isReflex  : isReflex,
-        bisector  : ray (toVec2 p) (toVec2 dir)
+        bisector  : ray p dir
     }
