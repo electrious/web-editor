@@ -10,12 +10,12 @@ import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Math.Angle (Angle)
-import Math.Line (Line)
+import Math.LineSeg (LineSeg)
 import SmartHouse.Algorithm.Vertex (Ray)
 import Three.Math.Vector (Vector3)
 
 newtype Edge = Edge {
-    line          :: Line Vector3,
+    line          :: LineSeg Vector3,
     slope         :: Angle,
     leftBisector  :: Ray,
     rightBisector :: Ray
@@ -35,7 +35,7 @@ _leftBisector = _Newtype <<< prop (SProxy :: SProxy "leftBisector")
 _rightBisector :: forall t a r. Newtype t { rightBisector :: a | r } => Lens' t a
 _rightBisector = _Newtype <<< prop (SProxy :: SProxy "rightBisector")
 
-edge :: Line Vector3 -> Angle -> Ray -> Ray -> Edge
+edge :: LineSeg Vector3 -> Angle -> Ray -> Ray -> Edge
 edge l s lb rb = Edge {
     line          : l,
     slope         : s,

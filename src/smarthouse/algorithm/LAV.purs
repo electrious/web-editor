@@ -16,7 +16,7 @@ import Data.Symbol (SProxy(..))
 import Data.Triple (Triple(..))
 import Editor.Common.Lenses (_position)
 import Math.Angle (degree)
-import Math.Line (mkLine)
+import Math.LineSeg (mkLineSeg)
 import Model.Polygon (Polygon, newPolygon, polyWindows)
 import SmartHouse.Algorithm.Edge (Edge, edge)
 import SmartHouse.Algorithm.Vertex (Vertex, _bisector, vertexFrom)
@@ -36,7 +36,7 @@ instance defaultLAV :: Default LAV where
 -- create a LAV for a polygon
 lavFromPolygon :: forall v. Vector v => Polygon v -> LAV
 lavFromPolygon poly = def # _vertices .~ (mapWithIndex mkV $ polyWindows $ getVector <$> poly)
-    where mkV idx (Triple prev p next) = vertexFrom idx p (mkLine prev p) (mkLine p next)
+    where mkV idx (Triple prev p next) = vertexFrom idx p (mkLineSeg prev p) (mkLineSeg p next)
 
 newtype SLAV = SLAV {
     lavs  :: Array LAV,
@@ -77,4 +77,4 @@ slavFromPolygon polys = def # _lavs .~ lavs
 
           f v n = let vp = v ^. _position
                       np = n ^. _position
-                  in edge (mkLine vp np) (degree 20.0) (v ^. _bisector) (n ^. _bisector)
+                  in edge (mkLineSeg vp np) (degree 20.0) (v ^. _bisector) (n ^. _bisector)

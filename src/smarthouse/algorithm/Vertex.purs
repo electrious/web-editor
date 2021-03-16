@@ -9,7 +9,7 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Math.Line (Line, lineVec)
+import Math.LineSeg (LineSeg, lineVec)
 import Three.Math.Vector (class Vector, Vector2, Vector3, normal, toVec2, vecX, vecY, (<**>), (<+>))
 
 newtype Ray = Ray {
@@ -32,8 +32,8 @@ ray s d = Ray { start : s, direction : d }
 newtype Vertex = Vertex {
     index     :: Int,
     position  :: Vector3,
-    leftEdge  :: Line Vector3,
-    rightEdge :: Line Vector3,
+    leftEdge  :: LineSeg Vector3,
+    rightEdge :: LineSeg Vector3,
     isReflex  :: Boolean,
     bisector  :: Ray
     }
@@ -60,7 +60,7 @@ _cross :: forall v. Vector v => v -> v -> Number
 _cross v1 v2 = vecX v1 * vecY v2 - vecX v2 * vecY v1
 
 -- create a Vectex from a point and edges it connects to
-vertexFrom :: Int -> Vector3 -> Line Vector3 -> Line Vector3 -> Vertex
+vertexFrom :: Int -> Vector3 -> LineSeg Vector3 -> LineSeg Vector3 -> Vertex
 vertexFrom idx p leftEdge rightEdge =
     let lv       = normal $ lineVec leftEdge <**> (-1.0)
         rv       = normal $ lineVec rightEdge

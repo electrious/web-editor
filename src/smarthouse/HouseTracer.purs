@@ -28,7 +28,7 @@ import FRP.Dynamic (Dynamic, gateDyn, sampleDyn, step)
 import FRP.Event (Event)
 import FRP.Event.Extra (multicast, performEvent)
 import Math.Angle (degreeVal)
-import Math.Line (Line, _end, _start, distToLine, intersection, lineVec, linesAngle, mkLine, perpendicularLine, projPointWithLine)
+import Math.LineSeg (LineSeg, _end, _start, distToLineSeg, intersection, lineVec, linesAngle, mkLineSeg, perpendicularLineSeg, projPointWithLineSeg)
 import Model.Polygon (Polygon, newPolygon)
 import Rendering.DynamicNode (dynamic_)
 import Rendering.Node (Node, _env, fixNodeE, line, mesh, node)
@@ -36,7 +36,7 @@ import Three.Core.Face3 (normal)
 import Three.Core.Geometry (CircleGeometry, mkCircleGeometry)
 import Three.Core.Material (LineBasicMaterial, LineDashedMaterial, MeshBasicMaterial, mkLineBasicMaterial, mkLineDashedMaterial, mkMeshBasicMaterial)
 import Three.Core.Object3D (worldToLocal)
-import Three.Math.Vector (Vector3, addScaled, dist, mkVec3, toVec2, toVec3, vecZ)
+import Three.Math.Vector (Vector3, addScaled, dist, mkVec3, toVec2, toVec3)
 
 newtype HouseTracerConf = HouseTracerConf {
     mouseMove :: Event SceneMouseMoveEvent,
@@ -88,15 +88,15 @@ addNewVert v s = case s ^. _firstVert of
 lastVert :: TracerState -> Maybe Vector3
 lastVert s = head $ s ^. _tracedVerts
 
-lastLine :: TracerState -> Maybe (Line Vector3)
+lastLine :: TracerState -> Maybe (LineSeg Vector3)
 lastLine st = f $ st ^. _tracedVerts
-    where f (v1:v2:_) = Just $ mkLine v1 v2
+    where f (v1:v2:_) = Just $ mkLineSeg v1 v2
           f _         = Nothing
 
-allLines :: TracerState -> List (Line Vector3)
+allLines :: TracerState -> List (LineSeg Vector3)
 allLines st = fst $ foldl f (Tuple Nil Nothing) $ st ^. _tracedVerts
     where f (Tuple r Nothing) v = Tuple r (Just v)
-          f (Tuple r (Just lv)) v = Tuple (mkLine v lv : r) (Just v)
+          f (Tuple r (Just lv)) v = Tuple (mkLineSeg v lv : r) (Just v)
 
 --------------------------------------------------------
 -- render the tracer state
@@ -122,17 +122,17 @@ renderState st = do
 -- temp lines
 --------------------------------------------------------
 
-tempLineTo :: Maybe Vector3 -> TracerState -> Maybe (Line Vector3)
-tempLineTo t s = mkLine <$> t <*> lastVert s
+tempLineTo :: Maybe Vector3 -> TracerState -> Maybe (LineSeg Vector3)
+tempLineTo t s = mkLineSeg <$> t <*> lastVert s
 
 lineMat :: LineBasicMaterial
 lineMat = unsafePerformEffect $ mkLineBasicMaterial 0xeeeeee 2.0
 
-renderLine :: forall e. Line Vector3 -> Node e Unit
+renderLine :: forall e. LineSeg Vector3 -> Node e Unit
 renderLine l = void $ line (def # _name .~ "vert-adder-line") vs lineMat
     where vs = [l ^. _start, l ^. _end]
 
-renderMaybeLine :: forall e. Maybe (Line Vector3) -> Node e Unit
+renderMaybeLine :: forall e. Maybe (LineSeg Vector3) -> Node e Unit
 renderMaybeLine Nothing  = pure unit
 renderMaybeLine (Just l) = renderLine l
 --------------------------------------------------------
@@ -143,26 +143,26 @@ renderMaybeLine (Just l) = renderLine l
 --------------------------------------------------------
 
 -- calculate the perpendicular helper line to the last polygon line
-perpHelperLine :: TracerState -> Maybe (Line Vector3)
-perpHelperLine = lastLine >>> map (map toVec2 >>> perpendicularLine >>> map (flip toVec3 0.0))
+perpHelperLine :: TracerState -> Maybe (LineSeg Vector3)
+perpHelperLine = lastLine >>> map (map toVec2 >>> perpendicularLineSeg >>> map (flip toVec3 0.0))
 
 -- check whether the temp line is close to the perpendicular line
 -- enough to show the helper line
-canShowPerpLine :: Maybe (Line Vector3) -> Maybe (Line Vector3) -> Boolean
+canShowPerpLine :: Maybe (LineSeg Vector3) -> Maybe (LineSeg Vector3) -> Boolean
 canShowPerpLine (Just l1) (Just l2) = almostParallel l1 l2
 canShowPerpLine _ _                 = false
 
 -- check if two lines is almost parallel or not
-almostParallel :: Line Vector3 -> Line Vector3 -> Boolean
+almostParallel :: LineSeg Vector3 -> LineSeg Vector3 -> Boolean
 almostParallel l1 l2 = let a = degreeVal (linesAngle l1 l2) in a < 10.0 || a > 170.0
 
 -- check if a point is close to the vector of the specified line
-pointCloseToLine :: Vector3 -> Line Vector3 -> Boolean
+pointCloseToLine :: Vector3 -> LineSeg Vector3 -> Boolean
 pointCloseToLine v l = almostParallel l nl
-    where nl = mkLine v (l ^. _start)
+    where nl = mkLineSeg v (l ^. _start)
 
 -- find the most parallel edge in the polygon to the specified point
-paraHelperLine :: TracerState -> Maybe Vector3 -> Maybe (Line Vector3)
+paraHelperLine :: TracerState -> Maybe Vector3 -> Maybe (LineSeg Vector3)
 paraHelperLine st Nothing  = Nothing
 paraHelperLine st (Just p) = foldl f Nothing $ allLines st
     where f Nothing l    = if pointCloseToLine p l then Just (extendLine l) else Nothing
@@ -172,17 +172,17 @@ paraHelperLine st (Just p) = foldl f Nothing $ allLines st
                              v = lineVec l
                              ns = addScaled s v (-20.0)
                              ne = addScaled s v 20.0
-                         in mkLine ns ne
+                         in mkLineSeg ns ne
 
 -- render helper lines
 helperLineMat :: LineDashedMaterial
 helperLineMat = unsafePerformEffect $ mkLineDashedMaterial 0xe28743 2.0 1.0 3.0 1.0
 
-renderHelperLine :: forall e. Line Vector3 -> Node e Unit
+renderHelperLine :: forall e. LineSeg Vector3 -> Node e Unit
 renderHelperLine l = void $ line (def # _name .~ "helper-line") vs helperLineMat
     where vs = [l ^. _start, l ^. _end]
 
-renderMaybeHelperLine :: forall e. Maybe (Line Vector3) -> Node e Unit
+renderMaybeHelperLine :: forall e. Maybe (LineSeg Vector3) -> Node e Unit
 renderMaybeHelperLine Nothing  = pure unit
 renderMaybeHelperLine (Just l) = renderHelperLine l
 
@@ -222,7 +222,7 @@ helperLines showDyn stDyn pDyn = do
 --------------------------------------------------------
 -- point snapping
 --------------------------------------------------------
-snapPoint :: Vector3 -> TracerState -> Maybe (Line Vector3) -> Maybe (Line Vector3) -> Vector3
+snapPoint :: Vector3 -> TracerState -> Maybe (LineSeg Vector3) -> Maybe (LineSeg Vector3) -> Vector3
 snapPoint p st Nothing Nothing           = fromMaybe p $ snapToVert p st
 snapPoint p st (Just l) Nothing          = fromMaybe p $ snapToLine p st l
 snapPoint p st Nothing (Just l)          = fromMaybe p $ snapToLine p st l
@@ -235,22 +235,22 @@ snapToVert p st = fst $ foldl f (Tuple Nothing 0.0) $ st ^. _tracedVerts
           f o@(Tuple (Just _) od) v = let d = dist p v
                                       in if d < od then Tuple (Just v) d else o
 
-snapToLine :: Vector3 -> TracerState -> Line Vector3 -> Maybe Vector3
+snapToLine :: Vector3 -> TracerState -> LineSeg Vector3 -> Maybe Vector3
 snapToLine p st l = f <$> lastVert st
-    where f v = if distToLine p l < 0.3
-                then projPointWithLine v p l
+    where f v = if distToLineSeg p l < 0.3
+                then projPointWithLineSeg v p l
                 else p
 
-snapToCrossing :: Vector3 -> TracerState -> Line Vector3 -> Line Vector3 -> Maybe Vector3
+snapToCrossing :: Vector3 -> TracerState -> LineSeg Vector3 -> LineSeg Vector3 -> Maybe Vector3
 snapToCrossing p st perpL paraL = let v1 = snapToLine p st perpL
                                       v2 = snapToLine p st paraL
-                                      v3 = toVec3 (intersection (toVec2 <$> perpL) (toVec2 <$> paraL)) (vecZ p)
+                                      v3 = intersection perpL paraL
                                       g (Tuple Nothing _) v = Tuple (Just v) (dist p v)
                                       g o@(Tuple (Just _) od) v = let nd = dist p v
                                                                   in if nd < od
                                                                      then Tuple (Just v) nd
                                                                      else o
-                                  in fst $ foldl g (Tuple Nothing 0.0) $ compact [v1, v2, Just v3]
+                                  in fst $ foldl g (Tuple Nothing 0.0) $ compact [v1, v2, v3]
     
 --------------------------------------------------------
 

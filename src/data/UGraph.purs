@@ -21,7 +21,7 @@ import Data.Set as S
 import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple(..), fst, snd)
 import Math.Angle (degreeVal)
-import Math.Line (Line, _end, _start, mkLine, mostParaLine, projPointWithLine)
+import Math.LineSeg (LineSeg, _end, _start, mkLineSeg, mostParaLineSeg, projPointWithLineSeg)
 import Model.Polygon (Polygon, _polyVerts, newPolygon, polyEdges)
 import Three.Math.Vector (class Vector, getVector, updateVector, (<**>), (<+>))
 
@@ -48,10 +48,10 @@ updateVert v g = foldl addEdge (insertVertex v $ deleteVertex v g) (adjacent v g
     where addEdge g' v' = insertEdge v v' def g'
 
 -- | get all edges in the graph and remove all duplicated edge
-edges :: forall v w. Ord v => UGraph v w -> List (Line v)
+edges :: forall v w. Ord v => UGraph v w -> List (LineSeg v)
 edges g = snd $ foldl edgesFrom (Tuple g Nil) $ G.vertices g
     where edgesFrom arg@(Tuple g' _) v = foldl (f v) arg (G.adjacent v g')
-          f v (Tuple g' es) vv = let l = mkLine v vv
+          f v (Tuple g' es) vv = let l = mkLineSeg v vv
                                  in Tuple (G.deleteEdge vv v g') (Cons l es)
 
 -- | get center point of the graph
@@ -85,7 +85,7 @@ mergeVertices v1 v2 v g = let ns1 = G.adjacent v1 g
 -- can snap to to make an edge paralell to another edge in the graph
 snapToParallel :: forall v w. Eq v => Ord v => Vector v => Default w => v -> UGraph v w -> UGraph v w
 snapToParallel v g =
-    let ls = mkLine v <$> adjacent v g  -- new edges lines start from v
+    let ls = mkLineSeg v <$> adjacent v g  -- new edges lines start from v
         es = difference (edges g) ls    -- all other edges
         -- find a new V after snapping
         nps = head $ compact $ (flip (snapVertToPara v) es <$> ls)
@@ -93,11 +93,11 @@ snapToParallel v g =
     in fromMaybe g $ f <$> nps
 
 
-snapVertToPara :: forall f v. Foldable f => Vector v => v -> Line v -> f (Line v) -> Maybe v
+snapVertToPara :: forall f v. Foldable f => Vector v => v -> LineSeg v -> f (LineSeg v) -> Maybe v
 snapVertToPara v line lines = 
     let f (Tuple _ a) = degreeVal a < 10.0
-        pl = fst <$> filter f (mostParaLine line lines)
-    in projPointWithLine (line ^. _end) (line ^. _start) <$> pl
+        pl = fst <$> filter f (mostParaLineSeg line lines)
+    in projPointWithLineSeg (line ^. _end) (line ^. _start) <$> pl
 
 
 newtype CircleState v = CircleState {

@@ -21,7 +21,7 @@ import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic, current, dynEvent, latestEvt, performDynamic, step)
 import FRP.Event (Event, fold)
 import FRP.Event.Extra (multicast)
-import Math.Line (Line, _end, _start, lineCenter)
+import Math.LineSeg (LineSeg, _end, _start, lineCenter)
 import Model.ActiveMode (ActiveMode(..), isActive)
 import Model.HouseBuilder.FloorPlan (FloorPlan, FloorPlanOp(..), floorGraph, floorPlanTop)
 import Model.HouseBuilder.HousePoint (HousePoint, HousePointType(..), _pointType, mergeHousePoint)
@@ -71,7 +71,7 @@ applyOp (UpdHeight h)  fp = fp # _height  .~ h
 
 -- calculate center point for a house line, make the center a RidgePoint
 -- if at least one end of the line is a RidgePoint
-houseLineCenter :: Line HousePoint -> Effect HousePoint
+houseLineCenter :: LineSeg HousePoint -> Effect HousePoint
 houseLineCenter l = do
     c <- assignNewId $ lineCenter l
     let s = l ^. _start

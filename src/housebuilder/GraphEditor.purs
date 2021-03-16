@@ -40,7 +40,7 @@ import FRP.Dynamic (Dynamic, current, dynEvent, gateDyn, performDynamic, sampleD
 import FRP.Event (Event)
 import FRP.Event.Extra (multicast, performEvent)
 import HouseBuilder.PolyGeometry (mkPolyGeometry)
-import Math.Line (Line, _end, _start)
+import Math.LineSeg (LineSeg, _end, _start)
 import Model.ActiveMode (ActiveMode(..), fromBoolean, isActive)
 import Model.HouseBuilder.FloorPlan (FloorPlan, floorPlanHousePoints)
 import Model.Polygon (Polygon, polygonAround)
@@ -72,7 +72,7 @@ newtype GraphEditorConf v w = GraphEditorConf {
     vertModifier   :: Modifier v,
     vertMerger     :: VertMerger v,
     heightEditable :: v -> Boolean,
-    lineCenter     :: Line v -> Effect v,
+    lineCenter     :: LineSeg v -> Effect v,
     mouseMove      :: Event SceneMouseMoveEvent
     }
 
@@ -125,7 +125,7 @@ setupVertMarkers :: forall e v. Vector v => HasUUID v => Dynamic (UUIDMap (VertM
 setupVertMarkers = renderDynamic
 
 
-graphMidPoints :: forall v w. Ord v => HasUUID v => Vector v => (v -> Boolean) -> (Line v -> Effect v) -> Dynamic ActiveMode -> UGraph v w -> Effect (List (MidMarkerPoint UUID v))
+graphMidPoints :: forall v w. Ord v => HasUUID v => Vector v => (v -> Boolean) -> (LineSeg v -> Effect v) -> Dynamic ActiveMode -> UGraph v w -> Effect (List (MidMarkerPoint UUID v))
 graphMidPoints flt lineCenter actDyn = traverse midP <<< edges
     where midP l = do
               let s = l ^. _start
