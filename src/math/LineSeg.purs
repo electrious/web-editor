@@ -12,10 +12,10 @@ import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple(..))
-import Math (abs)
 import Math.Angle (Angle)
+import Math.Utils (lineIntersection)
 import Model.Roof.RoofPlate (angleBetween)
-import Three.Math.Vector (class Vector, Vector2, Vector3, addScaled, cross, mkVec3, normal, toVec2, toVec3, vecX, vecY, (<**>), (<+>), (<->), (<.>))
+import Three.Math.Vector (class Vector, Vector2, Vector3, addScaled, cross, mkVec3, normal, toVec2, toVec3, (<**>), (<+>), (<->), (<.>))
 import Three.Math.Vector as V
 
 newtype LineSeg v = LineSeg {
@@ -99,20 +99,5 @@ distToLineSeg p l = let lv = normal $ lineVec l
 
 -- 2D line intersection point
 intersection :: LineSeg Vector3 -> LineSeg Vector3 -> Maybe Vector3
-intersection (LineSeg { start: s1, end: e1 }) (LineSeg { start: s2, end: e2 }) =
-    let x1 = vecX s1
-        y1 = vecY s1
-        x2 = vecX e1
-        y2 = vecY e1
-        x3 = vecX s2
-        y3 = vecY s2
-        x4 = vecX e2
-        y4 = vecY e2
-        d  = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
-    in if abs d < 0.00000001
-       then Nothing
-       else let n1 = x1 * y2 - y1 * x2
-                n2 = x3 * y4 - y3 * x4
-                x = (n1 * (x3 - x4) - (x1 - x2) * n2) / d
-                y = (n1 * (y3 - y4) - (y1 - y2) * n2) / d
-            in Just $ mkVec3 x y 0.0
+intersection (LineSeg { start: s1, end: e1 })
+             (LineSeg { start: s2, end: e2 }) = lineIntersection s1 e1 s2 e2

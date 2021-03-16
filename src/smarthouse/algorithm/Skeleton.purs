@@ -9,17 +9,12 @@ import Data.Maybe (Maybe)
 import Editor.Common.Lenses (_position)
 import Math (abs)
 import Math.LineSeg (intersection, lineVec)
+import Math.Utils (approxSame)
 import SmartHouse.Algorithm.Edge (Edge, _line)
 import SmartHouse.Algorithm.Event (PointEvent)
 import SmartHouse.Algorithm.LAV (SLAV, _edges)
 import SmartHouse.Algorithm.Vertex (Vertex, _leftEdge, _rightEdge)
-import Three.Math.Vector (Vector2, Vector3, normal, toVec2, vecX, vecY, (<.>))
-
-approxEqual :: Number -> Number -> Boolean
-approxEqual a b = abs (a - b) < 0.0001
-
-approxSame :: Vector2 -> Vector2 -> Boolean
-approxSame p1 p2 = approxEqual (vecX p1) (vecX p2) && approxEqual (vecY p1) (vecY p2)
+import Three.Math.Vector (Vector3, normal, toVec2, (<.>))
 
 -- next event for a reflex vertex
 nextEvtForReflex :: SLAV -> Vertex -> List PointEvent

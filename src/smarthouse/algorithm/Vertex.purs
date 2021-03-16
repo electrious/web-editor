@@ -23,9 +23,6 @@ derive instance eqRay :: Eq Ray
 instance showRay :: Show Ray where
     show = genericShow
 
-_direction :: forall t a r. Newtype t { direction :: a | r } => Lens' t a
-_direction = _Newtype <<< prop (SProxy :: SProxy "direction")
-
 ray :: Vector2 -> Vector2 -> Ray
 ray s d = Ray { start : s, direction : d }
 
