@@ -5,7 +5,8 @@ import Prelude
 import Data.Filterable (filter)
 import Data.Lens ((^.))
 import Data.List (List(..))
-import Data.Maybe (Maybe)
+import Data.Maybe (Maybe(..))
+import Data.Tuple (Tuple(..))
 import Editor.Common.Lenses (_position)
 import Math (abs)
 import Math.LineSeg (intersection, lineVec)
@@ -14,7 +15,7 @@ import SmartHouse.Algorithm.Edge (Edge, _line)
 import SmartHouse.Algorithm.Event (PointEvent)
 import SmartHouse.Algorithm.LAV (SLAV, _edges)
 import SmartHouse.Algorithm.Vertex (Vertex, _leftEdge, _rightEdge)
-import Three.Math.Vector (Vector3, normal, toVec2, (<.>))
+import Three.Math.Vector (Vector3, normal, (<.>))
 
 -- next event for a reflex vertex
 nextEvtForReflex :: SLAV -> Vertex -> List PointEvent
@@ -30,6 +31,7 @@ nextEvtForReflex slav v =
 
         -- we choose the "less parallel" edge (in order to exclude a potentially parallel edge)
         normEdgeVec = normal <<< lineVec
+        
         intersectP :: Edge -> Maybe Vector3
         intersectP e = let eVec      = normEdgeVec $ e ^. _line
                            leftdot   = abs $ normEdgeVec lEdge <.> eVec
@@ -38,10 +40,14 @@ nextEvtForReflex slav v =
                            otherEdge = if leftdot < rightdot then rEdge else lEdge
                        in intersection selfEdge otherEdge
 
-        closeToV i = approxSame i $ toVec2 $ v ^. _position
+        notV i = not $ approxSame i $ v ^. _position
+
+        -- find a valid intersection point
+        validIntersectP :: Edge -> Maybe (Tuple Edge Vector3)
+        validIntersectP e = intersectP e >>= (\i -> if notV i then Just $ Tuple e i else Nothing)
 
         -- locate candidate b
-                
+        
 
         edges = filter notNearby (slav ^. _edges)
 
