@@ -4,8 +4,9 @@ import Prelude
 
 import Data.Compactable (compact)
 import Data.Filterable (filter)
-import Data.Lens ((^.))
-import Data.List (List, fromFoldable)
+import Data.Foldable (minimumBy)
+import Data.Lens (view, (^.))
+import Data.List (List(..), fromFoldable)
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
 import Editor.Common.Lenses (_position)
@@ -15,10 +16,10 @@ import Math.LineSeg (LineSeg, _start, direction, distToLineSeg)
 import Math.LineSeg as S
 import Math.Utils (approxSame, epsilon)
 import SmartHouse.Algorithm.Edge (Edge, _leftBisector, _line, _rightBisector)
-import SmartHouse.Algorithm.Event (PointEvent, splitE)
-import SmartHouse.Algorithm.LAV (SLAV, _edges)
-import SmartHouse.Algorithm.Vertex (Vertex, _bisector, _cross, _leftEdge, _rightEdge, ray)
-import Three.Math.Vector (Vector3, length, normal, (<**>), (<+>), (<->), (<.>))
+import SmartHouse.Algorithm.Event (PointEvent, edgeE, intersectionPoint, splitE)
+import SmartHouse.Algorithm.LAV (LAV, SLAV, _edges, nextVertex, prevVertex)
+import SmartHouse.Algorithm.Vertex (Vertex, _bisector, _cross, _isReflex, _leftEdge, _rightEdge, ray)
+import Three.Math.Vector (Vector3, dist, length, normal, (<**>), (<+>), (<->), (<.>))
 
 
 -- a potential b is at the intersection of between our own bisector and the bisector of the
@@ -77,3 +78,23 @@ nextEvtForReflex slav v =
         mkSplitEvt (Tuple e b) = splitE (distToLineSeg b (e ^. _line)) b v e
 
     in compact $ (validIntersectP >=> findValidB >>> map mkSplitEvt) <$> edges
+
+-- next event for a vertex
+nextEvent :: SLAV -> LAV -> Vertex -> Maybe PointEvent
+nextEvent slav lav v =
+    let evts = if v ^. _isReflex then nextEvtForReflex slav v else Nil
+        prevV = prevVertex v lav
+        nextV = nextVertex v lav
+        -- intersection of a vertex's bisector with v's bisector
+        intersectWith = view _bisector >>> intersection (v ^. _bisector)
+        iPrev = prevV >>= intersectWith
+        iNext = nextV >>= intersectWith
+
+        mkPrevEdgeEvt e pv pi = edgeE (distToLineSeg pi e) pi pv v
+        pEvt = mkPrevEdgeEvt (v ^. _leftEdge) <$> prevV <*> iPrev
+        mkNextEdgeEvt e nv ni = edgeE (distToLineSeg ni e) ni v nv
+        nEvt = mkNextEdgeEvt (v ^. _rightEdge) <$> nextV <*> iNext
+
+        allEvts = append (fromFoldable (compact [pEvt, nEvt])) evts
+        distF e = dist (v ^. _position) (intersectionPoint e)
+    in minimumBy (comparing distF) allEvts

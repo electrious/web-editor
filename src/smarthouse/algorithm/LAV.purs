@@ -2,7 +2,8 @@ module SmartHouse.Algorithm.LAV where
 
 import Prelude hiding (degree)
 
-import Data.Array (concatMap, filter, fromFoldable, head, mapWithIndex, snoc, tail, zipWith)
+import Data.Array (concatMap, filter, fromFoldable, head, index, mapWithIndex, snoc, tail, zipWith)
+import Data.Array as Arr
 import Data.Default (class Default, def)
 import Data.Foldable (class Foldable)
 import Data.Generic.Rep (class Generic)
@@ -10,11 +11,11 @@ import Data.Generic.Rep.Show (genericShow)
 import Data.Lens (Lens', view, (^.), (.~))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.Maybe (fromMaybe)
+import Data.Maybe (Maybe, fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Triple (Triple(..))
-import Editor.Common.Lenses (_position)
+import Editor.Common.Lenses (_index, _position)
 import Math.Angle (degree)
 import Math.LineSeg (mkLineSeg)
 import Model.Polygon (Polygon, newPolygon, polyWindows)
@@ -37,6 +38,19 @@ instance defaultLAV :: Default LAV where
 lavFromPolygon :: forall v. Vector v => Polygon v -> LAV
 lavFromPolygon poly = def # _vertices .~ (mapWithIndex mkV $ polyWindows $ getVector <$> poly)
     where mkV idx (Triple prev p next) = vertexFrom idx p (mkLineSeg prev p) (mkLineSeg p next)
+
+length :: LAV -> Int
+length (LAV { vertices : vs }) = Arr.length vs
+
+prevVertex :: Vertex -> LAV -> Maybe Vertex
+prevVertex v lav = let i = v ^. _index
+                       pi = if i == 0 then length lav - 1 else i - 1
+                   in index (lav ^. _vertices) pi
+
+nextVertex :: Vertex -> LAV -> Maybe Vertex
+nextVertex v lav = let i = v ^. _index
+                       pi = if i == length lav - 1 then 0 else i + 1
+                   in index (lav ^. _vertices) pi
 
 newtype SLAV = SLAV {
     lavs  :: Array LAV,

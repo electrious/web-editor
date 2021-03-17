@@ -4,7 +4,7 @@ import Prelude
 
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Lens (Lens')
+import Data.Lens (Lens', (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
@@ -76,3 +76,7 @@ splitE dist p v e = SplitEvent $ SplitE {
     vertex       : v,
     oppositeEdge : e
     }
+
+intersectionPoint :: PointEvent -> Vector3
+intersectionPoint (EdgeEvent e)  = e ^. _intersection
+intersectionPoint (SplitEvent e) = e ^. _intersection
