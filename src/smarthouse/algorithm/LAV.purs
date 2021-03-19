@@ -18,17 +18,20 @@ import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (class Traversable, traverse)
 import Data.Triple (Triple(..))
+import Data.UUID (UUID, emptyUUID, genUUID)
 import Data.UUIDMap (UUIDMap)
-import Editor.Common.Lenses (_length, _position)
+import Editor.Common.Lenses (_id, _length, _position)
 import Effect (Effect)
 import Math.Angle (degree)
 import Math.LineSeg (mkLineSeg)
+import Model.UUID (class HasUUID)
 import Model.Polygon (Polygon, newPolygon, polyWindows)
 import SmartHouse.Algorithm.Edge (Edge, edge)
 import SmartHouse.Algorithm.Vertex (Vertex, _bisector, vertexFrom)
 import Three.Math.Vector (class Vector, getVector, normal, (<->))
 
 newtype LAV = LAV {
+    id      :: UUID,
     head    :: Maybe Vertex,
     last    :: Maybe Vertex,
     length  :: Int,
@@ -42,8 +45,11 @@ derive instance newtypeLAV :: Newtype LAV _
 derive instance genericLAV :: Generic LAV _
 instance showLAV :: Show LAV where
     show = genericShow
+instance hasUUIDLAV :: HasUUID LAV where
+    idLens = _id
 instance defaultLAV :: Default LAV where
     def = LAV {
+        id      : emptyUUID,
         head    : Nothing,
         last    : Nothing,
         length  : 0,
@@ -70,9 +76,11 @@ _right = _Newtype <<< prop (SProxy :: SProxy "right")
 -- create a LAV for a polygon
 lavFromPolygon :: forall v. Vector v => Polygon v -> Effect LAV
 lavFromPolygon poly = do
+    i <- genUUID
     let mkV (Triple prev p next) = vertexFrom p (mkLineSeg prev p) (mkLineSeg p next)
     vs <- traverse mkV $ polyWindows $ getVector <$> poly
-    pure $ def # _head    .~ Arr.head vs
+    pure $ def # _id      .~ i
+               # _head    .~ Arr.head vs
                # _last    .~ Arr.last vs
                # _length  .~ Arr.length vs
                # _current .~ Arr.head vs
