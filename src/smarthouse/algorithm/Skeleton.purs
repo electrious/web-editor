@@ -83,8 +83,8 @@ nextEvtForReflex slav v =
 nextEvent :: SLAV -> LAV -> Vertex -> Maybe PointEvent
 nextEvent slav lav v =
     let evts = if v ^. _isReflex then nextEvtForReflex slav v else Nil
-        prevV = prevVertex v lav
-        nextV = nextVertex v lav
+        prevV = prevVertex lav
+        nextV = nextVertex lav
         -- intersection of a vertex's bisector with v's bisector
         intersectWith = view _bisector >>> intersection (v ^. _bisector)
         iPrev = prevV >>= intersectWith
@@ -98,3 +98,4 @@ nextEvent slav lav v =
         allEvts = append (fromFoldable (compact [pEvt, nEvt])) evts
         distF e = dist (v ^. _position) (intersectionPoint e)
     in minimumBy (comparing distF) allEvts
+
