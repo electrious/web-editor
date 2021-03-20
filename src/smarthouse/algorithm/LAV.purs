@@ -2,6 +2,7 @@ module SmartHouse.Algorithm.LAV where
 
 import Prelude hiding (degree)
 
+import Algorithm.MeshFlatten (_vertex)
 import Data.Array (filter, zipWith)
 import Data.Array as Arr
 import Data.Default (class Default, def)
@@ -29,6 +30,7 @@ import Math.LineSeg (mkLineSeg)
 import Model.Polygon (Polygon, newPolygon, polyWindows)
 import Model.UUID (class HasUUID, idLens)
 import SmartHouse.Algorithm.Edge (Edge, edge)
+import SmartHouse.Algorithm.Event (PointEvent(..), _vertexA, _vertexB)
 import SmartHouse.Algorithm.Vertex (Vertex, _bisector, vertexFrom)
 import Three.Math.Vector (class Vector, getVector, normal, (<->))
 
@@ -181,3 +183,8 @@ invalidateVertex v slav = slav # _validStates %~ update (const $ Just false) (v 
 -- check if a vertex is valid or not
 isValid :: Vertex -> SLAV -> Boolean
 isValid v slav = fromMaybe false $ lookup (v ^. idLens) (slav ^. _validStates)
+
+-- check if an event is valid or not
+eventValid :: PointEvent -> SLAV -> Boolean
+eventValid (EdgeEvent e) slav  = isValid (e ^. _vertexA) slav && isValid (e ^. _vertexB) slav
+eventValid (SplitEvent e) slav = isValid (e ^. _vertex) slav
