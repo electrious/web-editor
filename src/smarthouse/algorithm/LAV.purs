@@ -3,6 +3,8 @@ module SmartHouse.Algorithm.LAV where
 import Prelude hiding (degree)
 
 import Algorithm.MeshFlatten (_vertex)
+import Control.Monad.RWS (get, modify)
+import Control.Monad.State (StateT)
 import Data.Array (filter, zipWith)
 import Data.Array as Arr
 import Data.Default (class Default, def)
@@ -130,19 +132,19 @@ vertices lav = Arr.fromFoldable $ ls <> c <> rs
           c  = maybe Nil singleton $ lav ^. _current
           rs = lav ^. _right
 
-newtype SLAV = SLAV {
-    lavs  :: UUIDMap LAV,
-    edges :: Array Edge,
+newtype SLAVState = SLAVState {
+    lavs        :: UUIDMap LAV,
+    edges       :: Array Edge,
 
     validStates :: UUIDMap Boolean
     }
 
-derive instance newtypeSLAV :: Newtype SLAV _
-derive instance genericSLAV :: Generic SLAV _
-instance showSLAV :: Show SLAV where
+derive instance newtypeSLAV :: Newtype SLAVState _
+derive instance genericSLAV :: Generic SLAVState _
+instance showSLAV :: Show SLAVState where
     show = genericShow
-instance defaultSLAV :: Default SLAV where
-    def = SLAV { lavs : M.empty, edges : [], validStates : M.empty }
+instance defaultSLAV :: Default SLAVState where
+    def = SLAVState { lavs : M.empty, edges : [], validStates : M.empty }
 
 _lavs :: forall t a r. Newtype t { lavs :: a | r } => Lens' t a
 _lavs = _Newtype <<< prop (SProxy :: SProxy "lavs")
@@ -156,6 +158,9 @@ _edges = _Newtype <<< prop (SProxy :: SProxy "edges")
 _validStates :: forall t a r. Newtype t { validStates :: a | r } => Lens' t a
 _validStates = _Newtype <<< prop (SProxy :: SProxy "validStates")
 
+
+type SLAV = StateT SLAVState Effect
+
 -- delete duplicated vertices or connect two consecutive edges if they're in the same direction
 normalizeContour :: forall v. Eq v => Vector v => Polygon v -> Polygon v
 normalizeContour = newPolygon <<< map g <<< filter f <<< polyWindows
@@ -163,7 +168,7 @@ normalizeContour = newPolygon <<< map g <<< filter f <<< polyWindows
           g (Triple _ p _) = p
 
 
-slavFromPolygon :: forall f v. Functor f => Foldable f => Traversable f => Eq v => Vector v => f (Polygon v) -> Effect SLAV
+slavFromPolygon :: forall f v. Functor f => Foldable f => Traversable f => Eq v => Vector v => f (Polygon v) -> Effect SLAVState
 slavFromPolygon polys = do
     lavs <- Arr.fromFoldable <$> traverse (lavFromPolygon <<< normalizeContour) polys
     let vs    = Arr.concatMap vertices lavs
@@ -180,14 +185,14 @@ slavFromPolygon polys = do
 
 
 -- invalidate a vertex in the SLAV
-invalidateVertex :: Vertex -> SLAV -> SLAV
-invalidateVertex v slav = slav # _validStates %~ update (const $ Just false) (v ^. idLens)
+invalidateVertex :: Vertex -> SLAV Unit
+invalidateVertex v = void $ modify (\s -> s # _validStates %~ update (const $ Just false) (v ^. idLens))
 
 -- check if a vertex is valid or not
-isValid :: Vertex -> SLAV -> Boolean
-isValid v slav = fromMaybe false $ lookup (v ^. idLens) (slav ^. _validStates)
+isValid :: Vertex -> SLAV Boolean
+isValid v = get >>= view _validStates >>> lookup (v ^. idLens) >>> fromMaybe false >>> pure
 
 -- check if an event is valid or not
-eventValid :: PointEvent -> SLAV -> Boolean
-eventValid (EdgeEvent e) slav  = isValid (e ^. _vertexA) slav && isValid (e ^. _vertexB) slav
-eventValid (SplitEvent e) slav = isValid (e ^. _vertex) slav
+eventValid :: PointEvent -> SLAV Boolean
+eventValid (EdgeEvent e)  = (&&) <$> isValid (e ^. _vertexA) <*> isValid (e ^. _vertexB)
+eventValid (SplitEvent e) = isValid (e ^. _vertex)
