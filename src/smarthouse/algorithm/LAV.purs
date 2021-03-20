@@ -23,6 +23,7 @@ import Data.Triple (Triple(..))
 import Data.Tuple (Tuple(..))
 import Data.UUID (UUID, emptyUUID, genUUID)
 import Data.UUIDMap (UUIDMap)
+import Data.UUIDMap as UM
 import Editor.Common.Lenses (_id, _length, _position)
 import Effect (Effect)
 import Math.Angle (degree)
@@ -51,6 +52,8 @@ instance showLAV :: Show LAV where
     show = genericShow
 instance hasUUIDLAV :: HasUUID LAV where
     idLens = _id
+instance eqLAV :: Eq LAV where
+    eq l1 l2 = l1 ^. idLens == l2 ^. idLens
 instance defaultLAV :: Default LAV where
     def = LAV {
         id      : emptyUUID,
@@ -81,7 +84,7 @@ _right = _Newtype <<< prop (SProxy :: SProxy "right")
 lavFromPolygon :: forall v. Vector v => Polygon v -> Effect LAV
 lavFromPolygon poly = do
     i <- genUUID
-    let mkV (Triple prev p next) = vertexFrom p (mkLineSeg prev p) (mkLineSeg p next)
+    let mkV (Triple prev p next) = vertexFrom i p (mkLineSeg prev p) (mkLineSeg p next)
     vs <- traverse mkV $ polyWindows $ getVector <$> poly
     pure $ def # _id      .~ i
                # _head    .~ Arr.head vs
@@ -128,7 +131,7 @@ vertices lav = Arr.fromFoldable $ ls <> c <> rs
           rs = lav ^. _right
 
 newtype SLAV = SLAV {
-    lavs  :: Array LAV,
+    lavs  :: UUIDMap LAV,
     edges :: Array Edge,
 
     validStates :: UUIDMap Boolean
@@ -139,7 +142,7 @@ derive instance genericSLAV :: Generic SLAV _
 instance showSLAV :: Show SLAV where
     show = genericShow
 instance defaultSLAV :: Default SLAV where
-    def = SLAV { lavs : [], edges : [], validStates : M.empty }
+    def = SLAV { lavs : M.empty, edges : [], validStates : M.empty }
 
 _lavs :: forall t a r. Newtype t { lavs :: a | r } => Lens' t a
 _lavs = _Newtype <<< prop (SProxy :: SProxy "lavs")
@@ -171,8 +174,8 @@ slavFromPolygon polys = do
                     np = n ^. _position
                 in edge (mkLineSeg vp np) (degree 20.0) (v ^. _bisector) (n ^. _bisector)
 
-    pure $ def # _lavs .~ lavs
-               # _edges .~ edges
+    pure $ def # _lavs        .~ UM.fromFoldable lavs
+               # _edges       .~ edges
                # _validStates .~ M.fromFoldable (flip Tuple true <<< view idLens <$> vs)
 
 
