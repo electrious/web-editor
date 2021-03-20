@@ -12,20 +12,22 @@ import Data.Lens (Lens', view, (%~), (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (List(..), fromFoldable, head, singleton, tail, (:))
+import Data.Map (lookup, update)
 import Data.Map as M
 import Data.Maybe (Maybe(..), fromMaybe, maybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (class Traversable, traverse)
 import Data.Triple (Triple(..))
+import Data.Tuple (Tuple(..))
 import Data.UUID (UUID, emptyUUID, genUUID)
 import Data.UUIDMap (UUIDMap)
 import Editor.Common.Lenses (_id, _length, _position)
 import Effect (Effect)
 import Math.Angle (degree)
 import Math.LineSeg (mkLineSeg)
-import Model.UUID (class HasUUID)
 import Model.Polygon (Polygon, newPolygon, polyWindows)
+import Model.UUID (class HasUUID, idLens)
 import SmartHouse.Algorithm.Edge (Edge, edge)
 import SmartHouse.Algorithm.Vertex (Vertex, _bisector, vertexFrom)
 import Three.Math.Vector (class Vector, getVector, normal, (<->))
@@ -166,5 +168,16 @@ slavFromPolygon polys = do
         f v n = let vp = v ^. _position
                     np = n ^. _position
                 in edge (mkLineSeg vp np) (degree 20.0) (v ^. _bisector) (n ^. _bisector)
+
     pure $ def # _lavs .~ lavs
                # _edges .~ edges
+               # _validStates .~ M.fromFoldable (flip Tuple true <<< view idLens <$> vs)
+
+
+-- invalidate a vertex in the SLAV
+invalidateVertex :: Vertex -> SLAV -> SLAV
+invalidateVertex v slav = slav # _validStates %~ update (const $ Just false) (v ^. idLens)
+
+-- check if a vertex is valid or not
+isValid :: Vertex -> SLAV -> Boolean
+isValid v slav = fromMaybe false $ lookup (v ^. idLens) (slav ^. _validStates)

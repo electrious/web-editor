@@ -2,6 +2,7 @@ module SmartHouse.Algorithm.Event where
 
 import Prelude
 
+import Algorithm.MeshFlatten (_vertex)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Lens (Lens', (^.))
@@ -10,6 +11,7 @@ import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import SmartHouse.Algorithm.Edge (Edge)
+import SmartHouse.Algorithm.LAV (SLAV, isValid)
 import SmartHouse.Algorithm.Vertex (Vertex)
 import Three.Math.Vector (Vector3)
 
@@ -35,6 +37,8 @@ _vertexA = _Newtype <<< prop (SProxy :: SProxy "vertexA")
 _vertexB :: forall t a r. Newtype t { vertexB :: a | r } => Lens' t a
 _vertexB = _Newtype <<< prop (SProxy :: SProxy "vertexB")
 
+edgeEValid :: EdgeE -> SLAV -> Boolean
+edgeEValid e slav = isValid (e ^. _vertexA) slav && isValid (e ^. _vertexB) slav
 
 newtype SplitE = SplitE {
     distance     :: Number,
@@ -52,6 +56,8 @@ instance showSplitE :: Show SplitE where
 _oppositeEdge :: forall t a r. Newtype t { oppositeEdge :: a | r } => Lens' t a
 _oppositeEdge = _Newtype <<< prop (SProxy :: SProxy "oppositeEdge")
 
+splitEValid :: SplitE -> SLAV -> Boolean
+splitEValid e slav = isValid (e ^. _vertex) slav
 
 data PointEvent = EdgeEvent EdgeE
                 | SplitEvent SplitE
@@ -80,3 +86,7 @@ splitE dist p v e = SplitEvent $ SplitE {
 intersectionPoint :: PointEvent -> Vector3
 intersectionPoint (EdgeEvent e)  = e ^. _intersection
 intersectionPoint (SplitEvent e) = e ^. _intersection
+
+validEvent :: PointEvent -> SLAV -> Boolean
+validEvent (EdgeEvent e)  = edgeEValid e
+validEvent (SplitEvent e) = splitEValid e
