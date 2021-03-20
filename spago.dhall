@@ -21,6 +21,7 @@ You can edit this file as you like.
   , "psci-support"
   , "uuid"
   , "web-touchevents"
+  , "pqueue"
   ]
 , packages = ./packages.dhall
 , sources = [ "src/**/*.purs", "test/**/*.purs", "example/**/*.purs" ]
