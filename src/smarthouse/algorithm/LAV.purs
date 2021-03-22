@@ -5,28 +5,28 @@ import Prelude hiding (degree)
 import Algorithm.MeshFlatten (_vertex)
 import Control.Monad.RWS (get, modify)
 import Control.Monad.State (StateT)
-import Data.Array (filter, zipWith)
+import Data.Array (filter, index, last, zipWith)
 import Data.Array as Arr
 import Data.Default (class Default, def)
 import Data.Foldable (class Foldable)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Lens (Lens', view, (%~), (.~), (^.))
+import Data.Lens (Lens', over, view, (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.List (List(..), fromFoldable, head, singleton, tail, (:))
 import Data.Map (lookup, update)
 import Data.Map as M
-import Data.Maybe (Maybe(..), fromMaybe, maybe)
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (class Traversable, traverse)
+import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Triple (Triple(..))
 import Data.Tuple (Tuple(..))
 import Data.UUID (UUID, emptyUUID, genUUID)
 import Data.UUIDMap (UUIDMap)
 import Data.UUIDMap as UM
-import Editor.Common.Lenses (_id, _length, _position)
+import Editor.Common.Lenses (_id, _index, _position)
 import Effect (Effect)
 import Math.Angle (degree)
 import Math.LineSeg (mkLineSeg)
@@ -38,14 +38,8 @@ import SmartHouse.Algorithm.Vertex (Vertex, _bisector, vertexFrom)
 import Three.Math.Vector (class Vector, getVector, normal, (<->))
 
 newtype LAV = LAV {
-    id      :: UUID,
-    head    :: Maybe Vertex,
-    last    :: Maybe Vertex,
-    length  :: Int,
-
-    current :: Maybe Vertex,
-    left    :: List Vertex,
-    right   :: List Vertex
+    id       :: UUID,
+    vertices :: Array Vertex
     }
 
 derive instance newtypeLAV :: Newtype LAV _
@@ -58,79 +52,31 @@ instance eqLAV :: Eq LAV where
     eq l1 l2 = l1 ^. idLens == l2 ^. idLens
 instance defaultLAV :: Default LAV where
     def = LAV {
-        id      : emptyUUID,
-        head    : Nothing,
-        last    : Nothing,
-        length  : 0,
-        current : Nothing,
-        left    : Nil,
-        right   : Nil 
+        id       : emptyUUID,
+        vertices : []
         }
-
-_head :: forall t a r. Newtype t { head :: a | r } => Lens' t a
-_head = _Newtype <<< prop (SProxy :: SProxy "head")
-
-_last :: forall t a r. Newtype t { last :: a | r } => Lens' t a
-_last = _Newtype <<< prop (SProxy :: SProxy "last")
-
-_current :: forall t a r. Newtype t { current :: a | r } => Lens' t a
-_current = _Newtype <<< prop (SProxy :: SProxy "current")
-
-_left :: forall t a r. Newtype t { left :: a | r } => Lens' t a
-_left = _Newtype <<< prop (SProxy :: SProxy "left")
-
-_right :: forall t a r. Newtype t { right :: a | r } => Lens' t a
-_right = _Newtype <<< prop (SProxy :: SProxy "right")
 
 -- create a LAV for a polygon
 lavFromPolygon :: forall v. Vector v => Polygon v -> Effect LAV
 lavFromPolygon poly = do
     i <- genUUID
-    let mkV (Triple prev p next) = vertexFrom i p (mkLineSeg prev p) (mkLineSeg p next)
-    vs <- traverse mkV $ polyWindows $ getVector <$> poly
-    pure $ def # _id      .~ i
-               # _head    .~ Arr.head vs
-               # _last    .~ Arr.last vs
-               # _length  .~ Arr.length vs
-               # _current .~ Arr.head vs
-               # _right   .~ fromFoldable (fromMaybe [] $ Arr.tail vs)
+    let mkV idx (Triple prev p next) = vertexFrom i idx p (mkLineSeg prev p) (mkLineSeg p next)
+    vs <- traverseWithIndex mkV $ polyWindows $ getVector <$> poly
+    pure $ def # _id       .~ i
+               # _vertices .~ vs
 
 length :: LAV -> Int
-length = view _length
+length = Arr.length <<< view _vertices
 
-prevVertex :: LAV -> Maybe Vertex
-prevVertex lav = case lav ^. _left of
-    (l:_) -> Just l
-    Nil   -> lav ^. _last
+prevVertex :: Vertex -> LAV -> Maybe Vertex
+prevVertex v lav = if v ^. _index == 0
+                   then last $ lav ^. _vertices
+                   else index (lav ^. _vertices) (v ^. _index - 1)
 
-nextVertex :: LAV -> Maybe Vertex
-nextVertex lav = case lav ^. _right of
-    (r:_) -> Just r
-    Nil   -> lav ^. _head
-
-moveRight :: LAV -> LAV
-moveRight lav =
-    let c = lav ^. _current
-        l = lav ^. _left
-        nl = maybe l (flip Cons l) c
-    in lav # _left    .~ nl
-           # _current .~ head (lav ^. _right)
-           # _right   %~ (fromMaybe Nil <<< tail)
-
-moveLeft :: LAV -> LAV
-moveLeft lav =
-    let c = lav ^. _current
-        r = lav ^. _right
-        nr = maybe r (flip Cons r) c
-    in lav # _left    %~ (fromMaybe Nil <<< tail)
-           # _current .~ head (lav ^. _left)
-           # _right   .~ nr
-
-vertices :: LAV -> Array Vertex
-vertices lav = Arr.fromFoldable $ ls <> c <> rs
-    where ls = lav ^. _left
-          c  = maybe Nil singleton $ lav ^. _current
-          rs = lav ^. _right
+nextVertex :: Vertex -> LAV -> Maybe Vertex
+nextVertex v lav = if v ^. _index == length lav - 1
+                   then Arr.head $ lav ^. _vertices
+                   else index (lav ^. _vertices) (v ^. _index + 1)
 
 newtype SLAVState = SLAVState {
     lavs        :: UUIDMap LAV,
@@ -171,7 +117,7 @@ normalizeContour = newPolygon <<< map g <<< filter f <<< polyWindows
 slavFromPolygon :: forall f v. Functor f => Foldable f => Traversable f => Eq v => Vector v => f (Polygon v) -> Effect SLAVState
 slavFromPolygon polys = do
     lavs <- Arr.fromFoldable <$> traverse (lavFromPolygon <<< normalizeContour) polys
-    let vs    = Arr.concatMap vertices lavs
+    let vs    = Arr.concatMap (view _vertices) lavs
         ns    = fromMaybe vs $ Arr.snoc <$> Arr.tail vs <*> Arr.head vs
         edges = zipWith f vs ns
 
@@ -183,10 +129,15 @@ slavFromPolygon polys = do
                # _edges       .~ edges
                # _validStates .~ M.fromFoldable (flip Tuple true <<< view idLens <$> vs)
 
+getLav :: UUID -> SLAV (Maybe LAV)
+getLav i = M.lookup i <<< view _lavs <$> get
+
+delLav :: UUID -> SLAV Unit
+delLav i = void $ modify $ over _lavs $ M.delete i
 
 -- invalidate a vertex in the SLAV
 invalidateVertex :: Vertex -> SLAV Unit
-invalidateVertex v = void $ modify (\s -> s # _validStates %~ update (const $ Just false) (v ^. idLens))
+invalidateVertex v = void $ modify $ over _validStates $ update (const $ Just false) (v ^. idLens)
 
 -- check if a vertex is valid or not
 isValid :: Vertex -> SLAV Boolean

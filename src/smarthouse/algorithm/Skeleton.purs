@@ -85,8 +85,8 @@ nextEvtForReflex v = do
 nextEvent :: LAV -> Vertex -> SLAV (Maybe PointEvent)
 nextEvent lav v = do
     evts <- if v ^. _isReflex then nextEvtForReflex v else pure Nil
-    let prevV = prevVertex lav
-        nextV = nextVertex lav
+    let prevV = prevVertex v lav
+        nextV = nextVertex v lav
         -- intersection of a vertex's bisector with v's bisector
         intersectWith = view _bisector >>> intersection (v ^. _bisector)
         iPrev = prevV >>= intersectWith
@@ -101,3 +101,14 @@ nextEvent lav v = do
         distF e = dist (v ^. _position) (intersectionPoint e)
     pure $ minimumBy (comparing distF) allEvts
 
+
+{-
+-- check if an edge event's two vertices A, B and A's predecessor C forms a triangle ABC
+isTriangle :: LAV -> EdgeE -> Boolean
+isTriangle lav e = prevVertex (e ^. _vertexA) lav == nextVertex (e ^. _vertexB) lav
+
+-- handle edge event
+handleEdgeEvent :: EdgeE -> SLAV (Tuple Subtree (List PointEvent))
+handleEdgeEvent e = do
+    lav <- getLav $ e ^. _vertexA <<< _lavId
+-}
