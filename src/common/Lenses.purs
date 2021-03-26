@@ -143,6 +143,9 @@ _face = _Newtype <<< prop (SProxy :: SProxy "face")
 _index :: forall t a r. Newtype t { index :: a | r } => Lens' t a
 _index = _Newtype <<< prop (SProxy :: SProxy "index")
 
+_indices :: forall t a r. Newtype t { indices :: a | r } => Lens' t a
+_indices = _Newtype <<< prop (SProxy :: SProxy "indices")
+
 _wrapper :: forall t a r. Newtype t { wrapper :: a | r } => Lens' t a
 _wrapper = _Newtype <<< prop (SProxy :: SProxy "wrapper")
 

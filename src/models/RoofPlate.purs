@@ -320,9 +320,6 @@ _inclined = _Newtype <<< prop (SProxy :: SProxy "inclined")
 _contours :: Lens' RoofEdited (Array Point)
 _contours = _Newtype <<< prop (SProxy :: SProxy "contours")
 
-_indices :: Lens' RoofEdited (Array Int)
-_indices = _Newtype <<< prop (SProxy :: SProxy "indices")
-
 toRoofEdited :: RoofPlate -> RoofEdited
 toRoofEdited r = RoofEdited {
                    ground   : vec2Point gutter,

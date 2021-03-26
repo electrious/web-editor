@@ -2,6 +2,7 @@ module SmartHouse.Algorithm.Skeleton where
 
 import Prelude
 
+import Algorithm.MeshFlatten (_vertex)
 import Control.Monad.RWS (get)
 import Data.Compactable (compact)
 import Data.Filterable (filter)
@@ -9,17 +10,21 @@ import Data.Foldable (minimumBy)
 import Data.Lens (view, (^.))
 import Data.List (List(..), fromFoldable)
 import Data.Maybe (Maybe(..))
+import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import Editor.Common.Lenses (_position)
+import Editor.Common.Lenses (_distance, _position)
+import Effect.Class (liftEffect)
 import Math (abs)
 import Math.Line (_direction, _origin, intersection)
 import Math.LineSeg (LineSeg, _start, direction, distToLineSeg)
 import Math.LineSeg as S
 import Math.Utils (approxSame, epsilon)
+import Model.UUID (idLens)
 import SmartHouse.Algorithm.Edge (Edge, _leftBisector, _line, _rightBisector)
-import SmartHouse.Algorithm.Event (PointEvent, edgeE, intersectionPoint, splitE)
-import SmartHouse.Algorithm.LAV (LAV, SLAV, _edges, nextVertex, prevVertex)
-import SmartHouse.Algorithm.Vertex (Vertex, _bisector, _cross, _isReflex, _leftEdge, _rightEdge, ray)
+import SmartHouse.Algorithm.Event (EdgeE, PointEvent(..), _intersection, _vertexA, _vertexB, edgeE, intersectionPoint, splitE)
+import SmartHouse.Algorithm.LAV (LAV, SLAV, _edges, _vertices, delLav, getLav, invalidateVertex, nextVertex, prevVertex, unifyVerts, updateLav)
+import SmartHouse.Algorithm.Vertex (Vertex, _bisector, _cross, _isReflex, _lavId, _leftEdge, _rightEdge, ray)
+import Smarthouse.Algorithm.Subtree (Subtree, subtree)
 import Three.Math.Vector (Vector3, dist, length, normal, (<**>), (<+>), (<->), (<.>))
 
 
@@ -102,13 +107,37 @@ nextEvent lav v = do
     pure $ minimumBy (comparing distF) allEvts
 
 
-{-
+
 -- check if an edge event's two vertices A, B and A's predecessor C forms a triangle ABC
-isTriangle :: LAV -> EdgeE -> Boolean
-isTriangle lav e = prevVertex (e ^. _vertexA) lav == nextVertex (e ^. _vertexB) lav
+isTriangle :: EdgeE -> LAV -> Boolean
+isTriangle e lav = prevVertex (e ^. _vertexA) lav == nextVertex (e ^. _vertexB) lav
+
+lavForEvt :: PointEvent -> SLAV (Maybe LAV)
+lavForEvt (EdgeEvent e) = getLav $ e ^. _vertexA <<< _lavId
+lavForEvt (SplitEvent e) = getLav $ e ^. _vertex <<< _lavId
 
 -- handle edge event
-handleEdgeEvent :: EdgeE -> SLAV (Tuple Subtree (List PointEvent))
-handleEdgeEvent e = do
-    lav <- getLav $ e ^. _vertexA <<< _lavId
--}
+handleEdgeEvent :: LAV -> EdgeE -> SLAV (Tuple Subtree (List PointEvent))
+handleEdgeEvent lav e =
+    if isTriangle e lav
+        then do let vs = lav ^. _vertices
+                    sinks = fromFoldable $ view _position <$> vs
+
+                -- delete this LAV and invalidate all vertices in it
+                delLav (lav ^. idLens)
+                void $ traverse invalidateVertex vs
+
+                pure $ Tuple (subtree (e ^. _intersection) (e ^. _distance) sinks) Nil
+        else do let va = e ^. _vertexA
+                    vb = e ^. _vertexB
+                Tuple newLav newV <- liftEffect $ unifyVerts va vb (e ^. _intersection) lav
+                invalidateVertex va
+                invalidateVertex vb
+
+                let sinks = fromFoldable [va ^. _position, vb ^. _position]
+                newEvt <- nextEvent newLav newV
+                let evts = fromFoldable $ compact [newEvt]
+
+                updateLav newLav
+                
+                pure $ Tuple (subtree (e ^. _intersection) (e ^. _distance) sinks) evts

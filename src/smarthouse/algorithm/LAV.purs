@@ -5,7 +5,7 @@ import Prelude hiding (degree)
 import Algorithm.MeshFlatten (_vertex)
 import Control.Monad.RWS (get, modify)
 import Control.Monad.State (StateT)
-import Data.Array (filter, index, last, zipWith)
+import Data.Array (deleteAt, filter, index, last, mapWithIndex, updateAt, zipWith)
 import Data.Array as Arr
 import Data.Default (class Default, def)
 import Data.Foldable (class Foldable)
@@ -20,26 +20,27 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (class Traversable, traverse)
-import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Triple (Triple(..))
 import Data.Tuple (Tuple(..))
 import Data.UUID (UUID, emptyUUID, genUUID)
 import Data.UUIDMap (UUIDMap)
 import Data.UUIDMap as UM
-import Editor.Common.Lenses (_id, _index, _position)
+import Editor.Common.Lenses (_id, _indices, _position)
 import Effect (Effect)
 import Math.Angle (degree)
+import Math.Line (_direction)
 import Math.LineSeg (mkLineSeg)
 import Model.Polygon (Polygon, newPolygon, polyWindows)
 import Model.UUID (class HasUUID, idLens)
 import SmartHouse.Algorithm.Edge (Edge, edge)
 import SmartHouse.Algorithm.Event (PointEvent(..), _vertexA, _vertexB)
-import SmartHouse.Algorithm.Vertex (Vertex, _bisector, vertexFrom)
-import Three.Math.Vector (class Vector, getVector, normal, (<->))
+import SmartHouse.Algorithm.Vertex (Vertex, _bisector, _leftEdge, _rightEdge, vertexFrom)
+import Three.Math.Vector (class Vector, Vector3, getVector, normal, (<->))
 
 newtype LAV = LAV {
     id       :: UUID,
-    vertices :: Array Vertex
+    vertices :: Array Vertex,
+    indices  :: UUIDMap Int
     }
 
 derive instance newtypeLAV :: Newtype LAV _
@@ -53,30 +54,63 @@ instance eqLAV :: Eq LAV where
 instance defaultLAV :: Default LAV where
     def = LAV {
         id       : emptyUUID,
-        vertices : []
+        vertices : [],
+        indices  : M.empty
         }
 
 -- create a LAV for a polygon
 lavFromPolygon :: forall v. Vector v => Polygon v -> Effect LAV
 lavFromPolygon poly = do
     i <- genUUID
-    let mkV idx (Triple prev p next) = vertexFrom i idx p (mkLineSeg prev p) (mkLineSeg p next)
-    vs <- traverseWithIndex mkV $ polyWindows $ getVector <$> poly
+    let mkV (Triple prev p next) = vertexFrom i p (mkLineSeg prev p) (mkLineSeg p next) Nothing Nothing
+    vs <- traverse mkV $ polyWindows $ getVector <$> poly
+    let idxMap = M.fromFoldable $ mapWithIndex (\idx v -> Tuple (v ^. idLens) idx) vs
     pure $ def # _id       .~ i
                # _vertices .~ vs
+               # _indices  .~ idxMap
 
 length :: LAV -> Int
 length = Arr.length <<< view _vertices
 
+vertIndex :: Vertex -> LAV -> Maybe Int
+vertIndex v lav = M.lookup (v ^. idLens) (lav ^. _indices)
+
 prevVertex :: Vertex -> LAV -> Maybe Vertex
-prevVertex v lav = if v ^. _index == 0
-                   then last $ lav ^. _vertices
-                   else index (lav ^. _vertices) (v ^. _index - 1)
+prevVertex v lav = vertIndex v lav >>= f
+    where f idx = if idx == 0
+                  then last $ lav ^. _vertices
+                  else index (lav ^. _vertices) (idx - 1)
 
 nextVertex :: Vertex -> LAV -> Maybe Vertex
-nextVertex v lav = if v ^. _index == length lav - 1
-                   then Arr.head $ lav ^. _vertices
-                   else index (lav ^. _vertices) (v ^. _index + 1)
+nextVertex v lav = vertIndex v lav >>= f
+    where f idx = if idx == length lav - 1
+                  then Arr.head $ lav ^. _vertices
+                  else index (lav ^. _vertices) (idx + 1)
+
+
+unifyVerts :: Vertex -> Vertex -> Vector3 -> LAV -> Effect (Tuple LAV Vertex)
+unifyVerts va vb point lav = do
+    nv <- vertexFrom (lav ^. idLens) point (va ^. _leftEdge) (vb ^. _rightEdge) (Just $ vb ^. _bisector <<< _direction) (Just $ va ^. _bisector <<< _direction)
+
+    let idxA = vertIndex va lav
+        idxB = vertIndex vb lav
+        idx  = min <$> idxA <*> idxB
+        
+        vs   = lav ^. _vertices
+        -- new lav array after delete va, vb and add nv
+        arr  = idx >>= (\i -> updateAt i nv vs >>= deleteAt (i + 1))
+        -- update the indices map
+        om = lav ^. _indices
+        m  = M.delete (va ^. idLens) $ M.delete (vb ^. idLens) om
+        -- delete 1 for all indices larger than the nv index
+        updIdx nvi i = if i > nvi then i - 1 else i
+
+        nm = idx >>= (\i -> Just $ updIdx i <$> M.insert (nv ^. idLens) i m)
+        
+        newLav = lav # _vertices .~ fromMaybe vs arr
+                     # _indices  .~ fromMaybe om nm
+    pure $ Tuple newLav nv
+
 
 newtype SLAVState = SLAVState {
     lavs        :: UUIDMap LAV,
@@ -134,6 +168,9 @@ getLav i = M.lookup i <<< view _lavs <$> get
 
 delLav :: UUID -> SLAV Unit
 delLav i = void $ modify $ over _lavs $ M.delete i
+
+updateLav :: LAV -> SLAV Unit
+updateLav lav = void $ modify $ over _lavs $ M.update (const $ Just lav) (lav ^. idLens)
 
 -- invalidate a vertex in the SLAV
 invalidateVertex :: Vertex -> SLAV Unit

@@ -7,6 +7,7 @@ import Data.Generic.Rep.Show (genericShow)
 import Data.Lens (Lens', (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
+import Data.Maybe (Maybe, fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.UUID (UUID, genUUID)
@@ -25,7 +26,6 @@ ray = line
     
 newtype Vertex = Vertex {
     id        :: UUID,
-    index     :: Int,
     position  :: Vector3,
     leftEdge  :: LineSeg Vector3,
     rightEdge :: LineSeg Vector3,
@@ -62,16 +62,15 @@ _cross :: forall v. Vector v => v -> v -> Number
 _cross v1 v2 = vecX v1 * vecY v2 - vecX v2 * vecY v1
 
 -- create a Vectex from a point and edges it connects to
-vertexFrom :: UUID -> Int -> Vector3 -> LineSeg Vector3 -> LineSeg Vector3 -> Effect Vertex
-vertexFrom lavId idx p leftEdge rightEdge = do
+vertexFrom :: UUID -> Vector3 -> LineSeg Vector3 -> LineSeg Vector3 -> Maybe Vector3 -> Maybe Vector3 -> Effect Vertex
+vertexFrom lavId p leftEdge rightEdge vecL vecR = do
     i <- genUUID
-    let lv       = normal $ lineVec leftEdge <**> (-1.0)
-        rv       = normal $ lineVec rightEdge
+    let lv       = normal $ fromMaybe (lineVec leftEdge <**> (-1.0)) vecL
+        rv       = normal $ fromMaybe (lineVec rightEdge) vecR
         isReflex = _cross lv rv < 0.0
         dir      = (lv <+> rv) <**> (if isReflex then -1.0 else 1.0)
     pure $ Vertex {
         id        : i,
-        index     : idx,
         position  : p,
         leftEdge  : leftEdge,
         rightEdge : rightEdge,
