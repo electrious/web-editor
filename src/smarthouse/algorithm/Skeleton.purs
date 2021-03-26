@@ -8,7 +8,8 @@ import Data.Compactable (compact)
 import Data.Filterable (filter)
 import Data.Foldable (minimumBy)
 import Data.Lens (view, (^.))
-import Data.List (List(..), fromFoldable)
+import Data.List (List(..), concatMap, foldM, fromFoldable)
+import Data.Map as M
 import Data.Maybe (Maybe(..))
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
@@ -21,8 +22,8 @@ import Math.LineSeg as S
 import Math.Utils (approxSame, epsilon)
 import Model.UUID (idLens)
 import SmartHouse.Algorithm.Edge (Edge, _leftBisector, _line, _rightBisector)
-import SmartHouse.Algorithm.Event (EdgeE, PointEvent(..), _intersection, _vertexA, _vertexB, edgeE, intersectionPoint, splitE)
-import SmartHouse.Algorithm.LAV (LAV, SLAV, _edges, _vertices, delLav, getLav, invalidateVertex, nextVertex, prevVertex, unifyVerts, updateLav)
+import SmartHouse.Algorithm.Event (EdgeE, PointEvent(..), SplitE, _intersection, _oppositeEdge, _vertexA, _vertexB, edgeE, intersectionPoint, splitE)
+import SmartHouse.Algorithm.LAV (LAV, SLAV, _edges, _lavs, _vertices, delLav, getLav, invalidateVertex, nextVertex, prevVertex, unifyVerts, updateLav)
 import SmartHouse.Algorithm.Vertex (Vertex, _bisector, _cross, _isReflex, _lavId, _leftEdge, _rightEdge, ray)
 import Smarthouse.Algorithm.Subtree (Subtree, subtree)
 import Three.Math.Vector (Vector3, dist, length, normal, (<**>), (<+>), (<->), (<.>))
@@ -141,3 +142,39 @@ handleEdgeEvent lav e =
                 updateLav newLav
                 
                 pure $ Tuple (subtree (e ^. _intersection) (e ^. _distance) sinks) evts
+
+
+handleSplitEvent :: LAV -> SplitE -> SLAV (Maybe (Tuple Subtree (List PointEvent)))
+handleSplitEvent lav e = do
+
+    pure Nothing
+
+
+findXY :: SplitE -> SLAV (Maybe (Tuple Vertex Vertex))
+findXY e = get >>= getVS >>> foldM f Nothing
+    where opEdge  = e ^. _oppositeEdge ^. _line
+          opNorm  = direction opEdge
+          opStart = opEdge ^. _start
+
+          -- get all vertices in all LAVs
+          getVS s = concatMap (fromFoldable <<< view _vertices) (M.values $ s ^. _lavs)
+
+          f Nothing v    = testV opStart opNorm (e ^. _intersection) v
+          f r@(Just _) v = pure r
+
+-- test if a vertex is the right candidate for calculating X and Y
+testV :: Vector3 -> Vector3 -> Vector3 -> Vertex -> SLAV (Maybe (Tuple Vertex Vertex))
+testV eStart eNorm p v = do
+    lav <- getLav $ v ^. _lavId
+    res <- if eNorm == direction (v ^. _leftEdge) && eStart == v ^. _leftEdge <<< _start
+           then do let prev = prevVertex v =<< lav
+                   pure $ Tuple v <$> prev
+           else if eNorm == direction (v ^. _rightEdge) && eStart == v ^. _rightEdge <<< _start
+                then do let next = nextVertex v =<< lav
+                        pure $ flip Tuple v <$> next
+                else pure Nothing
+    case res of
+        Nothing -> pure Nothing
+        Just (Tuple x y) -> do let xleft = _cross (normal $ y ^. _bisector <<< _direction) (normal $ p <-> y ^. _position) >= (- epsilon)
+                                   xright = _cross (normal $ x ^. _bisector <<< _direction) (normal $ p <-> x ^. _position) <= epsilon
+                               pure $ if xleft && xright then Just (Tuple x y) else Nothing
