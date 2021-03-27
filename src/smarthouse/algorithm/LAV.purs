@@ -5,14 +5,14 @@ import Prelude hiding (degree)
 import Algorithm.MeshFlatten (_vertex)
 import Control.Monad.RWS (get, modify)
 import Control.Monad.State (StateT)
-import Data.Array (deleteAt, filter, index, last, updateAt, zipWith)
+import Data.Array (deleteAt, filter, foldl, index, last, updateAt, zipWith)
 import Data.Array as Arr
 import Data.Default (class Default, def)
 import Data.Foldable (class Foldable)
 import Data.FunctorWithIndex (class FunctorWithIndex, mapWithIndex)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Lens (Lens', over, set, view, (.~), (^.))
+import Data.Lens (Lens', over, set, view, (%~), (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (List(..))
@@ -185,8 +185,12 @@ slavFromPolygon polys = do
 getLav :: UUID -> SLAV (Maybe LAV)
 getLav i = M.lookup i <<< view _lavs <$> get
 
-addLav :: LAV -> SLAV Unit
-addLav lav = void $ modify $ over _lavs $ M.insert (lav ^. idLens) lav
+-- add a new LAV to SLAV, with all new vertices nvs's validstate setup correctly
+addLav :: LAV -> List Vertex -> SLAV Unit
+addLav lav nvs = void $ modify f
+    where f s = s # _lavs        %~ M.insert (lav ^. idLens) lav
+                  # _validStates %~ flip (foldl g) nvs
+          g m v = M.insert (v ^. idLens) true m
 
 delLav :: UUID -> SLAV Unit
 delLav i = void $ modify $ over _lavs $ M.delete i

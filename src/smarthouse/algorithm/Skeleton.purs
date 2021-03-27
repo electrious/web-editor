@@ -147,11 +147,10 @@ handleEdgeEvent lav e =
 
 
 handleSplitEvent :: SplitE -> SLAV (Maybe (Tuple Subtree (List PointEvent)))
-handleSplitEvent e = findXY e >>= handleSplitEvent' e
+handleSplitEvent e = findXY e >>= traverse (handleSplitEvent' e)
 
-handleSplitEvent' :: SplitE -> Maybe (Tuple Vertex Vertex) -> SLAV (Maybe (Tuple Subtree (List PointEvent)))
-handleSplitEvent' e Nothing = pure Nothing
-handleSplitEvent' e (Just (Tuple x y)) = do
+handleSplitEvent' :: SplitE -> Tuple Vertex Vertex -> SLAV (Tuple Subtree (List PointEvent))
+handleSplitEvent' e (Tuple x y) = do
     let lavId  = e ^. _vertex <<< _lavId
         intPos = e ^. _intersection
     v1 <- liftEffect $ vertexFrom lavId intPos (e ^. _vertex <<< _leftEdge) (e ^. _oppositeEdge <<< _line) Nothing Nothing
@@ -188,12 +187,12 @@ handleSplitEvent' e (Just (Tuple x y)) = do
 
     invalidateVertex v
     
-    pure $ Just $ Tuple (subtree intPos (e ^. _distance) (Cons (v ^. _position) sinks)) evts
+    pure $ Tuple (subtree intPos (e ^. _distance) (Cons (v ^. _position) sinks)) evts
 
 
 processNewLAV :: LAV -> List Vertex -> SLAV (Tuple (List PointEvent) (List Vector3))
 processNewLAV lav nvs = if length lav > 2
-                        then do addLav lav
+                        then do addLav lav nvs
                                 evts <- traverse (nextEvent lav) nvs
                                 pure $ Tuple (compact evts) Nil
                         else -- only 2 vertices in this LAV, collapse it
