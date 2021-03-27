@@ -4,17 +4,17 @@ import Prelude
 
 import Algorithm.MeshFlatten (_vertex)
 import Control.Monad.RWS (get)
+import Data.Array ((!!))
 import Data.Compactable (compact)
 import Data.Filterable (filter)
-import Data.Foldable (minimumBy)
+import Data.Foldable (minimumBy, traverse_)
 import Data.Lens (view, (^.))
-import Data.List (List(..), concatMap, foldM, fromFoldable)
+import Data.List (List(..), concatMap, foldM, fromFoldable, singleton)
 import Data.Map as M
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Editor.Common.Lenses (_distance, _position)
-import Editor.MarkerPoint (_vert1)
 import Effect.Class (liftEffect)
 import Math (abs)
 import Math.Line (_direction, _origin, intersection)
@@ -24,11 +24,11 @@ import Math.Utils (approxSame, epsilon)
 import Model.UUID (idLens)
 import SmartHouse.Algorithm.Edge (Edge, _leftBisector, _line, _rightBisector)
 import SmartHouse.Algorithm.Event (EdgeE, PointEvent(..), SplitE, _intersection, _oppositeEdge, _vertexA, _vertexB, edgeE, intersectionPoint, splitE)
-import SmartHouse.Algorithm.LAV (LAV, SLAV, _edges, _lavs, _vertices, delLav, getLav, invalidateVertex, nextVertex, prevVertex, unifyVerts, updateLav)
-import SmartHouse.Algorithm.Vertex (Vertex(..), _bisector, _cross, _isReflex, _lavId, _leftEdge, _rightEdge, ray, vertexFrom)
-import Smarthouse.Algorithm.Subtree (Subtree(..), subtree)
-import Three.Math.Vector (Vector3, dist, length, normal, (<**>), (<+>), (<->), (<.>))
-import Type.Data.Boolean (class Not)
+import SmartHouse.Algorithm.LAV (LAV, SLAV, _edges, _lavs, _vertices, addLav, delLav, getLav, invalidateVertex, lavFromVertices, length, nextVertex, prevVertex, unifyVerts, updateLav, verticesFromTo)
+import SmartHouse.Algorithm.Vertex (Vertex, _bisector, _cross, _isReflex, _lavId, _leftEdge, _rightEdge, ray, vertexFrom)
+import Smarthouse.Algorithm.Subtree (Subtree, subtree)
+import Three.Math.Vector (Vector3, dist, normal, (<**>), (<+>), (<->), (<.>))
+import Three.Math.Vector as V
 
 
 -- a potential b is at the intersection of between our own bisector and the bisector of the
@@ -48,7 +48,7 @@ locateB v (Tuple e i) = let linVec   = normal $ v ^. _position <-> i
                             edVec2   = if linVec <.> edVec < 0.0 then edVec <**> (-1.0) else edVec
                             -- bisector of the tested edge e and self edge of v
                             bisecVec = edVec2 <+> linVec
-                        in if length bisecVec == 0.0
+                        in if V.length bisecVec == 0.0
                            then Nothing
                            else let bisector = ray i bisecVec
                                 in Tuple e <$> intersection bisector (v ^. _bisector)
@@ -151,14 +151,57 @@ handleSplitEvent e = findXY e >>= handleSplitEvent' e
 
 handleSplitEvent' :: SplitE -> Maybe (Tuple Vertex Vertex) -> SLAV (Maybe (Tuple Subtree (List PointEvent)))
 handleSplitEvent' e Nothing = pure Nothing
-handleSplitEvent' e (Just $ Tuple x y) = do
-    let lavId = e ^. _vertex <<< _lavId
+handleSplitEvent' e (Just (Tuple x y)) = do
+    let lavId  = e ^. _vertex <<< _lavId
         intPos = e ^. _intersection
     v1 <- liftEffect $ vertexFrom lavId intPos (e ^. _vertex <<< _leftEdge) (e ^. _oppositeEdge <<< _line) Nothing Nothing
     v2 <- liftEffect $ vertexFrom lavId intPos (e ^. _oppositeEdge <<< _line) (e ^. _vertex <<< _rightEdge) Nothing Nothing
+
+    lav <- getLav lavId
+    let v = e ^. _vertex
     
-    pure Nothing
-        
+        eNext = lav >>= nextVertex v
+        ePrev = lav >>= prevVertex v
+
+    delLav lavId  -- delete original LAV
+    
+    Tuple evts sinks  <- if lavId /= x ^. _lavId
+                         then do  -- the split event actually merges two LAVs
+                             lav1 <- getLav $ x ^. _lavId
+                             let vs1 = Cons v1 $ fromMaybe Nil $ verticesFromTo x y <$> lav1
+                                 vs2 = Cons v2 $ fromMaybe Nil $ verticesFromTo <$> eNext <*> ePrev <*> lav
+
+                                 -- all vertices from the two LAVs and new v1, v2
+                                 nvs = vs1 <> vs2
+                             delLav $ x ^. _lavId
+                             nLav <- liftEffect $ lavFromVertices nvs
+                             processNewLAV nLav $ fromFoldable [v1, v2]
+                         else do
+                             let vs1 = Cons v1 $ fromMaybe Nil $ verticesFromTo <$> Just x <*> ePrev <*> lav
+                                 vs2 = Cons v2 $ fromMaybe Nil $ verticesFromTo <$> eNext <*> Just y <*> lav
+                             lav1 <- liftEffect $ lavFromVertices vs1
+                             lav2 <- liftEffect $ lavFromVertices vs2
+
+                             Tuple evts1 sinks1 <- processNewLAV lav1 $ singleton v1
+                             Tuple evts2 sinks2 <- processNewLAV lav2 $ singleton v2
+                             pure $ Tuple (evts1 <> evts2) (sinks1 <> sinks2)
+
+    invalidateVertex v
+    
+    pure $ Just $ Tuple (subtree intPos (e ^. _distance) (Cons (v ^. _position) sinks)) evts
+
+
+processNewLAV :: LAV -> List Vertex -> SLAV (Tuple (List PointEvent) (List Vector3))
+processNewLAV lav nvs = if length lav > 2
+                        then do addLav lav
+                                evts <- traverse (nextEvent lav) nvs
+                                pure $ Tuple (compact evts) Nil
+                        else -- only 2 vertices in this LAV, collapse it
+                            do let vs = lav ^. _vertices
+                                   sink = view _position <$> vs !! 1
+                               traverse_ invalidateVertex vs
+                               pure $ Tuple Nil (compact $ singleton sink)
+
 
 findXY :: SplitE -> SLAV (Maybe (Tuple Vertex Vertex))
 findXY e = get >>= getVS >>> foldM f Nothing

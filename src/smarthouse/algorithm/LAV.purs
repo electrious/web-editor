@@ -5,15 +5,17 @@ import Prelude hiding (degree)
 import Algorithm.MeshFlatten (_vertex)
 import Control.Monad.RWS (get, modify)
 import Control.Monad.State (StateT)
-import Data.Array (deleteAt, filter, index, last, mapWithIndex, updateAt, zipWith)
+import Data.Array (deleteAt, filter, index, last, updateAt, zipWith)
 import Data.Array as Arr
 import Data.Default (class Default, def)
 import Data.Foldable (class Foldable)
+import Data.FunctorWithIndex (class FunctorWithIndex, mapWithIndex)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Lens (Lens', over, view, (.~), (^.))
+import Data.Lens (Lens', over, set, view, (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
+import Data.List (List(..))
 import Data.Map (lookup, update)
 import Data.Map as M
 import Data.Maybe (Maybe(..), fromMaybe)
@@ -34,7 +36,7 @@ import Model.Polygon (Polygon, newPolygon, polyWindows)
 import Model.UUID (class HasUUID, idLens)
 import SmartHouse.Algorithm.Edge (Edge, edge)
 import SmartHouse.Algorithm.Event (PointEvent(..), _vertexA, _vertexB)
-import SmartHouse.Algorithm.Vertex (Vertex(..), _bisector, _leftEdge, _rightEdge, vertexFrom)
+import SmartHouse.Algorithm.Vertex (Vertex, _bisector, _lavId, _leftEdge, _rightEdge, vertexFrom)
 import Three.Math.Vector (class Vector, Vector3, getVector, normal, (<->))
 
 newtype LAV = LAV {
@@ -69,6 +71,15 @@ lavFromPolygon poly = do
                # _vertices .~ vs
                # _indices  .~ idxMap
 
+lavFromVertices :: forall f. FunctorWithIndex Int f => Foldable f => f Vertex -> Effect LAV
+lavFromVertices vs = do
+    i <- genUUID
+    let nvs = set _lavId i <$> vs
+        idxMap = M.fromFoldable $ mapWithIndex (\idx v -> Tuple (v ^. idLens) idx) nvs
+    pure $ def # _id       .~ i
+               # _vertices .~ Arr.fromFoldable nvs
+               # _indices  .~ idxMap
+
 length :: LAV -> Int
 length = Arr.length <<< view _vertices
 
@@ -88,8 +99,13 @@ nextVertex v lav = vertIndex v lav >>= f
                   else index (lav ^. _vertices) (idx + 1)
 
 
-verticesFromTo :: Vertex -> Vertex -> List Vertex
-verticesFromTo vs ve = 
+-- find all vertices between start and end vertices, both included
+verticesFromTo :: Vertex -> Vertex -> LAV -> List Vertex
+verticesFromTo vs ve lav = go (Just vs) Nil
+    where go (Just v) ls | v == ve   = Cons v ls
+                         | otherwise = go (nextVertex v lav) (Cons v ls)
+          go Nothing ls = ls
+
 
 unifyVerts :: Vertex -> Vertex -> Vector3 -> LAV -> Effect (Tuple LAV Vertex)
 unifyVerts va vb point lav = do
@@ -168,6 +184,9 @@ slavFromPolygon polys = do
 
 getLav :: UUID -> SLAV (Maybe LAV)
 getLav i = M.lookup i <<< view _lavs <$> get
+
+addLav :: LAV -> SLAV Unit
+addLav lav = void $ modify $ over _lavs $ M.insert (lav ^. idLens) lav
 
 delLav :: UUID -> SLAV Unit
 delLav i = void $ modify $ over _lavs $ M.delete i
