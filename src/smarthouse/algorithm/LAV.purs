@@ -34,7 +34,7 @@ import Model.Polygon (Polygon, newPolygon, polyWindows)
 import Model.UUID (class HasUUID, idLens)
 import SmartHouse.Algorithm.Edge (Edge, edge)
 import SmartHouse.Algorithm.Event (PointEvent(..), _vertexA, _vertexB)
-import SmartHouse.Algorithm.Vertex (Vertex, _bisector, _leftEdge, _rightEdge, vertexFrom)
+import SmartHouse.Algorithm.Vertex (Vertex(..), _bisector, _leftEdge, _rightEdge, vertexFrom)
 import Three.Math.Vector (class Vector, Vector3, getVector, normal, (<->))
 
 newtype LAV = LAV {
@@ -87,6 +87,9 @@ nextVertex v lav = vertIndex v lav >>= f
                   then Arr.head $ lav ^. _vertices
                   else index (lav ^. _vertices) (idx + 1)
 
+
+verticesFromTo :: Vertex -> Vertex -> List Vertex
+verticesFromTo vs ve = 
 
 unifyVerts :: Vertex -> Vertex -> Vector3 -> LAV -> Effect (Tuple LAV Vertex)
 unifyVerts va vb point lav = do

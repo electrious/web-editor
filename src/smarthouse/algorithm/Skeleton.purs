@@ -14,6 +14,7 @@ import Data.Maybe (Maybe(..))
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Editor.Common.Lenses (_distance, _position)
+import Editor.MarkerPoint (_vert1)
 import Effect.Class (liftEffect)
 import Math (abs)
 import Math.Line (_direction, _origin, intersection)
@@ -24,9 +25,10 @@ import Model.UUID (idLens)
 import SmartHouse.Algorithm.Edge (Edge, _leftBisector, _line, _rightBisector)
 import SmartHouse.Algorithm.Event (EdgeE, PointEvent(..), SplitE, _intersection, _oppositeEdge, _vertexA, _vertexB, edgeE, intersectionPoint, splitE)
 import SmartHouse.Algorithm.LAV (LAV, SLAV, _edges, _lavs, _vertices, delLav, getLav, invalidateVertex, nextVertex, prevVertex, unifyVerts, updateLav)
-import SmartHouse.Algorithm.Vertex (Vertex, _bisector, _cross, _isReflex, _lavId, _leftEdge, _rightEdge, ray)
-import Smarthouse.Algorithm.Subtree (Subtree, subtree)
+import SmartHouse.Algorithm.Vertex (Vertex(..), _bisector, _cross, _isReflex, _lavId, _leftEdge, _rightEdge, ray, vertexFrom)
+import Smarthouse.Algorithm.Subtree (Subtree(..), subtree)
 import Three.Math.Vector (Vector3, dist, length, normal, (<**>), (<+>), (<->), (<.>))
+import Type.Data.Boolean (class Not)
 
 
 -- a potential b is at the intersection of between our own bisector and the bisector of the
@@ -144,11 +146,19 @@ handleEdgeEvent lav e =
                 pure $ Tuple (subtree (e ^. _intersection) (e ^. _distance) sinks) evts
 
 
-handleSplitEvent :: LAV -> SplitE -> SLAV (Maybe (Tuple Subtree (List PointEvent)))
-handleSplitEvent lav e = do
+handleSplitEvent :: SplitE -> SLAV (Maybe (Tuple Subtree (List PointEvent)))
+handleSplitEvent e = findXY e >>= handleSplitEvent' e
 
+handleSplitEvent' :: SplitE -> Maybe (Tuple Vertex Vertex) -> SLAV (Maybe (Tuple Subtree (List PointEvent)))
+handleSplitEvent' e Nothing = pure Nothing
+handleSplitEvent' e (Just $ Tuple x y) = do
+    let lavId = e ^. _vertex <<< _lavId
+        intPos = e ^. _intersection
+    v1 <- liftEffect $ vertexFrom lavId intPos (e ^. _vertex <<< _leftEdge) (e ^. _oppositeEdge <<< _line) Nothing Nothing
+    v2 <- liftEffect $ vertexFrom lavId intPos (e ^. _oppositeEdge <<< _line) (e ^. _vertex <<< _rightEdge) Nothing Nothing
+    
     pure Nothing
-
+        
 
 findXY :: SplitE -> SLAV (Maybe (Tuple Vertex Vertex))
 findXY e = get >>= getVS >>> foldM f Nothing
@@ -166,15 +176,13 @@ findXY e = get >>= getVS >>> foldM f Nothing
 testV :: Vector3 -> Vector3 -> Vector3 -> Vertex -> SLAV (Maybe (Tuple Vertex Vertex))
 testV eStart eNorm p v = do
     lav <- getLav $ v ^. _lavId
-    res <- if eNorm == direction (v ^. _leftEdge) && eStart == v ^. _leftEdge <<< _start
-           then do let prev = prevVertex v =<< lav
-                   pure $ Tuple v <$> prev
+
+    let f t@(Tuple x y) = let xleft  = _cross (normal $ y ^. _bisector <<< _direction) (normal $ p <-> y ^. _position) >= (- epsilon)
+                              xright = _cross (normal $ x ^. _bisector <<< _direction) (normal $ p <-> x ^. _position) <= epsilon
+                          in if xleft && xright then Just t else Nothing
+
+    pure $ if eNorm == direction (v ^. _leftEdge) && eStart == v ^. _leftEdge <<< _start
+           then lav >>= prevVertex v >>= Tuple v >>> f
            else if eNorm == direction (v ^. _rightEdge) && eStart == v ^. _rightEdge <<< _start
-                then do let next = nextVertex v =<< lav
-                        pure $ flip Tuple v <$> next
-                else pure Nothing
-    case res of
-        Nothing -> pure Nothing
-        Just (Tuple x y) -> do let xleft = _cross (normal $ y ^. _bisector <<< _direction) (normal $ p <-> y ^. _position) >= (- epsilon)
-                                   xright = _cross (normal $ x ^. _bisector <<< _direction) (normal $ p <-> x ^. _position) <= epsilon
-                               pure $ if xleft && xright then Just (Tuple x y) else Nothing
+                then lav >>= nextVertex v >>= flip Tuple v >>> f
+                else Nothing
