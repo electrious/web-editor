@@ -9,6 +9,7 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
+import Editor.Common.Lenses (_distance)
 import SmartHouse.Algorithm.Edge (Edge)
 import SmartHouse.Algorithm.Vertex (Vertex)
 import Three.Math.Vector (Vector3)
@@ -80,3 +81,7 @@ splitE dist p v e = SplitEvent $ SplitE {
 intersectionPoint :: PointEvent -> Vector3
 intersectionPoint (EdgeEvent e)  = e ^. _intersection
 intersectionPoint (SplitEvent e) = e ^. _intersection
+
+distance :: PointEvent -> Number
+distance (EdgeEvent e)  = e ^. _distance
+distance (SplitEvent e) = e ^. _distance

@@ -4,7 +4,7 @@ import Prelude hiding (degree)
 
 import Algorithm.MeshFlatten (_vertex)
 import Control.Monad.RWS (get, modify)
-import Control.Monad.State (StateT)
+import Control.Monad.State (StateT, evalStateT)
 import Data.Array (deleteAt, filter, foldl, index, last, updateAt, zipWith)
 import Data.Array as Arr
 import Data.Default (class Default, def)
@@ -181,6 +181,13 @@ slavFromPolygon polys = do
     pure $ def # _lavs        .~ UM.fromFoldable lavs
                # _edges       .~ edges
                # _validStates .~ M.fromFoldable (flip Tuple true <<< view idLens <$> vs)
+
+-- run a SLAV action with a list of polygons
+runSLAV :: forall a f v. Functor f => Foldable f => Traversable f => Eq v => Vector v => SLAV a -> f (Polygon v) -> Effect a
+runSLAV slav ps = slavFromPolygon ps >>= evalStateT slav
+
+emptySLAV :: SLAV Boolean
+emptySLAV = M.isEmpty <<< view _lavs <$> get
 
 getLav :: UUID -> SLAV (Maybe LAV)
 getLav i = M.lookup i <<< view _lavs <$> get

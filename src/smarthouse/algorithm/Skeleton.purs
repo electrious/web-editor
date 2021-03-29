@@ -4,30 +4,34 @@ import Prelude
 
 import Algorithm.MeshFlatten (_vertex)
 import Control.Monad.RWS (get)
-import Data.Array ((!!))
+import Data.Array (foldl, (!!))
+import Data.Array as Arr
 import Data.Compactable (compact)
 import Data.Filterable (filter)
-import Data.Foldable (minimumBy, traverse_)
+import Data.Foldable (class Foldable, minimumBy, traverse_)
 import Data.Lens (view, (^.))
 import Data.List (List(..), concatMap, foldM, fromFoldable, singleton)
 import Data.Map as M
 import Data.Maybe (Maybe(..), fromMaybe)
-import Data.Traversable (traverse)
-import Data.Tuple (Tuple(..))
+import Data.PQueue as PQ
+import Data.Traversable (class Traversable, traverse)
+import Data.Tuple (Tuple(..), snd)
 import Editor.Common.Lenses (_distance, _position)
+import Effect (Effect)
 import Effect.Class (liftEffect)
 import Math (abs)
 import Math.Line (_direction, _origin, intersection)
 import Math.LineSeg (LineSeg, _start, direction, distToLineSeg)
 import Math.LineSeg as S
 import Math.Utils (approxSame, epsilon)
+import Model.Polygon (Polygon)
 import Model.UUID (idLens)
 import SmartHouse.Algorithm.Edge (Edge, _leftBisector, _line, _rightBisector)
-import SmartHouse.Algorithm.Event (EdgeE, PointEvent(..), SplitE, _intersection, _oppositeEdge, _vertexA, _vertexB, edgeE, intersectionPoint, splitE)
-import SmartHouse.Algorithm.LAV (LAV, SLAV, _edges, _lavs, _vertices, addLav, delLav, getLav, invalidateVertex, lavFromVertices, length, nextVertex, prevVertex, unifyVerts, updateLav, verticesFromTo)
+import SmartHouse.Algorithm.Event (EdgeE, PointEvent(..), SplitE, _intersection, _oppositeEdge, _vertexA, _vertexB, distance, edgeE, intersectionPoint, splitE)
+import SmartHouse.Algorithm.LAV (LAV, SLAV, _edges, _lavs, _vertices, addLav, delLav, emptySLAV, getLav, invalidateVertex, lavFromVertices, length, nextVertex, prevVertex, runSLAV, unifyVerts, updateLav, verticesFromTo)
 import SmartHouse.Algorithm.Vertex (Vertex, _bisector, _cross, _isReflex, _lavId, _leftEdge, _rightEdge, ray, vertexFrom)
 import Smarthouse.Algorithm.Subtree (Subtree, subtree)
-import Three.Math.Vector (Vector3, dist, normal, (<**>), (<+>), (<->), (<.>))
+import Three.Math.Vector (class Vector, Vector3, dist, normal, (<**>), (<+>), (<->), (<.>))
 import Three.Math.Vector as V
 
 
@@ -119,9 +123,17 @@ lavForEvt :: PointEvent -> SLAV (Maybe LAV)
 lavForEvt (EdgeEvent e) = getLav $ e ^. _vertexA <<< _lavId
 lavForEvt (SplitEvent e) = getLav $ e ^. _vertex <<< _lavId
 
+-- handle PointEvents
+handleEvent :: PointEvent -> SLAV (Maybe (Tuple Subtree (List PointEvent)))
+handleEvent (EdgeEvent e)  = handleEdgeEvent e
+handleEvent (SplitEvent e) = handleSplitEvent e
+
 -- handle edge event
-handleEdgeEvent :: LAV -> EdgeE -> SLAV (Tuple Subtree (List PointEvent))
-handleEdgeEvent lav e =
+handleEdgeEvent :: EdgeE -> SLAV (Maybe (Tuple Subtree (List PointEvent)))
+handleEdgeEvent e = getLav (e ^. _vertexA <<< _lavId) >>= traverse (handleEdgeEvent' e)
+
+handleEdgeEvent' :: EdgeE -> LAV -> SLAV (Tuple Subtree (List PointEvent))
+handleEdgeEvent' e lav =
     if isTriangle e lav
         then do let vs = lav ^. _vertices
                     sinks = fromFoldable $ view _position <$> vs
@@ -228,3 +240,35 @@ testV eStart eNorm p v = do
            else if eNorm == direction (v ^. _rightEdge) && eStart == v ^. _rightEdge <<< _start
                 then lav >>= nextVertex v >>= flip Tuple v >>> f
                 else Nothing
+
+
+-- Compute Straight Skeleton of a polygon
+skeletonize :: forall f v. Functor f => Foldable f => Traversable f => Eq v => Vector v => f (Polygon v) -> Effect (List Subtree)
+skeletonize = runSLAV skeletonize'
+
+skeletonize' :: SLAV (List Subtree)
+skeletonize' = do
+    lavs <- view _lavs <$> get
+    let calcEvts lav = traverse (nextEvent lav) (lav ^. _vertices)
+    evts <- join <$> traverse calcEvts (Arr.fromFoldable lavs)
+    let priEvts = (\e -> Tuple (distance e) e) <$> compact evts
+
+        queue = PQ.fromFoldable priEvts
+
+        valid q = if PQ.isEmpty q
+                  then pure false
+                  else not <$> emptySLAV
+
+        go Nothing out  = pure out
+        go (Just q) out = do
+            v <- valid q
+            if v
+                then do res <- join <$> traverse handleEvent (snd <$> PQ.head q)
+                        case res of
+                            Nothing -> go (PQ.tail q) out
+                            Just (Tuple arc es) -> do
+                                let nq = foldl (\q' e -> PQ.insert (distance e) e q') q es
+                                go (Just nq) (Cons arc out)
+                else go (PQ.tail q) out
+
+    go (Just queue) Nil
