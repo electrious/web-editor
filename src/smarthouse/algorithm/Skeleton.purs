@@ -13,6 +13,7 @@ import Data.Lens (view, (^.))
 import Data.List (List(..), concatMap, foldM, fromFoldable, singleton)
 import Data.Map as M
 import Data.Maybe (Maybe(..), fromMaybe)
+import Data.PQueue (PQueue)
 import Data.PQueue as PQ
 import Data.Traversable (class Traversable, traverse)
 import Data.Tuple (Tuple(..), snd)
@@ -242,6 +243,9 @@ testV eStart eNorm p v = do
                 else Nothing
 
 
+addEvtsToQueue :: forall f. Foldable f => PQueue Number PointEvent -> f PointEvent -> PQueue Number PointEvent
+addEvtsToQueue = foldl (\q' e -> PQ.insert (distance e) e q')
+
 -- Compute Straight Skeleton of a polygon
 skeletonize :: forall f v. Functor f => Foldable f => Traversable f => Eq v => Vector v => f (Polygon v) -> Effect (List Subtree)
 skeletonize = runSLAV skeletonize'
@@ -255,20 +259,14 @@ skeletonize' = do
 
         queue = PQ.fromFoldable priEvts
 
-        valid q = if PQ.isEmpty q
-                  then pure false
-                  else not <$> emptySLAV
-
         go Nothing out  = pure out
         go (Just q) out = do
-            v <- valid q
-            if v
+            v <- emptySLAV
+            if not (PQ.isEmpty q || v)
                 then do res <- join <$> traverse handleEvent (snd <$> PQ.head q)
                         case res of
                             Nothing -> go (PQ.tail q) out
-                            Just (Tuple arc es) -> do
-                                let nq = foldl (\q' e -> PQ.insert (distance e) e q') q es
-                                go (Just nq) (Cons arc out)
-                else go (PQ.tail q) out
+                            Just (Tuple arc es) -> go (Just $ addEvtsToQueue q es) (Cons arc out)
+                else pure out
 
     go (Just queue) Nil
