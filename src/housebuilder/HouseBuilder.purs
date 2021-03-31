@@ -4,7 +4,9 @@ import Prelude
 
 import Custom.Mesh (TapMouseMesh)
 import Data.Default (class Default, def)
+import Data.Foldable (traverse_)
 import Data.Lens (view, (.~), (^.))
+import Data.List (List, concatMap, singleton)
 import Data.Newtype (class Newtype)
 import Editor.Common.Lenses (_leadId, _mouseMove, _name)
 import Editor.Editor (Editor)
@@ -13,10 +15,14 @@ import Effect.Class (liftEffect)
 import Effect.Class.Console (log)
 import FRP.Dynamic (step)
 import FRP.Event (subscribe)
+import FRP.Event.Extra (performEvent)
 import HouseBuilder.FloorPlanBuilder (_canEdit)
+import Rendering.DynamicNode (eventNode_)
 import Rendering.Node (Node, fixNodeE, getEnv, localEnv, mkNodeEnv, node, runNode, tapMouseMesh)
 import Rendering.TextureLoader (loadTextureFromUrl)
-import SmartHouse.HouseTracer (traceHouse)
+import SmartHouse.Algorithm.Skeleton (skeletonize)
+import SmartHouse.HouseTracer (renderLine, traceHouse)
+import Smarthouse.Algorithm.Subtree (Subtree, treeLines)
 import Three.Core.Geometry (mkPlaneGeometry)
 import Three.Core.Material (mkMeshBasicMaterialWithTexture)
 import Three.Loader.TextureLoader (clampToEdgeWrapping, repeatWrapping, setRepeat, setWrapS, setWrapT)
@@ -72,6 +78,10 @@ createHouseBuilder = node (def # _name .~ "house-builder") $
 
         _ <- liftEffect $ subscribe floorPlanEvt (show >>> log)
         let nModeEvt = const AddRoofs <$> floorPlanEvt
+
+        -- calculate skeletons
+        let skeletons = performEvent $ skeletonize <<< singleton <$> floorPlanEvt
+        eventNode_ $ renderSkeletons <$> skeletons
         
         pure { input: nModeEvt, output : unit}
 
@@ -79,3 +89,7 @@ createHouseBuilder = node (def # _name .~ "house-builder") $
 -- | external API to build a 3D house for 2D lead
 buildHouse :: Editor -> HouseBuilderConfig -> Effect Unit
 buildHouse editor cfg = void $ runNode createHouseBuilder $ mkNodeEnv editor cfg
+
+
+renderSkeletons :: forall e. List Subtree -> Node e Unit
+renderSkeletons trees = traverse_ renderLine $ concatMap treeLines trees

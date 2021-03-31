@@ -10,7 +10,7 @@ import Data.Lens.Record (prop)
 import Data.List (List)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Math.Line (Line, line)
+import Math.LineSeg (LineSeg, mkLineSeg)
 import Three.Math.Vector (Vector3)
 
 newtype Subtree = Subtree {
@@ -38,6 +38,6 @@ subtree source h ss = Subtree {
     }
 
 
-treeLines :: Subtree -> List (Line Vector3)
-treeLines t = line s <$> t ^. _sinks
+treeLines :: Subtree -> List (LineSeg Vector3)
+treeLines t = mkLineSeg s <$> t ^. _sinks
     where s = t ^. _source
