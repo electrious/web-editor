@@ -141,7 +141,7 @@ handleEdgeEvent' e lav =
 
                 -- delete this LAV and invalidate all vertices in it
                 delLav (lav ^. idLens)
-                void $ traverse invalidateVertex vs
+                traverse_ invalidateVertex vs
 
                 pure $ Tuple (subtree (e ^. _intersection) (e ^. _distance) sinks) Nil
         else do let va = e ^. _vertexA
@@ -154,7 +154,7 @@ handleEdgeEvent' e lav =
                 newEvt <- nextEvent newLav newV
                 let evts = fromFoldable $ compact [newEvt]
 
-                updateLav newLav
+                updateLav newLav newV
                 
                 pure $ Tuple (subtree (e ^. _intersection) (e ^. _distance) sinks) evts
 

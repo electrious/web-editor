@@ -202,8 +202,10 @@ addLav lav nvs = void $ modify f
 delLav :: UUID -> SLAV Unit
 delLav i = void $ modify $ over _lavs $ M.delete i
 
-updateLav :: LAV -> SLAV Unit
-updateLav lav = void $ modify $ over _lavs $ M.update (const $ Just lav) (lav ^. idLens)
+updateLav :: LAV -> Vertex -> SLAV Unit
+updateLav lav v = void $ modify f
+    where f s = s # _lavs        %~ M.update (const $ Just lav) (lav ^. idLens)
+                  # _validStates %~ M.insert (v ^. idLens) true
 
 -- invalidate a vertex in the SLAV
 invalidateVertex :: Vertex -> SLAV Unit
