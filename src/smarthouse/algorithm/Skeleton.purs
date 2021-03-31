@@ -12,7 +12,7 @@ import Data.Foldable (class Foldable, minimumBy, traverse_)
 import Data.Lens (view, (^.))
 import Data.List (List(..), concatMap, foldM, fromFoldable, singleton)
 import Data.Map as M
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (Maybe(..), fromMaybe, maybe)
 import Data.PQueue (PQueue)
 import Data.PQueue as PQ
 import Data.Traversable (class Traversable, traverse)
@@ -29,7 +29,7 @@ import Model.Polygon (Polygon)
 import Model.UUID (idLens)
 import SmartHouse.Algorithm.Edge (Edge, _leftBisector, _line, _rightBisector)
 import SmartHouse.Algorithm.Event (EdgeE, PointEvent(..), SplitE, _intersection, _oppositeEdge, _vertexA, _vertexB, distance, edgeE, intersectionPoint, splitE)
-import SmartHouse.Algorithm.LAV (LAV, SLAV, _edges, _lavs, _vertices, addLav, delLav, emptySLAV, getLav, invalidateVertex, lavFromVertices, length, nextVertex, prevVertex, runSLAV, unifyVerts, updateLav, verticesFromTo)
+import SmartHouse.Algorithm.LAV (LAV, SLAV, _edges, _lavs, _vertices, addLav, delLav, emptySLAV, eventValid, getLav, invalidateVertex, lavFromVertices, length, nextVertex, prevVertex, runSLAV, unifyVerts, updateLav, verticesFromTo)
 import SmartHouse.Algorithm.Vertex (Vertex, _bisector, _cross, _isReflex, _lavId, _leftEdge, _rightEdge, ray, vertexFrom)
 import Smarthouse.Algorithm.Subtree (Subtree, subtree)
 import Three.Math.Vector (class Vector, Vector3, dist, normal, (<**>), (<+>), (<->), (<.>))
@@ -259,14 +259,23 @@ skeletonize' = do
 
         queue = PQ.fromFoldable priEvts
 
+        getNext = pure <<< map snd <<< PQ.head
+        validate e = eventValid e >>= (\v -> pure $ if v then Just e else Nothing)
+            
         go Nothing out  = pure out
         go (Just q) out = do
             v <- emptySLAV
             if not (PQ.isEmpty q || v)
-                then do res <- join <$> traverse handleEvent (snd <$> PQ.head q)
+                then do res <- handleEvent <<<= validate <<<= getNext q
                         case res of
                             Nothing -> go (PQ.tail q) out
                             Just (Tuple arc es) -> go (Just $ addEvtsToQueue q es) (Cons arc out)
                 else pure out
 
     go (Just queue) Nil
+
+
+chainMaybe :: forall a b m. Monad m => (a -> m (Maybe b)) -> m (Maybe a) -> m (Maybe b)
+chainMaybe f v = v >>= maybe (pure Nothing) f
+
+infixr 5 chainMaybe as <<<=
