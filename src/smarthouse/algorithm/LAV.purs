@@ -113,18 +113,18 @@ unifyVerts va vb point lav = do
 
     let idxA = vertIndex va lav
         idxB = vertIndex vb lav
-        idx  = min <$> idxA <*> idxB
         
         vs   = lav ^. _vertices
         -- new lav array after delete va, vb and add nv
-        arr  = idx >>= (\i -> updateAt i nv vs >>= deleteAt (i + 1))
+        arr  = join $ (\ia ib -> updateAt ia nv vs >>= deleteAt ib) <$> idxA <*> idxB
+        
         -- update the indices map
         om = lav ^. _indices
         m  = M.delete (va ^. idLens) $ M.delete (vb ^. idLens) om
         -- delete 1 for all indices larger than the nv index
         updIdx nvi i = if i > nvi then i - 1 else i
 
-        nm = idx >>= (\i -> Just $ updIdx i <$> M.insert (nv ^. idLens) i m)
+        nm = (\ia ib -> updIdx ib <$> M.insert (nv ^. idLens) ia m) <$> idxA <*> idxB
         
         newLav = lav # _vertices .~ fromMaybe vs arr
                      # _indices  .~ fromMaybe om nm
