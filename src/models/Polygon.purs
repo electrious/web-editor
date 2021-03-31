@@ -32,7 +32,7 @@ import Rendering.NodeRenderable (class NodeRenderable)
 import Three.Core.Geometry (mkShape, mkShapeGeometry)
 import Three.Core.Material (MeshBasicMaterial)
 import Three.Core.Mesh (setMaterial)
-import Three.Math.Vector (class Vector, Vector2, dist, getVector, mkVec3, toVec2, updateVector, vecX, vecY, vecZ, (<**>), (<+>))
+import Three.Math.Vector (class Vector, dist, getVector, mkVec3, toVec2, updateVector, vecX, vecY, vecZ, (<**>), (<+>))
 
 newtype Polygon v = Polygon (Array v)
 
@@ -68,7 +68,7 @@ polygonAround l p = newPolygon $ updateVector p <$> [p1, p2, p3, p4]
           p4 = mkVec3 (x + l) (y - l) z
 
 -- make a polygon in counter clockwise orientation
-counterClockPoly :: Polygon Vector2 -> Polygon Vector2
+counterClockPoly :: forall v. Vector v => Polygon v -> Polygon v
 counterClockPoly poly = case polygonOrient poly of
     Clockwise -> Polygon $ reverse $ poly ^. _polyVerts
     CounterClockwise -> poly
@@ -187,7 +187,7 @@ instance showPolyOrient :: Show PolyOrient where
 
 
 -- get polygon orient for a 2d polygon
-polygonOrient :: Polygon Vector2 -> PolyOrient
+polygonOrient :: forall v. Vector v => Polygon v -> PolyOrient
 polygonOrient poly = toOrient $ foldl f 0.0 $ polyEdges poly
     where f n (Tuple s e) = n + (vecX e - vecX s) * (vecY s + vecY e)
           toOrient v | v >= 0.0  = Clockwise

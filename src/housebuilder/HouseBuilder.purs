@@ -17,6 +17,7 @@ import FRP.Dynamic (step)
 import FRP.Event (subscribe)
 import FRP.Event.Extra (performEvent)
 import HouseBuilder.FloorPlanBuilder (_canEdit)
+import Model.Polygon (counterClockPoly)
 import Rendering.DynamicNode (eventNode_)
 import Rendering.Node (Node, fixNodeE, getEnv, localEnv, mkNodeEnv, node, runNode, tapMouseMesh)
 import Rendering.TextureLoader (loadTextureFromUrl)
@@ -80,7 +81,7 @@ createHouseBuilder = node (def # _name .~ "house-builder") $
         let nModeEvt = const AddRoofs <$> floorPlanEvt
 
         -- calculate skeletons
-        let skeletons = performEvent $ skeletonize <<< singleton <$> floorPlanEvt
+        let skeletons = performEvent $ skeletonize <<< singleton <<< counterClockPoly <$> floorPlanEvt
         eventNode_ $ renderSkeletons <$> skeletons
         
         pure { input: nModeEvt, output : unit}
