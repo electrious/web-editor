@@ -40,10 +40,10 @@ import Three.Math.Vector as V
 -- angle between the tested edge and any one of our own edges.
 -- we choose the "less parallel" edge (in order to exclude a potentially parallel edge)
 intersectP :: LineSeg Vector3 -> LineSeg Vector3 -> Edge -> Maybe Vector3
-intersectP lEdge rEdge e = let eVec      = direction $ e ^. _line
-                               leftdot   = abs $ direction lEdge <.> eVec
-                               rightdot  = abs $ direction rEdge <.> eVec
-                               selfEdge  = if leftdot < rightdot then lEdge else rEdge
+intersectP lEdge rEdge e = let eVec     = direction $ e ^. _line
+                               leftdot  = abs $ direction lEdge <.> eVec
+                               rightdot = abs $ direction rEdge <.> eVec
+                               selfEdge = if leftdot < rightdot then lEdge else rEdge
                            in S.intersection selfEdge (e ^. _line)
 
 -- locate candidate b
@@ -55,8 +55,7 @@ locateB v (Tuple e i) = let linVec   = normal $ v ^. _position <-> i
                             bisecVec = edVec2 <+> linVec
                         in if V.length bisecVec == 0.0
                            then Nothing
-                           else let bisector = ray i bisecVec
-                                in Tuple e <$> intersection bisector (v ^. _bisector)
+                           else Tuple e <$> intersection (ray i bisecVec) (v ^. _bisector)
 
 -- check eligibility of b
 -- valid b should lie within the area limited by the edge and the bisectors of its two vertices
@@ -65,7 +64,7 @@ validB (Tuple e b) = let xleft = _cross (normal $ e ^. _leftBisector <<< _direct
                                         (normal $ b <-> e ^. _leftBisector <<< _origin) > (- epsilon)
                          xright = _cross (normal $ e ^. _rightBisector <<< _direction)
                                          (normal $ b <-> e ^. _rightBisector <<< _origin) < epsilon
-                         xedge = _cross (direction $ e ^. _line) (b <-> e ^. _line <<< _start) < epsilon
+                         xedge = _cross (direction $ e ^. _line) (normal $ b <-> e ^. _line <<< _start) < epsilon
                      in xleft && xright && xedge
 
 -- next event for a reflex vertex
