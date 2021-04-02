@@ -14,7 +14,7 @@ import Data.UUID (UUID, genUUID)
 import Editor.Common.Lenses (_id)
 import Effect (Effect)
 import Math.Line (Line, line)
-import Math.LineSeg (LineSeg, lineVec)
+import Math.LineSeg (LineSeg, direction)
 import Model.UUID (class HasUUID, idLens)
 import Three.Math.Vector (class Vector, Vector3, normal, vecX, vecY, (<**>), (<+>))
 
@@ -65,10 +65,12 @@ _cross v1 v2 = vecX v1 * vecY v2 - vecX v2 * vecY v1
 vertexFrom :: UUID -> Vector3 -> LineSeg Vector3 -> LineSeg Vector3 -> Maybe Vector3 -> Maybe Vector3 -> Effect Vertex
 vertexFrom lavId p leftEdge rightEdge vecL vecR = do
     i <- genUUID
-    let lv       = normal $ fromMaybe (lineVec leftEdge <**> (-1.0)) vecL
-        rv       = normal $ fromMaybe (lineVec rightEdge) vecR
+    let leftVec  = direction leftEdge <**> (-1.0)
+        rightVec = direction rightEdge
+        lv       = normal $ fromMaybe leftVec vecL
+        rv       = normal $ fromMaybe rightVec vecR
         isReflex = _cross lv rv < 0.0
-        dir      = (lv <+> rv) <**> (if isReflex then -1.0 else 1.0)
+        dir      = (leftVec <+> rightVec) <**> (if isReflex then -1.0 else 1.0)
     pure $ Vertex {
         id        : i,
         position  : p,
