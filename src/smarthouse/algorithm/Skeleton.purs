@@ -15,7 +15,9 @@ import Data.Map as M
 import Data.Maybe (Maybe(..), fromMaybe, maybe)
 import Data.PQueue (PQueue)
 import Data.PQueue as PQ
+import Data.Set as Set
 import Data.Traversable (class Traversable, traverse)
+import Data.Triple (Triple(..))
 import Data.Tuple (Tuple(..), snd)
 import Editor.Common.Lenses (_distance, _position)
 import Effect (Effect)
@@ -137,12 +139,13 @@ handleEdgeEvent' e lav =
     if isTriangle e lav
         then do let vs = lav ^. _vertices
                     sinks = fromFoldable $ view _position <$> vs
+                    edges = Set.fromFoldable $ Arr.concatMap (\v -> [v ^. _leftEdge, v ^. _rightEdge]) vs
 
                 -- delete this LAV and invalidate all vertices in it
                 delLav (lav ^. idLens)
                 traverse_ invalidateVertex vs
 
-                pure $ Tuple (subtree (e ^. _intersection) (e ^. _distance) sinks) Nil
+                pure $ Tuple (subtree (e ^. _intersection) (e ^. _distance) sinks (Set.toUnfoldable edges)) Nil
         else do let va = e ^. _vertexA
                     vb = e ^. _vertexB
                 Tuple newLav newV <- liftEffect $ unifyVerts va vb (e ^. _intersection) lav
@@ -150,12 +153,13 @@ handleEdgeEvent' e lav =
                 invalidateVertex vb
 
                 let sinks = fromFoldable [va ^. _position, vb ^. _position]
+                    edges = Set.fromFoldable [va ^. _leftEdge, va ^. _rightEdge, vb ^. _leftEdge, vb ^. _rightEdge]
                 newEvt <- nextEvent newLav newV
                 let evts = fromFoldable $ compact [newEvt]
 
                 updateLav newLav newV
                 
-                pure $ Tuple (subtree (e ^. _intersection) (e ^. _distance) sinks) evts
+                pure $ Tuple (subtree (e ^. _intersection) (e ^. _distance) sinks (Set.toUnfoldable edges)) evts
 
 
 handleSplitEvent :: SplitE -> SLAV (Maybe (Tuple Subtree (List PointEvent)))
@@ -170,48 +174,51 @@ handleSplitEvent' e (Tuple x y) = do
 
     lav <- getLav lavId
     let v = e ^. _vertex
+        edges = Set.fromFoldable [v ^. _leftEdge, v ^. _rightEdge]
     
         eNext = lav >>= nextVertex v
         ePrev = lav >>= prevVertex v
 
     delLav lavId  -- delete original LAV
     
-    Tuple evts sinks  <- if lavId /= x ^. _lavId
-                         then do  -- the split event actually merges two LAVs
-                             lav1 <- getLav $ x ^. _lavId
-                             let vs1 = Cons v1 $ fromMaybe Nil $ verticesFromTo x y <$> lav1
-                                 vs2 = Cons v2 $ fromMaybe Nil $ verticesFromTo <$> eNext <*> ePrev <*> lav
+    Triple evts sinks es <- if lavId /= x ^. _lavId
+                            then do  -- the split event actually merges two LAVs
+                                lav1 <- getLav $ x ^. _lavId
+                                let vs1 = Cons v1 $ fromMaybe Nil $ verticesFromTo x y <$> lav1
+                                    vs2 = Cons v2 $ fromMaybe Nil $ verticesFromTo <$> eNext <*> ePrev <*> lav
 
-                                 -- all vertices from the two LAVs and new v1, v2
-                                 nvs = vs1 <> vs2
-                             delLav $ x ^. _lavId
-                             nLav <- liftEffect $ lavFromVertices nvs
-                             processNewLAV nLav $ fromFoldable [v1, v2]
-                         else do
-                             let vs1 = Cons v1 $ fromMaybe Nil $ verticesFromTo <$> Just x <*> ePrev <*> lav
-                                 vs2 = Cons v2 $ fromMaybe Nil $ verticesFromTo <$> eNext <*> Just y <*> lav
-                             lav1 <- liftEffect $ lavFromVertices vs1
-                             lav2 <- liftEffect $ lavFromVertices vs2
+                                    -- all vertices from the two LAVs and new v1, v2
+                                    nvs = vs1 <> vs2
+                                delLav $ x ^. _lavId
+                                nLav <- liftEffect $ lavFromVertices nvs
+                                processNewLAV nLav $ fromFoldable [v1, v2]
+                            else do
+                                let vs1 = Cons v1 $ fromMaybe Nil $ verticesFromTo <$> Just x <*> ePrev <*> lav
+                                    vs2 = Cons v2 $ fromMaybe Nil $ verticesFromTo <$> eNext <*> Just y <*> lav
+                                lav1 <- liftEffect $ lavFromVertices vs1
+                                lav2 <- liftEffect $ lavFromVertices vs2
 
-                             Tuple evts1 sinks1 <- processNewLAV lav1 $ singleton v1
-                             Tuple evts2 sinks2 <- processNewLAV lav2 $ singleton v2
-                             pure $ Tuple (evts1 <> evts2) (sinks1 <> sinks2)
+                                Triple evts1 sinks1 edges1 <- processNewLAV lav1 $ singleton v1
+                                Triple evts2 sinks2 edges2 <- processNewLAV lav2 $ singleton v2
+                                pure $ Triple (evts1 <> evts2) (sinks1 <> sinks2) (edges1 <> edges2)
 
     invalidateVertex v
     
-    pure $ Tuple (subtree intPos (e ^. _distance) (Cons (v ^. _position) sinks)) evts
+    pure $ Tuple (subtree intPos (e ^. _distance) (Cons (v ^. _position) sinks) (Set.toUnfoldable $ edges <> es)) evts
 
 
-processNewLAV :: LAV -> List Vertex -> SLAV (Tuple (List PointEvent) (List Vector3))
+processNewLAV :: LAV -> List Vertex -> SLAV (Triple (List PointEvent) (List Vector3) (Set.Set (LineSeg Vector3)))
 processNewLAV lav nvs = if length lav > 2
                         then do addLav lav nvs
                                 evts <- traverse (nextEvent lav) nvs
-                                pure $ Tuple (compact evts) Nil
+                                pure $ Triple (compact evts) Nil Set.empty
                         else -- only 2 vertices in this LAV, collapse it
                             do let vs = lav ^. _vertices
-                                   sink = view _position <$> vs !! 1
+                                   v  = vs !! 1
+                                   sink = view _position <$> v
+                                   edges = Set.fromFoldable $ compact $ [view _leftEdge <$> v, view _rightEdge <$> v]
                                traverse_ invalidateVertex vs
-                               pure $ Tuple Nil (compact $ singleton sink)
+                               pure $ Triple Nil (compact $ singleton sink) edges
 
 
 findXY :: SplitE -> SLAV (Maybe (Tuple Vertex Vertex))

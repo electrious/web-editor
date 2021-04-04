@@ -16,7 +16,8 @@ import Three.Math.Vector (Vector3)
 newtype Subtree = Subtree {
     source :: Vector3,
     height :: Number,
-    sinks  :: List Vector3
+    sinks  :: List Vector3,
+    edges  :: List (LineSeg Vector3)
     }
 
 derive instance newtypeSubtree :: Newtype Subtree _
@@ -30,11 +31,12 @@ _source = _Newtype <<< prop (SProxy :: SProxy "source")
 _sinks :: forall t a r. Newtype t { sinks :: a | r } => Lens' t a
 _sinks = _Newtype <<< prop (SProxy :: SProxy "sinks")
 
-subtree :: Vector3 -> Number -> List Vector3 -> Subtree
-subtree source h ss = Subtree {
+subtree :: Vector3 -> Number -> List Vector3 -> List (LineSeg Vector3) -> Subtree
+subtree source h ss es = Subtree {
     source : source,
     height : h,
-    sinks  : ss
+    sinks  : ss,
+    edges  : es
     }
 
 

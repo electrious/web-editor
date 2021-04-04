@@ -19,6 +19,12 @@ instance eqVec2 :: Eq Vector2 where
 instance eqVec3 :: Eq Vector3 where
   eq = vEq
 
+instance ordVec2 :: Ord Vector2 where
+    compare v1 v2 = compare (vecX v1) (vecX v2) <> compare (vecY v1) (vecY v2)
+
+instance ordVec3 :: Ord Vector3 where
+    compare v1 v2 = compare (vecX v1) (vecX v2) <> compare (vecY v1) (vecY v2) <> compare (vecZ v1) (vecZ v2)
+
 instance defaultVector2 :: Default Vector2 where
     def = mkVec2 0.0 0.0
 

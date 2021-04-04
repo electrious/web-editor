@@ -29,6 +29,8 @@ instance showLineSeg :: Show v => Show (LineSeg v) where
     show = genericShow
 instance eqLineSeg :: Eq v => Eq (LineSeg v) where
     eq (LineSeg { start: s1, end: e1}) (LineSeg { start: s2, end: e2 }) = (s1 == s2 && e1 == e2) || (s1 == e2 && e1 == s2)
+instance ordLineSeg :: Ord v => Ord (LineSeg v) where
+    compare (LineSeg { start: s1, end: e1}) (LineSeg { start: s2, end: e2 }) = compare s1 s2 <> compare e1 e2
 instance functorLineSeg :: Functor LineSeg where
     map f (LineSeg { start: sl, end: el}) = LineSeg { start: f sl, end: f el }
 
