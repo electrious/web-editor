@@ -176,7 +176,7 @@ slavFromPolygon polys = do
 
         f v n = let vp = v ^. _position
                     np = n ^. _position
-                in edge (mkLineSeg vp np) (degree 20.0) (v ^. _bisector) (n ^. _bisector)
+                in edge (mkLineSeg vp np) (v ^. _bisector) (n ^. _bisector)
 
     pure $ def # _lavs        .~ UM.fromFoldable lavs
                # _edges       .~ edges
