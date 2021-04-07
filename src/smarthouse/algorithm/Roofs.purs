@@ -30,7 +30,7 @@ nodesForEdge e slope ts =
     let s      = scaleFactor slope
         mkP t  = t ^. _source <+> (upVec <**> s)
         edge   = e ^. _line
-        g t1 t2 = compare (distanceAlong t1 edge) (distanceAlong t2 edge)
+        g t1 t2 = compare (distanceAlong t2 edge) (distanceAlong t1 edge)
     in sortBy g $ mkP <$> filter (elem edge <<< view _edges) ts
 
 -- find polygon for an edge

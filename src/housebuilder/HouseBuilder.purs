@@ -6,27 +6,30 @@ import Custom.Mesh (TapMouseMesh)
 import Data.Default (class Default, def)
 import Data.Foldable (traverse_)
 import Data.Lens (view, (.~), (^.))
-import Data.List (List, concatMap, singleton)
+import Data.List (List, singleton)
 import Data.Newtype (class Newtype)
 import Editor.Common.Lenses (_leadId, _mouseMove, _name)
 import Editor.Editor (Editor)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import Effect.Class.Console (log)
+import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (step)
 import FRP.Event (subscribe)
 import FRP.Event.Extra (performEvent)
 import HouseBuilder.FloorPlanBuilder (_canEdit)
-import Model.Polygon (counterClockPoly)
+import HouseBuilder.PolyGeometry (mkPolyGeometry)
+import Math.Angle (degree)
+import Model.Polygon (Polygon, counterClockPoly)
 import Rendering.DynamicNode (eventNode_)
-import Rendering.Node (Node, fixNodeE, getEnv, localEnv, mkNodeEnv, node, runNode, tapMouseMesh)
+import Rendering.Node (Node, fixNodeE, getEnv, localEnv, mesh, mkNodeEnv, node, runNode, tapMouseMesh)
 import Rendering.TextureLoader (loadTextureFromUrl)
 import SmartHouse.Algorithm.Skeleton (skeletonize)
-import SmartHouse.HouseTracer (renderLine, traceHouse)
-import Smarthouse.Algorithm.Subtree (Subtree, treeLines)
+import SmartHouse.HouseTracer (traceHouse)
 import Three.Core.Geometry (mkPlaneGeometry)
-import Three.Core.Material (mkMeshBasicMaterialWithTexture)
+import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial, mkMeshBasicMaterialWithTexture)
 import Three.Loader.TextureLoader (clampToEdgeWrapping, repeatWrapping, setRepeat, setWrapS, setWrapT)
+import Three.Math.Vector (Vector3)
 
 -- represent the state of the builder
 data BuilderMode = AddFloorPlan  -- Add and edit FloorPlans
@@ -81,8 +84,8 @@ createHouseBuilder = node (def # _name .~ "house-builder") $
         let nModeEvt = const AddRoofs <$> floorPlanEvt
 
         -- calculate skeletons
-        let skeletons = performEvent $ skeletonize <<< singleton <<< counterClockPoly <$> floorPlanEvt
-        eventNode_ $ renderSkeletons <$> skeletons
+        let polysEvt = performEvent $ skeletonize (degree 70.0) <<< singleton <<< counterClockPoly <$> floorPlanEvt
+        eventNode_ $ renderRoofPolys <$> polysEvt
         
         pure { input: nModeEvt, output : unit}
 
@@ -92,5 +95,13 @@ buildHouse :: Editor -> HouseBuilderConfig -> Effect Unit
 buildHouse editor cfg = void $ runNode createHouseBuilder $ mkNodeEnv editor cfg
 
 
-renderSkeletons :: forall e. List Subtree -> Node e Unit
-renderSkeletons trees = traverse_ renderLine $ concatMap treeLines trees
+renderRoofPolys :: forall e. List (Polygon Vector3) -> Node e Unit
+renderRoofPolys = traverse_ renderRoofPoly
+
+roofMaterial :: MeshBasicMaterial
+roofMaterial = unsafePerformEffect $ mkMeshBasicMaterial 0xaabbcc
+
+renderRoofPoly :: forall e. Polygon Vector3 -> Node e Unit
+renderRoofPoly poly = do
+    geo <- liftEffect $ mkPolyGeometry poly
+    void $ mesh (def # _name .~ "roof") geo roofMaterial
