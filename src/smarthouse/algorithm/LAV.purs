@@ -29,7 +29,6 @@ import Data.UUIDMap (UUIDMap)
 import Data.UUIDMap as UM
 import Editor.Common.Lenses (_id, _indices, _position)
 import Effect (Effect)
-import Math.Angle (degree)
 import Math.Line (_direction)
 import Math.LineSeg (mkLineSeg)
 import Model.Polygon (Polygon, newPolygon, polyWindows)
