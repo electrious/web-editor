@@ -4,6 +4,7 @@ import Prelude
 
 import Effect (Effect)
 import Three.Loader.TextureLoader (Texture)
+import Three.Math.Color (Color)
   
 foreign import data Material :: Type
 foreign import data MeshBasicMaterial :: Type
@@ -12,6 +13,7 @@ foreign import data LineBasicMaterial :: Type
 foreign import data LineDashedMaterial :: Type
 
 foreign import mkMeshBasicMaterial :: Int -> Effect MeshBasicMaterial
+foreign import mkMeshBasicMaterialWithColor :: Color -> Effect MeshBasicMaterial
 foreign import mkMeshBasicMaterialWithTexture :: Texture -> Effect MeshBasicMaterial
 foreign import mkMeshPhongMaterial :: Int -> Effect MeshPhongMaterial
 

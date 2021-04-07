@@ -13,7 +13,7 @@ import Editor.Editor (Editor)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import Effect.Class.Console (log)
-import Effect.Unsafe (unsafePerformEffect)
+import Effect.Random (randomRange)
 import FRP.Dynamic (step)
 import FRP.Event (subscribe)
 import FRP.Event.Extra (performEvent)
@@ -27,8 +27,9 @@ import Rendering.TextureLoader (loadTextureFromUrl)
 import SmartHouse.Algorithm.Skeleton (skeletonize)
 import SmartHouse.HouseTracer (traceHouse)
 import Three.Core.Geometry (mkPlaneGeometry)
-import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial, mkMeshBasicMaterialWithTexture)
+import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterialWithColor, mkMeshBasicMaterialWithTexture)
 import Three.Loader.TextureLoader (clampToEdgeWrapping, repeatWrapping, setRepeat, setWrapS, setWrapT)
+import Three.Math.Color (Color, mkColorRGB)
 import Three.Math.Vector (Vector3)
 
 -- represent the state of the builder
@@ -98,10 +99,18 @@ buildHouse editor cfg = void $ runNode createHouseBuilder $ mkNodeEnv editor cfg
 renderRoofPolys :: forall e. List (Polygon Vector3) -> Node e Unit
 renderRoofPolys = traverse_ renderRoofPoly
 
-roofMaterial :: MeshBasicMaterial
-roofMaterial = unsafePerformEffect $ mkMeshBasicMaterial 0xaabbcc
+randomColor :: Effect Color
+randomColor = do
+    r <- randomRange 0.0 1.0
+    g <- randomRange 0.0 1.0
+    b <- randomRange 0.0 1.0
+    mkColorRGB r g b
+
+randomRoofMaterial :: Effect MeshBasicMaterial
+randomRoofMaterial = randomColor >>= mkMeshBasicMaterialWithColor
 
 renderRoofPoly :: forall e. Polygon Vector3 -> Node e Unit
 renderRoofPoly poly = do
     geo <- liftEffect $ mkPolyGeometry poly
-    void $ mesh (def # _name .~ "roof") geo roofMaterial
+    mat <- liftEffect randomRoofMaterial
+    void $ mesh (def # _name .~ "roof") geo mat

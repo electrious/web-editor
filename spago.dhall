@@ -17,11 +17,12 @@ You can edit this file as you like.
   , "memoize"
   , "newtype"
   , "numbers"
+  , "pqueue"
   , "profunctor-lenses"
   , "psci-support"
+  , "random"
   , "uuid"
   , "web-touchevents"
-  , "pqueue"
   ]
 , packages = ./packages.dhall
 , sources = [ "src/**/*.purs", "test/**/*.purs", "example/**/*.purs" ]
