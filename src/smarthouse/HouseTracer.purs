@@ -14,7 +14,7 @@ import Data.Generic.Rep.Show (genericShow)
 import Data.Lens (Lens', view, (%~), (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.List (List(..), head, (:))
+import Data.List (List(..), head, init, (:))
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
@@ -174,6 +174,19 @@ paraHelperLine st (Just p) = foldl f Nothing $ allLines st
                              ne = addScaled s v 20.0
                          in mkLineSeg ns ne
 
+-- helper line to connect to the first point traced
+endHelperLine :: TracerState -> Maybe Vector3 -> Maybe (LineSeg Vector3)
+endHelperLine st Nothing  = Nothing
+endHelperLine st (Just p) = foldl f Nothing $ fromMaybe Nil $ init $ allLines st
+    where tempL = mkLineSeg <$> (st ^. _firstVert) <*> Just p
+          f Nothing l    = if fromMaybe false (almostParallel <$> Just l <*> tempL) then mkL l <$> st ^. _firstVert else Nothing
+          f v@(Just _) _ = v
+
+          mkL l s = let v = lineVec l
+                        ns = addScaled s v (-20.0)
+                        ne = addScaled s v 20.0
+                    in mkLineSeg ns ne
+
 -- render helper lines
 helperLineMat :: LineDashedMaterial
 helperLineMat = unsafePerformEffect $ mkLineDashedMaterial 0xe28743 2.0 1.0 3.0 1.0
@@ -186,7 +199,7 @@ renderMaybeHelperLine :: forall e. Maybe (LineSeg Vector3) -> Node e Unit
 renderMaybeHelperLine Nothing  = pure unit
 renderMaybeHelperLine (Just l) = renderHelperLine l
 
-procShow :: forall t42. Boolean -> Maybe t42 -> Maybe t42
+procShow :: forall v. Boolean -> Maybe v -> Maybe v
 procShow s v = if s then v else Nothing
 
 helperLines :: forall e. Dynamic Boolean -> Dynamic TracerState -> Dynamic (Maybe Vector3) -> Node e (Dynamic (Maybe Vector3))
@@ -201,10 +214,13 @@ helperLines showDyn stDyn pDyn = do
         -- parallel helper lines
         paraLineDyn = paraHelperLine <$> stDyn <*> pDyn
 
-        f (Just p) st perpL paraL = Just $ snapPoint p st perpL paraL
-        f Nothing _ _ _ = Nothing
+        -- end helper line
+        endLineDyn = endHelperLine <$> stDyn <*> pDyn
 
-        spDyn = f <$> pDyn <*> stDyn <*> perpLineShowDyn <*> paraLineDyn
+        f (Just p) st perpL paraL endL = Just $ snapPoint p st perpL paraL endL
+        f Nothing _ _ _ _ = Nothing
+
+        spDyn = f <$> pDyn <*> stDyn <*> perpLineShowDyn <*> paraLineDyn <*> endLineDyn
         
     -- render temp line
     dynamic_ $ renderMaybeLine <$> (procShow <$> showDyn <*> tempLineDyn)
@@ -215,6 +231,9 @@ helperLines showDyn stDyn pDyn = do
     -- render the parallel helper line
     dynamic_ $ renderMaybeHelperLine <$> (procShow <$> showDyn <*> paraLineDyn)
 
+    -- render the end helper line
+    dynamic_ $ renderMaybeHelperLine <$> (procShow <$> showDyn <*> endLineDyn)
+
     pure $ spDyn
 
 --------------------------------------------------------
@@ -222,11 +241,14 @@ helperLines showDyn stDyn pDyn = do
 --------------------------------------------------------
 -- point snapping
 --------------------------------------------------------
-snapPoint :: Vector3 -> TracerState -> Maybe (LineSeg Vector3) -> Maybe (LineSeg Vector3) -> Vector3
-snapPoint p st Nothing Nothing           = fromMaybe p $ snapToVert p st
-snapPoint p st (Just l) Nothing          = fromMaybe p $ snapToLine p st l
-snapPoint p st Nothing (Just l)          = fromMaybe p $ snapToLine p st l
-snapPoint p st (Just perpL) (Just paraL) = fromMaybe p $ snapToCrossing p st perpL paraL
+snapPoint :: Vector3 -> TracerState -> Maybe (LineSeg Vector3) -> Maybe (LineSeg Vector3) -> Maybe (LineSeg Vector3) -> Vector3
+snapPoint p st Nothing Nothing Nothing          = fromMaybe p $ snapToVert p st
+snapPoint p st (Just l) Nothing Nothing         = fromMaybe p $ snapToLine p st l
+snapPoint p st Nothing (Just l) Nothing         = fromMaybe p $ snapToLine p st l
+snapPoint p st Nothing Nothing (Just l)         = fromMaybe p $ snapToLine p st l
+snapPoint p st (Just perpL) Nothing (Just endL) = fromMaybe p $ snapToCrossing p st perpL endL
+snapPoint p st Nothing (Just paraL) (Just endL) = fromMaybe p $ snapToCrossing p st paraL endL
+snapPoint p st (Just perpL) (Just paraL) _      = fromMaybe p $ snapToCrossing p st perpL paraL
 
 snapToVert :: Vector3 -> TracerState -> Maybe Vector3
 snapToVert p st = fst $ foldl f (Tuple Nothing 0.0) $ st ^. _tracedVerts
@@ -237,7 +259,7 @@ snapToVert p st = fst $ foldl f (Tuple Nothing 0.0) $ st ^. _tracedVerts
 
 snapToLine :: Vector3 -> TracerState -> LineSeg Vector3 -> Maybe Vector3
 snapToLine p st l = f <$> lastVert st
-    where f v = if distToLineSeg p l < 0.3
+    where f v = if distToLineSeg p l < 0.5
                 then projPointWithLineSeg v p l
                 else p
 
@@ -298,6 +320,6 @@ traceHouse = node (def # _name .~ "house-tracer") $
         newVertEvt <- vertAdder stDyn
 
         let newStEvt = multicast $ sampleDyn stDyn $ addNewVert <$> newVertEvt
-            polyEvt = multicast $ newPolygon <<< view _tracedVerts <$> filter (view _finished) newStEvt
+            polyEvt  = multicast $ newPolygon <<< view _tracedVerts <$> filter (view _finished) newStEvt
 
         pure { input: newStEvt, output: polyEvt }

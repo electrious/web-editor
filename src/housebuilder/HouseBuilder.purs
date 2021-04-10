@@ -1,6 +1,6 @@
 module HouseBuilder.HouseBuilder (buildHouse, HouseBuilderConfig) where
 
-import Prelude
+import Prelude hiding (degree)
 
 import Custom.Mesh (TapMouseMesh)
 import Data.Default (class Default, def)
