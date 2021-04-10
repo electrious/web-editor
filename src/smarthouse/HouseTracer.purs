@@ -5,7 +5,6 @@ import Prelude
 import Control.Alternative (empty)
 import Control.Monad.Reader (ask)
 import Data.Array (fromFoldable)
-import Data.Compactable (compact)
 import Data.Default (class Default, def)
 import Data.Filterable (filter)
 import Data.Foldable (foldl, traverse_)
@@ -14,7 +13,7 @@ import Data.Generic.Rep.Show (genericShow)
 import Data.Lens (Lens', view, (%~), (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.List (List(..), head, init, (:))
+import Data.List (List(..), head, (:))
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
@@ -177,7 +176,7 @@ paraHelperLine st (Just p) = foldl f Nothing $ allLines st
 -- helper line to connect to the first point traced
 endHelperLine :: TracerState -> Maybe Vector3 -> Maybe (LineSeg Vector3)
 endHelperLine st Nothing  = Nothing
-endHelperLine st (Just p) = foldl f Nothing $ fromMaybe Nil $ init $ allLines st
+endHelperLine st (Just p) = foldl f Nothing $ allLines st
     where tempL = mkLineSeg <$> (st ^. _firstVert) <*> Just p
           f Nothing l    = if fromMaybe false (almostParallel <$> Just l <*> tempL) then mkL l <$> st ^. _firstVert else Nothing
           f v@(Just _) _ = v
@@ -264,16 +263,9 @@ snapToLine p st l = f <$> lastVert st
                 else p
 
 snapToCrossing :: Vector3 -> TracerState -> LineSeg Vector3 -> LineSeg Vector3 -> Maybe Vector3
-snapToCrossing p st perpL paraL = let v1 = snapToLine p st perpL
-                                      v2 = snapToLine p st paraL
-                                      v3 = intersection perpL paraL
-                                      g (Tuple Nothing _) v = Tuple (Just v) (dist p v)
-                                      g o@(Tuple (Just _) od) v = let nd = dist p v
-                                                                  in if nd < od
-                                                                     then Tuple (Just v) nd
-                                                                     else o
-                                  in fst $ foldl g (Tuple Nothing 0.0) $ compact [v1, v2, v3]
-    
+snapToCrossing p st l1 l2 = filter f $ intersection l1 l2
+    where f p1 = dist p p1 < 0.5
+
 --------------------------------------------------------
 
 vertAdder :: Dynamic TracerState -> Node HouseTracerConf (Event Vector3)
