@@ -5,6 +5,7 @@ import Prelude
 import Data.Filterable (filter)
 import Data.Lens (view, (^.))
 import Data.List (List(..), elem, singleton, sortBy)
+import Editor.Common.Lenses (_height)
 import Math.Angle (Angle, degreeVal, tan)
 import Math.LineSeg (LineSeg, _end, _start, direction)
 import Model.Polygon (Polygon, newPolygon)
@@ -28,7 +29,7 @@ distanceAlong p e = (p <-> e ^. _start) <.> direction e
 nodesForEdge :: Edge -> Angle -> List Subtree -> List Vector3
 nodesForEdge e slope ts =
     let s      = scaleFactor slope
-        mkP t  = t ^. _source <+> (upVec <**> s)
+        mkP t  = t ^. _source <+> (upVec <**> (t ^. _height * s))
         edge   = e ^. _line
         g t1 t2 = compare (distanceAlong t2 edge) (distanceAlong t1 edge)
     in sortBy g $ mkP <$> filter (elem edge <<< view _edges) ts

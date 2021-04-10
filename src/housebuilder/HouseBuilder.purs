@@ -85,7 +85,7 @@ createHouseBuilder = node (def # _name .~ "house-builder") $
         let nModeEvt = const AddRoofs <$> floorPlanEvt
 
         -- calculate skeletons
-        let polysEvt = performEvent $ skeletonize (degree 70.0) <<< singleton <<< counterClockPoly <$> floorPlanEvt
+        let polysEvt = performEvent $ skeletonize (degree 30.0) <<< singleton <<< counterClockPoly <$> floorPlanEvt
         eventNode_ $ renderRoofPolys <$> polysEvt
         
         pure { input: nModeEvt, output : unit}
