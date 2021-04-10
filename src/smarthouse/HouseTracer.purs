@@ -5,9 +5,10 @@ import Prelude
 import Control.Alternative (empty)
 import Control.Monad.Reader (ask)
 import Data.Array (fromFoldable)
+import Data.Compactable (compact)
 import Data.Default (class Default, def)
 import Data.Filterable (filter)
-import Data.Foldable (foldl, traverse_)
+import Data.Foldable (class Foldable, foldl, traverse_)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Lens (Lens', view, (%~), (.~), (^.))
@@ -245,16 +246,19 @@ snapPoint p st Nothing Nothing Nothing          = fromMaybe p $ snapToVert p st
 snapPoint p st (Just l) Nothing Nothing         = fromMaybe p $ snapToLine p st l
 snapPoint p st Nothing (Just l) Nothing         = fromMaybe p $ snapToLine p st l
 snapPoint p st Nothing Nothing (Just l)         = fromMaybe p $ snapToLine p st l
-snapPoint p st (Just perpL) Nothing (Just endL) = fromMaybe p $ snapToCrossing p st perpL endL
-snapPoint p st Nothing (Just paraL) (Just endL) = fromMaybe p $ snapToCrossing p st paraL endL
-snapPoint p st (Just perpL) (Just paraL) _      = fromMaybe p $ snapToCrossing p st perpL paraL
+snapPoint p st (Just perpL) Nothing (Just endL) = fromMaybe p $ closestPoint p $ compact $ [snapToVert p st, snapToCrossing p perpL endL]
+snapPoint p st Nothing (Just paraL) (Just endL) = fromMaybe p $ closestPoint p $ compact $ [snapToVert p st, snapToCrossing p paraL endL]
+snapPoint p st (Just perpL) (Just paraL) _      = fromMaybe p $ closestPoint p $ compact $ [snapToVert p st, snapToCrossing p perpL paraL]
 
-snapToVert :: Vector3 -> TracerState -> Maybe Vector3
-snapToVert p st = fst $ foldl f (Tuple Nothing 0.0) $ st ^. _tracedVerts
+closestPoint :: forall f. Foldable f => Vector3 -> f Vector3 -> Maybe Vector3
+closestPoint p = fst <<< foldl f (Tuple Nothing 0.0) 
     where f o@(Tuple Nothing _) v = let d = dist p v
                                     in if d < 0.5 then Tuple (Just v) d else o
           f o@(Tuple (Just _) od) v = let d = dist p v
                                       in if d < od then Tuple (Just v) d else o
+
+snapToVert :: Vector3 -> TracerState -> Maybe Vector3
+snapToVert p st = closestPoint p $ st ^. _tracedVerts
 
 snapToLine :: Vector3 -> TracerState -> LineSeg Vector3 -> Maybe Vector3
 snapToLine p st l = f <$> lastVert st
@@ -262,8 +266,8 @@ snapToLine p st l = f <$> lastVert st
                 then projPointWithLineSeg v p l
                 else p
 
-snapToCrossing :: Vector3 -> TracerState -> LineSeg Vector3 -> LineSeg Vector3 -> Maybe Vector3
-snapToCrossing p st l1 l2 = filter f $ intersection l1 l2
+snapToCrossing :: Vector3 -> LineSeg Vector3 -> LineSeg Vector3 -> Maybe Vector3
+snapToCrossing p l1 l2 = filter f $ intersection l1 l2
     where f p1 = dist p p1 < 0.5
 
 --------------------------------------------------------
