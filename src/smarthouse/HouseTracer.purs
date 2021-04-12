@@ -2,6 +2,7 @@ module SmartHouse.HouseTracer where
 
 import Prelude
 
+import Control.Alt ((<|>))
 import Control.Alternative (empty)
 import Control.Monad.Reader (ask)
 import Data.Array (fromFoldable)
@@ -23,9 +24,9 @@ import Editor.ObjectAdder (createObjectAdder, mkCandidatePoint)
 import Editor.PanelAPIInterpreter (_finished)
 import Editor.SceneEvent (SceneMouseMoveEvent)
 import Effect.Unsafe (unsafePerformEffect)
-import FRP.Dynamic (Dynamic, gateDyn, sampleDyn, step)
+import FRP.Dynamic (Dynamic, sampleDyn, step)
 import FRP.Event (Event)
-import FRP.Event.Extra (multicast, performEvent)
+import FRP.Event.Extra (debug, delay, multicast, performEvent)
 import Math.Angle (degreeVal)
 import Math.LineSeg (LineSeg, _end, _start, distToLineSeg, intersection, lineVec, linesAngle, mkLineSeg, perpendicularLineSeg, projPointWithLineSeg)
 import Model.Polygon (Polygon, newPolygon)
@@ -38,19 +39,15 @@ import Three.Core.Object3D (worldToLocal)
 import Three.Math.Vector (Vector3, addScaled, dist, mkVec3, toVec2, toVec3)
 
 newtype HouseTracerConf = HouseTracerConf {
-    mouseMove :: Event SceneMouseMoveEvent,
-    canEdit   :: Dynamic Boolean
+    mouseMove :: Event SceneMouseMoveEvent
     }
 
 derive instance newtypeHouseTracerConf :: Newtype HouseTracerConf _
 instance defaultHouseTracerConf :: Default HouseTracerConf where
     def = HouseTracerConf {
-        mouseMove : empty,
-        canEdit   : pure false
+        mouseMove : empty
         }
 
-_canEdit :: forall t a r. Newtype t { canEdit :: a | r } => Lens' t a
-_canEdit = _Newtype <<< prop (SProxy :: SProxy "canEdit")
 
 newtype TracerState = TracerState {
     tracedVerts :: List Vector3,    -- all traced points in reverse order
@@ -198,11 +195,8 @@ renderMaybeHelperLine :: forall e. Maybe (LineSeg Vector3) -> Node e Unit
 renderMaybeHelperLine Nothing  = pure unit
 renderMaybeHelperLine (Just l) = renderHelperLine l
 
-procShow :: forall v. Boolean -> Maybe v -> Maybe v
-procShow s v = if s then v else Nothing
-
-helperLines :: forall e. Dynamic Boolean -> Dynamic TracerState -> Dynamic (Maybe Vector3) -> Node e (Dynamic (Maybe Vector3))
-helperLines showDyn stDyn pDyn = do
+helperLines :: forall e. Dynamic TracerState -> Dynamic (Maybe Vector3) -> Node e (Dynamic (Maybe Vector3))
+helperLines stDyn pDyn = do
     let tempLineDyn = tempLineTo <$> pDyn <*> stDyn
         -- calculate the perpendicular helper line to render
         perpLineDyn = perpHelperLine <$> stDyn
@@ -222,16 +216,16 @@ helperLines showDyn stDyn pDyn = do
         spDyn = f <$> pDyn <*> stDyn <*> perpLineShowDyn <*> paraLineDyn <*> endLineDyn
         
     -- render temp line
-    dynamic_ $ renderMaybeLine <$> (procShow <$> showDyn <*> tempLineDyn)
+    dynamic_ $ renderMaybeLine <$> tempLineDyn
 
     -- render the perpendicular helper line
-    dynamic_ $ renderMaybeHelperLine <$> (procShow <$> showDyn <*> perpLineShowDyn)
+    dynamic_ $ renderMaybeHelperLine <$> perpLineShowDyn
 
     -- render the parallel helper line
-    dynamic_ $ renderMaybeHelperLine <$> (procShow <$> showDyn <*> paraLineDyn)
+    dynamic_ $ renderMaybeHelperLine <$> paraLineDyn
 
     -- render the end helper line
-    dynamic_ $ renderMaybeHelperLine <$> (procShow <$> showDyn <*> endLineDyn)
+    dynamic_ $ renderMaybeHelperLine <$> endLineDyn
 
     pure $ spDyn
 
@@ -274,7 +268,6 @@ vertAdder stDyn = do
     let parent = e ^. _parent
         conf   = e ^. _env
 
-        canEdit  = conf ^. _canEdit
         mouseEvt = conf ^. _mouseMove
 
         -- get a candidate point
@@ -282,10 +275,10 @@ vertAdder stDyn = do
             np <- worldToLocal (evt ^. _point) parent
             pure $ Just $ mkCandidatePoint np (normal $ evt ^. _face)
 
-        candPntDyn = step Nothing $ performEvent $ getCandPoint <$> gateDyn canEdit mouseEvt
+        candPntDyn = step Nothing $ performEvent $ getCandPoint <$> mouseEvt
         candVecDyn = map (view _position) <$> candPntDyn
 
-    newPDyn <- helperLines canEdit stDyn candVecDyn
+    newPDyn <- helperLines stDyn candVecDyn
 
     let newCandPDyn = updPos <$> candPntDyn <*> newPDyn
         
@@ -296,7 +289,7 @@ vertAdder stDyn = do
     -- render the object adder
     let opt = def # _name .~ "vert-adder"
                   # _position .~ pure (mkVec3 0.0 0.0 0.2)
-    addedPntEvt <- node opt $ createObjectAdder newCandPDyn canEdit
+    addedPntEvt <- node opt $ createObjectAdder newCandPDyn (pure true)
     
     pure $ view _position <$> addedPntEvt
 
@@ -304,7 +297,7 @@ vertAdder stDyn = do
 traceHouse :: Node HouseTracerConf (Event (Polygon Vector3))
 traceHouse = node (def # _name .~ "house-tracer") $
     fixNodeE \stEvt -> do
-        let stDyn = step def stEvt
+        let stDyn = step def $ debug stEvt
         -- render the current state
         dynamic_ $ renderState <$> stDyn
 
@@ -314,4 +307,7 @@ traceHouse = node (def # _name .~ "house-tracer") $
         let newStEvt = multicast $ sampleDyn stDyn $ addNewVert <$> newVertEvt
             polyEvt  = multicast $ newPolygon <<< view _tracedVerts <$> filter (view _finished) newStEvt
 
-        pure { input: newStEvt, output: polyEvt }
+            -- reset state after finish tracing a new house
+            newStAfterFinishEvt = delay 20 $ const def <$> polyEvt
+
+        pure { input: multicast (newStAfterFinishEvt <|> newStEvt), output: polyEvt }

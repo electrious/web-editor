@@ -24,7 +24,7 @@ import Rendering.DynamicNode (eventNode_)
 import Rendering.Node (Node, getEnv, localEnv, mesh, mkNodeEnv, node, runNode, tapMouseMesh)
 import Rendering.TextureLoader (loadTextureFromUrl)
 import SmartHouse.Algorithm.Skeleton (skeletonize)
-import SmartHouse.HouseTracer (_canEdit, traceHouse)
+import SmartHouse.HouseTracer (traceHouse)
 import Three.Core.Geometry (_bevelEnabled, _depth, mkExtrudeGeometry, mkPlaneGeometry, mkShape)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterialWithColor, mkMeshBasicMaterialWithTexture, mkMeshPhongMaterial)
 import Three.Loader.TextureLoader (clampToEdgeWrapping, repeatWrapping, setRepeat, setWrapS, setWrapT)
@@ -65,7 +65,6 @@ createHouseBuilder = node (def # _name .~ "house-builder") do
     helper <- mkHelperPlane
 
     let cfg = def # _mouseMove .~ helper ^. _mouseMove
-                  # _canEdit   .~ pure true
 
         h = meter 3.5
         --bgTapEvt = const unit <$> helper ^. _tapped
