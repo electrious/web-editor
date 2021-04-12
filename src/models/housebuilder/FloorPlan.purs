@@ -1,4 +1,4 @@
-module Model.HouseBuilder.FloorPlan (FloorPlan(..), newFloorPlan, FloorPlanOp(..), floorPlanTop, floorPlanHousePoints, floorGraph) where
+module Model.HouseBuilder.FloorPlan (FloorPlan(..), newFloorPlan, FloorPlanOp(..), floorPlanTop, floorPlanHousePoints) where
 
 import Prelude
 
@@ -7,8 +7,6 @@ import Data.Default (class Default, def)
 import Data.Lens (view, (.~), (^.))
 import Data.Meter (Meter, meter, meterVal)
 import Data.Newtype (class Newtype)
-import Data.UGraph (UGraph, addPolygon)
-import Data.UGraph as UG
 import Data.UUID (UUID, emptyUUID, genUUID)
 import Editor.Common.Lenses (_height, _id, _name, _polygon, _position)
 import Effect (Effect)
@@ -16,7 +14,6 @@ import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic)
 import Model.ActiveMode (ActiveMode(..))
-import Model.HouseBuilder.HousePoint (HousePoint, HousePointType(..), _pointType)
 import Model.Polygon (class IsPolygon, Polygon, _polyVerts, polygonAround)
 import Model.UUID (class HasUUID, assignNewIds)
 import Rendering.Node (localEnv, mesh, node)
@@ -84,13 +81,6 @@ floorPlanTop fp = fp ^. _height + meter 0.02
 floorPlanHousePoints :: forall v. Default v => Vector v => FloorPlan -> Polygon v
 floorPlanHousePoints fp = f <$> fp ^. _polygon
     where f v = updateVector def $ mkVec3 (vecX v) (vecY v) 0.0
-
--- | convert floorplan to a default graph with all vertices set to GutterPoint
-floorGraph :: forall w. Default w => FloorPlan -> Effect (UGraph HousePoint w)
-floorGraph fp = do
-    let setType p = p # _pointType .~ GutterPoint
-    poly <- assignNewIds $ setType <$> floorPlanHousePoints fp
-    pure $ addPolygon poly UG.empty
 
 instance nodeRenderableFloorPlan :: NodeRenderable (Dynamic ActiveMode) FloorPlan TapMouseMesh where
     render fp = do
