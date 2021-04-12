@@ -14,14 +14,13 @@ import Effect (Effect)
 import Effect.Class (liftEffect)
 import Effect.Class.Console (log)
 import Effect.Random (randomRange)
-import FRP.Dynamic (step)
 import FRP.Event (subscribe)
 import FRP.Event.Extra (performEvent)
 import HouseBuilder.PolyGeometry (mkPolyGeometry)
 import Math.Angle (degree)
 import Model.Polygon (Polygon, counterClockPoly)
 import Rendering.DynamicNode (eventNode_)
-import Rendering.Node (Node, fixNodeE, getEnv, localEnv, mesh, mkNodeEnv, node, runNode, tapMouseMesh)
+import Rendering.Node (Node, getEnv, localEnv, mesh, mkNodeEnv, node, runNode, tapMouseMesh)
 import Rendering.TextureLoader (loadTextureFromUrl)
 import SmartHouse.Algorithm.Skeleton (skeletonize)
 import SmartHouse.HouseTracer (_canEdit, traceHouse)
@@ -30,13 +29,6 @@ import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterialWithColor, mkM
 import Three.Loader.TextureLoader (clampToEdgeWrapping, repeatWrapping, setRepeat, setWrapS, setWrapT)
 import Three.Math.Color (Color, mkColorRGB)
 import Three.Math.Vector (Vector3)
-
--- represent the state of the builder
-data BuilderMode = AddFloorPlan  -- Add and edit FloorPlans
-                 | AddRoofs      -- Add Roof ridges and plates
-
-derive instance eqBuilderMode :: Eq BuilderMode
-
 
 newtype HouseBuilderConfig = HouseBuilderConfig {
     leadId :: Int
@@ -67,27 +59,22 @@ mkHelperPlane = do
     tapMouseMesh (def # _name .~ "helper-plane") geo mat
 
 createHouseBuilder :: Node HouseBuilderConfig Unit
-createHouseBuilder = node (def # _name .~ "house-builder") $
-    fixNodeE \newModeEvt -> do
-        -- add helper plane that accepts tap and drag events
-        helper <- mkHelperPlane
+createHouseBuilder = node (def # _name .~ "house-builder") do
+    -- add helper plane that accepts tap and drag events
+    helper <- mkHelperPlane
 
-        let modeDyn = step AddFloorPlan newModeEvt
-            cfg = def # _mouseMove .~ helper ^. _mouseMove
-                      # _canEdit   .~ ((==) AddFloorPlan <$> modeDyn)
+    let cfg = def # _mouseMove .~ helper ^. _mouseMove
+                  # _canEdit   .~ pure true
 
-            --bgTapEvt = const unit <$> helper ^. _tapped
+        --bgTapEvt = const unit <$> helper ^. _tapped
     
-        floorPlanEvt <- localEnv (const cfg) $ traceHouse
+    floorPlanEvt <- localEnv (const cfg) $ traceHouse
 
-        _ <- liftEffect $ subscribe floorPlanEvt (show >>> log)
-        let nModeEvt = const AddRoofs <$> floorPlanEvt
+    _ <- liftEffect $ subscribe floorPlanEvt (show >>> log)
 
-        -- calculate skeletons
-        let polysEvt = performEvent $ skeletonize (degree 30.0) <<< singleton <<< counterClockPoly <$> floorPlanEvt
-        eventNode_ $ renderRoofPolys <$> polysEvt
-        
-        pure { input: nModeEvt, output : unit}
+    -- calculate skeletons
+    let polysEvt = performEvent $ skeletonize (degree 30.0) <<< singleton <<< counterClockPoly <$> floorPlanEvt
+    eventNode_ $ renderRoofPolys <$> polysEvt
 
 
 -- | external API to build a 3D house for 2D lead
