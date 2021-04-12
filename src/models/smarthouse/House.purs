@@ -20,7 +20,6 @@ import Math.Angle (Angle)
 import Model.Polygon (Polygon, _polyVerts, counterClockPoly)
 import Model.UUID (class HasUUID)
 import Rendering.Node (Node, mesh, node)
-import Rendering.NodeRenderable (class NodeRenderable)
 import SmartHouse.Algorithm.Skeleton (skeletonize)
 import Three.Core.Geometry (_bevelEnabled, _depth, mkExtrudeGeometry, mkShape)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterialWithColor, mkMeshPhongMaterial)
@@ -54,13 +53,12 @@ createHouseFrom slope poly = do
 
 
 -- rendering
-instance nodeRenderableHouse :: NodeRenderable e House Unit where
-    render house = do
-        let h = house ^. _height
-            p = mkVec3 0.0 0.0 (meterVal h)
-        renderWalls h $ house ^. _floor
-        node (def # _position .~ pure p) $ traverse_ renderRoofPoly $ house ^. _roofs
-        
+renderHouse :: forall e.House -> Node e Unit
+renderHouse house = do
+    let h = house ^. _height
+        p = mkVec3 0.0 0.0 (meterVal h)
+    renderWalls h $ house ^. _floor
+    node (def # _position .~ pure p) $ traverse_ renderRoofPoly $ house ^. _roofs
 
 randomColor :: Effect Color
 randomColor = do

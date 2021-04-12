@@ -4,18 +4,21 @@ import Prelude hiding (degree)
 
 import Custom.Mesh (TapMouseMesh)
 import Data.Default (class Default, def)
+import Data.Foldable (traverse_)
 import Data.Lens (view, (.~), (^.))
+import Data.Map as M
 import Data.Newtype (class Newtype)
 import Editor.Common.Lenses (_leadId, _mouseMove, _name)
 import Editor.Editor (Editor)
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import FRP.Event (Event)
+import FRP.Dynamic (sampleDyn)
 import FRP.Event.Extra (performEvent)
 import Math.Angle (degree)
-import Model.SmartHouse.House (createHouseFrom)
-import Rendering.DynamicNode (renderEvent)
-import Rendering.Node (Node, getEnv, localEnv, mkNodeEnv, node, runNode, tapMouseMesh)
+import Model.SmartHouse.House (createHouseFrom, renderHouse)
+import Model.UUID (idLens)
+import Rendering.DynamicNode (dynamic_)
+import Rendering.Node (Node, fixNodeDWith, getEnv, localEnv, mkNodeEnv, node, runNode, tapMouseMesh)
 import Rendering.TextureLoader (loadTextureFromUrl)
 import SmartHouse.HouseTracer (traceHouse)
 import Three.Core.Geometry (mkPlaneGeometry)
@@ -50,19 +53,27 @@ mkHelperPlane = do
 
     tapMouseMesh (def # _name .~ "helper-plane") geo mat
 
+
 createHouseBuilder :: Node HouseBuilderConfig Unit
-createHouseBuilder = node (def # _name .~ "house-builder") do
-    -- add helper plane that accepts tap and drag events
-    helper <- mkHelperPlane
+createHouseBuilder = node (def # _name .~ "house-builder") $
+    fixNodeDWith M.empty \housesDyn -> do
+        -- add helper plane that accepts tap and drag events
+        helper <- mkHelperPlane
 
-    let cfg = def # _mouseMove .~ helper ^. _mouseMove
+        -- render all houses
+        dynamic_ $ traverse_ renderHouse <$> housesDyn
 
-        --bgTapEvt = const unit <$> helper ^. _tapped
-    
-    floorPlanEvt <- localEnv (const cfg) traceHouse
-    let houseEvt = performEvent $ createHouseFrom (degree 30.0) <$> floorPlanEvt
-    _ :: Event Unit <- renderEvent houseEvt
-    pure unit
+        let cfg = def # _mouseMove .~ helper ^. _mouseMove
+
+            --bgTapEvt = const unit <$> helper ^. _tapped
+        
+        floorPlanEvt <- localEnv (const cfg) traceHouse
+        let houseEvt = performEvent $ createHouseFrom (degree 30.0) <$> floorPlanEvt
+
+            f h = M.insert (h ^. idLens) h
+            newHsEvt = sampleDyn housesDyn $ f <$> houseEvt
+
+        pure { input: newHsEvt, output : unit }
 
 
 -- | external API to build a 3D house for 2D lead
