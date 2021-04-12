@@ -7,8 +7,9 @@ import Data.Default (class Default, def)
 import Data.Foldable (traverse_)
 import Data.Lens (view, (.~), (^.))
 import Data.List (List, singleton)
+import Data.Meter (Meter, meter, meterVal)
 import Data.Newtype (class Newtype)
-import Editor.Common.Lenses (_leadId, _mouseMove, _name)
+import Editor.Common.Lenses (_leadId, _mouseMove, _name, _position)
 import Editor.Editor (Editor)
 import Effect (Effect)
 import Effect.Class (liftEffect)
@@ -18,17 +19,17 @@ import FRP.Event (subscribe)
 import FRP.Event.Extra (performEvent)
 import HouseBuilder.PolyGeometry (mkPolyGeometry)
 import Math.Angle (degree)
-import Model.Polygon (Polygon, counterClockPoly)
+import Model.Polygon (Polygon, _polyVerts, counterClockPoly)
 import Rendering.DynamicNode (eventNode_)
 import Rendering.Node (Node, getEnv, localEnv, mesh, mkNodeEnv, node, runNode, tapMouseMesh)
 import Rendering.TextureLoader (loadTextureFromUrl)
 import SmartHouse.Algorithm.Skeleton (skeletonize)
 import SmartHouse.HouseTracer (_canEdit, traceHouse)
-import Three.Core.Geometry (mkPlaneGeometry)
-import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterialWithColor, mkMeshBasicMaterialWithTexture)
+import Three.Core.Geometry (_bevelEnabled, _depth, mkExtrudeGeometry, mkPlaneGeometry, mkShape)
+import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterialWithColor, mkMeshBasicMaterialWithTexture, mkMeshPhongMaterial)
 import Three.Loader.TextureLoader (clampToEdgeWrapping, repeatWrapping, setRepeat, setWrapS, setWrapT)
 import Three.Math.Color (Color, mkColorRGB)
-import Three.Math.Vector (Vector3)
+import Three.Math.Vector (Vector3, mkVec3, toVec2)
 
 newtype HouseBuilderConfig = HouseBuilderConfig {
     leadId :: Int
@@ -66,6 +67,7 @@ createHouseBuilder = node (def # _name .~ "house-builder") do
     let cfg = def # _mouseMove .~ helper ^. _mouseMove
                   # _canEdit   .~ pure true
 
+        h = meter 3.5
         --bgTapEvt = const unit <$> helper ^. _tapped
     
     floorPlanEvt <- localEnv (const cfg) $ traceHouse
@@ -74,7 +76,11 @@ createHouseBuilder = node (def # _name .~ "house-builder") do
 
     -- calculate skeletons
     let polysEvt = performEvent $ skeletonize (degree 30.0) <<< singleton <<< counterClockPoly <$> floorPlanEvt
-    eventNode_ $ renderRoofPolys <$> polysEvt
+        pos = mkVec3 0.0 0.0 (meterVal h)
+    node (def # _position .~ pure pos) $ eventNode_ $ renderRoofPolys <$> polysEvt
+
+    -- render walls1
+    eventNode_ $ renderWalls h <$> floorPlanEvt
 
 
 -- | external API to build a 3D house for 2D lead
@@ -100,3 +106,13 @@ renderRoofPoly poly = do
     geo <- liftEffect $ mkPolyGeometry poly
     mat <- liftEffect randomRoofMaterial
     void $ mesh (def # _name .~ "roof") geo mat
+
+
+renderWalls :: forall e. Meter -> Polygon Vector3 -> Node e Unit
+renderWalls height poly = do
+    shp <- liftEffect $ mkShape $ (toVec2 <$> poly) ^. _polyVerts
+    geo <- liftEffect $ mkExtrudeGeometry shp $ def # _depth .~ meterVal height
+                                                    # _bevelEnabled .~ false
+    mat <- liftEffect $ mkMeshPhongMaterial 0x999999
+
+    void $ mesh (def # _name .~ "walls") geo mat
