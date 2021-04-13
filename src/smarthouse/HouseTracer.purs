@@ -26,7 +26,7 @@ import Editor.SceneEvent (SceneMouseMoveEvent)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, sampleDyn, step)
 import FRP.Event (Event)
-import FRP.Event.Extra (debug, delay, multicast, performEvent)
+import FRP.Event.Extra (delay, multicast, performEvent)
 import Math.Angle (degreeVal)
 import Math.LineSeg (LineSeg, _end, _start, distToLineSeg, intersection, lineVec, linesAngle, mkLineSeg, perpendicularLineSeg, projPointWithLineSeg)
 import Model.Polygon (Polygon, newPolygon)
@@ -297,7 +297,7 @@ vertAdder stDyn = do
 traceHouse :: Node HouseTracerConf (Event (Polygon Vector3))
 traceHouse = node (def # _name .~ "house-tracer") $
     fixNodeE \stEvt -> do
-        let stDyn = step def $ debug stEvt
+        let stDyn = step def stEvt
         -- render the current state
         dynamic_ $ renderState <$> stDyn
 
