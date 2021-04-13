@@ -23,7 +23,7 @@ import Rendering.TextureLoader (loadTextureFromUrl)
 import SmartHouse.HouseTracer (traceHouse)
 import Three.Core.Geometry (mkPlaneGeometry)
 import Three.Core.Material (mkMeshBasicMaterialWithTexture)
-import Three.Loader.TextureLoader (clampToEdgeWrapping, repeatWrapping, setRepeat, setWrapS, setWrapT)
+import Three.Loader.TextureLoader (Texture, clampToEdgeWrapping, repeatWrapping, setRepeat, setWrapS, setWrapT)
 
 newtype HouseBuilderConfig = HouseBuilderConfig {
     leadId :: Int
@@ -38,30 +38,36 @@ instance defaultHouseBuilderConfig :: Default HouseBuilderConfig where
 imageUrlForLead :: Int -> String
 imageUrlForLead l = "https://s3.eu-west-1.amazonaws.com/data.electrious.com/leads/" <> show l <> "/manual.jpg"
 
-mkHelperPlane :: Node HouseBuilderConfig TapMouseMesh
-mkHelperPlane = do
-    lId <- view _leadId <$> getEnv
+loadHouseTexture :: Int -> Effect Texture
+loadHouseTexture lId = do
     let img = imageUrlForLead lId
+        t   = loadTextureFromUrl img
+    setWrapS clampToEdgeWrapping t
+    setWrapT repeatWrapping t
+    setRepeat 1.0 1.0 t
 
+    pure t
+
+
+mkHelperPlane :: forall e. Texture -> Node e TapMouseMesh
+mkHelperPlane t = do
     geo <- liftEffect $ mkPlaneGeometry 100.0 46.5 10 10
-    let t = loadTextureFromUrl img
-    liftEffect do
-        setWrapS clampToEdgeWrapping t
-        setWrapT repeatWrapping t
-        setRepeat 1.0 1.0 t
     mat <- liftEffect $ mkMeshBasicMaterialWithTexture t
 
     tapMouseMesh (def # _name .~ "helper-plane") geo mat
 
 
 createHouseBuilder :: Node HouseBuilderConfig Unit
-createHouseBuilder = node (def # _name .~ "house-builder") $
+createHouseBuilder = node (def # _name .~ "house-builder") $ do
+    lId <- view _leadId <$> getEnv
+    t <- liftEffect $ loadHouseTexture lId
+    
     fixNodeDWith M.empty \housesDyn -> do
         -- add helper plane that accepts tap and drag events
-        helper <- mkHelperPlane
+        helper <- mkHelperPlane t
 
         -- render all houses
-        dynamic_ $ traverse_ renderHouse <$> housesDyn
+        localEnv (const t) $ dynamic_ $ traverse_ renderHouse <$> housesDyn
 
         let cfg = def # _mouseMove .~ helper ^. _mouseMove
 

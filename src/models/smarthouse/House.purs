@@ -14,16 +14,15 @@ import Data.UUID (UUID, genUUID)
 import Editor.Common.Lenses (_floor, _height, _id, _name, _position, _roofs)
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import Effect.Random (randomRange)
 import HouseBuilder.PolyGeometry (mkPolyGeometry)
 import Math.Angle (Angle)
 import Model.Polygon (Polygon, _polyVerts, counterClockPoly)
 import Model.UUID (class HasUUID)
-import Rendering.Node (Node, mesh, node)
+import Rendering.Node (Node, getEnv, mesh, node)
 import SmartHouse.Algorithm.Skeleton (skeletonize)
 import Three.Core.Geometry (_bevelEnabled, _depth, mkExtrudeGeometry, mkShape)
-import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterialWithColor, mkMeshPhongMaterial)
-import Three.Math.Color (Color, mkColorRGB)
+import Three.Core.Material (mkMeshBasicMaterialWithTexture, mkMeshPhongMaterial)
+import Three.Loader.TextureLoader (Texture)
 import Three.Math.Vector (Vector3, mkVec3, toVec2)
 
 newtype House = House {
@@ -51,29 +50,19 @@ createHouseFrom slope poly = do
         roofs  : roofs
         }
 
-
 -- rendering
-renderHouse :: forall e.House -> Node e Unit
+renderHouse :: House -> Node Texture Unit
 renderHouse house = do
     let h = house ^. _height
         p = mkVec3 0.0 0.0 (meterVal h)
     renderWalls h $ house ^. _floor
     node (def # _position .~ pure p) $ traverse_ renderRoofPoly $ house ^. _roofs
 
-randomColor :: Effect Color
-randomColor = do
-    r <- randomRange 0.0 1.0
-    g <- randomRange 0.0 1.0
-    b <- randomRange 0.0 1.0
-    mkColorRGB r g b
-
-randomRoofMaterial :: Effect MeshBasicMaterial
-randomRoofMaterial = randomColor >>= mkMeshBasicMaterialWithColor
-
-renderRoofPoly :: forall e. Polygon Vector3 -> Node e Unit
+renderRoofPoly :: Polygon Vector3 -> Node Texture Unit
 renderRoofPoly poly = do
+    t <- getEnv
     geo <- liftEffect $ mkPolyGeometry poly
-    mat <- liftEffect randomRoofMaterial
+    mat <- liftEffect $ mkMeshBasicMaterialWithTexture t
     void $ mesh (def # _name .~ "roof") geo mat
 
 
