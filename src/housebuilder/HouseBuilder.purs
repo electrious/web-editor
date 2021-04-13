@@ -7,15 +7,16 @@ import Data.Default (class Default, def)
 import Data.Foldable (traverse_)
 import Data.Lens (view, (.~), (^.))
 import Data.Map as M
+import Data.Meter (meter, meterVal)
 import Data.Newtype (class Newtype)
-import Editor.Common.Lenses (_leadId, _mouseMove, _name)
+import Editor.Common.Lenses (_height, _leadId, _mouseMove, _name, _width)
 import Editor.Editor (Editor)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (sampleDyn)
 import FRP.Event.Extra (performEvent)
 import Math.Angle (degree)
-import Model.SmartHouse.House (createHouseFrom, renderHouse)
+import Model.SmartHouse.House (HouseTextureInfo, _size, _texture, createHouseFrom, mkHouseTextureInfo, renderHouse)
 import Model.UUID (idLens)
 import Rendering.DynamicNode (dynamic_)
 import Rendering.Node (Node, fixNodeDWith, getEnv, localEnv, mkNodeEnv, node, runNode, tapMouseMesh)
@@ -49,10 +50,12 @@ loadHouseTexture lId = do
     pure t
 
 
-mkHelperPlane :: forall e. Texture -> Node e TapMouseMesh
+mkHelperPlane :: forall e. HouseTextureInfo -> Node e TapMouseMesh
 mkHelperPlane t = do
-    geo <- liftEffect $ mkPlaneGeometry 100.0 46.5 10 10
-    mat <- liftEffect $ mkMeshBasicMaterialWithTexture t
+    let w = meterVal $ t ^. _size <<< _width
+        h = meterVal $ t ^. _size <<< _height
+    geo <- liftEffect $ mkPlaneGeometry w h 10 10
+    mat <- liftEffect $ mkMeshBasicMaterialWithTexture $ t ^. _texture
 
     tapMouseMesh (def # _name .~ "helper-plane") geo mat
 
@@ -61,13 +64,15 @@ createHouseBuilder :: Node HouseBuilderConfig Unit
 createHouseBuilder = node (def # _name .~ "house-builder") $ do
     lId <- view _leadId <$> getEnv
     t <- liftEffect $ loadHouseTexture lId
+    let tInfo = mkHouseTextureInfo t (def # _width .~ meter 100.0
+                                          # _height .~ meter 46.5)
     
     fixNodeDWith M.empty \housesDyn -> do
         -- add helper plane that accepts tap and drag events
-        helper <- mkHelperPlane t
+        helper <- mkHelperPlane tInfo
 
         -- render all houses
-        localEnv (const t) $ dynamic_ $ traverse_ renderHouse <$> housesDyn
+        localEnv (const tInfo) $ dynamic_ $ traverse_ renderHouse <$> housesDyn
 
         let cfg = def # _mouseMove .~ helper ^. _mouseMove
 

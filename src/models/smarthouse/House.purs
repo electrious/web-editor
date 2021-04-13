@@ -5,16 +5,20 @@ import Prelude
 import Data.Default (def)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Lens ((.~), (^.))
+import Data.Hardware.Size (Size)
+import Data.Lens (Lens', (.~), (^.))
+import Data.Lens.Iso.Newtype (_Newtype)
+import Data.Lens.Record (prop)
 import Data.List (List, singleton)
 import Data.Meter (Meter, meter, meterVal)
 import Data.Newtype (class Newtype)
+import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse_)
 import Data.UUID (UUID, genUUID)
 import Editor.Common.Lenses (_floor, _height, _id, _name, _position, _roofs)
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import HouseBuilder.PolyGeometry (mkPolyGeometry)
+import HouseBuilder.PolyGeometry (mkPolyGeometryWithUV)
 import Math.Angle (Angle)
 import Model.Polygon (Polygon, _polyVerts, counterClockPoly)
 import Model.UUID (class HasUUID)
@@ -51,18 +55,34 @@ createHouseFrom slope poly = do
         }
 
 -- rendering
-renderHouse :: House -> Node Texture Unit
+newtype HouseTextureInfo = HouseTextureInfo {
+    texture :: Texture,
+    size    :: Size
+    }
+
+derive instance newtypeHouseTextureInfo :: Newtype HouseTextureInfo _
+
+mkHouseTextureInfo :: Texture -> Size -> HouseTextureInfo
+mkHouseTextureInfo t s = HouseTextureInfo { texture : t, size : s }
+
+renderHouse :: House -> Node HouseTextureInfo Unit
 renderHouse house = do
     let h = house ^. _height
         p = mkVec3 0.0 0.0 (meterVal h)
     renderWalls h $ house ^. _floor
     node (def # _position .~ pure p) $ traverse_ renderRoofPoly $ house ^. _roofs
 
-renderRoofPoly :: Polygon Vector3 -> Node Texture Unit
+_texture :: forall t a r. Newtype t { texture :: a | r } => Lens' t a
+_texture = _Newtype <<< prop (SProxy :: SProxy "texture")
+
+_size :: forall t a r. Newtype t { size :: a | r } => Lens' t a
+_size = _Newtype <<< prop (SProxy :: SProxy "size")
+
+renderRoofPoly :: Polygon Vector3 -> Node HouseTextureInfo Unit
 renderRoofPoly poly = do
-    t <- getEnv
-    geo <- liftEffect $ mkPolyGeometry poly
-    mat <- liftEffect $ mkMeshBasicMaterialWithTexture t
+    info <- getEnv
+    geo <- liftEffect $ mkPolyGeometryWithUV (info ^. _size) poly
+    mat <- liftEffect $ mkMeshBasicMaterialWithTexture (info ^. _texture)
     void $ mesh (def # _name .~ "roof") geo mat
 
 
