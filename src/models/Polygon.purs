@@ -1,5 +1,5 @@
 module Model.Polygon (Polygon, _polyVerts, newPolygon, polygonAround, numOfVerts,
-                      addVertexAt, delVertexAt, updateVertAt, polyCenter, polyEdges, polyWindows,
+                      addVertexAt, delVertexAt, updateVertAt, polyCenter, polyEdges, polyOutline, polyWindows,
                       polyMidPoints, polygonBBox, counterClockPoly,
                       renderPolygon, class IsPolygon, toPolygon, PolyOrient(..), polygonOrient) where
 
@@ -20,12 +20,13 @@ import Data.Maybe (Maybe, fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Traversable (class Traversable)
 import Data.Triple (Triple(..))
-import Data.Tuple (Tuple(..))
+import Data.Tuple (Tuple(..), uncurry)
 import Editor.Common.Lenses (_maxX, _maxY, _mesh, _minX, _minY)
 import Editor.Disposable (Disposee(..))
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic, current, subscribeDyn)
+import Math.LineSeg (LineSeg(..), mkLineSeg)
 import RBush.RBush (BBox)
 import Rendering.Node (getEnv, tapMouseMesh)
 import Rendering.NodeRenderable (class NodeRenderable)
@@ -101,6 +102,9 @@ polyEdges poly = if length vs < 2
                  else zip vs v2Lst
     where vs    = poly ^. _polyVerts
           v2Lst = fromMaybe [] $ snoc <$> tail vs <*> head vs
+
+polyOutline :: forall v. Vector v => Polygon v -> Array (LineSeg v)
+polyOutline = map (uncurry mkLineSeg) <<< polyEdges
 
 -- | for each vertex, get a triple with its left and right neighbor vertices
 polyWindows :: forall v. Polygon v -> Array (Triple v v v)

@@ -14,8 +14,7 @@ import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple(..))
 import Math.Angle (Angle)
 import Math.Utils (lineIntersection)
-import Model.Roof.RoofPlate (angleBetween)
-import Three.Math.Vector (class Vector, Vector2, Vector3, addScaled, cross, mkVec3, normal, toVec2, toVec3, (<**>), (<+>), (<->), (<.>))
+import Three.Math.Vector (class Vector, Vector2, Vector3, addScaled, angleBetween, cross, mkVec3, normal, toVec2, toVec3, (<**>), (<+>), (<->), (<.>))
 import Three.Math.Vector as V
 
 newtype LineSeg v = LineSeg {

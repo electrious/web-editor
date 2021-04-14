@@ -20,10 +20,11 @@ import Effect (Effect)
 import Effect.Class (liftEffect)
 import HouseBuilder.PolyGeometry (mkPolyGeometryWithUV)
 import Math.Angle (Angle)
-import Model.Polygon (Polygon, _polyVerts, counterClockPoly)
+import Model.Polygon (Polygon, _polyVerts, counterClockPoly, polyOutline)
 import Model.UUID (class HasUUID)
 import Rendering.Node (Node, getEnv, mesh, node)
 import SmartHouse.Algorithm.Skeleton (skeletonize)
+import SmartHouse.HouseTracer (renderLine)
 import Three.Core.Geometry (_bevelEnabled, _depth, mkExtrudeGeometry, mkShape)
 import Three.Core.Material (mkMeshBasicMaterialWithTexture, mkMeshPhongMaterial)
 import Three.Loader.TextureLoader (Texture)
@@ -81,6 +82,11 @@ _size = _Newtype <<< prop (SProxy :: SProxy "size")
 renderRoofPoly :: Polygon Vector3 -> Node HouseTextureInfo Unit
 renderRoofPoly poly = do
     info <- getEnv
+
+    -- render the roof outline as white line
+    traverse_ renderLine $ polyOutline poly
+    
+    -- render the roof polygon
     geo <- liftEffect $ mkPolyGeometryWithUV (info ^. _size) poly
     mat <- liftEffect $ mkMeshBasicMaterialWithTexture (info ^. _texture)
     void $ mesh (def # _name .~ "roof") geo mat

@@ -20,11 +20,11 @@ import Editor.Common.Lenses (_alignment, _center, _id, _leadId, _normal, _orient
 import Effect (Effect)
 import Foreign.Generic (class Decode, class Encode, decode, defaultOptions, encode, genericDecode, genericEncode)
 import Math as Math
-import Math.Angle (Angle, acos, atan2, degree, degreeVal)
+import Math.Angle (Angle, atan2, degree, degreeVal)
 import Model.Polygon (class IsPolygon, newPolygon)
 import Model.Roof.Panel (Alignment(..), Orientation(..))
 import Model.UUID (class HasUUID)
-import Three.Math.Vector (class Vector, Vector2, Vector3, addScaled, cross, length, mkVec2, mkVec3, vecX, vecY, vecZ, (<.>))
+import Three.Math.Vector (Vector2, Vector3, addScaled, angleBetween, cross, mkVec2, mkVec3, vecX, vecY, vecZ)
 
 -- | define the core RoofPlate type as a record
 newtype RoofPlate = RoofPlate {
@@ -207,11 +207,6 @@ toJSRoofPlate r = JSRoofPlate {
     azimuth           : degreeVal $ r ^. _azimuth,
     rotation_override : degreeVal $ r ^. _rotation
 }
-
--- | helper function to calculate angle between two Vector3
-angleBetween :: forall a. Vector a => a -> a -> Angle
-angleBetween v1 v2 = acos $ d / (length v1 * length v2)
-    where d = v1 <.> v2
 
 -- | calculate the gutter vector based on roof normal vector
 -- the gutter vector always has 0 for the z element, and it should be

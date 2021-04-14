@@ -16,11 +16,11 @@ import Editor.Common.Lenses (_center, _index, _item, _maxX, _maxY, _minX, _minY,
 import Effect (Effect)
 import Math.Angle (degreeVal)
 import Model.Polygon (Polygon, polygonBBox, toPolygon)
-import Model.Roof.RoofPlate (RoofPlate, angleBetween)
+import Model.Roof.RoofPlate (RoofPlate)
 import RBush.RBush (BBox, RBush, load, mkRBush, search)
 import Three.Core.Geometry (class IsBufferGeometry, clone, getAttribute, isBufferAttribute, setNeedsUpdate, setXYZ)
 import Three.Core.Mesh (Mesh, setBufferGeometry)
-import Three.Math.Vector (Vector2, Vector3, addScaled, mkVec2, vecX, vecY, vecZ, (<->), (<.>))
+import Three.Math.Vector (Vector2, Vector3, addScaled, angleBetween, mkVec2, vecX, vecY, vecZ, (<->), (<.>))
 
 
 newtype VertexItem = VertexItem {
