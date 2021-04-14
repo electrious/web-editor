@@ -1,4 +1,4 @@
-module HouseBuilder.PolyGeometry where
+module SmartHouse.PolyGeometry where
 
 import Prelude
 

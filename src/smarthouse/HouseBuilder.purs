@@ -1,4 +1,4 @@
-module HouseBuilder.HouseBuilder (buildHouse, HouseBuilderConfig) where
+module SmartHouse.HouseBuilder (buildHouse, HouseBuilderConfig) where
 
 import Prelude hiding (degree)
 
