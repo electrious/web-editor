@@ -24,12 +24,13 @@ import FRP.Dynamic (latestEvt, sampleDyn)
 import FRP.Event (Event)
 import FRP.Event.Extra (anyEvt, performEvent)
 import Math.Angle (degree)
-import Model.SmartHouse.House (House, createHouseFrom, houseTapped, renderHouse)
+import Model.SmartHouse.House (House, createHouseFrom, houseTapped)
 import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo, _size, _texture, mkHouseTextureInfo)
 import Model.UUID (idLens)
 import Rendering.DynamicNode (dynamic)
 import Rendering.Node (Node, fixNodeDWith, getEnv, localEnv, mkNodeEnv, node, runNode, tapMouseMesh)
 import Rendering.TextureLoader (loadTextureFromUrl)
+import SmartHouse.HouseEditor (editHouse)
 import SmartHouse.HouseTracer (traceHouse)
 import Three.Core.Geometry (mkPlaneGeometry)
 import Three.Core.Material (mkMeshBasicMaterialWithTexture)
@@ -92,7 +93,7 @@ activateRoof u s = s # _active .~ u
 
 renderHousesState :: HousesState -> Node HouseTextureInfo (Event UUID)
 renderHousesState s = anyEvt <<< map houseTapped <$> traverse render (s ^. _houses)
-    where render h = renderHouse (s ^. _active == Just (h ^. idLens)) h
+    where render h = editHouse (s ^. _active == Just (h ^. idLens)) h
 
 createHouseBuilder :: Node HouseBuilderConfig Unit
 createHouseBuilder = node (def # _name .~ "house-builder") $ do
