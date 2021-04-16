@@ -5,7 +5,7 @@ import Prelude
 import Control.Alt ((<|>))
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Lens (Lens', (^.))
+import Data.Lens (Lens', (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (List, singleton)
@@ -14,7 +14,7 @@ import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
 import Data.UUID (UUID, genUUID)
-import Editor.Common.Lenses (_id)
+import Editor.Common.Lenses (_height, _id)
 import Effect (Effect)
 import FRP.Event (Event)
 import Math.Angle (Angle)
@@ -52,6 +52,10 @@ createHouseFrom slope poly = do
         height : meter 3.5,   -- default height
         roofs  : roofs
         }
+
+
+updateHeight :: Meter -> House -> House
+updateHeight height h = h # _height .~ height
 
 newtype HouseNode = HouseNode {
     id         :: UUID,
