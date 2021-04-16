@@ -56,7 +56,8 @@ createHouseFrom slope poly = do
 newtype HouseNode = HouseNode {
     id         :: UUID,
     roofTapped :: Event UUID,
-    wallTapped :: Event Unit
+    wallTapped :: Event Unit,
+    house      :: Event House
     }
 
 derive instance newtypeHouseNode :: Newtype HouseNode _
@@ -68,6 +69,9 @@ _roofTapped = _Newtype <<< prop (SProxy :: SProxy "roofTapped")
 
 _wallTapped :: forall t a r. Newtype t { wallTapped :: a | r } => Lens' t a
 _wallTapped = _Newtype <<< prop (SProxy :: SProxy "wallTapped")
+
+_house :: forall t a r. Newtype t { house :: a | r } => Lens' t a
+_house = _Newtype <<< prop (SProxy :: SProxy "house")
 
 houseTapped :: HouseNode -> Event UUID
 houseTapped h = (const i <$> h ^. _roofTapped) <|> (const i <$> h ^. _wallTapped)
