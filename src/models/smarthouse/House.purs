@@ -57,11 +57,26 @@ createHouseFrom slope poly = do
 updateHeight :: Meter -> House -> House
 updateHeight height h = h # _height .~ height
 
+
+
+-- | Types of operation applied to houses
+data HouseOp = HouseOpCreate House
+             | HouseOpDelete UUID
+             | HouseOpUpdate House
+
+derive instance genericHouseOp :: Generic HouseOp _
+derive instance eqHouseOp :: Eq HouseOp
+
+instance showHouseOp :: Show HouseOp where
+    show = genericShow
+
+
 newtype HouseNode = HouseNode {
     id         :: UUID,
     roofTapped :: Event UUID,
     wallTapped :: Event Unit,
-    house      :: Event House
+    updated    :: Event HouseOp,
+    deleted    :: Event HouseOp
     }
 
 derive instance newtypeHouseNode :: Newtype HouseNode _
@@ -73,9 +88,6 @@ _roofTapped = _Newtype <<< prop (SProxy :: SProxy "roofTapped")
 
 _wallTapped :: forall t a r. Newtype t { wallTapped :: a | r } => Lens' t a
 _wallTapped = _Newtype <<< prop (SProxy :: SProxy "wallTapped")
-
-_house :: forall t a r. Newtype t { house :: a | r } => Lens' t a
-_house = _Newtype <<< prop (SProxy :: SProxy "house")
 
 houseTapped :: HouseNode -> Event UUID
 houseTapped h = (const i <$> h ^. _roofTapped) <|> (const i <$> h ^. _wallTapped)

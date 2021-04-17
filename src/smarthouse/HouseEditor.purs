@@ -2,6 +2,7 @@ module SmartHouse.HouseEditor where
 
 import Prelude
 
+import Control.Alternative (empty)
 import Data.Default (def)
 import Data.Lens ((.~), (^.))
 import Data.Meter (Meter, meterVal)
@@ -14,7 +15,7 @@ import FRP.Event (Event)
 import FRP.Event.Extra (anyEvt)
 import Model.ActiveMode (ActiveMode)
 import Model.Polygon (Polygon, _polyVerts)
-import Model.SmartHouse.House (House, HouseNode(..), updateHeight)
+import Model.SmartHouse.House (House, HouseNode(..), HouseOp(..), updateHeight)
 import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo)
 import Model.SmartHouse.Roof (renderRoof)
 import Model.UUID (idLens)
@@ -40,12 +41,13 @@ editHouse actDyn house = do
         hEvt <- localEnv (const def) $ setupHeightEditor actDyn hPosDyn
 
         let nhEvt = flip updateHeight house <$> hEvt
-        let hn = HouseNode {
-            id         : house ^. idLens,
-            roofTapped : anyEvt roofTap,
-            wallTapped : wallTap,
-            house      : nhEvt
-            }
+            hn = HouseNode {
+                id         : house ^. idLens,
+                roofTapped : anyEvt roofTap,
+                wallTapped : wallTap,
+                updated    : HouseOpUpdate <$> nhEvt,
+                deleted    : empty
+                }
         pure { input: hEvt, output: hn }
 
 renderWalls :: forall e. Meter -> Polygon Vector3 -> Node e (Event Unit)

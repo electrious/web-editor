@@ -4,7 +4,11 @@ import Prelude hiding (degree)
 
 import Control.Alt ((<|>))
 import Custom.Mesh (TapMouseMesh)
+import Data.Compactable (compact)
 import Data.Default (class Default, def)
+import Data.Foldable (class Foldable)
+import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Show (genericShow)
 import Data.Lens (Lens', view, (%~), (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
@@ -16,25 +20,27 @@ import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
 import Data.UUID (UUID)
 import Data.UUIDMap (UUIDMap)
-import Editor.Common.Lenses (_active, _height, _leadId, _mouseMove, _name, _tapped, _width)
+import Editor.Common.Lenses (_deleted, _height, _leadId, _mouseMove, _name, _tapped, _updated, _width)
 import Editor.Editor (Editor)
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import FRP.Dynamic (latestEvt, sampleDyn)
-import FRP.Event (Event)
-import FRP.Event.Extra (anyEvt, performEvent)
+import FRP.Dynamic (Dynamic)
+import FRP.Event (Event, keepLatest, sampleOn)
+import FRP.Event.Extra (performEvent)
 import Math.Angle (degree)
-import Model.SmartHouse.House (House, createHouseFrom, houseTapped)
+import Model.ActiveMode (ActiveMode(..))
+import Model.SmartHouse.House (House, HouseNode, HouseOp(..), createHouseFrom, houseTapped)
 import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo, _size, _texture, mkHouseTextureInfo)
 import Model.UUID (idLens)
-import Rendering.DynamicNode (dynamic)
-import Rendering.Node (Node, fixNodeDWith, getEnv, localEnv, mkNodeEnv, node, runNode, tapMouseMesh)
+import Rendering.DynamicNode (eventNode)
+import Rendering.Node (Node, fixNodeDWith, fixNodeEWith, getEnv, localEnv, mkNodeEnv, node, runNode, tapMouseMesh)
 import Rendering.TextureLoader (loadTextureFromUrl)
 import SmartHouse.HouseEditor (editHouse)
 import SmartHouse.HouseTracer (traceHouse)
 import Three.Core.Geometry (mkPlaneGeometry)
 import Three.Core.Material (mkMeshBasicMaterialWithTexture)
 import Three.Loader.TextureLoader (Texture, clampToEdgeWrapping, repeatWrapping, setRepeat, setWrapS, setWrapT)
+import Util (foldEvtWith)
 
 newtype HouseBuilderConfig = HouseBuilderConfig {
     leadId :: Int
@@ -69,57 +75,93 @@ mkHelperPlane t = do
 
     tapMouseMesh (def # _name .~ "helper-plane") geo mat
 
+-- internal data structure to manage houses
+type HouseDict = UUIDMap House
 
-newtype HousesState = HousesState {
-    houses :: UUIDMap House,
-    active :: Maybe UUID
+newtype HouseDictData = HouseDictData {
+    houses         :: HouseDict,
+    housesToRender :: Maybe HouseDict
     }
 
-derive instance newtypeHousesState :: Newtype HousesState _
-instance defaultHousesState :: Default HousesState where
-    def = HousesState {
-        houses : M.empty,
-        active : Nothing
+derive instance newtypeHouseDictData :: Newtype HouseDictData _
+derive instance genericHouseDictData :: Generic HouseDictData _
+instance showHouseDictData :: Show HouseDictData where
+    show = genericShow
+instance defaultHouseDictData :: Default HouseDictData where
+    def = HouseDictData {
+        houses         : M.empty,
+        housesToRender : Nothing
         }
+
 _houses :: forall t a r. Newtype t { houses :: a | r } => Lens' t a
 _houses = _Newtype <<< prop (SProxy :: SProxy "houses")
 
-addHouse :: House -> HousesState -> HousesState
-addHouse h s = s # _houses %~ M.insert (h ^. idLens) h
-                 # _active .~ Just (h ^. idLens)
+_housesToRender :: forall t a r. Newtype t { housesToRender :: a | r } => Lens' t a
+_housesToRender = _Newtype <<< prop (SProxy :: SProxy "housesToRender")
 
-activateRoof :: Maybe UUID -> HousesState -> HousesState
-activateRoof u s = s # _active .~ u
+-- mark all houses to be rendered
+renderAll :: HouseDictData -> HouseDictData
+renderAll s = s # _housesToRender .~ Just (s ^. _houses)
 
-renderHousesState :: HousesState -> Node HouseTextureInfo (Event UUID)
-renderHousesState s = anyEvt <<< map houseTapped <$> traverse render (s ^. _houses)
-    where render h = editHouse (s ^. _active == Just (h ^. idLens)) h
+-- | update the HouseDictData with house operations
+applyHouseOp :: HouseOp -> HouseDictData -> HouseDictData
+applyHouseOp (HouseOpCreate house) d = renderAll $ d # _houses %~ M.insert (house ^. idLens) house
+applyHouseOp (HouseOpDelete hid)   d = renderAll $ d # _houses %~ M.delete hid
+applyHouseOp (HouseOpUpdate house) d = d # _houses %~ M.insert (house ^. idLens) house
+                                         # _housesToRender .~ Nothing
+
+
+-- get house update event from a list of house nodes
+getHouseUpd :: forall f. Foldable f => Functor f => f HouseNode -> Event HouseOp
+getHouseUpd = foldEvtWith (view _updated)
+
+-- get house delete event from a list of house nodes
+getHouseDel :: forall f. Foldable f => Functor f => f HouseNode -> Event HouseOp
+getHouseDel = foldEvtWith (view _deleted)
+
+-- get the activated house from a list of house nodes
+getActivated :: forall f. Foldable f => Functor f => f HouseNode -> Event UUID
+getActivated = foldEvtWith f
+    where f n = const (n ^. idLens) <$> houseTapped n
+
+renderHouseDict :: Dynamic (Maybe UUID) -> HouseDict -> Node HouseTextureInfo (UUIDMap HouseNode)
+renderHouseDict actHouseDyn houses = traverse render houses
+    where getMode h (Just i) | h ^. idLens == i = Active
+                             | otherwise        = Inactive
+          getMode h Nothing                     = Inactive
+          
+          render h = editHouse (getMode h <$> actHouseDyn) h
 
 createHouseBuilder :: Node HouseBuilderConfig Unit
 createHouseBuilder = node (def # _name .~ "house-builder") $ do
     lId <- view _leadId <$> getEnv
     t <- liftEffect $ loadHouseTexture lId
-    let tInfo = mkHouseTextureInfo t (def # _width .~ meter 100.0
+    let tInfo = mkHouseTextureInfo t (def # _width  .~ meter 100.0
                                           # _height .~ meter 46.5)
     
-    fixNodeDWith def \stDyn -> do
-        -- add helper plane that accepts tap and drag events
-        helper <- mkHelperPlane tInfo
+    fixNodeEWith def \hdEvt ->
+        fixNodeDWith Nothing \actRoofDyn -> do
+            -- add helper plane that accepts tap and drag events
+            helper <- mkHelperPlane tInfo
 
-        -- render all houses
-        actEvt <- localEnv (const tInfo) $ latestEvt <$> dynamic (renderHousesState <$> stDyn)
+            -- render all houses
+            let houseToRenderEvt = compact $ view _housesToRender <$> hdEvt
+            nodesEvt <- localEnv (const tInfo) $ eventNode (renderHouseDict actRoofDyn <$> houseToRenderEvt)
 
-        let cfg        = def # _mouseMove .~ helper ^. _mouseMove
-            deactEvt   = const Nothing <$> helper ^. _tapped
-            actRoofEvt = (Just <$> actEvt) <|> deactEvt
+            let deactEvt   = const Nothing <$> helper ^. _tapped
+                actEvt     = keepLatest $ getActivated <$> nodesEvt
+                actRoofEvt = (Just <$> actEvt) <|> deactEvt
             
-        floorPlanEvt <- localEnv (const cfg) traceHouse
-        let houseEvt = performEvent $ createHouseFrom (degree 30.0) <$> floorPlanEvt
+            floorPlanEvt <- localEnv (const $ def # _mouseMove .~ helper ^. _mouseMove) traceHouse
+            let houseEvt = performEvent $ createHouseFrom (degree 30.0) <$> floorPlanEvt
+                addHouseEvt = HouseOpCreate <$> houseEvt
+                updHouseEvt = keepLatest (getHouseUpd <$> nodesEvt)
 
-            newStEvt = sampleDyn stDyn $ (addHouse <$> houseEvt)
-                                     <|> (activateRoof <$> actRoofEvt)
+                opEvt = addHouseEvt <|> updHouseEvt
 
-        pure { input: newStEvt, output : unit }
+                newHdEvt = sampleOn hdEvt $ applyHouseOp <$> opEvt
+
+            pure { input: actRoofEvt, output : { input: newHdEvt, output : unit } }
 
 
 -- | external API to build a 3D house for 2D lead
