@@ -36,11 +36,13 @@ editHouse actDyn house = do
         -- height editor
         let hPos2D = dragArrowPos $ house ^. _floor <<< _polyVerts
             hPos   = mkVec3 (vecX hPos2D) (vecY hPos2D) (meterVal h)
-        hEvt <- setupHeightEditor $ def # _modeDyn .~ actDyn
-                                        # _position .~ pure hPos
-                                        # _min .~ (- meterVal h)
+
+        -- setup height editor and get the delta event
+        deltaEvt <- setupHeightEditor $ def # _modeDyn .~ actDyn
+                                            # _position .~ pure hPos
+                                            # _min .~ (- meterVal h)
     
-        let nhEvt = (+) h <$> hEvt
+        let hEvt = (+) h <$> deltaEvt  -- new height
             newHouseEvt = flip updateHeight house <$> hEvt
             hn = HouseNode {
                 id         : house ^. idLens,
@@ -49,7 +51,7 @@ editHouse actDyn house = do
                 updated    : HouseOpUpdate <$> newHouseEvt,
                 deleted    : empty
                 }
-        pure { input: nhEvt, output: hn }
+        pure { input: hEvt, output: hn }
 
 renderWalls :: forall e. Polygon Vector3 -> Meter -> Node e (Event Unit)
 renderWalls poly height = do
