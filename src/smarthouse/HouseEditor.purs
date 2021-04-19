@@ -10,7 +10,7 @@ import Data.Traversable (traverse)
 import Editor.Common.Lenses (_floor, _height, _name, _position, _roofs, _tapped)
 import Editor.HeightEditor (dragArrowPos, setupHeightEditor)
 import Effect.Class (liftEffect)
-import FRP.Dynamic (Dynamic)
+import FRP.Dynamic (Dynamic, latestEvt)
 import FRP.Event (Event)
 import FRP.Event.Extra (anyEvt)
 import Model.ActiveMode (ActiveMode)
@@ -19,6 +19,7 @@ import Model.SmartHouse.House (House, HouseNode(..), HouseOp(..), updateHeight)
 import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo)
 import Model.SmartHouse.Roof (renderRoof)
 import Model.UUID (idLens)
+import Rendering.DynamicNode (dynamic)
 import Rendering.Node (Node, fixNodeDWith, localEnv, node, tapMesh)
 import Three.Core.Geometry (_bevelEnabled, _depth, mkExtrudeGeometry, mkShape)
 import Three.Core.Material (mkMeshPhongMaterial)
@@ -28,17 +29,14 @@ editHouse :: Dynamic ActiveMode -> House -> Node HouseTextureInfo HouseNode
 editHouse actDyn house = do
     let h = house ^. _height
     fixNodeDWith h \hDyn -> do
-        let mkP = mkVec3 0.0 0.0 <<< meterVal
-            pDyn = mkP <$> hDyn
-        wallTap <- renderWalls h $ house ^. _floor
+        let pDyn = mkVec3 0.0 0.0 <<< meterVal <$> hDyn
+        wallTap <- latestEvt <$> dynamic (renderWalls (house ^. _floor) <$> hDyn)
         roofTap <- node (def # _position .~ pDyn) $ traverse renderRoof $ house ^. _roofs
 
         -- height editor
-        let hPos = dragArrowPos $ house ^. _floor <<< _polyVerts
-            updZ p z = mkVec3 (vecX p) (vecY p) (meterVal z)
-            hPosDyn = updZ hPos <$> hDyn
-
-        hEvt <- localEnv (const def) $ setupHeightEditor actDyn hPosDyn
+        let hPos2D = dragArrowPos $ house ^. _floor <<< _polyVerts
+            hPos   = mkVec3 (vecX hPos2D) (vecY hPos2D) (meterVal h)
+        hEvt <- localEnv (const def) $ setupHeightEditor actDyn (pure hPos)
 
         let nhEvt = flip updateHeight house <$> hEvt
             hn = HouseNode {
@@ -50,8 +48,8 @@ editHouse actDyn house = do
                 }
         pure { input: hEvt, output: hn }
 
-renderWalls :: forall e. Meter -> Polygon Vector3 -> Node e (Event Unit)
-renderWalls height poly = do
+renderWalls :: forall e. Polygon Vector3 -> Meter -> Node e (Event Unit)
+renderWalls poly height = do
     shp <- liftEffect $ mkShape $ (toVec2 <$> poly) ^. _polyVerts
     geo <- liftEffect $ mkExtrudeGeometry shp $ def # _depth .~ meterVal height
                                                     # _bevelEnabled .~ false
