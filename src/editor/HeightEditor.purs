@@ -4,19 +4,19 @@ import Prelude
 
 import Data.Default (class Default, def)
 import Data.Foldable (class Foldable, foldl)
-import Data.Lens (Lens', view, (^.), (.~))
+import Data.Lens (Lens', (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Meter (Meter, meter)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Editor.Common.Lenses (_isActive, _position, _rotation)
+import Editor.Common.Lenses (_isActive, _modeDyn, _position, _rotation)
 import FRP.Dynamic (Dynamic)
 import FRP.Event (Event)
 import Math (pi)
-import Model.ActiveMode (ActiveMode, isActive)
-import Rendering.Node (Node, getEnv, node)
+import Model.ActiveMode (ActiveMode(..), isActive)
+import Rendering.Node (Node, node)
 import Three.Core.Geometry (Geometry)
 import Three.Core.Material (MeshBasicMaterial)
 import Three.Math.Euler (mkEuler)
@@ -25,20 +25,32 @@ import UI.DraggableObject (DragObjCfg, DraggableObject, _customMat, _deltaTransf
 
 type DragArrow = DraggableObject
 
-newtype DragArrowConf = DragArrowConf {
+newtype HeightEditorConf = HeightEditorConf {
+    modeDyn       :: Dynamic ActiveMode,
+    position      :: Dynamic Vector3,
+    min           :: Number,
+    max           :: Number,
     arrowMaterial :: Maybe MeshBasicMaterial
     }
 
-derive instance newtypeDragArrowConf :: Newtype DragArrowConf _
-instance defaultDragArrowConf :: Default DragArrowConf where
-    def = DragArrowConf { arrowMaterial : Nothing }
+derive instance newtypeHeightEditorConf :: Newtype HeightEditorConf _
+instance defaultHeightEditorConf :: Default HeightEditorConf where
+    def = HeightEditorConf {
+        modeDyn       : pure Inactive,
+        position      : pure def,
+        min           : 0.0,
+        max           : 20.0,
+        arrowMaterial : Nothing
+        }
+
+_min :: forall t a r. Newtype t { min :: a | r } => Lens' t a
+_min = _Newtype <<< prop (SProxy :: SProxy "min")
+
+_max :: forall t a r. Newtype t { max :: a | r } => Lens' t a
+_max = _Newtype <<< prop (SProxy :: SProxy "max")
 
 _arrowMaterial :: forall t a r. Newtype t { arrowMaterial :: a | r } => Lens' t a
 _arrowMaterial = _Newtype <<< prop (SProxy :: SProxy "arrowMaterial")
-
-mkDragArrowConf :: Maybe MeshBasicMaterial -> DragArrowConf
-mkDragArrowConf m = DragArrowConf { arrowMaterial : m }
-
 
 dragArrowPos :: forall f v. Foldable f => Vector v => f v -> Vector3
 dragArrowPos vs = mkVec3 x y 0.5
@@ -51,12 +63,16 @@ dragArrowPos vs = mkVec3 x y 0.5
           y = maybe 0.0 vecY mv
 
 -- | create the drag arrow to drag the Floor Plan to form the house
-dragArrow :: Dynamic ActiveMode -> Dynamic Vector3 -> Node DragArrowConf DragArrow
-dragArrow actDyn posDyn = do
-    mat <- view _arrowMaterial <$> getEnv
+dragArrow :: forall e. HeightEditorConf -> Node e DragArrow
+dragArrow conf = do
+    let actDyn = conf ^. _modeDyn
+        posDyn = conf ^. _position
+        min    = conf ^. _min
+        max    = conf ^. _max
+        mat    = conf ^. _arrowMaterial
     
-    let -- make sure the arrow can only be dragged between 0 and 20 in Z axis
-        validator pos = let z = vecZ pos in z >= 0.0 && z <= 20.0
+        -- make sure the arrow can only be dragged between 0 and 20 in Z axis
+        validator pos = let z = vecZ pos in z >= min && z <= max
         -- make sure the arrow only can be dragged along Z axis
         transF d = mkVec3 0.0 0.0 (vecZ d)
         
@@ -69,8 +85,8 @@ dragArrow actDyn posDyn = do
 
 
 -- | setup drag arrow to edit the house height
-setupHeightEditor :: Dynamic ActiveMode -> Dynamic Vector3 -> Node DragArrowConf (Event Meter)
-setupHeightEditor actDyn posDyn = do
-    arrow <- dragArrow actDyn posDyn
+setupHeightEditor :: forall e. HeightEditorConf -> Node e (Event Meter)
+setupHeightEditor conf = do
+    arrow <- dragArrow conf
     let toH = meter <<< vecZ
     pure $ toH <$> (arrow ^. _position)

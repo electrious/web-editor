@@ -7,8 +7,8 @@ import Data.Default (def)
 import Data.Lens ((.~), (^.))
 import Data.Meter (Meter, meterVal)
 import Data.Traversable (traverse)
-import Editor.Common.Lenses (_floor, _height, _name, _position, _roofs, _tapped)
-import Editor.HeightEditor (dragArrowPos, setupHeightEditor)
+import Editor.Common.Lenses (_floor, _height, _modeDyn, _name, _position, _roofs, _tapped)
+import Editor.HeightEditor (_min, dragArrowPos, setupHeightEditor)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic, latestEvt)
 import FRP.Event (Event)
@@ -20,7 +20,7 @@ import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo)
 import Model.SmartHouse.Roof (renderRoof)
 import Model.UUID (idLens)
 import Rendering.DynamicNode (dynamic)
-import Rendering.Node (Node, fixNodeDWith, localEnv, node, tapMesh)
+import Rendering.Node (Node, fixNodeDWith, node, tapMesh)
 import Three.Core.Geometry (_bevelEnabled, _depth, mkExtrudeGeometry, mkShape)
 import Three.Core.Material (mkMeshPhongMaterial)
 import Three.Math.Vector (Vector3, mkVec3, toVec2, vecX, vecY)
@@ -36,17 +36,20 @@ editHouse actDyn house = do
         -- height editor
         let hPos2D = dragArrowPos $ house ^. _floor <<< _polyVerts
             hPos   = mkVec3 (vecX hPos2D) (vecY hPos2D) (meterVal h)
-        hEvt <- localEnv (const def) $ setupHeightEditor actDyn (pure hPos)
-
-        let nhEvt = flip updateHeight house <$> hEvt
+        hEvt <- setupHeightEditor $ def # _modeDyn .~ actDyn
+                                        # _position .~ pure hPos
+                                        # _min .~ (- meterVal h)
+    
+        let nhEvt = (+) h <$> hEvt
+            newHouseEvt = flip updateHeight house <$> hEvt
             hn = HouseNode {
                 id         : house ^. idLens,
                 roofTapped : anyEvt roofTap,
                 wallTapped : wallTap,
-                updated    : HouseOpUpdate <$> nhEvt,
+                updated    : HouseOpUpdate <$> newHouseEvt,
                 deleted    : empty
                 }
-        pure { input: hEvt, output: hn }
+        pure { input: nhEvt, output: hn }
 
 renderWalls :: forall e. Polygon Vector3 -> Meter -> Node e (Event Unit)
 renderWalls poly height = do
