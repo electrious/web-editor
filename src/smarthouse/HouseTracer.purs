@@ -19,7 +19,7 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple(..), fst)
-import Editor.Common.Lenses (_face, _mouseMove, _name, _parent, _point, _position)
+import Editor.Common.Lenses (_face, _modeDyn, _mouseMove, _name, _parent, _point, _position)
 import Editor.ObjectAdder (createObjectAdder, mkCandidatePoint)
 import Editor.PanelAPIInterpreter (_finished)
 import Editor.SceneEvent (SceneMouseMoveEvent)
@@ -29,9 +29,10 @@ import FRP.Event (Event)
 import FRP.Event.Extra (delay, multicast, performEvent)
 import Math.Angle (degreeVal)
 import Math.LineSeg (LineSeg, _end, _start, distToLineSeg, intersection, lineVec, linesAngle, mkLineSeg, perpendicularLineSeg, projPointWithLineSeg)
+import Model.ActiveMode (ActiveMode(..), isActive)
 import Model.Polygon (Polygon, newPolygon)
 import Rendering.DynamicNode (dynamic_)
-import Rendering.Node (Node, _env, fixNodeE, line, mesh, node)
+import Rendering.Node (Node, _visible, fixNodeE, line, mesh, node)
 import Three.Core.Face3 (normal)
 import Three.Core.Geometry (CircleGeometry, mkCircleGeometry)
 import Three.Core.Material (LineBasicMaterial, LineDashedMaterial, MeshBasicMaterial, mkLineBasicMaterial, mkLineDashedMaterial, mkMeshBasicMaterial)
@@ -39,12 +40,14 @@ import Three.Core.Object3D (worldToLocal)
 import Three.Math.Vector (Vector3, addScaled, dist, mkVec3, toVec2, toVec3)
 
 newtype HouseTracerConf = HouseTracerConf {
+    modeDyn   :: Dynamic ActiveMode,
     mouseMove :: Event SceneMouseMoveEvent
     }
 
 derive instance newtypeHouseTracerConf :: Newtype HouseTracerConf _
 instance defaultHouseTracerConf :: Default HouseTracerConf where
     def = HouseTracerConf {
+        modeDyn   : pure Active,
         mouseMove : empty
         }
 
@@ -262,12 +265,10 @@ snapToLine p st l = f <$> lastVert st
 
 --------------------------------------------------------
 
-vertAdder :: Dynamic TracerState -> Node HouseTracerConf (Event Vector3)
-vertAdder stDyn = do
+vertAdder :: forall e. HouseTracerConf -> Dynamic TracerState -> Node e (Event Vector3)
+vertAdder conf stDyn = do
     e <- ask
     let parent = e ^. _parent
-        conf   = e ^. _env
-
         mouseEvt = conf ^. _mouseMove
 
         -- get a candidate point
@@ -294,15 +295,16 @@ vertAdder stDyn = do
     pure $ view _position <$> addedPntEvt
 
 
-traceHouse :: Node HouseTracerConf (Event (Polygon Vector3))
-traceHouse = node (def # _name .~ "house-tracer") $
+traceHouse :: forall e. HouseTracerConf -> Node e (Event (Polygon Vector3))
+traceHouse conf = node (def # _name    .~ "house-tracer"
+                            # _visible .~ (isActive <$> conf ^. _modeDyn)) $
     fixNodeE \stEvt -> do
         let stDyn = step def stEvt
         -- render the current state
         dynamic_ $ renderState <$> stDyn
 
         -- render the vertex adder
-        newVertEvt <- vertAdder stDyn
+        newVertEvt <- vertAdder conf stDyn
 
         let newStEvt = multicast $ sampleDyn stDyn $ addNewVert <$> newVertEvt
             polyEvt  = multicast $ newPolygon <<< view _tracedVerts <$> filter (view _finished) newStEvt

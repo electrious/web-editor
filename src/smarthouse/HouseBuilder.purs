@@ -13,14 +13,14 @@ import Data.Lens (Lens', view, (%~), (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Map as M
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), isNothing)
 import Data.Meter (meter, meterVal)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
 import Data.UUID (UUID)
 import Data.UUIDMap (UUIDMap)
-import Editor.Common.Lenses (_deleted, _height, _leadId, _mouseMove, _name, _tapped, _updated, _width)
+import Editor.Common.Lenses (_deleted, _height, _leadId, _modeDyn, _mouseMove, _name, _tapped, _updated, _width)
 import Editor.Editor (Editor)
 import Effect (Effect)
 import Effect.Class (liftEffect)
@@ -28,7 +28,7 @@ import FRP.Dynamic (Dynamic)
 import FRP.Event (Event, keepLatest, sampleOn)
 import FRP.Event.Extra (performEvent)
 import Math.Angle (degree)
-import Model.ActiveMode (ActiveMode(..))
+import Model.ActiveMode (ActiveMode(..), fromBoolean)
 import Model.SmartHouse.House (House, HouseNode, HouseOp(..), createHouseFrom, houseTapped)
 import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo, _size, _texture, mkHouseTextureInfo)
 import Model.UUID (idLens)
@@ -152,7 +152,8 @@ createHouseBuilder = node (def # _name .~ "house-builder") $ do
                 actEvt     = keepLatest $ getActivated <$> nodesEvt
                 actRoofEvt = (Just <$> actEvt) <|> deactEvt
             
-            floorPlanEvt <- localEnv (const $ def # _mouseMove .~ helper ^. _mouseMove) traceHouse
+            floorPlanEvt <- traceHouse $ def # _modeDyn   .~ (fromBoolean <<< isNothing <$> actRoofDyn)
+                                             # _mouseMove .~ helper ^. _mouseMove
             let houseEvt = performEvent $ createHouseFrom (degree 30.0) <$> floorPlanEvt
                 addHouseEvt = HouseOpCreate <$> houseEvt
                 updHouseEvt = keepLatest (getHouseUpd <$> nodesEvt)
