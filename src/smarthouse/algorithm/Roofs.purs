@@ -5,10 +5,13 @@ import Prelude
 import Data.Filterable (filter)
 import Data.Lens (view, (^.))
 import Data.List (List(..), elem, singleton, sortBy)
+import Data.Traversable (traverse)
 import Editor.Common.Lenses (_height)
+import Effect (Effect)
 import Math.Angle (Angle, degreeVal, tan)
 import Math.LineSeg (LineSeg, _end, _start, direction)
-import Model.Polygon (Polygon, newPolygon)
+import Model.Polygon (newPolygon)
+import Model.SmartHouse.Roof (Roof, createRoofFrom)
 import SmartHouse.Algorithm.Edge (Edge, _line)
 import SmartHouse.Algorithm.LAV (_edges)
 import Smarthouse.Algorithm.Subtree (Subtree, _source)
@@ -35,13 +38,13 @@ nodesForEdge e slope ts =
     in sortBy g $ mkP <$> filter (elem edge <<< view _edges) ts
 
 -- find polygon for an edge
-polygonsForEdge :: Angle -> List Subtree -> Edge -> Polygon Vector3
-polygonsForEdge slope ts e =
+roofForEdge :: Angle -> List Subtree -> Edge -> Effect Roof
+roofForEdge slope ts e = do
     let sorted = nodesForEdge e slope ts
         start  = e ^. _line <<< _start
         end    = e ^. _line <<< _end
         nodes  = Cons end (sorted <> singleton start)
-    in newPolygon nodes
+    createRoofFrom (newPolygon nodes)
 
-roofPolygons :: Angle -> List Subtree -> List Edge -> List (Polygon Vector3)
-roofPolygons slope ts = map (polygonsForEdge slope ts)
+roofsForEdges :: Angle -> List Subtree -> List Edge -> Effect (List Roof)
+roofsForEdges slope ts = traverse (roofForEdge slope ts)

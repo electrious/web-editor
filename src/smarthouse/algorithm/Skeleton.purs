@@ -29,12 +29,13 @@ import Math.LineSeg (LineSeg, _start, direction, distToLineSeg)
 import Math.LineSeg as S
 import Math.Utils (approxSame, epsilon)
 import Model.Polygon (Polygon)
+import Model.SmartHouse.Roof (Roof)
 import Model.UUID (idLens)
 import SmartHouse.Algorithm.Edge (Edge, _leftBisector, _line, _rightBisector)
 import SmartHouse.Algorithm.Event (EdgeE, PointEvent(..), SplitE, _intersection, _oppositeEdge, _vertexA, _vertexB, distance, edgeE, intersectionPoint, splitE)
 import SmartHouse.Algorithm.LAV (LAV, SLAV, _edges, _lavs, _vertices, addLav, delLav, emptySLAV, eventValid, getLav, invalidateVertex, lavFromVertices, length, nextVertex, prevVertex, runSLAV, unifyVerts, updateLav, verticesFromTo)
 import SmartHouse.Algorithm.Vertex (Vertex, _bisector, _cross, _isReflex, _lavId, _leftEdge, _rightEdge, ray, vertexFrom)
-import Smarthouse.Algorithm.Roofs (roofPolygons)
+import Smarthouse.Algorithm.Roofs (roofsForEdges)
 import Smarthouse.Algorithm.Subtree (Subtree, subtree)
 import Three.Math.Vector (class Vector, Vector3, dist, normal, (<**>), (<+>), (<->), (<.>))
 import Three.Math.Vector as V
@@ -255,7 +256,7 @@ addEvtsToQueue :: forall f. Foldable f => PQueue Number PointEvent -> f PointEve
 addEvtsToQueue = foldl (\q' e -> PQ.insert (distance e) e q')
 
 -- Compute Straight Skeleton of a polygon
-skeletonize :: forall f v. Functor f => Foldable f => Traversable f => Eq v => Vector v => Angle -> f (Polygon v) -> Effect (List (Polygon Vector3))
+skeletonize :: forall f v. Functor f => Foldable f => Traversable f => Eq v => Vector v => Angle -> f (Polygon v) -> Effect (List Roof)
 skeletonize slope = runSLAV $ skeletonize' >>= generateRoofs slope
 
 skeletonize' :: SLAV (List Subtree)
@@ -289,5 +290,7 @@ chainMaybe f v = v >>= maybe (pure Nothing) f
 infixr 5 chainMaybe as <<<=
 
 
-generateRoofs :: Angle -> List Subtree -> SLAV (List (Polygon Vector3))
-generateRoofs slope ts = roofPolygons slope ts <<< fromFoldable <<< view _edges <$> get
+generateRoofs :: Angle -> List Subtree -> SLAV (List Roof)
+generateRoofs slope ts = do
+    edges <- fromFoldable <<< view _edges <$> get
+    liftEffect $ roofsForEdges slope ts edges

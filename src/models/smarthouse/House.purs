@@ -12,14 +12,13 @@ import Data.List (List, singleton)
 import Data.Meter (Meter, meter)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Data.Traversable (traverse)
 import Data.UUID (UUID, genUUID)
 import Editor.Common.Lenses (_height, _id)
 import Effect (Effect)
 import FRP.Event (Event)
 import Math.Angle (Angle)
 import Model.Polygon (Polygon, counterClockPoly)
-import Model.SmartHouse.Roof (Roof, createRoofFrom)
+import Model.SmartHouse.Roof (Roof)
 import Model.UUID (class HasUUID, idLens)
 import SmartHouse.Algorithm.Skeleton (skeletonize)
 import Three.Math.Vector (Vector3)
@@ -43,8 +42,7 @@ instance hasUUIDHouse :: HasUUID House where
 createHouseFrom :: Angle -> Polygon Vector3 -> Effect House
 createHouseFrom slope poly = do
     i <- genUUID
-    roofPolys <- skeletonize slope $ singleton $ counterClockPoly poly
-    roofs <- traverse createRoofFrom roofPolys
+    roofs <- skeletonize slope $ singleton $ counterClockPoly poly
     
     pure $ House {
         id     : i,
