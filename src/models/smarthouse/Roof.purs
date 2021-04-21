@@ -23,14 +23,20 @@ import Model.UUID (class HasUUID, idLens)
 import Rendering.Node (Node, getEnv, tapMesh)
 import SmartHouse.HouseTracer (renderLine)
 import SmartHouse.PolyGeometry (mkPolyGeometryWithUV)
-import Smarthouse.Algorithm.Subtree (Subtree)
+import Smarthouse.Algorithm.Subtree (IndexedSubtree)
 import Three.Core.Material (mkMeshBasicMaterialWithTexture)
 import Three.Math.Vector (Vector3)
+
+
+data RoofState = SlopeRoof
+               | Gable
+
+derive instance eqRoofState :: Eq RoofState
 
 newtype Roof = Roof {
     id       :: UUID,
     polygon  :: Polygon Vector3,
-    subtrees :: List Subtree
+    subtrees :: List IndexedSubtree
     }
 
 derive instance newtypeRoof :: Newtype Roof _
@@ -43,7 +49,7 @@ instance hasUUIDRoof :: HasUUID Roof where
 _subtrees :: forall t a r. Newtype t { subtrees :: a | r } => Lens' t a
 _subtrees = _Newtype <<< prop (SProxy :: SProxy "subtrees")
 
-createRoofFrom :: Polygon Vector3 -> List Subtree -> Effect Roof
+createRoofFrom :: Polygon Vector3 -> List IndexedSubtree -> Effect Roof
 createRoofFrom p ts = do
     i <- genUUID
     pure $ Roof { id : i, polygon : p, subtrees : ts }
