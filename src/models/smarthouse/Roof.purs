@@ -3,6 +3,7 @@ module Model.SmartHouse.Roof where
 import Prelude
 
 import Control.Plus (empty)
+import Custom.Mesh (TappableMesh)
 import Data.Compactable (compact)
 import Data.Default (def)
 import Data.Generic.Rep (class Generic)
@@ -27,7 +28,7 @@ import Rendering.Node (Node, getEnv, tapMesh)
 import SmartHouse.HouseTracer (renderLine)
 import SmartHouse.PolyGeometry (mkPolyGeometry, mkPolyGeometryWithUV)
 import Smarthouse.Algorithm.Subtree (IndexedSubtree, _isGable, getIndex, getSubtree)
-import Three.Core.Material (mkMeshBasicMaterial, mkMeshBasicMaterialWithTexture)
+import Three.Core.Material (mkMeshBasicMaterialWithTexture, mkMeshPhongMaterial)
 import Three.Math.Vector (Vector3)
 
 
@@ -85,25 +86,31 @@ _flipped = _Newtype <<< prop (SProxy :: SProxy "flipped")
 
 renderRoof :: Roof -> Node HouseTextureInfo RoofEvents
 renderRoof roof = do
-    info <- getEnv
-
     let poly  = roof ^. _polygon
-        state = roofState roof
         gable = canBeGable roof
     -- render the roof outline as white line
     traverse_ renderLine $ polyOutline poly
 
     -- render the roof polygon
-    geo <- liftEffect $ if state == SlopeRoof
-                        then mkPolyGeometryWithUV (info ^. _size) poly
-                        else mkPolyGeometry poly
-    mat <- liftEffect $ if state == SlopeRoof
-                        then mkMeshBasicMaterialWithTexture (info ^. _texture)
-                        else mkMeshBasicMaterial 0x999999
-    m <- tapMesh (def # _name .~ "roof") geo mat
+    m <- if roofState roof == Gable
+         then renderGableRoof poly
+         else renderSlopeRoof poly
     let t = if gable then empty else const (roof ^. idLens) <$> m ^. _tapped
         f = if gable then compact (const (subtreeIndex roof) <$> m ^. _tapped) else empty
     pure $ RoofEvents {
         tapped  : t,
         flipped : f
         }
+
+renderGableRoof :: forall e. Polygon Vector3 -> Node e TappableMesh
+renderGableRoof poly = do
+    geo <- liftEffect $ mkPolyGeometry poly
+    mat <- liftEffect $ mkMeshPhongMaterial 0x999999
+    tapMesh (def # _name .~ "roof") geo mat
+
+renderSlopeRoof :: Polygon Vector3 -> Node HouseTextureInfo TappableMesh
+renderSlopeRoof poly = do
+    info <- getEnv
+    geo <- liftEffect $ mkPolyGeometryWithUV (info ^. _size) poly
+    mat <- liftEffect $ mkMeshBasicMaterialWithTexture (info ^. _texture)
+    tapMesh (def # _name .~ "roof") geo mat
