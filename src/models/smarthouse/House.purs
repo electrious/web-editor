@@ -70,11 +70,12 @@ instance showHouseOp :: Show HouseOp where
 
 
 newtype HouseNode = HouseNode {
-    id         :: UUID,
-    roofTapped :: Event UUID,
-    wallTapped :: Event Unit,
-    updated    :: Event HouseOp,
-    deleted    :: Event HouseOp
+    id          :: UUID,
+    roofTapped  :: Event UUID,
+    roofFlipped :: Event Int,
+    wallTapped  :: Event Unit,
+    updated     :: Event HouseOp,
+    deleted     :: Event HouseOp
     }
 
 derive instance newtypeHouseNode :: Newtype HouseNode _
@@ -83,6 +84,9 @@ instance hasUUIDHouseNode :: HasUUID HouseNode where
 
 _roofTapped :: forall t a r. Newtype t { roofTapped :: a | r } => Lens' t a
 _roofTapped = _Newtype <<< prop (SProxy :: SProxy "roofTapped")
+
+_roofFlipped :: forall t a r. Newtype t { roofFlipped :: a | r } => Lens' t a
+_roofFlipped = _Newtype <<< prop (SProxy :: SProxy "roofFlipped")
 
 _wallTapped :: forall t a r. Newtype t { wallTapped :: a | r } => Lens' t a
 _wallTapped = _Newtype <<< prop (SProxy :: SProxy "wallTapped")

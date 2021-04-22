@@ -4,7 +4,7 @@ import Prelude
 
 import Control.Alternative (empty)
 import Data.Default (def)
-import Data.Lens ((.~), (^.))
+import Data.Lens (view, (.~), (^.))
 import Data.Meter (Meter, meterVal)
 import Data.Traversable (traverse)
 import Editor.Common.Lenses (_floor, _height, _modeDyn, _name, _position, _roofs, _tapped)
@@ -17,7 +17,7 @@ import Model.ActiveMode (ActiveMode)
 import Model.Polygon (Polygon, _polyVerts)
 import Model.SmartHouse.House (House, HouseNode(..), HouseOp(..), updateHeight)
 import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo)
-import Model.SmartHouse.Roof (renderRoof)
+import Model.SmartHouse.Roof (_flipped, renderRoof)
 import Model.UUID (idLens)
 import Rendering.DynamicNode (dynamic)
 import Rendering.Node (Node, fixNodeDWith, node, tapMesh)
@@ -31,25 +31,26 @@ editHouse actDyn house = do
     fixNodeDWith h \hDyn -> do
         let pDyn = mkVec3 0.0 0.0 <<< meterVal <$> hDyn
         wallTap <- latestEvt <$> dynamic (renderWalls (house ^. _floor) <$> hDyn)
-        roofTap <- node (def # _position .~ pDyn) $ traverse renderRoof $ house ^. _roofs
+        roofEvts <- node (def # _position .~ pDyn) $ traverse renderRoof $ house ^. _roofs
 
         -- height editor
         let hPos2D = dragArrowPos $ house ^. _floor <<< _polyVerts
             hPos   = mkVec3 (vecX hPos2D) (vecY hPos2D) (meterVal h)
 
         -- setup height editor and get the delta event
-        deltaEvt <- setupHeightEditor $ def # _modeDyn .~ actDyn
+        deltaEvt <- setupHeightEditor $ def # _modeDyn  .~ actDyn
                                             # _position .~ pure hPos
-                                            # _min .~ (- meterVal h)
+                                            # _min      .~ (- meterVal h)
     
         let hEvt = (+) h <$> deltaEvt  -- new height
             newHouseEvt = flip updateHeight house <$> hEvt
             hn = HouseNode {
-                id         : house ^. idLens,
-                roofTapped : anyEvt roofTap,
-                wallTapped : wallTap,
-                updated    : HouseOpUpdate <$> newHouseEvt,
-                deleted    : empty
+                id          : house ^. idLens,
+                roofTapped  : anyEvt $ view _tapped <$> roofEvts,
+                roofFlipped : anyEvt $ view _flipped <$> roofEvts,
+                wallTapped  : wallTap,
+                updated     : HouseOpUpdate <$> newHouseEvt,
+                deleted     : empty
                 }
         pure { input: hEvt, output: hn }
 
