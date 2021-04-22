@@ -2,6 +2,7 @@ module SmartHouse.HouseEditor where
 
 import Prelude
 
+import Control.Alt ((<|>))
 import Control.Alternative (empty)
 import Data.Default (def)
 import Data.Lens (view, (.~), (^.))
@@ -10,12 +11,12 @@ import Data.Traversable (traverse)
 import Editor.Common.Lenses (_floor, _height, _modeDyn, _name, _position, _roofs, _tapped)
 import Editor.HeightEditor (_min, dragArrowPos, setupHeightEditor)
 import Effect.Class (liftEffect)
-import FRP.Dynamic (Dynamic, latestEvt)
+import FRP.Dynamic (Dynamic, latestEvt, sampleDyn)
 import FRP.Event (Event)
-import FRP.Event.Extra (anyEvt)
+import FRP.Event.Extra (performEvent)
 import Model.ActiveMode (ActiveMode)
 import Model.Polygon (Polygon, _polyVerts)
-import Model.SmartHouse.House (House, HouseNode(..), HouseOp(..), updateHeight)
+import Model.SmartHouse.House (House, HouseNode(..), HouseOp(..), flipRoof, updateHeight)
 import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo)
 import Model.SmartHouse.Roof (_flipped, renderRoof)
 import Model.UUID (idLens)
@@ -24,16 +25,22 @@ import Rendering.Node (Node, fixNodeDWith, node, tapMesh)
 import Three.Core.Geometry (_bevelEnabled, _depth, mkExtrudeGeometry, mkShape)
 import Three.Core.Material (mkMeshPhongMaterial)
 import Three.Math.Vector (Vector3, mkVec3, toVec2, vecX, vecY)
+import Util (latestAnyEvtWith)
 
 editHouse :: Dynamic ActiveMode -> House -> Node HouseTextureInfo HouseNode
 editHouse actDyn house = do
     let h = house ^. _height
-    fixNodeDWith h \hDyn -> do
-        let pDyn = mkVec3 0.0 0.0 <<< meterVal <$> hDyn
-        wallTap <- latestEvt <$> dynamic (renderWalls (house ^. _floor) <$> hDyn)
-        roofEvts <- node (def # _position .~ pDyn) $ traverse renderRoof $ house ^. _roofs
+        floor = house ^. _floor
+    fixNodeDWith house \houseDyn -> do
+        let hDyn = view _height <$> houseDyn
+            pDyn = mkVec3 0.0 0.0 <<< meterVal <$> hDyn
+        -- render walls
+        wallTap <- latestEvt <$> dynamic (renderWalls floor <$> hDyn)
+        -- render roofs
+        roofEvtsDyn <- node (def # _position .~ pDyn) $ dynamic $ traverse renderRoof <<< view _roofs <$> houseDyn
 
-        -- height editor
+        let flipEvt = latestAnyEvtWith (view _flipped) roofEvtsDyn
+        -- height editor arrow position
         let hPos2D = dragArrowPos $ house ^. _floor <<< _polyVerts
             hPos   = mkVec3 (vecX hPos2D) (vecY hPos2D) (meterVal h)
 
@@ -43,16 +50,17 @@ editHouse actDyn house = do
                                             # _min      .~ (- meterVal h)
     
         let hEvt = (+) h <$> deltaEvt  -- new height
-            newHouseEvt = flip updateHeight house <$> hEvt
+            newHouseEvt1 = sampleDyn houseDyn $ updateHeight <$> hEvt
+            newHouseEvt2 = performEvent $ sampleDyn houseDyn $ flipRoof <$> flipEvt
+            newHouseEvt = newHouseEvt1 <|> newHouseEvt2
             hn = HouseNode {
                 id          : house ^. idLens,
-                roofTapped  : anyEvt $ view _tapped <$> roofEvts,
-                roofFlipped : anyEvt $ view _flipped <$> roofEvts,
+                roofTapped  : latestAnyEvtWith (view _tapped) roofEvtsDyn,
                 wallTapped  : wallTap,
                 updated     : HouseOpUpdate <$> newHouseEvt,
                 deleted     : empty
                 }
-        pure { input: hEvt, output: hn }
+        pure { input: newHouseEvt, output: hn }
 
 renderWalls :: forall e. Polygon Vector3 -> Meter -> Node e (Event Unit)
 renderWalls poly height = do

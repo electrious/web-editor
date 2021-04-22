@@ -25,7 +25,7 @@ import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo, _size, _texture)
 import Model.UUID (class HasUUID, idLens)
 import Rendering.Node (Node, getEnv, tapMesh)
 import SmartHouse.HouseTracer (renderLine)
-import SmartHouse.PolyGeometry (mkPolyGeometryWithUV)
+import SmartHouse.PolyGeometry (mkPolyGeometry, mkPolyGeometryWithUV)
 import Smarthouse.Algorithm.Subtree (IndexedSubtree, _isGable, getIndex, getSubtree)
 import Three.Core.Material (mkMeshBasicMaterial, mkMeshBasicMaterialWithTexture)
 import Three.Math.Vector (Vector3)
@@ -92,9 +92,11 @@ renderRoof roof = do
         gable = canBeGable roof
     -- render the roof outline as white line
     traverse_ renderLine $ polyOutline poly
-    
+
     -- render the roof polygon
-    geo <- liftEffect $ mkPolyGeometryWithUV (info ^. _size) poly
+    geo <- liftEffect $ if state == SlopeRoof
+                        then mkPolyGeometryWithUV (info ^. _size) poly
+                        else mkPolyGeometry poly
     mat <- liftEffect $ if state == SlopeRoof
                         then mkMeshBasicMaterialWithTexture (info ^. _texture)
                         else mkMeshBasicMaterial 0x999999

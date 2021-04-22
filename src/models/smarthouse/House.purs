@@ -8,25 +8,34 @@ import Data.Generic.Rep.Show (genericShow)
 import Data.Lens (Lens', (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.List (List, singleton)
+import Data.List (List, fromFoldable, modifyAt, singleton)
+import Data.Maybe (fromMaybe)
 import Data.Meter (Meter, meter)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
+import Data.Tuple (Tuple(..))
 import Data.UUID (UUID, genUUID)
-import Editor.Common.Lenses (_height, _id)
+import Editor.Common.Lenses (_floor, _height, _id, _roofs, _slope)
 import Effect (Effect)
 import FRP.Event (Event)
 import Math.Angle (Angle)
-import Model.Polygon (Polygon, counterClockPoly)
+import Model.Polygon (Polygon, _polyVerts, counterClockPoly)
 import Model.SmartHouse.Roof (Roof)
 import Model.UUID (class HasUUID, idLens)
+import SmartHouse.Algorithm.Edge (Edge)
+import SmartHouse.Algorithm.LAV (_edges)
 import SmartHouse.Algorithm.Skeleton (skeletonize)
+import Smarthouse.Algorithm.Roofs (generateRoofs)
+import Smarthouse.Algorithm.Subtree (Subtree, flipSubtree)
 import Three.Math.Vector (Vector3)
 
 newtype House = House {
     id     :: UUID,
     floor  :: Polygon Vector3,
     height :: Meter,
+    slope  :: Angle,
+    trees  :: List Subtree,
+    edges  :: List Edge,
     roofs  :: List Roof
     }
 
@@ -39,15 +48,22 @@ instance showHouse :: Show House where
 instance hasUUIDHouse :: HasUUID House where
     idLens = _id
 
+_trees :: forall t a r. Newtype t { trees :: a | r } => Lens' t a
+_trees = _Newtype <<< prop (SProxy :: SProxy "trees")
+
 createHouseFrom :: Angle -> Polygon Vector3 -> Effect House
 createHouseFrom slope poly = do
     i <- genUUID
-    roofs <- skeletonize slope $ singleton $ counterClockPoly poly
+    Tuple trees edges <- skeletonize $ singleton $ counterClockPoly poly
+    roofs <- generateRoofs slope trees edges
     
     pure $ House {
         id     : i,
         floor  : poly,
         height : meter 3.5,   -- default height
+        slope  : slope,
+        trees  : trees,
+        edges  : edges,
         roofs  : roofs
         }
 
@@ -55,7 +71,17 @@ createHouseFrom slope poly = do
 updateHeight :: Meter -> House -> House
 updateHeight height h = h # _height .~ height
 
-
+-- flip a roof to/from gable
+flipRoof :: Int -> House -> Effect House
+flipRoof idx h = do
+    let vs  = fromFoldable $ h ^. _floor <<< _polyVerts
+        ts  = h ^. _trees
+        -- flip the subtree at idx
+        nts = fromMaybe ts $ modifyAt idx (flip flipSubtree vs) ts
+    -- generate new roofs
+    roofs <- generateRoofs (h ^. _slope) nts (h ^. _edges)
+    pure $ h # _roofs .~ roofs
+             # _trees .~ nts
 
 -- | Types of operation applied to houses
 data HouseOp = HouseOpCreate House
@@ -70,12 +96,11 @@ instance showHouseOp :: Show HouseOp where
 
 
 newtype HouseNode = HouseNode {
-    id          :: UUID,
-    roofTapped  :: Event UUID,
-    roofFlipped :: Event Int,
-    wallTapped  :: Event Unit,
-    updated     :: Event HouseOp,
-    deleted     :: Event HouseOp
+    id         :: UUID,
+    roofTapped :: Event UUID,
+    wallTapped :: Event Unit,
+    updated    :: Event HouseOp,
+    deleted    :: Event HouseOp
     }
 
 derive instance newtypeHouseNode :: Newtype HouseNode _
@@ -84,9 +109,6 @@ instance hasUUIDHouseNode :: HasUUID HouseNode where
 
 _roofTapped :: forall t a r. Newtype t { roofTapped :: a | r } => Lens' t a
 _roofTapped = _Newtype <<< prop (SProxy :: SProxy "roofTapped")
-
-_roofFlipped :: forall t a r. Newtype t { roofFlipped :: a | r } => Lens' t a
-_roofFlipped = _Newtype <<< prop (SProxy :: SProxy "roofFlipped")
 
 _wallTapped :: forall t a r. Newtype t { wallTapped :: a | r } => Lens' t a
 _wallTapped = _Newtype <<< prop (SProxy :: SProxy "wallTapped")

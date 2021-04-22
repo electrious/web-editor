@@ -7,7 +7,7 @@ import Data.Lens (Lens', (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (List(..), elem, (:))
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple(..), fst, snd)
@@ -72,6 +72,13 @@ gableSubtree t vs = mkT $ foldl f (Tuple 0 Nil) (t ^. _sinks)
                              # _isGable         .~ true
                              # _originalSubtree .~ Just t
               _ -> t
+
+
+-- flip a subtree between gable and slope value
+flipSubtree :: Subtree -> List Vector3 -> Subtree
+flipSubtree t vs = if t ^. _isGable
+                   then fromMaybe t $ t ^. _originalSubtree
+                   else gableSubtree t vs
 
 
 type IndexedSubtree = Tuple Int Subtree

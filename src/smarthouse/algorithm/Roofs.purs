@@ -52,5 +52,5 @@ roofForEdge slope ts e = do
         nodes  = Cons end (sorted <> singleton start)
     createRoofFrom (newPolygon nodes) trees
 
-roofsForEdges :: Angle -> List Subtree -> List Edge -> Effect (List Roof)
-roofsForEdges slope ts = traverse (roofForEdge slope ts)
+generateRoofs :: Angle -> List Subtree -> List Edge -> Effect (List Roof)
+generateRoofs slope ts = traverse (roofForEdge slope ts)
