@@ -38,7 +38,7 @@ editHouse actDyn house = do
         -- render walls
         wallTap <- latestEvt <$> dynamic (renderWalls floor <$> hDyn)
         -- render roofs
-        roofEvtsDyn <- node (def # _position .~ pDyn) $ dynamic $ traverse renderRoof <<< view _roofs <$> houseDyn
+        roofEvtsDyn <- node (def # _position .~ pDyn) $ dynamic $ traverse (renderRoof actDyn) <<< view _roofs <$> houseDyn
 
         let flipEvt = latestAnyEvtWith (view _flipped) roofEvtsDyn
         -- height editor arrow position

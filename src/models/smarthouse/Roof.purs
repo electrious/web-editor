@@ -2,7 +2,6 @@ module Model.SmartHouse.Roof where
 
 import Prelude
 
-import Control.Plus (empty)
 import Custom.Mesh (TappableMesh)
 import Data.Compactable (compact)
 import Data.Default (def)
@@ -21,7 +20,10 @@ import Editor.Common.Lenses (_id, _name, _polygon, _tapped)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
+import FRP.Dynamic (Dynamic, gateDyn)
 import FRP.Event (Event)
+import FRP.Event.Extra (multicast)
+import Model.ActiveMode (ActiveMode, isActive)
 import Model.Polygon (Polygon, polyOutline)
 import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo, _size, _texture)
 import Model.UUID (class HasUUID, idLens)
@@ -85,8 +87,8 @@ derive instance newtypeRoofEvents :: Newtype RoofEvents _
 _flipped :: forall t a r. Newtype t { flipped :: a | r } => Lens' t a
 _flipped = _Newtype <<< prop (SProxy :: SProxy "flipped")
 
-renderRoof :: Roof -> Node HouseTextureInfo RoofEvents
-renderRoof roof = do
+renderRoof :: Dynamic ActiveMode -> Roof -> Node HouseTextureInfo RoofEvents
+renderRoof actDyn roof = do
     let poly  = roof ^. _polygon
         gable = canBeGable roof
     -- render the roof outline as white line
@@ -96,11 +98,13 @@ renderRoof roof = do
     m <- if roofState roof == Gable
          then renderGableRoof poly
          else renderSlopeRoof poly
-    let t = if gable then empty else const (roof ^. idLens) <$> m ^. _tapped
-        f = if gable then compact (const (subtreeIndex roof) <$> m ^. _tapped) else empty
+    let tapEvt      = multicast $ m ^. _tapped
+        actTapEvt   = gateDyn (isActive <$> actDyn) tapEvt
+        inactTapEvt = gateDyn (not <<< isActive <$> actDyn) tapEvt
+        
     pure $ RoofEvents {
-        tapped  : t,
-        flipped : f
+        tapped  : const (roof ^. idLens) <$> inactTapEvt,
+        flipped : compact $ const (subtreeIndex roof) <$> actTapEvt
         }
 
 
