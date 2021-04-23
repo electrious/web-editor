@@ -11,6 +11,7 @@ import Data.Traversable (traverse)
 import Editor.Common.Lenses (_floor, _height, _modeDyn, _name, _position, _roofs, _tapped)
 import Editor.HeightEditor (_min, dragArrowPos, setupHeightEditor)
 import Effect.Class (liftEffect)
+import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, latestEvt, sampleDyn)
 import FRP.Event (Event)
 import FRP.Event.Extra (performEvent)
@@ -23,7 +24,7 @@ import Model.UUID (idLens)
 import Rendering.DynamicNode (dynamic)
 import Rendering.Node (Node, fixNodeDWith, node, tapMesh)
 import Three.Core.Geometry (_bevelEnabled, _depth, mkExtrudeGeometry, mkShape)
-import Three.Core.Material (mkMeshPhongMaterial)
+import Three.Core.Material (MeshPhongMaterial, mkMeshPhongMaterial)
 import Three.Math.Vector (Vector3, mkVec3, toVec2, vecX, vecY)
 import Util (latestAnyEvtWith)
 
@@ -62,12 +63,14 @@ editHouse actDyn house = do
                 }
         pure { input: newHouseEvt, output: hn }
 
+
+wallMat :: MeshPhongMaterial
+wallMat = unsafePerformEffect $ mkMeshPhongMaterial 0x999999
+
 renderWalls :: forall e. Polygon Vector3 -> Meter -> Node e (Event Unit)
 renderWalls poly height = do
     shp <- liftEffect $ mkShape $ (toVec2 <$> poly) ^. _polyVerts
     geo <- liftEffect $ mkExtrudeGeometry shp $ def # _depth .~ meterVal height
                                                     # _bevelEnabled .~ false
-    mat <- liftEffect $ mkMeshPhongMaterial 0x999999
-
-    m <- tapMesh (def # _name .~ "walls") geo mat
+    m <- tapMesh (def # _name .~ "walls") geo wallMat
     pure $ const unit <$> m ^. _tapped
