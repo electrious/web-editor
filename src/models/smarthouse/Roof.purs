@@ -28,7 +28,7 @@ import Rendering.Node (Node, getEnv, tapMesh)
 import SmartHouse.HouseTracer (renderLine)
 import SmartHouse.PolyGeometry (mkPolyGeometry, mkPolyGeometryWithUV)
 import Smarthouse.Algorithm.Subtree (IndexedSubtree, _isGable, getIndex, getSubtree)
-import Three.Core.Material (mkMeshBasicMaterialWithTexture, mkMeshPhongMaterial)
+import Three.Core.Material (mkMeshBasicMaterial, mkMeshBasicMaterialWithTexture)
 import Three.Math.Vector (Vector3)
 
 
@@ -105,7 +105,8 @@ renderRoof roof = do
 renderGableRoof :: forall e. Polygon Vector3 -> Node e TappableMesh
 renderGableRoof poly = do
     geo <- liftEffect $ mkPolyGeometry poly
-    mat <- liftEffect $ mkMeshPhongMaterial 0x999999
+    -- NOTE: MeshPhongMaterial doesn't work here in mobile Safari, though it works for the walls.
+    mat <- liftEffect $ mkMeshBasicMaterial 0x999999
     tapMesh (def # _name .~ "roof") geo mat
 
 renderSlopeRoof :: Polygon Vector3 -> Node HouseTextureInfo TappableMesh
