@@ -144,6 +144,11 @@ let additions =
         , repo = "https://github.com/nullobject/purescript-pqueue.git"
         , version = "v2.0.0"
         }
+      , specular =
+        { dependencies = [ "foreign-object", "aff", "debug", "unsafe-reference", "avar", "typelevel-prelude", "contravariant", "record", "prelude", "generics-rep", "random"]
+        , repo = "https://github.com/restaumatic/purescript-specular.git"
+        , version = "v0.10.1"
+        }
       }
 
 in  upstream // overrides // additions

@@ -20,6 +20,7 @@ You can edit this file as you like.
   , "pqueue"
   , "profunctor-lenses"
   , "psci-support"
+  , "specular"
   , "uuid"
   , "web-touchevents"
   ]
