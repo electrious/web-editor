@@ -20,8 +20,9 @@ import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
 import Data.UUID (UUID)
 import Data.UUIDMap (UUIDMap)
-import Editor.Common.Lenses (_deleted, _height, _leadId, _modeDyn, _mouseMove, _name, _tapped, _updated, _width)
-import Editor.Editor (Editor)
+import Editor.Common.Lenses (_deleted, _height, _leadId, _modeDyn, _mouseMove, _name, _parent, _tapped, _updated, _width)
+import Editor.Editor (Editor, _sizeDyn)
+import Editor.SceneEvent (Size)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic)
@@ -37,9 +38,14 @@ import Rendering.Node (Node, fixNodeDWith, fixNodeEWith, getEnv, localEnv, mkNod
 import Rendering.TextureLoader (loadTextureFromUrl)
 import SmartHouse.HouseEditor (editHouse)
 import SmartHouse.HouseTracer (traceHouse)
+import Specular.Dom.Element (attrD)
+import Specular.Dom.Element.Class (el)
+import Specular.Dom.Widget (Widget, emptyWidget, runMainWidgetInNode)
 import Three.Core.Geometry (mkPlaneGeometry)
 import Three.Core.Material (mkMeshBasicMaterialWithTexture)
 import Three.Loader.TextureLoader (Texture, clampToEdgeWrapping, repeatWrapping, setRepeat, setWrapS, setWrapT)
+import UI.Bridge (toUIDyn)
+import Unsafe.Coerce (unsafeCoerce)
 import Util (foldEvtWith)
 
 newtype HouseBuilderConfig = HouseBuilderConfig {
@@ -165,6 +171,25 @@ createHouseBuilder = node (def # _name .~ "house-builder") $ do
             pure { input: actRoofEvt, output : { input: newHdEvt, output : unit } }
 
 
+newtype BuilderUIConf = BuilderUIConf {
+    sizeDyn :: Dynamic Size
+    }
+
+derive instance newtypeBuilderUIConf :: Newtype BuilderUIConf _
+
+-- | build the house editor UI widget system
+houseBuilderUI :: BuilderUIConf -> Widget Unit
+houseBuilderUI cfg = do
+    sizeD <- liftEffect $ toUIDyn $ cfg ^. _sizeDyn
+    let wd = show <<< view _width <$> sizeD
+        hd = show <<< view _height <$> sizeD
+        p = [attrD "width" wd, attrD "height" hd]
+    el "div" p emptyWidget
+
 -- | external API to build a 3D house for 2D lead
 buildHouse :: Editor -> HouseBuilderConfig -> Effect Unit
-buildHouse editor cfg = void $ runNode createHouseBuilder $ mkNodeEnv editor cfg
+buildHouse editor cfg = do
+    void $ runNode createHouseBuilder $ mkNodeEnv editor cfg
+    let parentEl = unsafeCoerce $ editor ^. _parent
+        conf = BuilderUIConf { sizeDyn : editor ^. _sizeDyn }
+    void $ runMainWidgetInNode parentEl $ houseBuilderUI conf
