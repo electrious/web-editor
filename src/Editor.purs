@@ -61,9 +61,11 @@ _flyCameraTarget = _Newtype <<< prop (SProxy :: SProxy "flyCameraTarget")
 
 -- | internal record that defines all components for threejs related objects
 newtype Editor = Editor {
+    parent     :: Element,
     canvas     :: Element,
     render     :: Effect Unit,
     content    :: Object3D,
+    sizeDyn    :: Dynamic Size,
     disposable :: Ref (Array (Effect Unit))
 }
 
@@ -222,9 +224,11 @@ createEditor elem cfg = do
 
     disposable <- new [d1, d2, d3, d4, d5, disposeScene scene, dispose rcs, OrbitControls.dispose orbitCtrl]
     let editor = Editor {
+        parent     : elem,
         canvas     : canvas,
         render     : renderFunc,
         content    : content,
+        sizeDyn    : sizeDyn,
         disposable : disposable
     }
 
