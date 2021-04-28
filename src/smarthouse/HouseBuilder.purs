@@ -3,6 +3,7 @@ module SmartHouse.HouseBuilder (buildHouse, HouseBuilderConfig) where
 import Prelude hiding (degree)
 
 import Control.Alt ((<|>))
+import Control.Alternative (empty)
 import Custom.Mesh (TapMouseMesh)
 import Data.Compactable (compact)
 import Data.Default (class Default, def)
@@ -32,6 +33,7 @@ import Model.ActiveMode (ActiveMode(..), fromBoolean)
 import Model.SmartHouse.House (House, HouseNode, HouseOp(..), createHouseFrom, houseTapped)
 import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo, _size, _texture, mkHouseTextureInfo)
 import Model.UUID (idLens)
+import OBJExporter (MeshFiles)
 import Rendering.DynamicNode (eventNode)
 import Rendering.Node (Node, fixNodeDWith, fixNodeEWith, getEnv, localEnv, mkNodeEnv, node, runNode, tapMouseMesh)
 import Rendering.TextureLoader (loadTextureFromUrl)
@@ -43,13 +45,30 @@ import Three.Loader.TextureLoader (Texture, clampToEdgeWrapping, repeatWrapping,
 import Util (foldEvtWith)
 
 newtype HouseBuilderConfig = HouseBuilderConfig {
-    leadId :: Int
+    leadId   :: Int,
+    toExport :: Event Unit
 }
 
 derive instance newtypeHouseBuilderConfig :: Newtype HouseBuilderConfig _
 instance defaultHouseBuilderConfig :: Default HouseBuilderConfig where
-    def = HouseBuilderConfig { leadId : 0 }
+    def = HouseBuilderConfig { leadId : 0, toExport : empty }
 
+_toExport :: forall t a r. Newtype t { toExport :: a | r } => Lens' t a
+_toExport = _Newtype <<< prop (SProxy :: SProxy "toExport")
+
+
+newtype HouseBuilt = HouseBuilt {
+    filesExported :: Event MeshFiles,
+    houseReady    :: Dynamic Boolean
+    }
+
+derive instance newtypeHouseBuilt :: Newtype HouseBuilt _
+
+_filesExported :: forall t a r. Newtype t { filesExported :: a | r } => Lens' t a
+_filesExported = _Newtype <<< prop (SProxy :: SProxy "filesExported")
+
+_houseReady :: forall t a r. Newtype t { houseReady :: a | r } => Lens' t a
+_houseReady = _Newtype <<< prop (SProxy :: SProxy "houseReady")
 
 -- | get 2D image url for a lead
 imageUrlForLead :: Int -> String
