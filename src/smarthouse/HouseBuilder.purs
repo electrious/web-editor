@@ -26,17 +26,17 @@ import Editor.Common.Lenses (_deleted, _height, _leadId, _modeDyn, _mouseMove, _
 import Editor.Editor (Editor)
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import FRP.Dynamic (Dynamic)
+import FRP.Dynamic (Dynamic, step)
 import FRP.Event (Event, keepLatest, sampleOn)
-import FRP.Event.Extra (performEvent)
+import FRP.Event.Extra (multicast, performEvent)
 import Math.Angle (degree)
 import Model.ActiveMode (ActiveMode(..), fromBoolean)
 import Model.SmartHouse.House (House, HouseNode, HouseOp(..), createHouseFrom, houseTapped)
 import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo, _size, _texture, mkHouseTextureInfo)
 import Model.UUID (idLens)
-import OBJExporter (MeshFiles)
+import OBJExporter (MeshFiles, exportObject)
 import Rendering.DynamicNode (eventNode)
-import Rendering.Node (Node, fixNodeDWith, fixNodeEWith, getEnv, localEnv, mkNodeEnv, node, runNode, tapMouseMesh)
+import Rendering.Node (Node, fixNodeDWith, fixNodeEWith, getEnv, getParent, localEnv, mkNodeEnv, node, runNode, tapMouseMesh)
 import Rendering.TextureLoader (loadTextureFromUrl)
 import SmartHouse.HouseEditor (editHouse)
 import SmartHouse.HouseTracer (traceHouse)
@@ -162,7 +162,10 @@ renderHouseDict actHouseDyn houses = traverse render houses
 
 createHouseBuilder :: Node HouseBuilderConfig HouseBuilt
 createHouseBuilder = node (def # _name .~ "house-builder") $ do
-    lId <- view _leadId <$> getEnv
+    cfg   <- getEnv
+    pNode <- getParent
+
+    let lId = cfg ^. _leadId
     t <- liftEffect $ loadHouseTexture lId
     let tInfo = mkHouseTextureInfo t (def # _width  .~ meter 100.0
                                           # _height .~ meter 46.5)
@@ -188,9 +191,15 @@ createHouseBuilder = node (def # _name .~ "house-builder") $ do
 
                 opEvt = addHouseEvt <|> updHouseEvt
 
-                newHdEvt = sampleOn hdEvt $ applyHouseOp <$> opEvt
+                newHdEvt = multicast $ sampleOn hdEvt $ applyHouseOp <$> opEvt
 
-            pure { input: actHouseEvt, output : { input: newHdEvt, output : def } }
+                -- state of if the current house is ready for exporting
+                readyEvt = sampleOn hdEvt $ const hasHouse <$> deactEvt
+
+                res = def # _houseReady .~ step false readyEvt
+                          # _filesExported .~ performEvent (const (exportObject pNode) <$> cfg ^. _toExport)
+
+            pure { input: actHouseEvt, output : { input: newHdEvt, output : res } }
 
 
 -- | external API to build a 3D house for 2D lead

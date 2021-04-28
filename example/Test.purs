@@ -90,4 +90,5 @@ doTest roofDat panelDat = do
                     --void $ subscribe (house ^. _alignment) logShow
                     --void $ subscribe (house ^. _screenshot) logShow
 
-                    buildHouse editor builderCfg
+                    r <- buildHouse editor builderCfg
+                    pure unit
