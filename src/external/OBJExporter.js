@@ -205,11 +205,3 @@ exports.mkOBJExporter = _ => {
 exports.parseObject = obj => exporter => _ => {
     return exporter.parse(obj);
 }
-
-exports.getOBJ = res => {
-    return res.obj;
-}
-
-exports.getMTL = res => {
-    return res.mtl;
-}
