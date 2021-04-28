@@ -1,4 +1,4 @@
-module SmartHouse.HouseBuilder (buildHouse, HouseBuilderConfig) where
+module SmartHouse.HouseBuilder (buildHouse, HouseBuilderConfig, HouseBuilt) where
 
 import Prelude hiding (degree)
 
@@ -19,6 +19,7 @@ import Data.Meter (meter, meterVal)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
+import Data.Tuple (fst)
 import Data.UUID (UUID)
 import Data.UUIDMap (UUIDMap)
 import Editor.Common.Lenses (_deleted, _height, _leadId, _modeDyn, _mouseMove, _name, _tapped, _updated, _width)
@@ -63,6 +64,11 @@ newtype HouseBuilt = HouseBuilt {
     }
 
 derive instance newtypeHouseBuilt :: Newtype HouseBuilt _
+instance defaultHouseBuilt :: Default HouseBuilt where
+    def = HouseBuilt {
+        filesExported : empty,
+        houseReady    : pure false
+        }
 
 _filesExported :: forall t a r. Newtype t { filesExported :: a | r } => Lens' t a
 _filesExported = _Newtype <<< prop (SProxy :: SProxy "filesExported")
@@ -118,6 +124,9 @@ _houses = _Newtype <<< prop (SProxy :: SProxy "houses")
 _housesToRender :: forall t a r. Newtype t { housesToRender :: a | r } => Lens' t a
 _housesToRender = _Newtype <<< prop (SProxy :: SProxy "housesToRender")
 
+hasHouse :: HouseDictData -> Boolean
+hasHouse = not <<< M.isEmpty <<< view _houses
+
 -- mark all houses to be rendered
 renderAll :: HouseDictData -> HouseDictData
 renderAll s = s # _housesToRender .~ Just (s ^. _houses)
@@ -151,7 +160,7 @@ renderHouseDict actHouseDyn houses = traverse render houses
           
           render h = editHouse (getMode h <$> actHouseDyn) h
 
-createHouseBuilder :: Node HouseBuilderConfig Unit
+createHouseBuilder :: Node HouseBuilderConfig HouseBuilt
 createHouseBuilder = node (def # _name .~ "house-builder") $ do
     lId <- view _leadId <$> getEnv
     t <- liftEffect $ loadHouseTexture lId
@@ -159,19 +168,19 @@ createHouseBuilder = node (def # _name .~ "house-builder") $ do
                                           # _height .~ meter 46.5)
     
     fixNodeEWith def \hdEvt ->
-        fixNodeDWith Nothing \actRoofDyn -> do
+        fixNodeDWith Nothing \actHouseDyn -> do
             -- add helper plane that accepts tap and drag events
             helper <- mkHelperPlane tInfo
 
             -- render all houses
             let houseToRenderEvt = compact $ view _housesToRender <$> hdEvt
-            nodesEvt <- localEnv (const tInfo) $ eventNode (renderHouseDict actRoofDyn <$> houseToRenderEvt)
+            nodesEvt <- localEnv (const tInfo) $ eventNode (renderHouseDict actHouseDyn <$> houseToRenderEvt)
 
-            let deactEvt   = const Nothing <$> helper ^. _tapped
-                actEvt     = keepLatest $ getActivated <$> nodesEvt
-                actRoofEvt = (Just <$> actEvt) <|> deactEvt
+            let deactEvt    = const Nothing <$> helper ^. _tapped
+                actEvt      = keepLatest $ getActivated <$> nodesEvt
+                actHouseEvt = (Just <$> actEvt) <|> deactEvt
             
-            floorPlanEvt <- traceHouse $ def # _modeDyn   .~ (fromBoolean <<< isNothing <$> actRoofDyn)
+            floorPlanEvt <- traceHouse $ def # _modeDyn   .~ (fromBoolean <<< isNothing <$> actHouseDyn)
                                              # _mouseMove .~ helper ^. _mouseMove
             let houseEvt = performEvent $ createHouseFrom (degree 30.0) <$> floorPlanEvt
                 addHouseEvt = HouseOpCreate <$> houseEvt
@@ -181,9 +190,9 @@ createHouseBuilder = node (def # _name .~ "house-builder") $ do
 
                 newHdEvt = sampleOn hdEvt $ applyHouseOp <$> opEvt
 
-            pure { input: actRoofEvt, output : { input: newHdEvt, output : unit } }
+            pure { input: actHouseEvt, output : { input: newHdEvt, output : def } }
 
 
 -- | external API to build a 3D house for 2D lead
-buildHouse :: Editor -> HouseBuilderConfig -> Effect Unit
-buildHouse editor cfg = void $ runNode createHouseBuilder $ mkNodeEnv editor cfg
+buildHouse :: Editor -> HouseBuilderConfig -> Effect HouseBuilt
+buildHouse editor cfg = fst <$> runNode createHouseBuilder (mkNodeEnv editor cfg)
