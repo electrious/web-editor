@@ -179,7 +179,7 @@ OBJExporter.prototype = {
             
 	    if (mat.map && mat.map instanceof THREE.Texture) {
                 
-		var file = mat.map.image.currentSrc.slice( mat.map.image.currentSrc.slice.lastIndexOf("/"), mat.map.image.currentSrc.length - 1 );
+		var file = mat.map.image.currentSrc.slice( mat.map.image.currentSrc.lastIndexOf("/"), mat.map.image.currentSrc.length - 1 );
                 
 		mtlOutput += 'map_Ka ' + file + '\n';
 		mtlOutput += 'map_Kd ' + file + '\n';

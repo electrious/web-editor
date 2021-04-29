@@ -2,6 +2,8 @@ module OBJExporter where
 
 import Prelude
 
+import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Show (genericShow)
 import Data.Lens (Lens')
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
@@ -21,6 +23,9 @@ newtype MeshFiles = MeshFiles {
     }
 
 derive instance newtypeMeshFiles :: Newtype MeshFiles _
+derive instance genericMeshFiles :: Generic MeshFiles _
+instance showMeshFiles :: Show MeshFiles where
+    show = genericShow
 
 _obj :: forall t a r. Newtype t { obj :: a | r } => Lens' t a
 _obj = _Newtype <<< prop (SProxy :: SProxy "obj")

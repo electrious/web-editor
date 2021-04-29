@@ -1,4 +1,4 @@
-module SmartHouse.HouseBuilder (buildHouse, HouseBuilderConfig, HouseBuilt) where
+module SmartHouse.HouseBuilder (buildHouse, HouseBuilderConfig, _toExport, HouseBuilt, _filesExported, _houseReady) where
 
 import Prelude hiding (degree)
 
@@ -179,7 +179,7 @@ createHouseBuilder = node (def # _name .~ "house-builder") $ do
             let houseToRenderEvt = compact $ view _housesToRender <$> hdEvt
             nodesEvt <- localEnv (const tInfo) $ eventNode (renderHouseDict actHouseDyn <$> houseToRenderEvt)
 
-            let deactEvt    = const Nothing <$> helper ^. _tapped
+            let deactEvt    = multicast $ const Nothing <$> helper ^. _tapped
                 actEvt      = keepLatest $ getActivated <$> nodesEvt
                 actHouseEvt = (Just <$> actEvt) <|> deactEvt
             
@@ -196,7 +196,7 @@ createHouseBuilder = node (def # _name .~ "house-builder") $ do
                 -- state of if the current house is ready for exporting
                 readyEvt = sampleOn hdEvt $ const hasHouse <$> deactEvt
 
-                res = def # _houseReady .~ step false readyEvt
+                res = def # _houseReady    .~ step false readyEvt
                           # _filesExported .~ performEvent (const (exportObject pNode) <$> cfg ^. _toExport)
 
             pure { input: actHouseEvt, output : { input: newHdEvt, output : res } }
