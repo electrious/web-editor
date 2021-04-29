@@ -28,7 +28,7 @@ import Effect (Effect)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic, step)
 import FRP.Event (Event, keepLatest, sampleOn)
-import FRP.Event.Extra (multicast, performEvent)
+import FRP.Event.Extra (delay, multicast, performEvent)
 import Math.Angle (degree)
 import Model.ActiveMode (ActiveMode(..), fromBoolean)
 import Model.SmartHouse.House (House, HouseNode, HouseOp(..), createHouseFrom, houseTapped)
@@ -38,6 +38,7 @@ import OBJExporter (MeshFiles, exportObject)
 import Rendering.DynamicNode (eventNode)
 import Rendering.Node (Node, fixNodeDWith, fixNodeEWith, getEnv, getParent, localEnv, mkNodeEnv, node, runNode, tapMouseMesh)
 import Rendering.TextureLoader (loadTextureFromUrl)
+import SmartHouse.BuilderMode (BuilderMode(..))
 import SmartHouse.HouseEditor (editHouse)
 import SmartHouse.HouseTracer (traceHouse)
 import Three.Core.Geometry (mkPlaneGeometry)
@@ -152,13 +153,19 @@ getActivated :: forall f. Foldable f => Functor f => f HouseNode -> Event UUID
 getActivated = foldEvtWith f
     where f n = const (n ^. idLens) <$> houseTapped n
 
-renderHouseDict :: Dynamic (Maybe UUID) -> HouseDict -> Node HouseTextureInfo (UUIDMap HouseNode)
-renderHouseDict actHouseDyn houses = traverse render houses
-    where getMode h (Just i) | h ^. idLens == i = Active
-                             | otherwise        = Inactive
-          getMode h Nothing                     = Inactive
+renderHouseDict :: Dynamic (Maybe UUID) -> Dynamic BuilderMode -> HouseDict -> Node HouseTextureInfo (UUIDMap HouseNode)
+renderHouseDict actHouseDyn modeDyn houses = traverse render houses
+    where getMode _ _ Showing                            = Inactive
+          getMode h (Just i) Building | h ^. idLens == i = Active
+                                      | otherwise        = Inactive
+          getMode h Nothing Building                     = Inactive
           
-          render h = editHouse (getMode h <$> actHouseDyn) h
+          render h = editHouse (getMode h <$> actHouseDyn <*> modeDyn) h
+
+
+tracerMode :: Maybe UUID -> BuilderMode -> ActiveMode
+tracerMode _ Showing  = Inactive
+tracerMode h Building = fromBoolean $ isNothing h
 
 createHouseBuilder :: Node HouseBuilderConfig HouseBuilt
 createHouseBuilder = node (def # _name .~ "house-builder") $ do
@@ -171,35 +178,41 @@ createHouseBuilder = node (def # _name .~ "house-builder") $ do
                                           # _height .~ meter 46.5)
     
     fixNodeEWith def \hdEvt ->
-        fixNodeDWith Nothing \actHouseDyn -> do
-            -- add helper plane that accepts tap and drag events
-            helper <- mkHelperPlane tInfo
+        fixNodeDWith Nothing \actHouseDyn ->
+            fixNodeDWith Building \modeDyn -> do
+                -- add helper plane that accepts tap and drag events
+                helper <- mkHelperPlane tInfo
 
-            -- render all houses
-            let houseToRenderEvt = compact $ view _housesToRender <$> hdEvt
-            nodesEvt <- localEnv (const tInfo) $ eventNode (renderHouseDict actHouseDyn <$> houseToRenderEvt)
+                -- render all houses
+                let houseToRenderEvt = compact $ view _housesToRender <$> hdEvt
+                nodesEvt <- localEnv (const tInfo) $ eventNode (renderHouseDict actHouseDyn modeDyn <$> houseToRenderEvt)
 
-            let deactEvt    = multicast $ const Nothing <$> helper ^. _tapped
-                actEvt      = keepLatest $ getActivated <$> nodesEvt
-                actHouseEvt = (Just <$> actEvt) <|> deactEvt
-            
-            floorPlanEvt <- traceHouse $ def # _modeDyn   .~ (fromBoolean <<< isNothing <$> actHouseDyn)
-                                             # _mouseMove .~ helper ^. _mouseMove
-            let houseEvt = performEvent $ createHouseFrom (degree 30.0) <$> floorPlanEvt
-                addHouseEvt = HouseOpCreate <$> houseEvt
-                updHouseEvt = keepLatest (getHouseUpd <$> nodesEvt)
+                let deactEvt    = multicast $ const Nothing <$> helper ^. _tapped
+                    actEvt      = keepLatest $ getActivated <$> nodesEvt
+                    actHouseEvt = (Just <$> actEvt) <|> deactEvt
+                
+                floorPlanEvt <- traceHouse $ def # _modeDyn   .~ (tracerMode <$> actHouseDyn <*> modeDyn)
+                                                 # _mouseMove .~ helper ^. _mouseMove
+                let houseEvt = performEvent $ createHouseFrom (degree 30.0) <$> floorPlanEvt
+                    addHouseEvt = HouseOpCreate <$> houseEvt
+                    updHouseEvt = keepLatest (getHouseUpd <$> nodesEvt)
 
-                opEvt = addHouseEvt <|> updHouseEvt
+                    opEvt = addHouseEvt <|> updHouseEvt
 
-                newHdEvt = multicast $ sampleOn hdEvt $ applyHouseOp <$> opEvt
+                    newHdEvt = multicast $ sampleOn hdEvt $ applyHouseOp <$> opEvt
 
-                -- state of if the current house is ready for exporting
-                readyEvt = sampleOn hdEvt $ const hasHouse <$> deactEvt
+                    -- state of if the current house is ready for exporting
+                    readyEvt = sampleOn hdEvt $ const hasHouse <$> deactEvt
 
-                res = def # _houseReady    .~ step false readyEvt
-                          # _filesExported .~ performEvent (const (exportObject pNode) <$> cfg ^. _toExport)
+                    exportEvt = cfg ^. _toExport
+                    modeEvt = (const Showing <$> exportEvt) <|> 
+                              (const Building <$> delay 30 exportEvt)
+                    toExpEvt = delay 15 exportEvt
+                    res = def # _houseReady    .~ step false readyEvt
+                              # _filesExported .~ performEvent (const (exportObject pNode) <$> toExpEvt)
 
-            pure { input: actHouseEvt, output : { input: newHdEvt, output : res } }
+                pure { input: modeEvt, output: { input: actHouseEvt, output : { input: newHdEvt, output : res } } }
+                
 
 
 -- | external API to build a 3D house for 2D lead

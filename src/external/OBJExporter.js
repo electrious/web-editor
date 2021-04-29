@@ -140,9 +140,9 @@ exports.exportObject = object => _ => {
 
 	};
 
-	object.traverse( function ( child ) {
+	object.traverseVisible( function ( child ) {
 
-	    if ( child instanceof THREE.Mesh ) parseMesh( child );
+	    if ( child instanceof THREE.Mesh && child.visible ) parseMesh( child );
 
 	} );
       	
