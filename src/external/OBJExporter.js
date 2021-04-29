@@ -1,13 +1,6 @@
 var THREE = require('three');
 
-var OBJExporter = function () {};
-
-OBJExporter.prototype = {
-
-    constructor: OBJExporter,
-
-    parse: function ( object ) {
-
+exports.exportObject = object => _ => {
 	var output = '';
 	var materials = {};
 
@@ -15,7 +8,7 @@ OBJExporter.prototype = {
 	var indexVertexUvs = 0;
 	var indexNormals = 0;
       	
-	var mtlFileName = 'objmaterial'; // maybe this value can be passed as parameter
+	var mtlFileName = 'scene'; // maybe this value can be passed as parameter
 	output += 'mtllib ' + mtlFileName +  '.mtl\n';
 
 	var parseMesh = function ( mesh ) {
@@ -179,10 +172,10 @@ OBJExporter.prototype = {
             
 	    if (mat.map && mat.map instanceof THREE.Texture) {
                 
-		var file = mat.map.image.currentSrc.slice( mat.map.image.currentSrc.lastIndexOf("/"), mat.map.image.currentSrc.length - 1 );
+		var file = mat.map.image.currentSrc.slice( mat.map.image.currentSrc.lastIndexOf("/"), mat.map.image.currentSrc.length );
                 
-		mtlOutput += 'map_Ka ' + file + '\n';
-		mtlOutput += 'map_Kd ' + file + '\n';
+		mtlOutput += 'map_Ka .' + file + '\n';
+		mtlOutput += 'map_Kd .' + file + '\n';
                 
 	    }
             
@@ -192,16 +185,4 @@ OBJExporter.prototype = {
 	    obj: output,
 	    mtl: mtlOutput
 	}
-
-    }
-
 };
-
-
-exports.mkOBJExporter = _ => {
-    return new OBJExporter();
-}
-
-exports.parseObject = obj => exporter => _ => {
-    return exporter.parse(obj);
-}

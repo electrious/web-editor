@@ -12,10 +12,7 @@ import Data.Symbol (SProxy(..))
 import Effect (Effect)
 import Three.Core.Object3D (Object3D)
 
-foreign import data OBJExporter :: Type
-
-foreign import mkOBJExporter :: Effect OBJExporter
-foreign import parseObject :: Object3D -> OBJExporter -> Effect MeshFiles
+foreign import exportObject :: Object3D -> Effect MeshFiles
 
 newtype MeshFiles = MeshFiles {
     obj :: String,
@@ -32,7 +29,3 @@ _obj = _Newtype <<< prop (SProxy :: SProxy "obj")
 
 _mtl :: forall t a r. Newtype t { mtl :: a | r } => Lens' t a
 _mtl = _Newtype <<< prop (SProxy :: SProxy "mtl")
-
-
-exportObject :: Object3D -> Effect MeshFiles
-exportObject obj = mkOBJExporter >>= parseObject obj
