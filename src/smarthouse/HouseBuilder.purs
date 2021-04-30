@@ -42,13 +42,14 @@ import Rendering.TextureLoader (loadTextureFromUrl)
 import SmartHouse.BuilderMode (BuilderMode(..))
 import SmartHouse.HouseEditor (editHouse)
 import SmartHouse.HouseTracer (traceHouse)
-import Specular.Dom.Element (attrD)
-import Specular.Dom.Element.Class (el)
+import Specular.Dom.Browser ((:=))
+import Specular.Dom.Element (attrsD)
 import Specular.Dom.Widget (Widget, emptyWidget, runMainWidgetInNode)
 import Three.Core.Geometry (mkPlaneGeometry)
 import Three.Core.Material (mkMeshBasicMaterialWithTexture)
 import Three.Loader.TextureLoader (Texture, clampToEdgeWrapping, repeatWrapping, setRepeat, setWrapS, setWrapT)
 import UI.Bridge (toUIDyn)
+import UI.Utils (div)
 import Unsafe.Coerce (unsafeCoerce)
 import Util (foldEvtWith)
 
@@ -231,10 +232,11 @@ derive instance newtypeBuilderUIConf :: Newtype BuilderUIConf _
 houseBuilderUI :: BuilderUIConf -> Widget Unit
 houseBuilderUI cfg = do
     sizeD <- liftEffect $ toUIDyn $ cfg ^. _sizeDyn
-    let wd = show <<< view _width <$> sizeD
-        hd = show <<< view _height <$> sizeD
-        p = [attrD "width" wd, attrD "height" hd]
-    el "div" p emptyWidget
+    let style s = "style" := ("position: absolute; " <>
+                              "width: " <> show (s ^. _width) <> "px;" <>
+                              "height: " <> show (s ^. _height) <> "px;" <>
+                              "padding: 8px; left: 0; top: 0; pointer-events: none;")
+    div [attrsD $ style <$> sizeD] emptyWidget
 
 -- | external API to build a 3D house for 2D lead
 buildHouse :: Editor -> HouseBuilderConfig -> Effect HouseBuilt
