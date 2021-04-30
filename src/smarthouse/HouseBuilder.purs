@@ -27,7 +27,7 @@ import Editor.Editor (Editor, _sizeDyn)
 import Editor.SceneEvent (Size)
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import FRP.Dynamic (Dynamic, step)
+import FRP.Dynamic (Dynamic(..), step)
 import FRP.Event (Event, keepLatest, sampleOn)
 import FRP.Event.Extra (delay, multicast, performEvent)
 import Math.Angle (degree)
@@ -42,6 +42,7 @@ import Rendering.TextureLoader (loadTextureFromUrl)
 import SmartHouse.BuilderMode (BuilderMode(..))
 import SmartHouse.HouseEditor (editHouse)
 import SmartHouse.HouseTracer (traceHouse)
+import SmartHouse.UI (BuilderUIConf(..), houseBuilderUI)
 import Specular.Dom.Browser ((:=))
 import Specular.Dom.Element (attrsD)
 import Specular.Dom.Widget (Widget, emptyWidget, runMainWidgetInNode)
@@ -221,29 +222,12 @@ createHouseBuilder = node (def # _name .~ "house-builder") $ do
                 pure { input: modeEvt, output: { input: actHouseEvt, output : { input: newHdEvt, output : res } } }
                 
 
-
-newtype BuilderUIConf = BuilderUIConf {
-    sizeDyn :: Dynamic Size
-    }
-
-derive instance newtypeBuilderUIConf :: Newtype BuilderUIConf _
-
--- | build the house editor UI widget system
-houseBuilderUI :: BuilderUIConf -> Widget Unit
-houseBuilderUI cfg = do
-    sizeD <- liftEffect $ toUIDyn $ cfg ^. _sizeDyn
-    let style s = "style" := ("position: absolute; " <>
-                              "width: " <> show (s ^. _width) <> "px;" <>
-                              "height: " <> show (s ^. _height) <> "px;" <>
-                              "padding: 8px; left: 0; top: 0; pointer-events: none;")
-    div [attrsD $ style <$> sizeD] emptyWidget
-
 -- | external API to build a 3D house for 2D lead
 buildHouse :: Editor -> HouseBuilderConfig -> Effect HouseBuilt
 buildHouse editor cfg = do
     res <- fst <$> runNode createHouseBuilder (mkNodeEnv editor cfg)
     let parentEl = unsafeCoerce $ editor ^. _parent
-        conf = BuilderUIConf { sizeDyn : editor ^. _sizeDyn }
+        conf = def # _sizeDyn .~ (editor ^. _sizeDyn)
     void $ runMainWidgetInNode parentEl $ houseBuilderUI conf
 
     pure res
