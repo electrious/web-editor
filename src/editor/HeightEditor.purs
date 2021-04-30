@@ -16,7 +16,7 @@ import FRP.Dynamic (Dynamic)
 import FRP.Event (Event)
 import Math (pi)
 import Model.ActiveMode (ActiveMode(..), isActive)
-import Rendering.Node (Node, node)
+import Rendering.Node (Node, _visible, node)
 import Three.Core.Geometry (Geometry)
 import Three.Core.Material (MeshBasicMaterial)
 import Three.Math.Euler (mkEuler)
@@ -65,7 +65,7 @@ dragArrowPos vs = mkVec3 x y 0.5
 -- | create the drag arrow to drag the Floor Plan to form the house
 dragArrow :: forall e. HeightEditorConf -> Node e DragArrow
 dragArrow conf = do
-    let actDyn = conf ^. _modeDyn
+    let actDyn = isActive <$> conf ^. _modeDyn
         posDyn = conf ^. _position
         min    = conf ^. _min
         max    = conf ^. _max
@@ -76,12 +76,13 @@ dragArrow conf = do
         -- make sure the arrow only can be dragged along Z axis
         transF d = mkVec3 0.0 0.0 (vecZ d)
         
-        cfg = def # _isActive       .~ (isActive <$> actDyn)
+        cfg = def # _isActive       .~ actDyn
                   # _customMat      .~ mat
                   # _validator      .~ validator
                   # _deltaTransform .~ Just transF
                   # _rotation       .~ mkEuler (pi / 2.0) 0.0 0.0
-    node (def # _position .~ posDyn) $ createDraggableObject (cfg :: DragObjCfg Geometry)
+    node (def # _position .~ posDyn
+              # _visible  .~ actDyn) $ createDraggableObject (cfg :: DragObjCfg Geometry)
 
 
 -- | setup drag arrow to edit the house height

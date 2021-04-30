@@ -1,8 +1,9 @@
-module SmartHouse.HouseBuilder (buildHouse, HouseBuilderConfig) where
+module SmartHouse.HouseBuilder (buildHouse, HouseBuilderConfig, _toExport, HouseBuilt, _filesExported, _houseReady) where
 
 import Prelude hiding (degree)
 
 import Control.Alt ((<|>))
+import Control.Alternative (empty)
 import Custom.Mesh (TapMouseMesh)
 import Data.Compactable (compact)
 import Data.Default (class Default, def)
@@ -18,6 +19,7 @@ import Data.Meter (meter, meterVal)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
+import Data.Tuple (fst)
 import Data.UUID (UUID)
 import Data.UUIDMap (UUIDMap)
 import Editor.Common.Lenses (_deleted, _height, _leadId, _modeDyn, _mouseMove, _name, _parent, _tapped, _updated, _width)
@@ -25,17 +27,19 @@ import Editor.Editor (Editor, _sizeDyn)
 import Editor.SceneEvent (Size)
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import FRP.Dynamic (Dynamic)
+import FRP.Dynamic (Dynamic, step)
 import FRP.Event (Event, keepLatest, sampleOn)
-import FRP.Event.Extra (performEvent)
+import FRP.Event.Extra (delay, multicast, performEvent)
 import Math.Angle (degree)
 import Model.ActiveMode (ActiveMode(..), fromBoolean)
 import Model.SmartHouse.House (House, HouseNode, HouseOp(..), createHouseFrom, houseTapped)
 import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo, _size, _texture, mkHouseTextureInfo)
 import Model.UUID (idLens)
+import OBJExporter (MeshFiles, exportObject)
 import Rendering.DynamicNode (eventNode)
-import Rendering.Node (Node, fixNodeDWith, fixNodeEWith, getEnv, localEnv, mkNodeEnv, node, runNode, tapMouseMesh)
+import Rendering.Node (Node, fixNodeDWith, fixNodeEWith, getEnv, getParent, localEnv, mkNodeEnv, node, runNode, tapMouseMesh)
 import Rendering.TextureLoader (loadTextureFromUrl)
+import SmartHouse.BuilderMode (BuilderMode(..))
 import SmartHouse.HouseEditor (editHouse)
 import SmartHouse.HouseTracer (traceHouse)
 import Specular.Dom.Element (attrD)
@@ -49,13 +53,35 @@ import Unsafe.Coerce (unsafeCoerce)
 import Util (foldEvtWith)
 
 newtype HouseBuilderConfig = HouseBuilderConfig {
-    leadId :: Int
+    leadId   :: Int,
+    toExport :: Event Unit
 }
 
 derive instance newtypeHouseBuilderConfig :: Newtype HouseBuilderConfig _
 instance defaultHouseBuilderConfig :: Default HouseBuilderConfig where
-    def = HouseBuilderConfig { leadId : 0 }
+    def = HouseBuilderConfig { leadId : 0, toExport : empty }
 
+_toExport :: forall t a r. Newtype t { toExport :: a | r } => Lens' t a
+_toExport = _Newtype <<< prop (SProxy :: SProxy "toExport")
+
+
+newtype HouseBuilt = HouseBuilt {
+    filesExported :: Event MeshFiles,
+    houseReady    :: Dynamic Boolean
+    }
+
+derive instance newtypeHouseBuilt :: Newtype HouseBuilt _
+instance defaultHouseBuilt :: Default HouseBuilt where
+    def = HouseBuilt {
+        filesExported : empty,
+        houseReady    : pure false
+        }
+
+_filesExported :: forall t a r. Newtype t { filesExported :: a | r } => Lens' t a
+_filesExported = _Newtype <<< prop (SProxy :: SProxy "filesExported")
+
+_houseReady :: forall t a r. Newtype t { houseReady :: a | r } => Lens' t a
+_houseReady = _Newtype <<< prop (SProxy :: SProxy "houseReady")
 
 -- | get 2D image url for a lead
 imageUrlForLead :: Int -> String
@@ -105,6 +131,9 @@ _houses = _Newtype <<< prop (SProxy :: SProxy "houses")
 _housesToRender :: forall t a r. Newtype t { housesToRender :: a | r } => Lens' t a
 _housesToRender = _Newtype <<< prop (SProxy :: SProxy "housesToRender")
 
+hasHouse :: HouseDictData -> Boolean
+hasHouse = not <<< M.isEmpty <<< view _houses
+
 -- mark all houses to be rendered
 renderAll :: HouseDictData -> HouseDictData
 renderAll s = s # _housesToRender .~ Just (s ^. _houses)
@@ -130,45 +159,66 @@ getActivated :: forall f. Foldable f => Functor f => f HouseNode -> Event UUID
 getActivated = foldEvtWith f
     where f n = const (n ^. idLens) <$> houseTapped n
 
-renderHouseDict :: Dynamic (Maybe UUID) -> HouseDict -> Node HouseTextureInfo (UUIDMap HouseNode)
-renderHouseDict actHouseDyn houses = traverse render houses
-    where getMode h (Just i) | h ^. idLens == i = Active
-                             | otherwise        = Inactive
-          getMode h Nothing                     = Inactive
+renderHouseDict :: Dynamic (Maybe UUID) -> Dynamic BuilderMode -> HouseDict -> Node HouseTextureInfo (UUIDMap HouseNode)
+renderHouseDict actHouseDyn modeDyn houses = traverse render houses
+    where getMode _ _ Showing                            = Inactive
+          getMode h (Just i) Building | h ^. idLens == i = Active
+                                      | otherwise        = Inactive
+          getMode h Nothing Building                     = Inactive
           
-          render h = editHouse (getMode h <$> actHouseDyn) h
+          render h = editHouse (getMode h <$> actHouseDyn <*> modeDyn) h
 
-createHouseBuilder :: Node HouseBuilderConfig Unit
+
+tracerMode :: Maybe UUID -> BuilderMode -> ActiveMode
+tracerMode _ Showing  = Inactive
+tracerMode h Building = fromBoolean $ isNothing h
+
+createHouseBuilder :: Node HouseBuilderConfig HouseBuilt
 createHouseBuilder = node (def # _name .~ "house-builder") $ do
-    lId <- view _leadId <$> getEnv
+    cfg   <- getEnv
+    pNode <- getParent
+
+    let lId = cfg ^. _leadId
     t <- liftEffect $ loadHouseTexture lId
     let tInfo = mkHouseTextureInfo t (def # _width  .~ meter 100.0
                                           # _height .~ meter 46.5)
     
     fixNodeEWith def \hdEvt ->
-        fixNodeDWith Nothing \actRoofDyn -> do
-            -- add helper plane that accepts tap and drag events
-            helper <- mkHelperPlane tInfo
+        fixNodeDWith Nothing \actHouseDyn ->
+            fixNodeDWith Building \modeDyn -> do
+                -- add helper plane that accepts tap and drag events
+                helper <- mkHelperPlane tInfo
 
-            -- render all houses
-            let houseToRenderEvt = compact $ view _housesToRender <$> hdEvt
-            nodesEvt <- localEnv (const tInfo) $ eventNode (renderHouseDict actRoofDyn <$> houseToRenderEvt)
+                -- render all houses
+                let houseToRenderEvt = compact $ view _housesToRender <$> hdEvt
+                nodesEvt <- localEnv (const tInfo) $ eventNode (renderHouseDict actHouseDyn modeDyn <$> houseToRenderEvt)
 
-            let deactEvt   = const Nothing <$> helper ^. _tapped
-                actEvt     = keepLatest $ getActivated <$> nodesEvt
-                actRoofEvt = (Just <$> actEvt) <|> deactEvt
-            
-            floorPlanEvt <- traceHouse $ def # _modeDyn   .~ (fromBoolean <<< isNothing <$> actRoofDyn)
-                                             # _mouseMove .~ helper ^. _mouseMove
-            let houseEvt = performEvent $ createHouseFrom (degree 30.0) <$> floorPlanEvt
-                addHouseEvt = HouseOpCreate <$> houseEvt
-                updHouseEvt = keepLatest (getHouseUpd <$> nodesEvt)
+                let deactEvt    = multicast $ const Nothing <$> helper ^. _tapped
+                    actEvt      = keepLatest $ getActivated <$> nodesEvt
+                    actHouseEvt = (Just <$> actEvt) <|> deactEvt
+                
+                floorPlanEvt <- traceHouse $ def # _modeDyn   .~ (tracerMode <$> actHouseDyn <*> modeDyn)
+                                                 # _mouseMove .~ helper ^. _mouseMove
+                let houseEvt = performEvent $ createHouseFrom (degree 30.0) <$> floorPlanEvt
+                    addHouseEvt = HouseOpCreate <$> houseEvt
+                    updHouseEvt = keepLatest (getHouseUpd <$> nodesEvt)
 
-                opEvt = addHouseEvt <|> updHouseEvt
+                    opEvt = addHouseEvt <|> updHouseEvt
 
-                newHdEvt = sampleOn hdEvt $ applyHouseOp <$> opEvt
+                    newHdEvt = multicast $ sampleOn hdEvt $ applyHouseOp <$> opEvt
 
-            pure { input: actRoofEvt, output : { input: newHdEvt, output : unit } }
+                    -- state of if the current house is ready for exporting
+                    readyEvt = sampleOn hdEvt $ const hasHouse <$> deactEvt
+
+                    exportEvt = cfg ^. _toExport
+                    modeEvt = (const Showing <$> exportEvt) <|> 
+                              (const Building <$> delay 30 exportEvt)
+                    toExpEvt = delay 15 exportEvt
+                    res = def # _houseReady    .~ step false readyEvt
+                              # _filesExported .~ performEvent (const (exportObject pNode) <$> toExpEvt)
+
+                pure { input: modeEvt, output: { input: actHouseEvt, output : { input: newHdEvt, output : res } } }
+                
 
 
 newtype BuilderUIConf = BuilderUIConf {
@@ -187,9 +237,11 @@ houseBuilderUI cfg = do
     el "div" p emptyWidget
 
 -- | external API to build a 3D house for 2D lead
-buildHouse :: Editor -> HouseBuilderConfig -> Effect Unit
+buildHouse :: Editor -> HouseBuilderConfig -> Effect HouseBuilt
 buildHouse editor cfg = do
-    void $ runNode createHouseBuilder $ mkNodeEnv editor cfg
+    res <- fst <$> runNode createHouseBuilder (mkNodeEnv editor cfg)
     let parentEl = unsafeCoerce $ editor ^. _parent
         conf = BuilderUIConf { sizeDyn : editor ^. _sizeDyn }
     void $ runMainWidgetInNode parentEl $ houseBuilderUI conf
+
+    pure res

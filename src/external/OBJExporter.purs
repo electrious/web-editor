@@ -1,22 +1,31 @@
 module OBJExporter where
 
 import Prelude
-import Data.Tuple (Tuple(..))
+
+import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Show (genericShow)
+import Data.Lens (Lens')
+import Data.Lens.Iso.Newtype (_Newtype)
+import Data.Lens.Record (prop)
+import Data.Newtype (class Newtype)
+import Data.Symbol (SProxy(..))
 import Effect (Effect)
 import Three.Core.Object3D (Object3D)
 
-foreign import data OBJExporter :: Type
-foreign import data ExportData :: Type
+foreign import exportObject :: Object3D -> Effect MeshFiles
 
-foreign import mkOBJExporter :: Effect OBJExporter
-foreign import parseObject :: Object3D -> OBJExporter -> Effect ExportData
+newtype MeshFiles = MeshFiles {
+    obj :: String,
+    mtl :: String
+    }
 
-foreign import getOBJ :: ExportData -> String
-foreign import getMTL :: ExportData -> String
+derive instance newtypeMeshFiles :: Newtype MeshFiles _
+derive instance genericMeshFiles :: Generic MeshFiles _
+instance showMeshFiles :: Show MeshFiles where
+    show = genericShow
 
+_obj :: forall t a r. Newtype t { obj :: a | r } => Lens' t a
+_obj = _Newtype <<< prop (SProxy :: SProxy "obj")
 
-exportObject :: Object3D -> Effect (Tuple String String)
-exportObject obj = do
-    e <- mkOBJExporter
-    r <- parseObject obj e
-    pure $ Tuple (getOBJ r) (getMTL r)
+_mtl :: forall t a r. Newtype t { mtl :: a | r } => Lens' t a
+_mtl = _Newtype <<< prop (SProxy :: SProxy "mtl")
