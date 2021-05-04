@@ -24,10 +24,9 @@ import Data.UUID (UUID)
 import Data.UUIDMap (UUIDMap)
 import Editor.Common.Lenses (_deleted, _height, _leadId, _modeDyn, _mouseMove, _name, _parent, _tapped, _updated, _width)
 import Editor.Editor (Editor, _sizeDyn)
-import Editor.SceneEvent (Size)
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import FRP.Dynamic (Dynamic(..), step)
+import FRP.Dynamic (Dynamic, step)
 import FRP.Event (Event, keepLatest, sampleOn)
 import FRP.Event.Extra (delay, multicast, performEvent)
 import Math.Angle (degree)
@@ -42,15 +41,11 @@ import Rendering.TextureLoader (loadTextureFromUrl)
 import SmartHouse.BuilderMode (BuilderMode(..))
 import SmartHouse.HouseEditor (editHouse)
 import SmartHouse.HouseTracer (traceHouse)
-import SmartHouse.UI (BuilderUIConf(..), houseBuilderUI)
-import Specular.Dom.Browser ((:=))
-import Specular.Dom.Element (attrsD)
-import Specular.Dom.Widget (Widget, emptyWidget, runMainWidgetInNode)
+import SmartHouse.UI (houseBuilderUI)
+import Specular.Dom.Widget (runMainWidgetInNode)
 import Three.Core.Geometry (mkPlaneGeometry)
 import Three.Core.Material (mkMeshBasicMaterialWithTexture)
 import Three.Loader.TextureLoader (Texture, clampToEdgeWrapping, repeatWrapping, setRepeat, setWrapS, setWrapT)
-import UI.Bridge (toUIDyn)
-import UI.Utils (div)
 import Unsafe.Coerce (unsafeCoerce)
 import Util (foldEvtWith)
 
@@ -227,7 +222,7 @@ buildHouse :: Editor -> HouseBuilderConfig -> Effect HouseBuilt
 buildHouse editor cfg = do
     res <- fst <$> runNode createHouseBuilder (mkNodeEnv editor cfg)
     let parentEl = unsafeCoerce $ editor ^. _parent
-        conf = def # _sizeDyn .~ (editor ^. _sizeDyn)
+        conf     = def # _sizeDyn .~ (editor ^. _sizeDyn)
     void $ runMainWidgetInNode parentEl $ houseBuilderUI conf
 
     pure res
