@@ -15,7 +15,6 @@ import Editor.SceneEvent (Size, size)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic)
 import FRP.Event (Event)
-import Specular.Dom.Browser ((:=))
 import Specular.Dom.Builder.Class (text)
 import Specular.Dom.Element (attrsD)
 import Specular.Dom.Widget (Widget)
@@ -23,7 +22,7 @@ import Specular.Dom.Widgets.Button (buttonOnClick)
 import Specular.FRP (weaken)
 import Specular.FRP as S
 import UI.Bridge (fromUIEvent, toUIDyn)
-import UI.Utils (div)
+import UI.Utils (div, mkStyle, (:~))
 
 newtype BuilderUIConf = BuilderUIConf {
     sizeDyn     :: Dynamic Size,
@@ -58,10 +57,13 @@ houseBuilderUI :: BuilderUIConf -> Widget BuilderUIEvents
 houseBuilderUI cfg = do
     sizeD <- liftEffect $ toUIDyn $ cfg ^. _sizeDyn
     showD <- liftEffect $ toUIDyn $ cfg ^. _showSaveDyn
-    let style s = "style" := ("position: absolute; " <>
-                              "width: " <> show (s ^. _width) <> "px;" <>
-                              "height: " <> show (s ^. _height) <> "px;" <>
-                              "padding: 8px; left: 0; top: 0; pointer-events: none;")
+    let style s = mkStyle [ "position"       :~ "absolute",
+                            "width"          :~ (show (s ^. _width) <> "px"),
+                            "height"         :~ (show (s ^. _height) <> "px"),
+                            "padding"        :~ "8px",
+                            "left"           :~ "0",
+                            "top"            :~ "0",
+                            "pointer-events" :~ "none" ]
     saveEvtUI <- div [attrsD $ style <$> sizeD] $ saveBtn showD
     saveEvt <- fromUIEvent saveEvtUI
     pure $ def # _toSave .~ saveEvt
@@ -70,5 +72,5 @@ houseBuilderUI cfg = do
 -- the Save button
 saveBtn :: S.Dynamic Boolean -> Widget (S.Event Unit)
 saveBtn showDyn = buttonOnClick (weaken $ mkAtt <$> showDyn) $ text "Save"
-    where mkAtt s = "style" := ("visible:" <> show s <> ";" <>
-                                "position:" <> "relative")
+    where mkAtt s = mkStyle [ "visible"  :~ show s,
+                              "position" :~ "relative" ]
