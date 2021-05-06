@@ -15,6 +15,7 @@ import Editor.SceneEvent (Size, size)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic)
 import FRP.Event (Event)
+import Specular.Dom.Browser ((:=))
 import Specular.Dom.Builder.Class (text)
 import Specular.Dom.Element (attrsD)
 import Specular.Dom.Widget (Widget)
@@ -22,7 +23,7 @@ import Specular.Dom.Widgets.Button (buttonOnClick)
 import Specular.FRP (weaken)
 import Specular.FRP as S
 import UI.Bridge (fromUIEvent, toUIDyn)
-import UI.Utils (div, mkStyle, (:~))
+import UI.Utils (div, mkAttrs, mkStyle, (:~))
 
 newtype BuilderUIConf = BuilderUIConf {
     sizeDyn     :: Dynamic Size,
@@ -60,7 +61,6 @@ houseBuilderUI cfg = do
     let style s = mkStyle [ "position"       :~ "absolute",
                             "width"          :~ (show (s ^. _width) <> "px"),
                             "height"         :~ (show (s ^. _height) <> "px"),
-                            "padding"        :~ "8px",
                             "left"           :~ "0",
                             "top"            :~ "0",
                             "pointer-events" :~ "none" ]
@@ -71,6 +71,9 @@ houseBuilderUI cfg = do
 
 -- the Save button
 saveBtn :: S.Dynamic Boolean -> Widget (S.Event Unit)
-saveBtn showDyn = buttonOnClick (weaken $ mkAtt <$> showDyn) $ text "Save"
-    where mkAtt s = mkStyle [ "visible"  :~ show s,
-                              "position" :~ "relative" ]
+saveBtn showDyn = buttonOnClick (weaken $ attD <$> showDyn) $ text "Save"
+    where attD s = if s
+                   then "class" := "uk-button"
+                   else mkAttrs [ "class" :~ "uk-button",
+                                  "disabled" :~ ""]
+                       
