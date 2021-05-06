@@ -48,5 +48,5 @@ mkStyle ps = "style" := joinWith "; " (fromFoldable $ f <$> ps)
     where f (Style k v) = k <> ": " <> v
 
 mkAttrs :: forall f. Functor f => Foldable f => f Style -> Attrs
-mkAttrs ps = O.fromFoldable $ f <$> ps
+mkAttrs = O.fromFoldable <<< map f
     where f (Style k v) = Tuple k v

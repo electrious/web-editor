@@ -17,7 +17,7 @@ import FRP.Dynamic (Dynamic)
 import FRP.Event (Event)
 import Specular.Dom.Browser ((:=))
 import Specular.Dom.Builder.Class (text)
-import Specular.Dom.Element (attrsD)
+import Specular.Dom.Element (attrsD, class_, classes)
 import Specular.Dom.Widget (Widget)
 import Specular.Dom.Widgets.Button (buttonOnClick)
 import Specular.FRP (weaken)
@@ -64,7 +64,10 @@ houseBuilderUI cfg = do
                             "left"           :~ "0",
                             "top"            :~ "0",
                             "pointer-events" :~ "none" ]
-    saveEvtUI <- div [attrsD $ style <$> sizeD] $ saveBtn showD
+    saveEvtUI <- div [attrsD $ style <$> sizeD, class_ "uk-inline"] $
+                         div [classes ["uk-position-bottom-right",
+                                       "uk-margin-small-right",
+                                       "uk-margin-small-bottom"]] $ saveBtn showD
     saveEvt <- fromUIEvent saveEvtUI
     pure $ def # _toSave .~ saveEvt
 
@@ -76,4 +79,3 @@ saveBtn showDyn = buttonOnClick (weaken $ attD <$> showDyn) $ text "Save"
                    then "class" := "uk-button"
                    else mkAttrs [ "class" :~ "uk-button",
                                   "disabled" :~ ""]
-                       
