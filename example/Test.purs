@@ -8,14 +8,15 @@ import Data.Default (def)
 import Data.Either (Either(..))
 import Data.Lens ((.~), (^.))
 import Data.Maybe (Maybe(..))
-import Editor.Common.Lenses (_apiConfig, _houseId, _leadId, _modeDyn, _panelType, _panels, _textureInfo)
+import Editor.Common.Lenses (_alignment, _apiConfig, _houseId, _leadId, _modeDyn, _panelType, _panels, _textureInfo)
 import Editor.Editor (_sizeDyn, createEditor)
 import Editor.EditorMode (EditorMode(..))
 import Editor.HouseEditor (_arrayEditParam, _dataServer, _heatmap, _heatmapTexture, _roofplates, _rotBtnTexture)
+import Editor.HouseLoader (_roofUpdate, _screenshot, editHouse)
+import Editor.PanelLayer (_serverUpdated)
 import Editor.SceneEvent (size)
 import Effect (Effect)
 import Effect.Class.Console (logShow)
-import FRP.Dynamic (dynEvent)
 import FRP.Event (subscribe)
 import FRP.Event.Extra (delay)
 import Foreign (Foreign)
@@ -24,7 +25,6 @@ import Model.Hardware.PanelTextureInfo (_premium, _standard, _standard72)
 import Model.Hardware.PanelType (PanelType(..))
 import Model.Roof.Panel (Panel)
 import Model.Roof.RoofPlate (RoofPlate)
-import SmartHouse.HouseBuilder (_filesExported, _houseReady, buildHouse)
 import Web.DOM.NonElementParentNode (getElementById)
 import Web.HTML (window)
 import Web.HTML.HTMLDocument (toNonElementParentNode)
@@ -83,17 +83,18 @@ doTest roofDat panelDat = do
 
                     editor <- createEditor el cfg
 
-                    --house <- editHouse editor houseCfg
+                    house <- editHouse editor houseCfg
 
-                    --void $ subscribe (house ^. _roofUpdate) logShow
-                    --void $ subscribe (house ^. _serverUpdated) logShow
-                    --void $ subscribe (house ^. _alignment) logShow
-                    --void $ subscribe (house ^. _screenshot) logShow
+                    void $ subscribe (house ^. _roofUpdate) logShow
+                    void $ subscribe (house ^. _serverUpdated) logShow
+                    void $ subscribe (house ^. _alignment) logShow
+                    void $ subscribe (house ^. _screenshot) logShow
 
+                    {-
                     let builderCfg = def # _leadId   .~ 318872
                                          
                     r <- buildHouse editor builderCfg
 
                     let readyEvt = const unit <$> dynEvent (r ^. _houseReady)
                     void $ subscribe (r ^. _filesExported) logShow
-                    pure unit
+                    pure unit -}
