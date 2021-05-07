@@ -26,7 +26,7 @@ import Editor.Common.Lenses (_deleted, _height, _leadId, _modeDyn, _mouseMove, _
 import Editor.Editor (Editor, _sizeDyn)
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import FRP.Dynamic (Dynamic, debugDyn, step)
+import FRP.Dynamic (Dynamic, step)
 import FRP.Event (Event, create, keepLatest, sampleOn, subscribe)
 import FRP.Event.Extra (delay, multicast, performEvent)
 import Math.Angle (degree)
@@ -199,13 +199,10 @@ createHouseBuilder exportEvt = node (def # _name .~ "house-builder") $ do
 
                     newHdEvt = multicast $ sampleOn hdEvt $ applyHouseOp <$> opEvt
 
-                    -- state of if the current house is ready for exporting
-                    readyEvt = sampleOn hdEvt $ const hasHouse <$> deactEvt
-
                     modeEvt = (const Showing <$> exportEvt) <|> 
                               (const Building <$> delay 30 exportEvt)
                     toExpEvt = delay 15 exportEvt
-                    res = def # _houseReady    .~ step false readyEvt
+                    res = def # _houseReady    .~ step false (hasHouse <$> hdEvt)
                               # _filesExported .~ performEvent (const (exportObject pNode) <$> toExpEvt)
 
                 pure { input: modeEvt, output: { input: actHouseEvt, output : { input: newHdEvt, output : res } } }

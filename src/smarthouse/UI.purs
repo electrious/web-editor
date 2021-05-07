@@ -75,6 +75,7 @@ houseBuilderUI cfg = do
 saveBtn :: S.Dynamic Boolean -> Widget (S.Event Unit)
 saveBtn showDyn = buttonOnClick (weaken $ attD <$> showDyn) $ text "Save"
     where attD s = if s
-                   then mkAttrs [ "class" :~ "uk-button"]
+                   then mkAttrs [ "class" :~ "uk-button",
+                                  "style" :~ "pointer-events: auto;"]
                    else mkAttrs [ "class"    :~ "uk-button",
                                   "disabled" :~ ""]
