@@ -1,4 +1,4 @@
-module SmartHouse.HouseBuilder (buildHouse, HouseBuilderConfig, _toExport, HouseBuilt, _filesExported, _houseReady) where
+module SmartHouse.HouseBuilder (buildHouse, HouseBuilderConfig, HouseBuilt, _filesExported, _houseReady) where
 
 import Prelude hiding (degree)
 
@@ -26,8 +26,8 @@ import Editor.Common.Lenses (_deleted, _height, _leadId, _modeDyn, _mouseMove, _
 import Editor.Editor (Editor, _sizeDyn)
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import FRP.Dynamic (Dynamic, step)
-import FRP.Event (Event, keepLatest, sampleOn)
+import FRP.Dynamic (Dynamic, debugDyn, step)
+import FRP.Event (Event, create, keepLatest, sampleOn, subscribe)
 import FRP.Event.Extra (delay, multicast, performEvent)
 import Math.Angle (degree)
 import Model.ActiveMode (ActiveMode(..), fromBoolean)
@@ -41,7 +41,7 @@ import Rendering.TextureLoader (loadTextureFromUrl)
 import SmartHouse.BuilderMode (BuilderMode(..))
 import SmartHouse.HouseEditor (editHouse)
 import SmartHouse.HouseTracer (traceHouse)
-import SmartHouse.UI (houseBuilderUI)
+import SmartHouse.UI (_showSaveDyn, _toSave, houseBuilderUI)
 import Specular.Dom.Widget (runMainWidgetInNode)
 import Three.Core.Geometry (mkPlaneGeometry)
 import Three.Core.Material (mkMeshBasicMaterialWithTexture)
@@ -50,17 +50,12 @@ import Unsafe.Coerce (unsafeCoerce)
 import Util (foldEvtWith)
 
 newtype HouseBuilderConfig = HouseBuilderConfig {
-    leadId   :: Int,
-    toExport :: Event Unit
+    leadId   :: Int
 }
 
 derive instance newtypeHouseBuilderConfig :: Newtype HouseBuilderConfig _
 instance defaultHouseBuilderConfig :: Default HouseBuilderConfig where
-    def = HouseBuilderConfig { leadId : 0, toExport : empty }
-
-_toExport :: forall t a r. Newtype t { toExport :: a | r } => Lens' t a
-_toExport = _Newtype <<< prop (SProxy :: SProxy "toExport")
-
+    def = HouseBuilderConfig { leadId : 0 }
 
 newtype HouseBuilt = HouseBuilt {
     filesExported :: Event MeshFiles,
@@ -170,8 +165,8 @@ tracerMode :: Maybe UUID -> BuilderMode -> ActiveMode
 tracerMode _ Showing  = Inactive
 tracerMode h Building = fromBoolean $ isNothing h
 
-createHouseBuilder :: Node HouseBuilderConfig HouseBuilt
-createHouseBuilder = node (def # _name .~ "house-builder") $ do
+createHouseBuilder :: Event Unit -> Node HouseBuilderConfig HouseBuilt
+createHouseBuilder exportEvt = node (def # _name .~ "house-builder") $ do
     cfg   <- getEnv
     pNode <- getParent
 
@@ -207,7 +202,6 @@ createHouseBuilder = node (def # _name .~ "house-builder") $ do
                     -- state of if the current house is ready for exporting
                     readyEvt = sampleOn hdEvt $ const hasHouse <$> deactEvt
 
-                    exportEvt = cfg ^. _toExport
                     modeEvt = (const Showing <$> exportEvt) <|> 
                               (const Building <$> delay 30 exportEvt)
                     toExpEvt = delay 15 exportEvt
@@ -220,9 +214,14 @@ createHouseBuilder = node (def # _name .~ "house-builder") $ do
 -- | external API to build a 3D house for 2D lead
 buildHouse :: Editor -> HouseBuilderConfig -> Effect HouseBuilt
 buildHouse editor cfg = do
-    res <- fst <$> runNode createHouseBuilder (mkNodeEnv editor cfg)
+    { event: expEvt, push: toExp } <- create
+
+    res <- fst <$> runNode (createHouseBuilder expEvt) (mkNodeEnv editor cfg)
     let parentEl = unsafeCoerce $ editor ^. _parent
-        conf     = def # _sizeDyn .~ (editor ^. _sizeDyn)
-    void $ runMainWidgetInNode parentEl $ houseBuilderUI conf
+        conf     = def # _sizeDyn     .~ (editor ^. _sizeDyn)
+                       # _showSaveDyn .~ (res ^. _houseReady)
+    uiEvts <- runMainWidgetInNode parentEl $ houseBuilderUI conf
+    
+    void $ subscribe (uiEvts ^. _toSave) toExp
 
     pure res

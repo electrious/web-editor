@@ -16,7 +16,7 @@ import Editor.SceneEvent (size)
 import Effect (Effect)
 import Effect.Class.Console (logShow)
 import FRP.Dynamic (dynEvent)
-import FRP.Event (create, subscribe)
+import FRP.Event (subscribe)
 import FRP.Event.Extra (delay)
 import Foreign (Foreign)
 import Foreign.Generic (decode)
@@ -24,7 +24,7 @@ import Model.Hardware.PanelTextureInfo (_premium, _standard, _standard72)
 import Model.Hardware.PanelType (PanelType(..))
 import Model.Roof.Panel (Panel)
 import Model.Roof.RoofPlate (RoofPlate)
-import SmartHouse.HouseBuilder (_filesExported, _houseReady, _toExport, buildHouse)
+import SmartHouse.HouseBuilder (_filesExported, _houseReady, buildHouse)
 import Web.DOM.NonElementParentNode (getElementById)
 import Web.HTML (window)
 import Web.HTML.HTMLDocument (toNonElementParentNode)
@@ -90,14 +90,10 @@ doTest roofDat panelDat = do
                     --void $ subscribe (house ^. _alignment) logShow
                     --void $ subscribe (house ^. _screenshot) logShow
 
-                    { event: exportEvt, push: toExport } <- create
                     let builderCfg = def # _leadId   .~ 318872
-                                         # _toExport .~ exportEvt
                                          
                     r <- buildHouse editor builderCfg
 
                     let readyEvt = const unit <$> dynEvent (r ^. _houseReady)
-                    void $ subscribe readyEvt logShow
-                    void $ subscribe (delay 1000 readyEvt) toExport
                     void $ subscribe (r ^. _filesExported) logShow
                     pure unit

@@ -15,7 +15,6 @@ import Editor.SceneEvent (Size, size)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic)
 import FRP.Event (Event)
-import Specular.Dom.Browser ((:=))
 import Specular.Dom.Builder.Class (text)
 import Specular.Dom.Element (attrsD, class_, classes)
 import Specular.Dom.Widget (Widget)
@@ -76,6 +75,6 @@ houseBuilderUI cfg = do
 saveBtn :: S.Dynamic Boolean -> Widget (S.Event Unit)
 saveBtn showDyn = buttonOnClick (weaken $ attD <$> showDyn) $ text "Save"
     where attD s = if s
-                   then "class" := "uk-button"
-                   else mkAttrs [ "class" :~ "uk-button",
+                   then mkAttrs [ "class" :~ "uk-button"]
+                   else mkAttrs [ "class"    :~ "uk-button",
                                   "disabled" :~ ""]
