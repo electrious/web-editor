@@ -7,14 +7,14 @@ import Specular.Dom.Element (attrs, class_, classes, el, text)
 import Specular.Dom.Widget (Widget)
 import Specular.Dom.Widgets.Button (buttonOnClick)
 import Specular.FRP (Event, leftmost)
-import UI.Utils (div, mkAttrs, (:~))
+import UI.Utils (div, mkAttrs, mkStyle, (:~))
 
 data ConfirmResult = Confirmed
                    | Cancelled
 
 
 dialogAttr :: Attrs
-dialogAttr = mkAttrs ["position"         :~ "absolute",
+dialogAttr = mkStyle ["position"         :~ "absolute",
                       "top"              :~ "40%",
                       "left"             :~ "50%",
                       "width"            :~ "500px",
