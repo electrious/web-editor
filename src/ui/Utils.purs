@@ -6,11 +6,14 @@ import Data.Array (fromFoldable)
 import Data.Foldable (class Foldable)
 import Data.String (joinWith)
 import Data.Tuple (Tuple(..))
+import Effect.Class (liftEffect)
 import Foreign.Object as O
+import Specular.Callback (mkCallback)
 import Specular.Dom.Browser (Attrs, (:=))
-import Specular.Dom.Element (Prop)
+import Specular.Dom.Element (Prop, attrs, onClick_, text)
 import Specular.Dom.Element.Class (el, el_)
 import Specular.Dom.Widget (RWidget)
+import Specular.FRP (Event, newEvent)
 
 -- | helper function to create a div element
 div :: forall r a. Array Prop -> RWidget r a -> RWidget r a
@@ -35,6 +38,14 @@ span' = el "span" []
 p :: forall r a. Array Prop -> RWidget r a -> RWidget r a
 p = el "p"
 
+type URL = String
+
+-- | helper function to create a <a> element
+elA :: forall r. String -> URL -> RWidget r (Event Unit)
+elA t url = do
+    { event: e, fire: pushF } <- liftEffect newEvent
+    el "a" [attrs $ mkAttrs ["href" :~ url], onClick_ (mkCallback pushF)] $ text t
+    pure e
 
 data Style = Style String String
 
