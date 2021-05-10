@@ -20,16 +20,16 @@ import Specular.FRP (Dynamic)
 import UI.Bridge (fromUIEvent)
 import UI.Switcher (switcher)
 
-newtype EditorPaneOpt = EditorPaneOpt {
+newtype ArrayEditorUIOpt = ArrayEditorUIOpt {
     alignment        :: Dynamic Alignment,
     alignmentEnabled :: Dynamic ActiveMode,
     opacity          :: Dynamic PanelOpacity,
     heatmap          :: Dynamic Boolean
     }
 
-derive instance newtypeEditorPaneOpt :: Newtype EditorPaneOpt _
-instance defaultEditorPaneOpt :: Default EditorPaneOpt where
-    def = EditorPaneOpt {
+derive instance newtypeArrayEditorUIOpt :: Newtype ArrayEditorUIOpt _
+instance defaultArrayEditorUIOpt :: Default ArrayEditorUIOpt where
+    def = ArrayEditorUIOpt {
         alignment        : pure Grid,
         alignmentEnabled : pure Inactive,
         opacity          : pure Opaque,
@@ -40,7 +40,7 @@ _alignmentEnabled :: forall t a r. Newtype t { alignmentEnabled :: a | r } => Le
 _alignmentEnabled = _Newtype <<< prop (SProxy :: SProxy "alignmentEnabled")
 
 
-arrayEditorPane :: EditorPaneOpt -> Widget ArrayEditParam
+arrayEditorPane :: ArrayEditorUIOpt -> Widget ArrayEditParam
 arrayEditorPane opt =
     el "table" [classes ["uk-table", "uk-table-small"]] $
         el "tbody" [] do
