@@ -751,6 +751,7 @@ updateEditorMode :: PanelLayerConfig -> PanelLayerState -> EditorMode -> Effect 
 updateEditorMode cfg st Showing      = pure $ (clearOperations st) # _btnsOperations .~ singleton ResetButtons
 updateEditorMode cfg st ArrayEditing = checkAndUpdateBtnOps cfg false $ clearOperations st
 updateEditorMode cfg st RoofEditing  = pure $ clearOperations st
+updateEditorMode cfg st HouseBuilding = pure $ clearOperations st
 
 checkAndUpdateBtnOps :: PanelLayerConfig -> Boolean -> PanelLayerState -> Effect PanelLayerState
 checkAndUpdateBtnOps cfg arrayChanged st = if st ^. _roofActive

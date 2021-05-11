@@ -11,7 +11,7 @@ import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple(..))
-import Editor.Common.Lenses (_height, _roofs, _width)
+import Editor.Common.Lenses (_height, _modeDyn, _roofs, _width)
 import Editor.Editor (_sizeDyn)
 import Editor.EditorMode (EditorMode(..))
 import Editor.HouseEditor (ArrayEditParam)
@@ -21,7 +21,7 @@ import FRP.Dynamic (Dynamic)
 import FRP.Event (Event)
 import Model.Roof.RoofPlate (RoofEdited)
 import Specular.Dom.Browser (Attrs)
-import Specular.Dom.Element (attr, attrs, attrsD, class_, classes, el, text)
+import Specular.Dom.Element (attr, attrs, attrsD, classWhenD, class_, classes, el, text)
 import Specular.Dom.Widget (Widget)
 import Specular.Dom.Widgets.Button (buttonOnClick)
 import Specular.FRP (dynamic, filterEvent, filterJustEvent, holdDyn, leftmost, never, switch)
@@ -33,7 +33,7 @@ import UI.RoofInstructions (roofInstructions)
 import UI.Utils (div, elA, mkAttrs, mkStyle, (:~))
 
 newtype RoofEditorUIOpt = RoofEditorUIOpt {
-    mode     :: Event EditorMode,
+    modeDyn  :: Dynamic EditorMode,
     sizeDyn  :: Dynamic Size,
     roofs    :: Dynamic (Maybe (Array RoofEdited)),
     arrayOpt :: ArrayEditorUIOpt
@@ -42,7 +42,7 @@ newtype RoofEditorUIOpt = RoofEditorUIOpt {
 derive instance newtypeRoofEditorUIOpt :: Newtype RoofEditorUIOpt _
 instance defaultRoofEditorUIOpt :: Default RoofEditorUIOpt where
     def = RoofEditorUIOpt {
-        mode     : empty,
+        modeDyn  : pure Showing,
         sizeDyn  : pure (size 10 10),
         roofs    : pure Nothing,
         arrayOpt : def
@@ -58,7 +58,7 @@ _arrayOpt = _Newtype <<< prop (SProxy :: SProxy "arrayOpt")
 newtype RoofEditorUIResult = RoofEditorUIResult {
     arrayParam :: ArrayEditParam,
     editorOp   :: Event EditorUIOp,
-    modeDyn    :: Dynamic EditorMode
+    mode       :: Event EditorMode
     }
 
 derive instance newtypeRoofEditorUIResult :: Newtype RoofEditorUIResult _
@@ -71,48 +71,52 @@ _editorOp = _Newtype <<< prop (SProxy :: SProxy "editorOp")
 
 roofEditorUI :: RoofEditorUIOpt -> Widget RoofEditorUIResult
 roofEditorUI opt = do
-    let style s = mkStyle [ "position"       :~ "absolute",
-                            "width"          :~ (show (s ^. _width) <> "px"),
-                            "height"         :~ (show (s ^. _height) <> "px"),
-                            "left"           :~ "0",
-                            "top"            :~ "0",
-                            "pointer-events" :~ "none" ]
+    let style s m = mkStyle [ "position"       :~ "absolute",
+                              "width"          :~ (show (s ^. _width) <> "px"),
+                              "height"         :~ (show (s ^. _height) <> "px"),
+                              "left"           :~ "0",
+                              "top"            :~ "0",
+                              "pointer-events" :~ "none",
+                              "display"        :~ display m
+                              ]
+        display Showing = "none"
+        display _       = "inline"
+    
     sizeD <- liftEffect $ toUIDyn $ opt ^. _sizeDyn
-    div [attrsD $ style <$> sizeD, class_ "uk_inline"] do
+    modeD <- liftEffect $ toUIDyn $ opt ^. _modeDyn
+    div [attrsD $ style <$> sizeD <*> modeD] do
         rsDyn <- liftEffect $ toUIDyn $ opt ^. _roofs
 
-        Tuple param modeUIDyn <- editorPane opt
-        opEvt <- buttons modeUIDyn rsDyn
+        Tuple param modeUIEvt <- editorPane opt modeD
+
+        opEvt <- buttons modeD rsDyn
         confOpEvt <- fromUIEvent =<< askConfirm opEvt
 
-        modeDyn <- fromUIDyn modeUIDyn
+        modeEvt <- fromUIEvent modeUIEvt
 
         pure $ RoofEditorUIResult {
             arrayParam : param,
             editorOp   : confOpEvt,
-            modeDyn    : modeDyn
+            mode       : modeEvt
             }
 
 shadowStyle :: String
 shadowStyle = "0 3px 1px -2px rgba(0, 0, 0, 0.2), 0 2px 2px 0 rgba(0, 0, 0, 0.14), 0 1px 5px 0 rgba(0, 0, 0, 0.06)"
 
-editorPane :: RoofEditorUIOpt -> Widget (Tuple ArrayEditParam (S.Dynamic EditorMode))
-editorPane opt =
+editorPane :: RoofEditorUIOpt -> S.Dynamic EditorMode -> Widget (Tuple ArrayEditParam (S.Event EditorMode))
+editorPane opt modeDyn =
     div [classes ["uk-overlay", "uk-overlay-default", "uk-padding-small", "uk-position-top-left"],
          attrs $ mkStyle ["box-shadow" :~ shadowStyle,
                           "pointer-events" :~ "auto" ]] do
         modeEvt  <- headerTab
-        arrParam <- body $ opt ^. _arrayOpt
-
-        mEvt <- liftEffect $ toUIEvent $ opt ^. _mode
-        modeDyn <- holdDyn Showing $ leftmost [modeEvt, mEvt]
+        arrParam <- body (opt ^. _arrayOpt)
         
-        pure $ Tuple arrParam modeDyn
+        pure $ Tuple arrParam modeEvt
 
 -- header tab of the pane switcher between Array and Roof editing
 headerTab :: Widget (S.Event EditorMode)
 headerTab = el "ul" [classes ["uk-subnav", "uk-subnav-pill"],
-                     attr "uk-switcher" ""] do
+                             attr "uk-switcher" ""] do
     arrEvt  <- el "li" [] $ elA "Edit Arrays" "#"
     roofEvt <- el "li" [] $ elA "Edit Roofs" "#"
 
@@ -145,11 +149,12 @@ getSave _         = Nothing
 
 btnsStyle :: Attrs
 btnsStyle = mkStyle [
-    "position" :~ "absolute",
-    "width"    :~ "180px",
-    "top"      :~ "20px",
-    "right"    :~ "20px",
-    "z-index"  :~ "10"
+    "position"       :~ "absolute",
+    "width"          :~ "180px",
+    "top"            :~ "20px",
+    "right"          :~ "20px",
+    "z-index"        :~ "10",
+    "pointer-events" :~ "auto"
     ]
 
 -- buttons to show on the top right corner of the editor

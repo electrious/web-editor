@@ -5,7 +5,7 @@ import Prelude hiding (div)
 import Specular.Dom.Builder.Class (text)
 import Specular.Dom.Element (attrs, classes, el)
 import Specular.Dom.Widget (Widget, emptyWidget)
-import UI.Utils (Style, div, mkAttrs, (:~))
+import UI.Utils (Style, div, mkStyle, (:~))
 
 dotStyle :: Array Style
 dotStyle = ["height"        :~ "25px",
@@ -31,16 +31,16 @@ roofInstructions =
     el "table" [classes ["uk-table", "uk-table-small"]] $
         el "tbody" [] do
             el "tr" [] do
-                el "td" [] $ div [attrs $ mkAttrs $ dotStyle <> blue] emptyWidget
+                el "td" [] $ div [attrs $ mkStyle $ dotStyle <> blue] emptyWidget
                 el "td" [] $ text "Click to create a new roofplate"
             el "tr" [] do
-                el "td" [] $ div [attrs $ mkAttrs $ dotStyle <> orange] emptyWidget
+                el "td" [] $ div [attrs $ mkStyle $ dotStyle <> orange] emptyWidget
                 el "td" [] $ text "Click to delete the roofplate"
             el "tr" [] do
-                el "td" [] $ div [attrs $ mkAttrs $ dotStyle <> red] emptyWidget
+                el "td" [] $ div [attrs $ mkStyle $ dotStyle <> red] emptyWidget
                 el "td" [] $ text "Click to delete a vertex. Drag to move the vertex"
             el "tr" [] do
-                el "td" [] $ div [attrs $ mkAttrs $ dotStyle <> green] emptyWidget
+                el "td" [] $ div [attrs $ mkStyle $ dotStyle <> green] emptyWidget
                 el "td" [] $ text "Click to add a new vertex"
             el "tr" [] do
                 el "td" [] $ el "b" [] $ text "Important:"

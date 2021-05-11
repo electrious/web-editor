@@ -9,16 +9,17 @@ import Data.Default (def)
 import Data.Either (Either(..))
 import Data.Lens ((.~), (^.))
 import Data.Maybe (Maybe(..))
-import Editor.Common.Lenses (_apiConfig, _houseId, _leadId, _modeDyn, _panelType, _panels, _textureInfo)
+import Editor.Common.Lenses (_apiConfig, _houseId, _leadId, _panelType, _panels, _textureInfo)
 import Editor.Editor (_sizeDyn, createEditor)
 import Editor.EditorMode (EditorMode(..))
 import Editor.HouseEditor (_dataServer, _heatmapTexture, _roofplates, _rotBtnTexture)
-import Editor.HouseLoader (_screenshot, editHouse)
+import Editor.HouseLoader (editHouse)
 import Editor.PanelLayer (_serverUpdated)
 import Editor.SceneEvent (size)
 import Effect (Effect)
 import Effect.Class.Console (logShow)
 import FRP.Event (subscribe)
+import FRP.Event.Extra (delay)
 import Foreign (Foreign)
 import Foreign.Generic (decode)
 import Model.Hardware.PanelTextureInfo (_premium, _standard, _standard72)
@@ -53,8 +54,7 @@ doTest roofDat panelDat = do
             Right (panels :: Array Panel) -> case elem of
                 Nothing -> logShow "can't find 'editor' element"
                 Just el -> do
-                    let modeDyn   = pure RoofEditing
-                        sizeDyn   = pure (size 1000 800)
+                    let sizeDyn   = pure (size 1000 800)
                         panelType = pure Standard
 
                         textures = def # _standard   .~ Just solarModuleJPG
@@ -63,11 +63,7 @@ doTest roofDat panelDat = do
                         apiCfg = def # _auth    .~ Just "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJJZCI6IiIsImN0YyI6NCwianRpIjoiNCJ9.d6pG95A4EoAPGhhnN4BsL7QtarpBRCEcta0Uu72SoVU"
                                      # _baseUrl .~ "https://api.electrious.com/v1"
 
-                        cfg = def # _modeDyn .~ modeDyn
-                                  # _sizeDyn .~ sizeDyn
-                        
-                        houseCfg = def # _modeDyn        .~ modeDyn
-                                       # _houseId        .~ 4
+                        houseCfg = def # _houseId        .~ 4
                                        # _leadId         .~ 296285
                                        # _roofplates     .~ roofs
                                        # _panels         .~ panels
@@ -78,12 +74,12 @@ doTest roofDat panelDat = do
                                        # _heatmapTexture .~ heatmapGradientPNG
                                        # _apiConfig      .~ apiCfg
 
-                    editor <- createEditor el cfg
+                    editor <- createEditor el $ def # _sizeDyn .~ sizeDyn
 
-                    house <- editHouse editor houseCfg empty empty
+                    house <- editHouse editor houseCfg (delay 10 $ pure ArrayEditing) empty
 
                     void $ subscribe (house ^. _serverUpdated) logShow
-                    void $ subscribe (house ^. _screenshot) logShow
+                    --void $ subscribe (house ^. _screenshot) logShow
 
                     {-
                     let builderCfg = def # _leadId   .~ 318872

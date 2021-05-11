@@ -23,7 +23,8 @@ import Data.Tuple (fst)
 import Data.UUID (UUID)
 import Data.UUIDMap (UUIDMap)
 import Editor.Common.Lenses (_deleted, _height, _leadId, _modeDyn, _mouseMove, _name, _parent, _tapped, _updated, _width)
-import Editor.Editor (Editor, _sizeDyn)
+import Editor.Editor (Editor, _sizeDyn, setMode)
+import Editor.EditorMode as EditorMode
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic, step)
@@ -211,6 +212,8 @@ createHouseBuilder exportEvt = node (def # _name .~ "house-builder") $ do
 -- | external API to build a 3D house for 2D lead
 buildHouse :: Editor -> HouseBuilderConfig -> Effect HouseBuilt
 buildHouse editor cfg = do
+    setMode editor EditorMode.HouseBuilding
+    
     { event: expEvt, push: toExp } <- create
 
     res <- fst <$> runNode (createHouseBuilder expEvt) (mkNodeEnv editor cfg)

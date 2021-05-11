@@ -16,6 +16,7 @@ import Foreign.Generic (class Decode, class Encode, ForeignError(..), decode, en
 data EditorMode = Showing
                 | RoofEditing
                 | ArrayEditing
+                | HouseBuilding
 
 derive instance genericEditorMode :: Generic EditorMode _
 derive instance eqEditorMode :: Eq EditorMode

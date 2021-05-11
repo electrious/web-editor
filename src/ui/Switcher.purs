@@ -6,7 +6,7 @@ import Data.Array (fromFoldable)
 import Data.Foldable (class Foldable)
 import Data.Traversable (class Traversable, traverse)
 import Editor.PanelNode (PanelOpacity(..))
-import Model.ActiveMode (ActiveMode, isActive)
+import Model.ActiveMode (ActiveMode(..), isActive)
 import Model.Roof.Panel (Alignment(..))
 import Specular.Dom.Element (class_, text)
 import Specular.Dom.Widget (Widget)
@@ -39,8 +39,9 @@ switcher opts actOpDyn modeDyn =
 switcherBtn :: forall o. SwitcherOption o => Dynamic o -> Dynamic ActiveMode -> o -> Widget (Event o)
 switcherBtn actOpDyn modeDyn o = (map $ const o) <$> buttonOnClick attD (text $ optionLabel o)
     where attD = weaken $ mkAtt <$> actOpDyn <*> modeDyn
-          mkAtt actO mode = mkAttrs [ "class"    :~ cls actO,
-                                      "disabled" :~ show (not $ isActive mode) ]
+          mkAtt actO Active   = mkAttrs [ "class" :~ cls actO]
+          mkAtt actO Inactive = mkAttrs [ "class" :~ cls actO,
+                                          "disabled" :~ "" ]
 
           cls actO = if actO == o
                      then "uk-button uk-button-primary"

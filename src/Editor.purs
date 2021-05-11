@@ -12,7 +12,7 @@ import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Editor.Common.Lenses (_deltaX, _deltaY, _height, _modeDyn, _shiftDragged, _width, _zoomed)
+import Editor.Common.Lenses (_deltaX, _deltaY, _height, _shiftDragged, _width, _zoomed)
 import Editor.Disposable (class Disposable, dispose)
 import Editor.EditorMode (EditorMode(..))
 import Editor.Input (setupInput)
@@ -21,7 +21,7 @@ import Editor.SceneEvent (Size, _dragEvent, setupRaycasting, size)
 import Effect (Effect)
 import Effect.Ref (Ref, modify, new, read)
 import FRP.Dynamic (Dynamic, gateDyn, sampleDyn, step, subscribeDyn)
-import FRP.Event (subscribe)
+import FRP.Event (create, subscribe)
 import FRP.Event.Extra (performEvent)
 import Math.Angle (degree, radianVal)
 import Three.Controls.OrbitControls (OrbitControls, enableDamping, enableZoom, isEnabled, mkOrbitControls, setAutoRotate, setAutoRotateSpeed, setDampingFactor, setEnabled, setMaxDistance, setMaxPolarAngle, setMinDistance, setMinPolarAngle, setTarget, update)
@@ -41,7 +41,6 @@ import Web.HTML.Window (requestAnimationFrame)
 
 newtype EditorConfig = EditorConfig {
     sizeDyn         :: Dynamic Size,
-    modeDyn         :: Dynamic EditorMode,
     flyCameraTarget :: Dynamic (Maybe Vector3)
 }
 
@@ -49,7 +48,6 @@ derive instance newtypeEditorConfig :: Newtype EditorConfig _
 instance defaultEditorConfig :: Default EditorConfig where
     def = EditorConfig {
         sizeDyn         : pure (size 800 600),
-        modeDyn         : pure Showing,
         flyCameraTarget : pure Nothing
     }
 
@@ -66,6 +64,7 @@ newtype Editor = Editor {
     render     :: Effect Unit,
     content    :: Object3D,
     sizeDyn    :: Dynamic Size,
+    setMode    :: EditorMode -> Effect Unit,
     disposable :: Ref (Array (Effect Unit))
 }
 
@@ -83,6 +82,9 @@ _content = _Newtype <<< prop (SProxy :: SProxy "content")
 
 renderEditor :: Editor -> Effect Unit
 renderEditor (Editor s) = s.render
+
+setMode :: Editor -> EditorMode -> Effect Unit
+setMode (Editor e) m = e.setMode m
 
 addDisposable :: Effect Unit -> Editor -> Effect Unit
 addDisposable d (Editor e) = void $ modify (cons d) e.disposable
@@ -175,7 +177,9 @@ createEditor elem cfg = do
     orbitCtrl <- mkOrbitControls camera (domElement renderer)
     d5 <- setupOrbitControls orbitCtrl $ cfg ^. _flyCameraTarget
 
-    let isShowing = (==) Showing <$> (cfg ^. _modeDyn)
+    { event: modeEvt, push: setMode } <- create
+
+    let isShowing = (==) Showing <$> step Showing modeEvt
         canEdit = not <$> isShowing
 
     -- add ambient light
@@ -229,6 +233,7 @@ createEditor elem cfg = do
         render     : renderFunc,
         content    : content,
         sizeDyn    : sizeDyn,
+        setMode    : setMode,
         disposable : disposable
     }
 
