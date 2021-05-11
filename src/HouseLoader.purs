@@ -5,36 +5,106 @@ import Prelude hiding (add)
 import API.Panel (loadPanels)
 import API.Racking (loadRacking)
 import API.Roofplate (loadRoofplates)
+import Control.Alt ((<|>))
 import Control.Monad.Except (runExcept)
 import Control.Monad.Reader (ask)
+import Data.Compactable (compact)
+import Data.Default (def)
 import Data.Either (Either(..))
-import Data.Lens (Lens', view, (^.))
+import Data.Lens (Lens', view, (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Map as Map
-import Data.Maybe (Maybe)
+import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Editor.Common.Lenses (_alignment, _houseId, _leadId, _orientation, _panels, _roofRackings, _wrapper)
+import Editor.Common.Lenses (_alignment, _houseId, _leadId, _modeDyn, _orientation, _panels, _parent, _roofRackings, _roofs, _wrapper)
 import Editor.Disposable (dispose)
-import Editor.Editor (Editor, _canvas, addDisposable)
+import Editor.Editor (Editor, _canvas, _sizeDyn, addDisposable)
+import Editor.EditorMode (EditorMode(..))
 import Editor.House (loadHouseModel)
-import Editor.HouseEditor (ArrayEditParam, HouseConfig, HouseEditor, _arrayEditParam, _dataServer, _roofplates, _screenshotDelay, performEditorEvent, runAPIInEditor, runHouseEditor)
+import Editor.HouseEditor (ArrayEditParam, HouseConfig, HouseEditor, _dataServer, _heatmap, _roofplates, _screenshotDelay, performEditorEvent, runAPIInEditor, runHouseEditor)
 import Editor.PanelLayer (_serverUpdated)
+import Editor.Rendering.PanelRendering (_opacity)
 import Editor.RoofManager (_editedRoofs, createRoofManager)
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import FRP.Event (Event, create, keepLatest)
+import FRP.Dynamic (step, subscribeDyn)
+import FRP.Event (Event, create, keepLatest, subscribe)
 import FRP.Event.Extra (delay, multicast, performEvent)
+import Model.ActiveMode (fromBoolean)
 import Model.Roof.Panel (Alignment, Orientation)
 import Model.Roof.RoofPlate (RoofEdited)
+import Specular.Dom.Widget (runMainWidgetInNode)
 import Three.Core.Object3D (add)
 import Three.Core.WebGLRenderer (toDataUrl)
-
-editHouse :: Editor -> HouseConfig -> Effect House
-editHouse scene houseCfg = runHouseEditor (loadHouse scene (houseCfg ^. _arrayEditParam)) houseCfg
+import UI.ArrayEditorUI (_alignmentEnabled)
+import UI.RoofEditorUI (EditorUIOp, _arrayOpt, _arrayParam, _editorOp, _mode, roofEditorUI)
+import Unsafe.Coerce (unsafeCoerce)
 
 newtype House = House {
+    loaded        :: Event Unit,
+    editorOp      :: Event EditorUIOp,
+    screenshot    :: Event String,
+    serverUpdated :: Event Unit
+}
+
+derive instance newtypeHouse :: Newtype House _
+
+editHouse :: Editor -> HouseConfig -> Event EditorMode -> Event Unit -> Effect House
+editHouse editor houseCfg inModeEvt inSavedEvt= do
+    -- events to send value from UI back to the house editor
+    { event: alignEvt, push : pushAlign } <- create
+    { event: orientEvt, push: pushOrient } <- create
+    { event: opEvt, push: pushOp } <- create
+    { event: hmEvt, push: pushHeatmap } <- create
+
+    { event: modeEvt, push: pushMode } <- create
+
+    -- setup param for house editor
+    let arrayEditParam = def # _alignment .~ alignEvt
+                             # _orientation .~ orientEvt
+                             # _opacity .~ opEvt
+                             # _heatmap .~ hmEvt
+
+    houseLoaded <- runHouseEditor (loadHouse editor arrayEditParam) $ houseCfg # _modeDyn .~ step Showing modeEvt
+
+    
+    -- setup the roof editor UI
+    let parentEl = unsafeCoerce $ editor ^. _parent
+
+        newAlignEvt = houseLoaded ^. _alignment
+
+        arrayUIOpt = def # _alignment .~ compact newAlignEvt
+                         # _alignmentEnabled .~ (fromBoolean <<< isJust <$> newAlignEvt)
+
+        roofsDyn = step Nothing $ (Just <$> houseLoaded ^. _roofUpdate) <|> (const Nothing <$> inSavedEvt)
+
+        opt = def # _mode     .~ inModeEvt
+                  # _sizeDyn  .~ (editor ^. _sizeDyn)
+                  # _roofs    .~ roofsDyn
+                  # _arrayOpt .~ arrayUIOpt
+
+    uiRes <- runMainWidgetInNode parentEl $ roofEditorUI opt
+
+    -- push back the events
+    let arrayParam = uiRes ^. _arrayParam
+    void $ subscribe (arrayParam ^. _alignment) pushAlign
+    void $ subscribe (arrayParam ^. _orientation) pushOrient
+    void $ subscribe (arrayParam ^. _opacity) pushOp
+    void $ subscribe (arrayParam ^. _heatmap) pushHeatmap
+
+    void $ subscribeDyn (uiRes ^. _modeDyn) pushMode
+    
+    pure $ House {
+        loaded        : houseLoaded ^. _loaded,
+        editorOp      : uiRes ^. _editorOp,
+        screenshot    : houseLoaded ^. _screenshot,
+        serverUpdated : houseLoaded ^. _serverUpdated
+    }
+
+
+newtype HouseLoaded = HouseLoaded {
     loaded        :: Event Unit,
     screenshot    :: Event String,
     roofUpdate    :: Event (Array RoofEdited),
@@ -45,7 +115,7 @@ newtype House = House {
     serverUpdated :: Event Unit
 }
 
-derive instance newtypeHouse :: Newtype House _
+derive instance newtypeHouseLoaded :: Newtype HouseLoaded _
 
 _loaded :: forall t a r. Newtype t { loaded :: a | r } => Lens' t a
 _loaded = _Newtype <<< prop (SProxy :: SProxy "loaded")
@@ -56,7 +126,7 @@ _screenshot = _Newtype <<< prop (SProxy :: SProxy "screenshot")
 _roofUpdate :: forall t a r. Newtype t { roofUpdate :: a | r } => Lens' t a
 _roofUpdate = _Newtype <<< prop (SProxy :: SProxy "roofUpdate")
 
-loadHouse :: Editor -> ArrayEditParam -> HouseEditor House
+loadHouse :: Editor -> ArrayEditParam -> HouseEditor HouseLoaded
 loadHouse editor param = do
     cfg <- ask
 
@@ -97,7 +167,7 @@ loadHouse editor param = do
     
     mgrEvt <- multicast <$> performEditorEvent (buildRoofMgr <$> hmEvt <*> roofsEvt <*> panelsEvt <*> roofRackDatEvt)
 
-    pure $ House {
+    pure $ HouseLoaded {
         loaded        : loadedEvt,
         screenshot    : performEvent $ getScreenshot     <$> delay (cfg ^. _screenshotDelay) loadedEvt,
         roofUpdate    : keepLatest $ view _editedRoofs   <$> mgrEvt,

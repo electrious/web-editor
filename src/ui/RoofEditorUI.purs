@@ -2,6 +2,8 @@ module UI.RoofEditorUI where
 
 import Prelude hiding (div)
 
+import Control.Plus (empty)
+import Data.Default (class Default, def)
 import Data.Lens (Lens', (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
@@ -9,27 +11,42 @@ import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple(..))
-import Editor.Common.Lenses (_roofs)
+import Editor.Common.Lenses (_height, _roofs, _width)
+import Editor.Editor (_sizeDyn)
 import Editor.EditorMode (EditorMode(..))
 import Editor.HouseEditor (ArrayEditParam)
-import Model.Roof.RoofPlate (RoofPlate)
+import Editor.SceneEvent (Size, size)
+import Effect.Class (liftEffect)
+import FRP.Dynamic (Dynamic)
+import FRP.Event (Event)
+import Model.Roof.RoofPlate (RoofEdited)
 import Specular.Dom.Browser (Attrs)
-import Specular.Dom.Element (attr, attrs, class_, classes, el, text)
+import Specular.Dom.Element (attr, attrs, attrsD, class_, classes, el, text)
 import Specular.Dom.Widget (Widget)
 import Specular.Dom.Widgets.Button (buttonOnClick)
-import Specular.FRP (Dynamic, Event, dynamic, filterEvent, filterJustEvent, holdDyn, leftmost, never, switch)
+import Specular.FRP (dynamic, filterEvent, filterJustEvent, holdDyn, leftmost, never, switch)
+import Specular.FRP as S
 import UI.ArrayEditorUI (ArrayEditorUIOpt, arrayEditorPane)
+import UI.Bridge (fromUIDyn, fromUIEvent, toUIDyn, toUIEvent)
 import UI.ConfirmDialog (ConfirmResult(..), confirmDialog)
 import UI.RoofInstructions (roofInstructions)
 import UI.Utils (div, elA, mkAttrs, mkStyle, (:~))
 
 newtype RoofEditorUIOpt = RoofEditorUIOpt {
     mode     :: Event EditorMode,
-    roofs    :: Dynamic (Maybe (Array RoofPlate)),
+    sizeDyn  :: Dynamic Size,
+    roofs    :: Dynamic (Maybe (Array RoofEdited)),
     arrayOpt :: ArrayEditorUIOpt
     }
 
 derive instance newtypeRoofEditorUIOpt :: Newtype RoofEditorUIOpt _
+instance defaultRoofEditorUIOpt :: Default RoofEditorUIOpt where
+    def = RoofEditorUIOpt {
+        mode     : empty,
+        sizeDyn  : pure (size 10 10),
+        roofs    : pure Nothing,
+        arrayOpt : def
+        }
 
 _mode :: forall t a r. Newtype t { mode :: a | r } => Lens' t a
 _mode = _Newtype <<< prop (SProxy :: SProxy "mode")
@@ -54,32 +71,46 @@ _editorOp = _Newtype <<< prop (SProxy :: SProxy "editorOp")
 
 roofEditorUI :: RoofEditorUIOpt -> Widget RoofEditorUIResult
 roofEditorUI opt = do
-    Tuple param modeDyn <- editorPane opt
-    opEvt <- buttons modeDyn (opt ^. _roofs)
-    confOpEvt <- askConfirm opEvt
+    let style s = mkStyle [ "position"       :~ "absolute",
+                            "width"          :~ (show (s ^. _width) <> "px"),
+                            "height"         :~ (show (s ^. _height) <> "px"),
+                            "left"           :~ "0",
+                            "top"            :~ "0",
+                            "pointer-events" :~ "none" ]
+    sizeD <- liftEffect $ toUIDyn $ opt ^. _sizeDyn
+    div [attrsD $ style <$> sizeD, class_ "uk_inline"] do
+        rsDyn <- liftEffect $ toUIDyn $ opt ^. _roofs
 
-    pure $ RoofEditorUIResult {
-        arrayParam : param,
-        editorOp   : confOpEvt,
-        modeDyn    : modeDyn
-        }
+        Tuple param modeUIDyn <- editorPane opt
+        opEvt <- buttons modeUIDyn rsDyn
+        confOpEvt <- fromUIEvent =<< askConfirm opEvt
+
+        modeDyn <- fromUIDyn modeUIDyn
+
+        pure $ RoofEditorUIResult {
+            arrayParam : param,
+            editorOp   : confOpEvt,
+            modeDyn    : modeDyn
+            }
 
 shadowStyle :: String
 shadowStyle = "0 3px 1px -2px rgba(0, 0, 0, 0.2), 0 2px 2px 0 rgba(0, 0, 0, 0.14), 0 1px 5px 0 rgba(0, 0, 0, 0.06)"
 
-editorPane :: RoofEditorUIOpt -> Widget (Tuple ArrayEditParam (Dynamic EditorMode))
+editorPane :: RoofEditorUIOpt -> Widget (Tuple ArrayEditParam (S.Dynamic EditorMode))
 editorPane opt =
     div [classes ["uk-overlay", "uk-overlay-default", "uk-padding-small", "uk-position-top-left"],
-         attrs $ mkStyle ["box-shadow" :~ shadowStyle ]] do
+         attrs $ mkStyle ["box-shadow" :~ shadowStyle,
+                          "pointer-events" :~ "auto" ]] do
         modeEvt  <- headerTab
         arrParam <- body $ opt ^. _arrayOpt
 
-        modeDyn <- holdDyn Showing $ leftmost [modeEvt, opt ^. _mode]
+        mEvt <- liftEffect $ toUIEvent $ opt ^. _mode
+        modeDyn <- holdDyn Showing $ leftmost [modeEvt, mEvt]
         
         pure $ Tuple arrParam modeDyn
 
 -- header tab of the pane switcher between Array and Roof editing
-headerTab :: Widget (Event EditorMode)
+headerTab :: Widget (S.Event EditorMode)
 headerTab = el "ul" [classes ["uk-subnav", "uk-subnav-pill"],
                      attr "uk-switcher" ""] do
     arrEvt  <- el "li" [] $ elA "Edit Arrays" "#"
@@ -97,7 +128,7 @@ body opt =
         pure res
 
 
-data EditorUIOp = Save (Array RoofPlate)
+data EditorUIOp = Save (Array RoofEdited)
                 | Close
 
 isSave :: EditorUIOp -> Boolean
@@ -108,7 +139,7 @@ isClose :: EditorUIOp -> Boolean
 isClose Close = true
 isClose _     = false
 
-getSave :: EditorUIOp -> Maybe (Array RoofPlate)
+getSave :: EditorUIOp -> Maybe (Array RoofEdited)
 getSave (Save rs) = Just rs
 getSave _         = Nothing
 
@@ -122,7 +153,7 @@ btnsStyle = mkStyle [
     ]
 
 -- buttons to show on the top right corner of the editor
-buttons :: Dynamic EditorMode -> Dynamic (Maybe (Array RoofPlate)) -> Widget (Event EditorUIOp)
+buttons :: S.Dynamic EditorMode -> S.Dynamic (Maybe (Array RoofEdited)) -> Widget (S.Event EditorUIOp)
 buttons modeDyn roofsDyn =
     div [classes ["uk-flex", "uk-flex-right"],
          attrs btnsStyle] do
@@ -132,27 +163,27 @@ buttons modeDyn roofsDyn =
         clsEvt <- switch <$> dynamic (closeBtn <$> showCloseDyn)
         pure $ leftmost [saveEvt, clsEvt]
 
-saveBtn :: Boolean -> Maybe (Array RoofPlate) -> Widget (Event EditorUIOp)
+saveBtn :: Boolean -> Maybe (Array RoofEdited) -> Widget (S.Event EditorUIOp)
 saveBtn true (Just roofs) = map (const $ Save roofs) <$> buttonOnClick attD (text "Save")
     where attD = pure $ mkAttrs ["class" :~ "uk-button"]
 saveBtn true Nothing      = pure never
 saveBtn false _           = pure never
 
 
-closeBtn :: Boolean -> Widget (Event EditorUIOp)
+closeBtn :: Boolean -> Widget (S.Event EditorUIOp)
 closeBtn true  = map (const Close) <$> buttonOnClick attD (text "Close")
     where attD = pure $ mkAttrs ["class" :~ "uk-button uk-margin-left uk-modal-close"]
 closeBtn false = pure never
 
 -- show confirm dialog to let user confirm if save
-askConfirm :: Event EditorUIOp -> Widget (Event EditorUIOp)
+askConfirm :: S.Event EditorUIOp -> Widget (S.Event EditorUIOp)
 askConfirm evt = do
     let saveEvt = filterEvent isSave evt
         clsEvt  = filterEvent isClose evt
     confirmed <- askConfirmToSave $ filterJustEvent $ getSave <$> saveEvt
     pure $ leftmost [Save <$> confirmed, clsEvt]
 
-askConfirmToSave :: Event (Array RoofPlate) -> Widget (Event (Array RoofPlate))
+askConfirmToSave :: S.Event (Array RoofEdited) -> Widget (S.Event (Array RoofEdited))
 askConfirmToSave rsEvt = do
     let confSave (Just rs) = do
             e <- confirmDialog (text "A.I. will redesign the solar system when roof plates are edited")

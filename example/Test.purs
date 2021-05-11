@@ -4,21 +4,21 @@ import Prelude
 
 import API (_auth, _baseUrl)
 import Control.Monad.Except (runExcept)
+import Control.Plus (empty)
 import Data.Default (def)
 import Data.Either (Either(..))
 import Data.Lens ((.~), (^.))
 import Data.Maybe (Maybe(..))
-import Editor.Common.Lenses (_alignment, _apiConfig, _houseId, _leadId, _modeDyn, _panelType, _panels, _textureInfo)
+import Editor.Common.Lenses (_apiConfig, _houseId, _leadId, _modeDyn, _panelType, _panels, _textureInfo)
 import Editor.Editor (_sizeDyn, createEditor)
 import Editor.EditorMode (EditorMode(..))
-import Editor.HouseEditor (_arrayEditParam, _dataServer, _heatmap, _heatmapTexture, _roofplates, _rotBtnTexture)
-import Editor.HouseLoader (_roofUpdate, _screenshot, editHouse)
+import Editor.HouseEditor (_dataServer, _heatmapTexture, _roofplates, _rotBtnTexture)
+import Editor.HouseLoader (_screenshot, editHouse)
 import Editor.PanelLayer (_serverUpdated)
 import Editor.SceneEvent (size)
 import Effect (Effect)
 import Effect.Class.Console (logShow)
 import FRP.Event (subscribe)
-import FRP.Event.Extra (delay)
 import Foreign (Foreign)
 import Foreign.Generic (decode)
 import Model.Hardware.PanelTextureInfo (_premium, _standard, _standard72)
@@ -54,7 +54,7 @@ doTest roofDat panelDat = do
                 Nothing -> logShow "can't find 'editor' element"
                 Just el -> do
                     let modeDyn   = pure RoofEditing
-                        sizeDyn   = pure (size 800 600)
+                        sizeDyn   = pure (size 1000 800)
                         panelType = pure Standard
 
                         textures = def # _standard   .~ Just solarModuleJPG
@@ -66,8 +66,6 @@ doTest roofDat panelDat = do
                         cfg = def # _modeDyn .~ modeDyn
                                   # _sizeDyn .~ sizeDyn
                         
-                        param = def # _heatmap .~ delay 10000 (pure true)
-
                         houseCfg = def # _modeDyn        .~ modeDyn
                                        # _houseId        .~ 4
                                        # _leadId         .~ 296285
@@ -79,15 +77,12 @@ doTest roofDat panelDat = do
                                        # _rotBtnTexture  .~ rotateButtonPNG
                                        # _heatmapTexture .~ heatmapGradientPNG
                                        # _apiConfig      .~ apiCfg
-                                       # _arrayEditParam .~ param
 
                     editor <- createEditor el cfg
 
-                    house <- editHouse editor houseCfg
+                    house <- editHouse editor houseCfg empty empty
 
-                    void $ subscribe (house ^. _roofUpdate) logShow
                     void $ subscribe (house ^. _serverUpdated) logShow
-                    void $ subscribe (house ^. _alignment) logShow
                     void $ subscribe (house ^. _screenshot) logShow
 
                     {-

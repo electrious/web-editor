@@ -55,9 +55,7 @@ newtype HouseConfig = HouseConfig {
     heatmapTexture  :: String,
     panelType       :: Dynamic PanelType,
     apiConfig       :: APIConfig,
-    screenshotDelay :: Int,
-
-    arrayEditParam  :: ArrayEditParam
+    screenshotDelay :: Int
 }
 
 derive instance newtypeHouseConfig :: Newtype HouseConfig _
@@ -74,9 +72,7 @@ instance defaultHouseConfig :: Default HouseConfig where
         heatmapTexture  : "",
         panelType       : pure Standard,
         apiConfig       : def,
-        screenshotDelay : 100,
-
-        arrayEditParam  : def
+        screenshotDelay : 100
     }
 
 _roofplates :: forall t a r. Newtype t { roofplates :: a | r } => Lens' t a
@@ -93,9 +89,6 @@ _heatmapTexture = _Newtype <<< prop (SProxy :: SProxy "heatmapTexture")
 
 _screenshotDelay :: forall t a r. Newtype t { screenshotDelay :: a | r } => Lens' t a
 _screenshotDelay = _Newtype <<< prop (SProxy :: SProxy "screenshotDelay")
-
-_arrayEditParam :: forall t a r. Newtype t { arrayEditParam :: a | r } => Lens' t a
-_arrayEditParam = _Newtype <<< prop (SProxy :: SProxy "arrayEditParam")
 
 newtype HouseEditor a = HouseEditor (ReaderT HouseConfig Effect a)
 
