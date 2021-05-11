@@ -147,7 +147,7 @@ let additions =
       , specular =
         { dependencies = [ "foreign-object", "aff", "debug", "unsafe-reference", "avar", "typelevel-prelude", "contravariant", "record", "prelude", "generics-rep", "random"]
         , repo = "https://github.com/restaumatic/purescript-specular.git"
-        , version = "v0.10.1"
+        , version = "v0.11.0"
         }
       }
 

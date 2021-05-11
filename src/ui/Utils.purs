@@ -8,7 +8,6 @@ import Data.String (joinWith)
 import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
 import Foreign.Object as O
-import Specular.Callback (mkCallback)
 import Specular.Dom.Browser (Attrs, (:=))
 import Specular.Dom.Element (Prop, attrs, onClick_, text)
 import Specular.Dom.Element.Class (el, el_)
@@ -44,7 +43,7 @@ type URL = String
 elA :: forall r. String -> URL -> RWidget r (Event Unit)
 elA t url = do
     { event: e, fire: pushF } <- liftEffect newEvent
-    el "a" [attrs $ mkAttrs ["href" :~ url], onClick_ (mkCallback pushF)] $ text t
+    el "a" [attrs $ mkAttrs ["href" :~ url], onClick_ (pushF unit)] $ text t
     pure e
 
 data Style = Style String String
