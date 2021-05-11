@@ -280,10 +280,9 @@ createRoofManager param meshData roofs panels racks = do
 
     let getRoofEdited = map toRoofEdited <<< UM.toUnfoldable
 
-    -- skipe the first roof in teh editedRoofs event, because it's the default data
     pure $ RoofManager {
         wrapper       : wrapper,
-        editedRoofs   : multicast $ skip 1 $ debounce (Milliseconds 1000.0) $ getRoofEdited <$> newRoofs,
+        editedRoofs   : multicast $ debounce (Milliseconds 1000.0) $ getRoofEdited <$> newRoofs,
         alignment     : map (view _value) <$> alignEvt,
         orientation   : map (view _value) <$> orientEvt,
         serverUpdated : serverUpdEvt,
