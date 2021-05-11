@@ -26,6 +26,7 @@ import Model.Hardware.PanelTextureInfo (_premium, _standard, _standard72)
 import Model.Hardware.PanelType (PanelType(..))
 import Model.Roof.Panel (Panel)
 import Model.Roof.RoofPlate (RoofPlate)
+import UI.RoofEditorUI (_editorOp)
 import Web.DOM.NonElementParentNode (getElementById)
 import Web.HTML (window)
 import Web.HTML.HTMLDocument (toNonElementParentNode)
@@ -79,6 +80,7 @@ doTest roofDat panelDat = do
                     house <- editHouse editor houseCfg (delay 10 $ pure ArrayEditing) empty
 
                     void $ subscribe (house ^. _serverUpdated) logShow
+                    void $ subscribe (house ^. _editorOp) logShow
                     --void $ subscribe (house ^. _screenshot) logShow
 
                     {-

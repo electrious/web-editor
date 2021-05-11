@@ -2,8 +2,9 @@ module UI.RoofEditorUI where
 
 import Prelude hiding (div)
 
-import Control.Plus (empty)
 import Data.Default (class Default, def)
+import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Show (genericShow)
 import Data.Lens (Lens', (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
@@ -19,15 +20,17 @@ import Editor.SceneEvent (Size, size)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic)
 import FRP.Event (Event)
+import Model.ActiveMode (ActiveMode(..))
 import Model.Roof.RoofPlate (RoofEdited)
+import Specular.Debug (traceEvent)
 import Specular.Dom.Browser (Attrs)
-import Specular.Dom.Element (attr, attrs, attrsD, classWhenD, class_, classes, el, text)
+import Specular.Dom.Element (attr, attrs, attrsD, class_, classes, el, text)
 import Specular.Dom.Widget (Widget)
 import Specular.Dom.Widgets.Button (buttonOnClick)
-import Specular.FRP (dynamic, filterEvent, filterJustEvent, holdDyn, leftmost, never, switch)
+import Specular.FRP (dynamic, filterEvent, filterJustEvent, holdDyn, leftmost, never, newEvent, subscribeEvent_, switch, tagDyn)
 import Specular.FRP as S
 import UI.ArrayEditorUI (ArrayEditorUIOpt, arrayEditorPane)
-import UI.Bridge (fromUIDyn, fromUIEvent, toUIDyn, toUIEvent)
+import UI.Bridge (fromUIEvent, toUIDyn)
 import UI.ConfirmDialog (ConfirmResult(..), confirmDialog)
 import UI.RoofInstructions (roofInstructions)
 import UI.Utils (div, elA, mkAttrs, mkStyle, (:~))
@@ -135,6 +138,10 @@ body opt =
 data EditorUIOp = Save (Array RoofEdited)
                 | Close
 
+derive instance genericEditorUIOp :: Generic EditorUIOp _
+instance showEditorUIOp :: Show EditorUIOp where
+    show = genericShow
+
 isSave :: EditorUIOp -> Boolean
 isSave (Save _) = true
 isSave _        = false
@@ -190,14 +197,14 @@ askConfirm evt = do
 
 askConfirmToSave :: S.Event (Array RoofEdited) -> Widget (S.Event (Array RoofEdited))
 askConfirmToSave rsEvt = do
-    let confSave (Just rs) = do
-            e <- confirmDialog (text "A.I. will redesign the solar system when roof plates are edited")
-            pure $ confirm rs <$> e
-        confSave _ = pure never
-
-        confirm rs Confirmed = Just rs
-        confirm _  Cancelled = Nothing
-        
     opDyn <- holdDyn Nothing $ Just <$> rsEvt
-    e <- switch <$> dynamic (confSave <$> opDyn)
-    pure $ filterJustEvent e
+
+    { event: closeEvt, fire: toClose } <- newEvent
+
+    actDyn <- holdDyn Inactive $ leftmost [const Active <$> rsEvt,
+                                           const Inactive <$> closeEvt]
+    e <- confirmDialog actDyn (text "A.I. will redesign the solar system when roof plates are edited")
+
+    subscribeEvent_ toClose e
+
+    pure $ filterJustEvent $ tagDyn opDyn $ const unit <$> filterEvent ((==) Confirmed) e
