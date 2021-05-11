@@ -278,7 +278,7 @@ createRoofNode cfg = do
         -- create the vertex markers editor
         let canEdit = (&&) <$> isActive <*> canEditRoofDyn
             -- PolyEditorConf
-            opt = def # _active   .~ (fromBoolean <$> isActive)
+            opt = def # _active   .~ (fromBoolean <$> canEdit)
                       # _polygon  .~ poly
         Tuple editor d0 <- runNode (createPolyEditor opt) (mkNodeEnv obj unit)
 
