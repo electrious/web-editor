@@ -1,10 +1,11 @@
-module SmartHouse.HouseBuilder (buildHouse, HouseBuilderConfig, HouseBuilt, _filesExported, _houseReady) where
+module SmartHouse.HouseBuilder (buildHouse, HouseBuilderConfig, HouseBuilt, _filesExported, _housesExported, _houseReady) where
 
 import Prelude hiding (degree)
 
 import Control.Alt ((<|>))
 import Control.Alternative (empty)
 import Custom.Mesh (TapMouseMesh)
+import Data.Array (fromFoldable)
 import Data.Compactable (compact)
 import Data.Default (class Default, def)
 import Data.Foldable (class Foldable)
@@ -32,7 +33,7 @@ import FRP.Event (Event, create, keepLatest, sampleOn, subscribe)
 import FRP.Event.Extra (delay, multicast, performEvent)
 import Math.Angle (degree)
 import Model.ActiveMode (ActiveMode(..), fromBoolean)
-import Model.SmartHouse.House (House, HouseNode, HouseOp(..), createHouseFrom, houseTapped)
+import Model.SmartHouse.House (House, HouseNode, HouseOp(..), JSHouses(..), createHouseFrom, exportHouse, houseTapped)
 import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo, _size, _texture, mkHouseTextureInfo)
 import Model.UUID (idLens)
 import OBJExporter (MeshFiles, exportObject)
@@ -59,19 +60,24 @@ instance defaultHouseBuilderConfig :: Default HouseBuilderConfig where
     def = HouseBuilderConfig { leadId : 0 }
 
 newtype HouseBuilt = HouseBuilt {
-    filesExported :: Event MeshFiles,
-    houseReady    :: Dynamic Boolean
+    filesExported  :: Event MeshFiles,
+    housesExported :: Event JSHouses,
+    houseReady     :: Dynamic Boolean
     }
 
 derive instance newtypeHouseBuilt :: Newtype HouseBuilt _
 instance defaultHouseBuilt :: Default HouseBuilt where
     def = HouseBuilt {
-        filesExported : empty,
-        houseReady    : pure false
+        filesExported  : empty,
+        housesExported : empty,
+        houseReady     : pure false
         }
 
 _filesExported :: forall t a r. Newtype t { filesExported :: a | r } => Lens' t a
 _filesExported = _Newtype <<< prop (SProxy :: SProxy "filesExported")
+
+_housesExported :: forall t a r. Newtype t { housesExported :: a | r } => Lens' t a
+_housesExported = _Newtype <<< prop (SProxy :: SProxy "housesExported")
 
 _houseReady :: forall t a r. Newtype t { houseReady :: a | r } => Lens' t a
 _houseReady = _Newtype <<< prop (SProxy :: SProxy "houseReady")
@@ -139,6 +145,9 @@ applyHouseOp (HouseOpUpdate house) d = d # _houses %~ M.insert (house ^. idLens)
                                          # _housesToRender .~ Nothing
 
 
+exportHouses :: HouseDictData -> JSHouses
+exportHouses hd = JSHouses { houses : fromFoldable $ M.values $ exportHouse <$> hd ^. _houses }
+
 -- get house update event from a list of house nodes
 getHouseUpd :: forall f. Foldable f => Functor f => f HouseNode -> Event HouseOp
 getHouseUpd = foldEvtWith (view _updated)
@@ -205,6 +214,7 @@ createHouseBuilder exportEvt = node (def # _name .~ "house-builder") $ do
                     toExpEvt = delay 15 exportEvt
                     res = def # _houseReady    .~ step false (hasHouse <$> hdEvt)
                               # _filesExported .~ performEvent (const (exportObject pNode) <$> toExpEvt)
+                              # _housesExported .~ (exportHouses <$> hdEvt)
 
                 pure { input: modeEvt, output: { input: actHouseEvt, output : { input: newHdEvt, output : res } } }
                 

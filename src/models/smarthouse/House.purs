@@ -3,6 +3,7 @@ module Model.SmartHouse.House where
 import Prelude
 
 import Control.Alt ((<|>))
+import Data.Array as Arr
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Lens (Lens', (.~), (^.))
@@ -10,17 +11,21 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (List, fromFoldable, modifyAt, singleton)
 import Data.Maybe (fromMaybe)
-import Data.Meter (Meter, meter)
+import Data.Meter (Meter, meter, meterVal)
 import Data.Newtype (class Newtype)
+import Data.Show (class Show)
 import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple(..))
 import Data.UUID (UUID, genUUID)
 import Editor.Common.Lenses (_floor, _height, _id, _roofs, _slope)
 import Effect (Effect)
 import FRP.Event (Event)
+import Foreign.Class (class Decode, class Encode)
+import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Math.Angle (Angle)
 import Model.Polygon (Polygon, _polyVerts, counterClockPoly)
-import Model.SmartHouse.Roof (Roof)
+import Model.Roof.RoofPlate (Point, vec2Point)
+import Model.SmartHouse.Roof (JSRoof, Roof, exportRoof)
 import Model.UUID (class HasUUID, idLens)
 import SmartHouse.Algorithm.Edge (Edge)
 import SmartHouse.Algorithm.LAV (_edges)
@@ -82,6 +87,39 @@ flipRoof idx h = do
     roofs <- generateRoofs (h ^. _slope) nts (h ^. _edges)
     pure $ h # _roofs .~ roofs
              # _trees .~ nts
+
+exportHouse :: House -> JSHouse
+exportHouse h = JSHouse { id: h ^. idLens, floor: floor, height: meterVal $ h ^. _height, roofs: roofs }
+    where floor = vec2Point <$> h ^. _floor <<< _polyVerts
+          roofs = Arr.fromFoldable $ exportRoof (h ^. _height) <$> h ^. _roofs
+
+-- House data exported to JSON and saved to server
+newtype JSHouse = JSHouse {
+    id     :: UUID,
+    floor  :: Array Point,
+    height :: Number,
+    roofs  :: Array JSRoof
+    }
+
+derive instance genericJSHouse :: Generic JSHouse _
+instance showJSHouse :: Show JSHouse where
+    show = genericShow
+instance encodeJSHouse :: Encode JSHouse where
+    encode = genericEncode (defaultOptions { unwrapSingleConstructors = true })
+instance decodeJSHouse :: Decode JSHouse where
+    decode = genericDecode (defaultOptions { unwrapSingleConstructors = true })
+
+
+-- all houses generated data to export
+newtype JSHouses = JSHouses {
+    houses :: Array JSHouse
+    }
+
+derive instance genericJSHouses :: Generic JSHouses _
+instance showJSHouses :: Show JSHouses where
+    show = genericShow
+instance encodeJSHouses :: Encode JSHouses where
+    encode = genericEncode (defaultOptions { unwrapSingleConstructors = true })
 
 -- | Types of operation applied to houses
 data HouseOp = HouseOpCreate House

@@ -12,6 +12,7 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (List(..), (:), length)
 import Data.Maybe (Maybe(..))
+import Data.Meter (Meter, meterVal)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse_)
@@ -23,8 +24,11 @@ import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, gateDyn)
 import FRP.Event (Event)
 import FRP.Event.Extra (multicast)
+import Foreign.Class (class Decode, class Encode)
+import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Model.ActiveMode (ActiveMode, isActive)
-import Model.Polygon (Polygon, polyOutline)
+import Model.Polygon (Polygon, _polyVerts, polyOutline)
+import Model.Roof.RoofPlate (Point, vec2Point)
 import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo, _size, _texture)
 import Model.UUID (class HasUUID, idLens)
 import Rendering.Node (Node, getEnv, tapMesh)
@@ -32,7 +36,7 @@ import SmartHouse.HouseTracer (renderLine)
 import SmartHouse.PolyGeometry (mkPolyGeometry, mkPolyGeometryWithUV)
 import Smarthouse.Algorithm.Subtree (IndexedSubtree, _isGable, getIndex, getSubtree)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial, mkMeshBasicMaterialWithTexture)
-import Three.Math.Vector (Vector3)
+import Three.Math.Vector (Vector3, mkVec3, vecX, vecY, vecZ)
 
 
 data RoofState = SlopeRoof
@@ -76,6 +80,25 @@ subtreeIndex r = case r ^. _subtrees of
     (t:Nil) -> Just $ getIndex t
     _       -> Nothing
 
+exportRoof :: Meter -> Roof -> JSRoof
+exportRoof h r = JSRoof { id: r ^. idLens, polygon: mkP <$> r ^. _polygon <<< _polyVerts }
+    where hv = meterVal h
+          mkP v = vec2Point $ mkVec3 (vecX v) (vecY v) (vecZ v + hv)
+
+
+-- The Roof data structure saved to server
+newtype JSRoof = JSRoof {
+    id      :: UUID,
+    polygon :: Array Point
+    }
+
+derive instance genericJSRoof :: Generic JSRoof _
+instance showJSRoof :: Show JSRoof where
+    show = genericShow
+instance encodeJSRoof :: Encode JSRoof where
+    encode = genericEncode (defaultOptions { unwrapSingleConstructors = true })
+instance decodeJSRoof :: Decode JSRoof where
+    decode = genericDecode (defaultOptions { unwrapSingleConstructors = true })
 
 newtype RoofEvents = RoofEvents {
     tapped  :: Event UUID,

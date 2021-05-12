@@ -16,14 +16,18 @@ import Editor.HouseLoader (editHouse)
 import Editor.SceneEvent (size)
 import Effect (Effect)
 import Effect.Class.Console (logShow)
+import Effect.Console (log)
+import FRP.Dynamic (dynEvent)
 import FRP.Event (subscribe)
 import FRP.Event.Extra (delay)
 import Foreign (Foreign)
-import Foreign.Generic (decode)
+import Foreign.Class (encode)
+import Foreign.Generic (decode, encodeJSON)
 import Model.Hardware.PanelTextureInfo (_premium, _standard, _standard72)
 import Model.Hardware.PanelType (PanelType(..))
 import Model.Roof.Panel (Panel)
 import Model.Roof.RoofPlate (RoofPlate)
+import SmartHouse.HouseBuilder (_filesExported, _houseReady, _housesExported, buildHouse)
 import UI.RoofEditorUI (_editorOp)
 import Web.DOM.NonElementParentNode (getElementById)
 import Web.HTML (window)
@@ -75,16 +79,20 @@ doTest roofDat panelDat = do
 
                     editor <- createEditor el $ def # _sizeDyn .~ sizeDyn
 
-                    house <- editHouse editor houseCfg (delay 10 $ pure RoofEditing)
+                    {-house <- editHouse editor houseCfg (delay 10 $ pure RoofEditing)
 
                     void $ subscribe (house ^. _editorOp) logShow
-                    --void $ subscribe (house ^. _screenshot) logShow
+                    --void $ subscribe (house ^. _screenshot) logShow -}
 
-                    {-
+                    
                     let builderCfg = def # _leadId   .~ 318872
                                          
                     r <- buildHouse editor builderCfg
 
                     let readyEvt = const unit <$> dynEvent (r ^. _houseReady)
-                    void $ subscribe (r ^. _filesExported) logShow
-                    pure unit -}
+                    void $ subscribe (r ^. _housesExported) (\h -> do
+                                                                  let s :: String
+                                                                      s = encodeJSON h
+                                                                  log s
+                                                                  )
+                    pure unit
