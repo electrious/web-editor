@@ -14,7 +14,6 @@ import Editor.Editor (_sizeDyn, createEditor)
 import Editor.EditorMode (EditorMode(..))
 import Editor.HouseEditor (_dataServer, _heatmapTexture, _roofplates, _rotBtnTexture)
 import Editor.HouseLoader (editHouse)
-import Editor.PanelLayer (_serverUpdated)
 import Editor.SceneEvent (size)
 import Effect (Effect)
 import Effect.Class.Console (logShow)
@@ -79,7 +78,6 @@ doTest roofDat panelDat = do
 
                     house <- editHouse editor houseCfg (delay 10 $ pure RoofEditing) empty
 
-                    void $ subscribe (house ^. _serverUpdated) logShow
                     void $ subscribe (house ^. _editorOp) logShow
                     --void $ subscribe (house ^. _screenshot) logShow
 

@@ -2,6 +2,9 @@ module UI.RoofEditorUI where
 
 import Prelude hiding (div)
 
+import API (APIConfig, runAPI)
+import API.Roofplate (buildRoofplates)
+import Control.Alt ((<|>))
 import Data.Default (class Default, def)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
@@ -12,7 +15,7 @@ import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple(..))
-import Editor.Common.Lenses (_height, _modeDyn, _roofs, _width)
+import Editor.Common.Lenses (_apiConfig, _height, _houseId, _modeDyn, _roofs, _width)
 import Editor.Editor (_sizeDyn)
 import Editor.EditorMode (EditorMode(..))
 import Editor.HouseEditor (ArrayEditParam)
@@ -20,34 +23,38 @@ import Editor.SceneEvent (Size, size)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic)
 import FRP.Event (Event)
-import Model.ActiveMode (ActiveMode(..))
+import FRP.Event.Extra (multicast, performEvent)
 import Model.Roof.RoofPlate (RoofEdited)
 import Specular.Dom.Browser (Attrs)
-import Specular.Dom.Element (attr, attrs, attrsD, classWhenD, class_, classes, el, text)
+import Specular.Dom.Element (attrs, attrsD, classWhenD, class_, classes, el, text)
 import Specular.Dom.Widget (Widget)
 import Specular.Dom.Widgets.Button (buttonOnClick)
-import Specular.FRP (dynamic, filterEvent, filterJustEvent, holdDyn, leftmost, never, newEvent, subscribeEvent_, switch, tagDyn)
+import Specular.FRP (dynamic, filterEvent, filterJustEvent, leftmost, never, switch, tagDyn)
 import Specular.FRP as S
 import UI.ArrayEditorUI (ArrayEditorUIOpt, arrayEditorPane)
 import UI.Bridge (fromUIEvent, toUIDyn)
-import UI.ConfirmDialog (ConfirmResult(..), confirmDialog)
+import UI.ConfirmDialog (askConfirm)
 import UI.RoofInstructions (roofInstructions)
 import UI.Utils (div, elA, mkAttrs, mkStyle, (:~))
 
 newtype RoofEditorUIOpt = RoofEditorUIOpt {
-    modeDyn  :: Dynamic EditorMode,
-    sizeDyn  :: Dynamic Size,
-    roofs    :: Dynamic (Maybe (Array RoofEdited)),
-    arrayOpt :: ArrayEditorUIOpt
+    houseId   :: Int,
+    apiConfig :: APIConfig,
+    modeDyn   :: Dynamic EditorMode,
+    sizeDyn   :: Dynamic Size,
+    roofs     :: Dynamic (Maybe (Array RoofEdited)),
+    arrayOpt  :: ArrayEditorUIOpt
     }
 
 derive instance newtypeRoofEditorUIOpt :: Newtype RoofEditorUIOpt _
 instance defaultRoofEditorUIOpt :: Default RoofEditorUIOpt where
     def = RoofEditorUIOpt {
-        modeDyn  : pure Showing,
-        sizeDyn  : pure (size 10 10),
-        roofs    : pure Nothing,
-        arrayOpt : def
+        houseId   : 0,
+        apiConfig : def,
+        modeDyn   : pure Showing,
+        sizeDyn   : pure (size 10 10),
+        roofs     : pure Nothing,
+        arrayOpt  : def
         }
 
 _mode :: forall t a r. Newtype t { mode :: a | r } => Lens' t a
@@ -90,15 +97,26 @@ roofEditorUI opt = do
         rsDyn <- liftEffect $ toUIDyn $ opt ^. _roofs
 
         Tuple param modeUIEvt <- editorPane opt modeD
+        opEvt <- buttons modeD
 
-        opEvt <- buttons modeD rsDyn
-        confOpEvt <- fromUIEvent =<< askConfirm opEvt
+        -- Save events means the save button clicked here
+        let saveClickedEvt = filterEvent ((==) RoofSaved) opEvt
+        closeEvt   <- fromUIEvent $ filterEvent ((==) Close) opEvt
+        
+        canSaveEvt <- askConfirm $ const unit <$> saveClickedEvt
+        toSaveEvt  <- fromUIEvent $ filterJustEvent $ tagDyn rsDyn $ const unit <$> canSaveEvt
+
+        -- run API to save the new roofplates edited
+        let apiCfg = opt ^. _apiConfig
+            hid    = opt ^. _houseId
+            -- Save event here means the roofs are saved
+            savedEvt = multicast $ const RoofSaved <$> performEvent (flip runAPI apiCfg <<< buildRoofplates hid <$> toSaveEvt)
 
         modeEvt <- fromUIEvent modeUIEvt
 
         pure $ RoofEditorUIResult {
             arrayParam : param,
-            editorOp   : confOpEvt,
+            editorOp   : savedEvt <|> closeEvt,
             mode       : modeEvt
             }
     
@@ -129,24 +147,14 @@ body opt modeDyn =
         pure res
 
 
-data EditorUIOp = Save (Array RoofEdited)
+data EditorUIOp = RoofSaved
+                | ArraySaved
                 | Close
 
 derive instance genericEditorUIOp :: Generic EditorUIOp _
+derive instance eqEditorUIOp :: Eq EditorUIOp
 instance showEditorUIOp :: Show EditorUIOp where
     show = genericShow
-
-isSave :: EditorUIOp -> Boolean
-isSave (Save _) = true
-isSave _        = false
-
-isClose :: EditorUIOp -> Boolean
-isClose Close = true
-isClose _     = false
-
-getSave :: EditorUIOp -> Maybe (Array RoofEdited)
-getSave (Save rs) = Just rs
-getSave _         = Nothing
 
 btnsStyle :: Attrs
 btnsStyle = mkStyle [
@@ -159,46 +167,23 @@ btnsStyle = mkStyle [
     ]
 
 -- buttons to show on the top right corner of the editor
-buttons :: S.Dynamic EditorMode -> S.Dynamic (Maybe (Array RoofEdited)) -> Widget (S.Event EditorUIOp)
-buttons modeDyn roofsDyn =
+buttons :: S.Dynamic EditorMode -> Widget (S.Event EditorUIOp)
+buttons modeDyn =
     div [classes ["uk-flex", "uk-flex-right"],
          attrs btnsStyle] do
         let editingRoofDyn = (==) RoofEditing <$> modeDyn
             showCloseDyn = (/=) Showing <$> modeDyn
-        saveEvt <- switch <$> dynamic (saveBtn <$> editingRoofDyn <*> roofsDyn)
+        saveEvt <- switch <$> dynamic (saveBtn <$> editingRoofDyn)
         clsEvt <- switch <$> dynamic (closeBtn <$> showCloseDyn)
-        pure $ leftmost [saveEvt, clsEvt]
+        
+        pure $ leftmost [const RoofSaved <$> saveEvt,
+                         const Close <$> clsEvt]
 
-saveBtn :: Boolean -> Maybe (Array RoofEdited) -> Widget (S.Event EditorUIOp)
-saveBtn true (Just roofs) = map (const $ Save roofs) <$> buttonOnClick attD (text "Save")
-    where attD = pure $ mkAttrs ["class" :~ "uk-button"]
-saveBtn true Nothing      = pure never
-saveBtn false _           = pure never
+saveBtn :: Boolean -> Widget (S.Event Unit)
+saveBtn true  = buttonOnClick (pure $ mkAttrs ["class" :~ "uk-button"]) (text "Save")
+saveBtn false = pure never
 
 
-closeBtn :: Boolean -> Widget (S.Event EditorUIOp)
-closeBtn true  = map (const Close) <$> buttonOnClick attD (text "Close")
-    where attD = pure $ mkAttrs ["class" :~ "uk-button uk-margin-left uk-modal-close"]
+closeBtn :: Boolean -> Widget (S.Event Unit)
+closeBtn true  = buttonOnClick (pure $ mkAttrs ["class" :~ "uk-button uk-margin-left uk-modal-close"]) (text "Close")
 closeBtn false = pure never
-
--- show confirm dialog to let user confirm if save
-askConfirm :: S.Event EditorUIOp -> Widget (S.Event EditorUIOp)
-askConfirm evt = do
-    let saveEvt = filterEvent isSave evt
-        clsEvt  = filterEvent isClose evt
-    confirmed <- askConfirmToSave $ filterJustEvent $ getSave <$> saveEvt
-    pure $ leftmost [Save <$> confirmed, clsEvt]
-
-askConfirmToSave :: S.Event (Array RoofEdited) -> Widget (S.Event (Array RoofEdited))
-askConfirmToSave rsEvt = do
-    opDyn <- holdDyn Nothing $ Just <$> rsEvt
-
-    { event: closeEvt, fire: toClose } <- newEvent
-
-    actDyn <- holdDyn Inactive $ leftmost [const Active <$> rsEvt,
-                                           const Inactive <$> closeEvt]
-    e <- confirmDialog actDyn (text "A.I. will redesign the solar system when roof plates are edited")
-
-    subscribeEvent_ toClose e
-
-    pure $ filterJustEvent $ tagDyn opDyn $ const unit <$> filterEvent ((==) Confirmed) e

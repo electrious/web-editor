@@ -18,7 +18,7 @@ import Data.Map as Map
 import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Editor.Common.Lenses (_alignment, _houseId, _leadId, _modeDyn, _orientation, _panels, _parent, _roofRackings, _roofs, _wrapper)
+import Editor.Common.Lenses (_alignment, _apiConfig, _houseId, _leadId, _modeDyn, _orientation, _panels, _parent, _roofRackings, _roofs, _wrapper)
 import Editor.Disposable (dispose)
 import Editor.Editor (Editor, _canvas, _sizeDyn, addDisposable, setMode)
 import Editor.EditorMode (EditorMode(..))
@@ -40,14 +40,13 @@ import Specular.Dom.Widget (runMainWidgetInNode)
 import Three.Core.Object3D (add)
 import Three.Core.WebGLRenderer (toDataUrl)
 import UI.ArrayEditorUI (_alignmentEnabled)
-import UI.RoofEditorUI (EditorUIOp, _arrayOpt, _arrayParam, _editorOp, _mode, roofEditorUI)
+import UI.RoofEditorUI (EditorUIOp(..), _arrayOpt, _arrayParam, _editorOp, _mode, roofEditorUI)
 import Unsafe.Coerce (unsafeCoerce)
 
 newtype House = House {
     loaded        :: Event Unit,
     editorOp      :: Event EditorUIOp,
-    screenshot    :: Event String,
-    serverUpdated :: Event Unit
+    screenshot    :: Event String
 }
 
 derive instance newtypeHouse :: Newtype House _
@@ -73,9 +72,9 @@ editHouse editor houseCfg inModeEvt inSavedEvt= do
     void $ subscribe modeEvt (setMode editor)
     
     houseLoaded <- runHouseEditor (loadHouse editor arrayEditParam) $ houseCfg # _modeDyn .~ modeDyn
-
-    -- setup the roof editor UI
-    let parentEl = unsafeCoerce $ editor ^. _parent
+    let arrSavedEvt = const ArraySaved <$> houseLoaded ^. _serverUpdated
+        -- setup the roof editor UI
+        parentEl = unsafeCoerce $ editor ^. _parent
 
         newAlignEvt = houseLoaded ^. _alignment
 
@@ -86,7 +85,9 @@ editHouse editor houseCfg inModeEvt inSavedEvt= do
 
         roofsDyn = step Nothing $ (Just <$> houseLoaded ^. _roofUpdate) <|> (const Nothing <$> inSavedEvt)
 
-        opt = def # _modeDyn  .~ modeDyn
+        opt = def # _houseId  .~ (houseCfg ^. _houseId)
+                  # _apiConfig .~ (houseCfg ^. _apiConfig)
+                  # _modeDyn  .~ modeDyn
                   # _sizeDyn  .~ (editor ^. _sizeDyn)
                   # _roofs    .~ roofsDyn
                   # _arrayOpt .~ arrayUIOpt
@@ -103,10 +104,9 @@ editHouse editor houseCfg inModeEvt inSavedEvt= do
     void $ subscribe (uiRes ^. _mode) pushMode
     
     pure $ House {
-        loaded        : houseLoaded ^. _loaded,
-        editorOp      : uiRes ^. _editorOp,
-        screenshot    : houseLoaded ^. _screenshot,
-        serverUpdated : houseLoaded ^. _serverUpdated
+        loaded     : houseLoaded ^. _loaded,
+        editorOp   : uiRes ^. _editorOp <|> arrSavedEvt,
+        screenshot : houseLoaded ^. _screenshot
     }
 
 

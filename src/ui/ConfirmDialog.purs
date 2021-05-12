@@ -9,7 +9,7 @@ import Specular.Dom.Browser (Attrs)
 import Specular.Dom.Element (attrsD, class_, classes, el, text)
 import Specular.Dom.Widget (Widget)
 import Specular.Dom.Widgets.Button (buttonOnClick)
-import Specular.FRP (Dynamic, Event, leftmost)
+import Specular.FRP (Dynamic, Event, filterEvent, holdDyn, leftmost, newEvent, subscribeEvent_)
 import UI.Utils (div, mkAttrs, mkStyle, (:~))
 
 data ConfirmResult = Confirmed
@@ -52,3 +52,15 @@ confirmDialog modeDyn child =
                                                            "type" :~ "button"]) $ text "Cancel"
                 pure $ leftmost [const Confirmed <$> confirmE,
                                  const Cancelled <$> cancelE]
+
+-- show confirm dialog to let user confirm an action
+askConfirm :: Event Unit -> Widget (Event Unit)
+askConfirm evt = do
+    { event: closeEvt, fire: toClose } <- newEvent
+
+    actDyn <- holdDyn Inactive $ leftmost [const Active <$> evt,
+                                           const Inactive <$> closeEvt]
+    e <- confirmDialog actDyn (text "A.I. will redesign the solar system when roof plates are edited")
+    subscribeEvent_ toClose e
+
+    pure $ const unit <$> filterEvent ((==) Confirmed) e
