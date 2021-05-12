@@ -11,6 +11,7 @@ import Control.Monad.Reader (ask)
 import Data.Compactable (compact)
 import Data.Default (def)
 import Data.Either (Either(..))
+import Data.Filterable (filter)
 import Data.Lens (Lens', view, (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
@@ -51,14 +52,15 @@ newtype House = House {
 
 derive instance newtypeHouse :: Newtype House _
 
-editHouse :: Editor -> HouseConfig -> Event EditorMode -> Event Unit -> Effect House
-editHouse editor houseCfg inModeEvt inSavedEvt= do
+editHouse :: Editor -> HouseConfig -> Event EditorMode -> Effect House
+editHouse editor houseCfg inModeEvt = do
     -- events to send value from UI back to the house editor
     { event: alignEvt, push : pushAlign } <- create
     { event: orientEvt, push: pushOrient } <- create
     { event: opEvt, push: pushOp } <- create
     { event: hmEvt, push: pushHeatmap } <- create
     { event: newModeEvt, push: pushMode } <- create
+    { event: savedEvt, push: pushSaved } <- create
 
     -- setup param for house editor
     let arrayEditParam = def # _alignment .~ alignEvt
@@ -83,7 +85,7 @@ editHouse editor houseCfg inModeEvt inSavedEvt= do
                          # _opacity          .~ step Opaque opEvt
                          # _heatmap          .~ step false hmEvt
 
-        roofsDyn = step Nothing $ (Just <$> houseLoaded ^. _roofUpdate) <|> (const Nothing <$> inSavedEvt)
+        roofsDyn = step Nothing $ (Just <$> houseLoaded ^. _roofUpdate) <|> (const Nothing <$> savedEvt)
 
         opt = def # _houseId  .~ (houseCfg ^. _houseId)
                   # _apiConfig .~ (houseCfg ^. _apiConfig)
@@ -96,16 +98,18 @@ editHouse editor houseCfg inModeEvt inSavedEvt= do
 
     -- push back the events
     let arrayParam = uiRes ^. _arrayParam
+        editorOpEvt = uiRes ^. _editorOp
     void $ subscribe (arrayParam ^. _alignment) pushAlign
     void $ subscribe (arrayParam ^. _orientation) pushOrient
     void $ subscribe (arrayParam ^. _opacity) pushOp
     void $ subscribe (arrayParam ^. _heatmap) pushHeatmap
 
     void $ subscribe (uiRes ^. _mode) pushMode
+    void $ subscribe (filter ((==) RoofSaved) editorOpEvt) pushSaved
     
     pure $ House {
         loaded     : houseLoaded ^. _loaded,
-        editorOp   : uiRes ^. _editorOp <|> arrSavedEvt,
+        editorOp   : editorOpEvt <|> arrSavedEvt,
         screenshot : houseLoaded ^. _screenshot
     }
 

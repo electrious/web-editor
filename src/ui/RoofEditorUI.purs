@@ -116,8 +116,8 @@ roofEditorUI opt = do
 
         pure $ RoofEditorUIResult {
             arrayParam : param,
-            editorOp   : savedEvt <|> closeEvt,
-            mode       : modeEvt
+            editorOp   : multicast $ savedEvt <|> closeEvt,
+            mode       : multicast modeEvt
             }
     
 editorPane :: RoofEditorUIOpt -> S.Dynamic EditorMode -> Widget (Tuple ArrayEditParam (S.Event EditorMode))
