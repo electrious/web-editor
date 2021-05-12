@@ -8,6 +8,7 @@ import Custom.Mesh (TapMouseMesh)
 import Data.Array (fromFoldable)
 import Data.Compactable (compact)
 import Data.Default (class Default, def)
+import Data.Filterable (filter)
 import Data.Foldable (class Foldable)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
@@ -29,7 +30,7 @@ import Editor.EditorMode as EditorMode
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic, step)
-import FRP.Event (Event, create, keepLatest, sampleOn, subscribe)
+import FRP.Event (Event, create, keepLatest, sampleOn, sampleOn_, subscribe)
 import FRP.Event.Extra (delay, multicast, performEvent)
 import Math.Angle (degree)
 import Model.ActiveMode (ActiveMode(..), fromBoolean)
@@ -43,11 +44,14 @@ import Rendering.TextureLoader (loadTextureFromUrl)
 import SmartHouse.BuilderMode (BuilderMode(..))
 import SmartHouse.HouseEditor (editHouse)
 import SmartHouse.HouseTracer (traceHouse)
-import SmartHouse.UI (_showSaveDyn, _toSave, houseBuilderUI)
+import SmartHouse.UI (_showSaveDyn, houseBuilderUI)
 import Specular.Dom.Widget (runMainWidgetInNode)
 import Three.Core.Geometry (mkPlaneGeometry)
 import Three.Core.Material (mkMeshBasicMaterialWithTexture)
 import Three.Loader.TextureLoader (Texture, clampToEdgeWrapping, repeatWrapping, setRepeat, setWrapS, setWrapT)
+import UI.ButtonPane (ButtonClicked(..))
+import UI.EditorUIOp (EditorUIOp(..))
+import UI.RoofEditorUI (_editorOp)
 import Unsafe.Coerce (unsafeCoerce)
 import Util (foldEvtWith)
 
@@ -62,7 +66,8 @@ instance defaultHouseBuilderConfig :: Default HouseBuilderConfig where
 newtype HouseBuilt = HouseBuilt {
     filesExported  :: Event MeshFiles,
     housesExported :: Event JSHouses,
-    houseReady     :: Dynamic Boolean
+    houseReady     :: Dynamic Boolean,
+    editorOp       :: Event EditorUIOp
     }
 
 derive instance newtypeHouseBuilt :: Newtype HouseBuilt _
@@ -70,7 +75,8 @@ instance defaultHouseBuilt :: Default HouseBuilt where
     def = HouseBuilt {
         filesExported  : empty,
         housesExported : empty,
-        houseReady     : pure false
+        houseReady     : pure false,
+        editorOp       : empty
         }
 
 _filesExported :: forall t a r. Newtype t { filesExported :: a | r } => Lens' t a
@@ -214,7 +220,7 @@ createHouseBuilder exportEvt = node (def # _name .~ "house-builder") $ do
                     toExpEvt = delay 15 exportEvt
                     res = def # _houseReady    .~ step false (hasHouse <$> hdEvt)
                               # _filesExported .~ performEvent (const (exportObject pNode) <$> toExpEvt)
-                              # _housesExported .~ (exportHouses <$> hdEvt)
+                              # _housesExported .~ (exportHouses <$> sampleOn_ hdEvt toExpEvt)
 
                 pure { input: modeEvt, output: { input: actHouseEvt, output : { input: newHdEvt, output : res } } }
                 
@@ -232,6 +238,6 @@ buildHouse editor cfg = do
                        # _showSaveDyn .~ (res ^. _houseReady)
     uiEvts <- runMainWidgetInNode parentEl $ houseBuilderUI conf
     
-    void $ subscribe (uiEvts ^. _toSave) toExp
+    void $ subscribe (const unit <$> filter ((==) BCSave) uiEvts) toExp
 
-    pure res
+    pure $ res # _editorOp .~ (const Close <$> filter ((==) BCClose) uiEvts)
