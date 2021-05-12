@@ -6,12 +6,10 @@ import API (APIConfig, runAPI)
 import API.Roofplate (buildRoofplates)
 import Control.Alt ((<|>))
 import Data.Default (class Default, def)
-import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Show (genericShow)
 import Data.Lens (Lens', (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple(..))
@@ -25,17 +23,17 @@ import FRP.Dynamic (Dynamic)
 import FRP.Event (Event, keepLatest)
 import FRP.Event.Extra (multicast, performEvent)
 import Model.Roof.RoofPlate (RoofEdited)
-import Specular.Dom.Browser (Attrs)
-import Specular.Dom.Element (attrs, attrsD, classWhenD, class_, classes, el, text)
+import Specular.Dom.Element (attrs, attrsD, classWhenD, class_, classes, el)
 import Specular.Dom.Widget (Widget)
-import Specular.Dom.Widgets.Button (buttonOnClick)
-import Specular.FRP (dynamic, filterEvent, filterJustEvent, leftmost, never, switch, tagDyn)
+import Specular.FRP (filterEvent, filterJustEvent, leftmost, tagDyn)
 import Specular.FRP as S
 import UI.ArrayEditorUI (ArrayEditorUIOpt, arrayEditorPane)
 import UI.Bridge (fromUIEvent, toUIDyn)
+import UI.ButtonPane (ButtonClicked(..), buttons)
 import UI.ConfirmDialog (askConfirm)
+import UI.EditorUIOp (EditorUIOp(..))
 import UI.RoofInstructions (roofInstructions)
-import UI.Utils (div, elA, mkAttrs, mkStyle, (:~))
+import UI.Utils (div, elA, mkStyle, (:~))
 
 newtype RoofEditorUIOpt = RoofEditorUIOpt {
     houseId   :: Int,
@@ -97,11 +95,14 @@ roofEditorUI opt = do
         rsDyn <- liftEffect $ toUIDyn $ opt ^. _roofs
 
         Tuple param modeUIEvt <- editorPane opt modeD
-        opEvt <- buttons modeD rsDyn
+
+        let showSaveDyn = (&&) <$> ((==) RoofEditing <$> modeD) <*> (isJust <$> rsDyn)
+            showCloseDyn = ((==) Showing) <$> modeD
+        opEvt <- buttons showSaveDyn showCloseDyn
 
         -- Save events means the save button clicked here
-        let saveClickedEvt = filterEvent ((==) RoofSaved) opEvt
-        closeEvt   <- fromUIEvent $ filterEvent ((==) Close) opEvt
+        let saveClickedEvt = filterEvent ((==) BCSave) opEvt
+        closeEvt   <- fromUIEvent $ const Close <$> filterEvent ((==) BCClose) opEvt
         
         canSaveEvt <- askConfirm $ const unit <$> saveClickedEvt
         toSaveEvt  <- fromUIEvent $ filterJustEvent $ tagDyn rsDyn $ const unit <$> canSaveEvt
@@ -146,46 +147,3 @@ body opt modeDyn =
         res <- el "li" [classWhenD ((==) ArrayEditing <$> modeDyn) "uk-active"] $ arrayEditorPane opt
         el "li" [classWhenD ((==) RoofEditing <$> modeDyn) "uk-active"] roofInstructions
         pure res
-
-
-data EditorUIOp = RoofSaved
-                | ArraySaved
-                | Close
-
-derive instance genericEditorUIOp :: Generic EditorUIOp _
-derive instance eqEditorUIOp :: Eq EditorUIOp
-instance showEditorUIOp :: Show EditorUIOp where
-    show = genericShow
-
-btnsStyle :: Attrs
-btnsStyle = mkStyle [
-    "position"       :~ "absolute",
-    "width"          :~ "180px",
-    "top"            :~ "20px",
-    "right"          :~ "20px",
-    "z-index"        :~ "10",
-    "pointer-events" :~ "auto"
-    ]
-
--- buttons to show on the top right corner of the editor
-buttons :: S.Dynamic EditorMode -> S.Dynamic (Maybe (Array RoofEdited)) -> Widget (S.Event EditorUIOp)
-buttons modeDyn roofsDyn =
-    div [classes ["uk-flex", "uk-flex-right"],
-         attrs btnsStyle] do
-        let editingRoofDyn = (==) RoofEditing <$> modeDyn
-            showCloseDyn = (/=) Showing <$> modeDyn
-        saveEvt <- switch <$> dynamic (saveBtn <$> editingRoofDyn <*> roofsDyn)
-        clsEvt <- switch <$> dynamic (closeBtn <$> showCloseDyn)
-        
-        pure $ leftmost [const RoofSaved <$> saveEvt,
-                         const Close <$> clsEvt]
-
-saveBtn :: Boolean -> Maybe (Array RoofEdited) -> Widget (S.Event Unit)
-saveBtn true (Just _) = buttonOnClick (pure $ mkAttrs ["class" :~ "uk-button"]) (text "Save")
-saveBtn true Nothing  = pure never
-saveBtn false _       = pure never
-
-
-closeBtn :: Boolean -> Widget (S.Event Unit)
-closeBtn true  = buttonOnClick (pure $ mkAttrs ["class" :~ "uk-button uk-margin-left uk-modal-close"]) (text "Close")
-closeBtn false = pure never

@@ -41,7 +41,8 @@ import Specular.Dom.Widget (runMainWidgetInNode)
 import Three.Core.Object3D (add)
 import Three.Core.WebGLRenderer (toDataUrl)
 import UI.ArrayEditorUI (_alignmentEnabled)
-import UI.RoofEditorUI (EditorUIOp(..), _arrayOpt, _arrayParam, _editorOp, _mode, roofEditorUI)
+import UI.EditorUIOp (EditorUIOp(..))
+import UI.RoofEditorUI (_arrayOpt, _arrayParam, _editorOp, _mode, roofEditorUI)
 import Unsafe.Coerce (unsafeCoerce)
 
 newtype House = House {
