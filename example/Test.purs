@@ -4,7 +4,6 @@ import Prelude
 
 import API (_auth, _baseUrl)
 import Control.Monad.Except (runExcept)
-import Control.Plus (empty)
 import Data.Default (def)
 import Data.Either (Either(..))
 import Data.Lens ((.~), (^.))

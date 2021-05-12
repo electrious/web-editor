@@ -22,7 +22,7 @@ import Editor.HouseEditor (ArrayEditParam)
 import Editor.SceneEvent (Size, size)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic)
-import FRP.Event (Event)
+import FRP.Event (Event, keepLatest)
 import FRP.Event.Extra (multicast, performEvent)
 import Model.Roof.RoofPlate (RoofEdited)
 import Specular.Dom.Browser (Attrs)
@@ -97,7 +97,7 @@ roofEditorUI opt = do
         rsDyn <- liftEffect $ toUIDyn $ opt ^. _roofs
 
         Tuple param modeUIEvt <- editorPane opt modeD
-        opEvt <- buttons modeD
+        opEvt <- buttons modeD rsDyn
 
         -- Save events means the save button clicked here
         let saveClickedEvt = filterEvent ((==) RoofSaved) opEvt
@@ -110,13 +110,14 @@ roofEditorUI opt = do
         let apiCfg = opt ^. _apiConfig
             hid    = opt ^. _houseId
             -- Save event here means the roofs are saved
-            savedEvt = multicast $ const RoofSaved <$> performEvent (flip runAPI apiCfg <<< buildRoofplates hid <$> toSaveEvt)
-
+            savedEvt = multicast $ keepLatest $ performEvent (flip runAPI apiCfg <<< buildRoofplates hid <$> toSaveEvt)
+            roofSaved = const RoofSaved <$> savedEvt
+            
         modeEvt <- fromUIEvent modeUIEvt
 
         pure $ RoofEditorUIResult {
             arrayParam : param,
-            editorOp   : multicast $ savedEvt <|> closeEvt,
+            editorOp   : multicast $ roofSaved <|> closeEvt,
             mode       : multicast modeEvt
             }
     
@@ -167,21 +168,22 @@ btnsStyle = mkStyle [
     ]
 
 -- buttons to show on the top right corner of the editor
-buttons :: S.Dynamic EditorMode -> Widget (S.Event EditorUIOp)
-buttons modeDyn =
+buttons :: S.Dynamic EditorMode -> S.Dynamic (Maybe (Array RoofEdited)) -> Widget (S.Event EditorUIOp)
+buttons modeDyn roofsDyn =
     div [classes ["uk-flex", "uk-flex-right"],
          attrs btnsStyle] do
         let editingRoofDyn = (==) RoofEditing <$> modeDyn
             showCloseDyn = (/=) Showing <$> modeDyn
-        saveEvt <- switch <$> dynamic (saveBtn <$> editingRoofDyn)
+        saveEvt <- switch <$> dynamic (saveBtn <$> editingRoofDyn <*> roofsDyn)
         clsEvt <- switch <$> dynamic (closeBtn <$> showCloseDyn)
         
         pure $ leftmost [const RoofSaved <$> saveEvt,
                          const Close <$> clsEvt]
 
-saveBtn :: Boolean -> Widget (S.Event Unit)
-saveBtn true  = buttonOnClick (pure $ mkAttrs ["class" :~ "uk-button"]) (text "Save")
-saveBtn false = pure never
+saveBtn :: Boolean -> Maybe (Array RoofEdited) -> Widget (S.Event Unit)
+saveBtn true (Just _) = buttonOnClick (pure $ mkAttrs ["class" :~ "uk-button"]) (text "Save")
+saveBtn true Nothing  = pure never
+saveBtn false _       = pure never
 
 
 closeBtn :: Boolean -> Widget (S.Event Unit)
