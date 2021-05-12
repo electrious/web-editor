@@ -23,7 +23,7 @@ import FRP.Event (Event)
 import Model.ActiveMode (ActiveMode(..))
 import Model.Roof.RoofPlate (RoofEdited)
 import Specular.Dom.Browser (Attrs)
-import Specular.Dom.Element (attr, attrs, attrsD, class_, classes, el, text)
+import Specular.Dom.Element (attr, attrs, attrsD, classWhenD, class_, classes, el, text)
 import Specular.Dom.Widget (Widget)
 import Specular.Dom.Widgets.Button (buttonOnClick)
 import Specular.FRP (dynamic, filterEvent, filterJustEvent, holdDyn, leftmost, never, newEvent, subscribeEvent_, switch, tagDyn)
@@ -101,36 +101,31 @@ roofEditorUI opt = do
             editorOp   : confOpEvt,
             mode       : modeEvt
             }
-
-shadowStyle :: String
-shadowStyle = "0 3px 1px -2px rgba(0, 0, 0, 0.2), 0 2px 2px 0 rgba(0, 0, 0, 0.14), 0 1px 5px 0 rgba(0, 0, 0, 0.06)"
-
+    
 editorPane :: RoofEditorUIOpt -> S.Dynamic EditorMode -> Widget (Tuple ArrayEditParam (S.Event EditorMode))
 editorPane opt modeDyn =
-    div [classes ["uk-overlay", "uk-overlay-default", "uk-padding-small", "uk-position-top-left"],
-         attrs $ mkStyle ["box-shadow" :~ shadowStyle,
-                          "pointer-events" :~ "auto" ]] do
-        modeEvt  <- headerTab
-        arrParam <- body (opt ^. _arrayOpt)
+    div [classes ["uk-overlay", "uk-overlay-default", "uk-padding-small", "uk-position-top-left", "uk-box-shadow-medium"],
+         attrs $ mkStyle ["pointer-events" :~ "auto"]] do
+        modeEvt  <- headerTab modeDyn
+        arrParam <- body (opt ^. _arrayOpt) modeDyn
         
         pure $ Tuple arrParam modeEvt
 
 -- header tab of the pane switcher between Array and Roof editing
-headerTab :: Widget (S.Event EditorMode)
-headerTab = el "ul" [classes ["uk-subnav", "uk-subnav-pill"],
-                             attr "uk-switcher" ""] do
-    arrEvt  <- el "li" [] $ elA "Edit Arrays" "#"
-    roofEvt <- el "li" [] $ elA "Edit Roofs" "#"
+headerTab :: S.Dynamic EditorMode -> Widget (S.Event EditorMode)
+headerTab modeDyn = el "ul" [classes ["uk-subnav", "uk-subnav-pill"]] do
+    arrEvt  <- el "li" [classWhenD ((==) ArrayEditing <$> modeDyn) "uk-active"] $ elA "Edit Arrays" "#"
+    roofEvt <- el "li" [classWhenD ((==) RoofEditing <$> modeDyn) "uk-active"] $ elA "Edit Roofs" "#"
 
     pure $ leftmost [const ArrayEditing <$> arrEvt,
                      const RoofEditing <$> roofEvt]
 
 -- body part of the switcher between array editing and roof editing UI
-body :: ArrayEditorUIOpt -> Widget ArrayEditParam
-body opt =
+body :: ArrayEditorUIOpt -> S.Dynamic EditorMode -> Widget ArrayEditParam
+body opt modeDyn =
     el "ul" [class_ "uk-switcher"] do
-        res <- el "li" [] $ arrayEditorPane opt
-        el "li" [] roofInstructions
+        res <- el "li" [classWhenD ((==) ArrayEditing <$> modeDyn) "uk-active"] $ arrayEditorPane opt
+        el "li" [classWhenD ((==) RoofEditing <$> modeDyn) "uk-active"] roofInstructions
         pure res
 
 

@@ -77,7 +77,7 @@ doTest roofDat panelDat = do
 
                     editor <- createEditor el $ def # _sizeDyn .~ sizeDyn
 
-                    house <- editHouse editor houseCfg (delay 10 $ pure ArrayEditing) empty
+                    house <- editHouse editor houseCfg (delay 10 $ pure RoofEditing) empty
 
                     void $ subscribe (house ^. _serverUpdated) logShow
                     void $ subscribe (house ^. _editorOp) logShow
