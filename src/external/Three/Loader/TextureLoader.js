@@ -8,8 +8,20 @@ exports.loadTexture = url => loader => _ => {
     return loader.load(url)
 }
 
+exports.loadTextureAsync = url => loader => cb => _ => {
+    loader.load(url, t => { cb(t)() })
+}
+
 exports.dispose = t => _ => {
     t.dispose()
+}
+
+exports.textureWidth = t => {
+    return t.image.width
+}
+
+exports.textureHeight = t => {
+    return t.image.height
 }
 
 // texture wrapping mode

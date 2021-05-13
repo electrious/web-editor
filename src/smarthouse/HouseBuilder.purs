@@ -3,7 +3,7 @@ module SmartHouse.HouseBuilder (buildHouse, HouseBuilderConfig, HouseBuilt, _fil
 import Prelude hiding (degree)
 
 import API (APIConfig, runAPI)
-import API.Image (_link, getImageMeta)
+import API.Image (ImageResp, _link, _pixelPerMeter, getImageMeta)
 import Control.Alt ((<|>))
 import Control.Alternative (empty)
 import Custom.Mesh (TapMouseMesh)
@@ -19,7 +19,7 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Map as M
 import Data.Maybe (Maybe(..), isNothing)
-import Data.Meter (meter, meterVal)
+import Data.Meter (meterVal)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
@@ -29,6 +29,7 @@ import Data.UUIDMap (UUIDMap)
 import Editor.Common.Lenses (_apiConfig, _deleted, _height, _leadId, _modeDyn, _mouseMove, _name, _parent, _tapped, _updated, _width)
 import Editor.Editor (Editor, _sizeDyn, setMode)
 import Editor.EditorMode as EditorMode
+import Editor.SceneEvent (size)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic, step)
@@ -42,7 +43,7 @@ import Model.UUID (idLens)
 import OBJExporter (MeshFiles, exportObject)
 import Rendering.DynamicNode (eventNode)
 import Rendering.Node (Node, fixNodeDWith, fixNodeEWith, getEnv, getParent, localEnv, mkNodeEnv, node, runNode, tapMouseMesh)
-import Rendering.TextureLoader (loadTextureFromUrl)
+import Rendering.TextureLoader (textureFromUrl)
 import SmartHouse.BuilderMode (BuilderMode(..))
 import SmartHouse.HouseEditor (editHouse)
 import SmartHouse.HouseTracer (traceHouse)
@@ -50,7 +51,7 @@ import SmartHouse.UI (_showSaveDyn, houseBuilderUI)
 import Specular.Dom.Widget (runMainWidgetInNode)
 import Three.Core.Geometry (mkPlaneGeometry)
 import Three.Core.Material (mkMeshBasicMaterialWithTexture)
-import Three.Loader.TextureLoader (Texture, clampToEdgeWrapping, repeatWrapping, setRepeat, setWrapS, setWrapT)
+import Three.Loader.TextureLoader (clampToEdgeWrapping, repeatWrapping, setRepeat, setWrapS, setWrapT, textureHeight, textureWidth)
 import UI.ButtonPane (ButtonClicked(..))
 import UI.EditorUIOp (EditorUIOp(..))
 import UI.RoofEditorUI (_editorOp)
@@ -98,14 +99,15 @@ compactHouseBuilt e = def # _filesExported  .~ keepLatest (view _filesExported <
                           # _editorOp       .~ keepLatest (view _editorOp <$> e)
 
 
-loadHouseTexture :: String -> Effect Texture
-loadHouseTexture imgUrl = do
-    let t = loadTextureFromUrl imgUrl
-    setWrapS clampToEdgeWrapping t
-    setWrapT repeatWrapping t
-    setRepeat 1.0 1.0 t
+loadHouseTexture :: ImageResp -> Event HouseTextureInfo
+loadHouseTexture img = performEvent $ f <$> textureFromUrl (img ^. _link)
+    where f t = do
+              setWrapS clampToEdgeWrapping t
+              setWrapT repeatWrapping t
+              setRepeat 1.0 1.0 t
 
-    pure t
+              let s = size (textureWidth t) (textureHeight t)
+              pure $ mkHouseTextureInfo t s (img ^. _pixelPerMeter)
 
 
 mkHelperPlane :: forall e. HouseTextureInfo -> Node e TapMouseMesh
@@ -195,10 +197,7 @@ createHouseBuilder exportEvt = node (def # _name .~ "house-builder") $ do
     imgEvt <- liftEffect $ runAPI (getImageMeta $ def # _leadId .~ lId) (cfg ^. _apiConfig)
 
     -- load texture image
-    let tEvt = performEvent $ loadHouseTexture <<< view _link <$> imgEvt
-        s = def # _width  .~ meter 100.0
-                # _height .~ meter 46.5
-        tInfoEvt = flip mkHouseTextureInfo s <$> tEvt
+    let tInfoEvt = keepLatest $ loadHouseTexture <$> imgEvt
     evt <- eventNode $ builderForHouse exportEvt <$> tInfoEvt
     pure $ compactHouseBuilt evt
 

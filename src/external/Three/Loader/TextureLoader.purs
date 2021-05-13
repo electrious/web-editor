@@ -19,4 +19,7 @@ foreign import data TextureLoader :: Type
 
 foreign import mkTextureLoader :: Effect TextureLoader
 foreign import loadTexture :: String -> TextureLoader -> Effect Texture
+foreign import loadTextureAsync :: String -> TextureLoader -> (Texture -> Effect Unit) -> Effect Unit
 foreign import dispose :: Texture -> Effect Unit
+foreign import textureWidth :: Texture -> Int
+foreign import textureHeight :: Texture -> Int

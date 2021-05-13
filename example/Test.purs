@@ -88,7 +88,7 @@ doTest roofDat panelDat = do
                           --void $ subscribe (house ^. _screenshot) logShow
 
                         else do
-                            let builderCfg = def # _leadId    .~ 224024   --318872
+                            let builderCfg = def # _leadId    .~ 359617   --318872
                                                  # _apiConfig .~ apiCfg
                             r <- buildHouse editor builderCfg
 
