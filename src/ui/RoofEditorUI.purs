@@ -97,7 +97,7 @@ roofEditorUI opt = do
         Tuple param modeUIEvt <- editorPane opt modeD
 
         let showSaveDyn = (&&) <$> ((==) RoofEditing <$> modeD) <*> (isJust <$> rsDyn)
-            showCloseDyn = ((==) Showing) <$> modeD
+            showCloseDyn = ((/=) Showing) <$> modeD
         opEvt <- buttons showSaveDyn showCloseDyn
 
         -- Save events means the save button clicked here
