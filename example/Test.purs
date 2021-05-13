@@ -21,13 +21,12 @@ import FRP.Dynamic (dynEvent)
 import FRP.Event (subscribe)
 import FRP.Event.Extra (delay)
 import Foreign (Foreign)
-import Foreign.Class (encode)
 import Foreign.Generic (decode, encodeJSON)
 import Model.Hardware.PanelTextureInfo (_premium, _standard, _standard72)
 import Model.Hardware.PanelType (PanelType(..))
 import Model.Roof.Panel (Panel)
 import Model.Roof.RoofPlate (RoofPlate)
-import SmartHouse.HouseBuilder (_filesExported, _houseReady, _housesExported, buildHouse)
+import SmartHouse.HouseBuilder (_houseReady, _housesExported, buildHouse)
 import UI.RoofEditorUI (_editorOp)
 import Web.DOM.NonElementParentNode (getElementById)
 import Web.HTML (window)
@@ -64,7 +63,7 @@ doTest roofDat panelDat = do
                                        # _premium    .~ Just qCellSolarPanelJPG
                                        # _standard72 .~ Just qCellSolarPanel72PNG
                         apiCfg = def # _auth    .~ Just "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJJZCI6IiIsImN0YyI6NCwianRpIjoiNCJ9.d6pG95A4EoAPGhhnN4BsL7QtarpBRCEcta0Uu72SoVU"
-                                     # _baseUrl .~ "https://api.electrious.com/v1"
+                                     # _baseUrl .~ "https://api.electrious.com"
 
                         houseCfg = def # _houseId        .~ 4
                                        # _leadId         .~ 296285
@@ -79,20 +78,19 @@ doTest roofDat panelDat = do
 
                     editor <- createEditor el $ def # _sizeDyn .~ sizeDyn
 
-                    {-house <- editHouse editor houseCfg (delay 10 $ pure RoofEditing)
+                    let mode = RoofEditing
 
-                    void $ subscribe (house ^. _editorOp) logShow
-                    --void $ subscribe (house ^. _screenshot) logShow -}
+                    if mode /= HouseBuilding
+                       then do
+                          house <- editHouse editor houseCfg (delay 10 $ pure mode)
 
-                    
-                    let builderCfg = def # _leadId   .~ 318872
+                          void $ subscribe (house ^. _editorOp) logShow
+                          --void $ subscribe (house ^. _screenshot) logShow
+
+                        else do
+                            let builderCfg = def # _leadId   .~ 318872
                                          
-                    r <- buildHouse editor builderCfg
+                            r <- buildHouse editor builderCfg
 
-                    let readyEvt = const unit <$> dynEvent (r ^. _houseReady)
-                    void $ subscribe (r ^. _housesExported) (\h -> do
-                                                                  let s :: String
-                                                                      s = encodeJSON h
-                                                                  log s
-                                                                  )
-                    pure unit
+                            let readyEvt = const unit <$> dynEvent (r ^. _houseReady)
+                            void $ subscribe (r ^. _housesExported) (encodeJSON >>> log)
