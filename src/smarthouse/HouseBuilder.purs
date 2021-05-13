@@ -1,7 +1,9 @@
-module SmartHouse.HouseBuilder (buildHouse, HouseBuilderConfig, HouseBuilt, _filesExported, _housesExported, _houseReady) where
+module SmartHouse.HouseBuilder (buildHouse, HouseBuilderConfig, HouseBuilt, _filesExported, _housesExported, _hasHouse) where
 
 import Prelude hiding (degree)
 
+import API (APIConfig, runAPI)
+import API.Image (_link, getImageMeta)
 import Control.Alt ((<|>))
 import Control.Alternative (empty)
 import Custom.Mesh (TapMouseMesh)
@@ -24,7 +26,7 @@ import Data.Traversable (traverse)
 import Data.Tuple (fst)
 import Data.UUID (UUID)
 import Data.UUIDMap (UUIDMap)
-import Editor.Common.Lenses (_deleted, _height, _leadId, _modeDyn, _mouseMove, _name, _parent, _tapped, _updated, _width)
+import Editor.Common.Lenses (_apiConfig, _deleted, _height, _leadId, _modeDyn, _mouseMove, _name, _parent, _tapped, _updated, _width)
 import Editor.Editor (Editor, _sizeDyn, setMode)
 import Editor.EditorMode as EditorMode
 import Effect (Effect)
@@ -56,17 +58,18 @@ import Unsafe.Coerce (unsafeCoerce)
 import Util (foldEvtWith)
 
 newtype HouseBuilderConfig = HouseBuilderConfig {
-    leadId   :: Int
+    leadId    :: Int,
+    apiConfig :: APIConfig
 }
 
 derive instance newtypeHouseBuilderConfig :: Newtype HouseBuilderConfig _
 instance defaultHouseBuilderConfig :: Default HouseBuilderConfig where
-    def = HouseBuilderConfig { leadId : 0 }
+    def = HouseBuilderConfig { leadId : 0, apiConfig : def }
 
 newtype HouseBuilt = HouseBuilt {
     filesExported  :: Event MeshFiles,
     housesExported :: Event JSHouses,
-    houseReady     :: Dynamic Boolean,
+    hasHouse       :: Event Boolean,
     editorOp       :: Event EditorUIOp
     }
 
@@ -75,7 +78,7 @@ instance defaultHouseBuilt :: Default HouseBuilt where
     def = HouseBuilt {
         filesExported  : empty,
         housesExported : empty,
-        houseReady     : pure false,
+        hasHouse       : empty,
         editorOp       : empty
         }
 
@@ -85,17 +88,19 @@ _filesExported = _Newtype <<< prop (SProxy :: SProxy "filesExported")
 _housesExported :: forall t a r. Newtype t { housesExported :: a | r } => Lens' t a
 _housesExported = _Newtype <<< prop (SProxy :: SProxy "housesExported")
 
-_houseReady :: forall t a r. Newtype t { houseReady :: a | r } => Lens' t a
-_houseReady = _Newtype <<< prop (SProxy :: SProxy "houseReady")
+_hasHouse :: forall t a r. Newtype t { hasHouse :: a | r } => Lens' t a
+_hasHouse = _Newtype <<< prop (SProxy :: SProxy "hasHouse")
 
--- | get 2D image url for a lead
-imageUrlForLead :: Int -> String
-imageUrlForLead l = "https://s3.eu-west-1.amazonaws.com/data.electrious.com/leads/" <> show l <> "/manual.jpg"
+compactHouseBuilt :: Event HouseBuilt -> HouseBuilt
+compactHouseBuilt e = def # _filesExported  .~ keepLatest (view _filesExported <$> e)
+                          # _housesExported .~ keepLatest (view _housesExported <$> e)
+                          # _hasHouse       .~ keepLatest (view _hasHouse <$> e)
+                          # _editorOp       .~ keepLatest (view _editorOp <$> e)
 
-loadHouseTexture :: Int -> Effect Texture
-loadHouseTexture lId = do
-    let img = imageUrlForLead lId
-        t   = loadTextureFromUrl img
+
+loadHouseTexture :: String -> Effect Texture
+loadHouseTexture imgUrl = do
+    let t = loadTextureFromUrl imgUrl
     setWrapS clampToEdgeWrapping t
     setWrapT repeatWrapping t
     setRepeat 1.0 1.0 t
@@ -183,17 +188,27 @@ tracerMode h Building = fromBoolean $ isNothing h
 
 createHouseBuilder :: Event Unit -> Node HouseBuilderConfig HouseBuilt
 createHouseBuilder exportEvt = node (def # _name .~ "house-builder") $ do
-    cfg   <- getEnv
-    pNode <- getParent
-
+    cfg <- getEnv
     let lId = cfg ^. _leadId
-    t <- liftEffect $ loadHouseTexture lId
-    let tInfo = mkHouseTextureInfo t (def # _width  .~ meter 100.0
-                                          # _height .~ meter 46.5)
-    
+
+    -- load image meta info
+    imgEvt <- liftEffect $ runAPI (getImageMeta $ def # _leadId .~ lId) (cfg ^. _apiConfig)
+
+    -- load texture image
+    let tEvt = performEvent $ loadHouseTexture <<< view _link <$> imgEvt
+        s = def # _width  .~ meter 100.0
+                # _height .~ meter 46.5
+        tInfoEvt = flip mkHouseTextureInfo s <$> tEvt
+    evt <- eventNode $ builderForHouse exportEvt <$> tInfoEvt
+    pure $ compactHouseBuilt evt
+
+builderForHouse :: Event Unit -> HouseTextureInfo -> Node HouseBuilderConfig HouseBuilt
+builderForHouse exportEvt tInfo =
     fixNodeEWith def \hdEvt ->
         fixNodeDWith Nothing \actHouseDyn ->
             fixNodeDWith Building \modeDyn -> do
+                pNode <- getParent
+                
                 -- add helper plane that accepts tap and drag events
                 helper <- mkHelperPlane tInfo
 
@@ -218,8 +233,8 @@ createHouseBuilder exportEvt = node (def # _name .~ "house-builder") $ do
                     modeEvt = (const Showing <$> exportEvt) <|> 
                               (const Building <$> delay 30 exportEvt)
                     toExpEvt = delay 15 exportEvt
-                    res = def # _houseReady    .~ step false (hasHouse <$> hdEvt)
-                              # _filesExported .~ performEvent (const (exportObject pNode) <$> toExpEvt)
+                    res = def # _hasHouse       .~ (hasHouse <$> hdEvt)
+                              # _filesExported  .~ performEvent (const (exportObject pNode) <$> toExpEvt)
                               # _housesExported .~ (exportHouses <$> sampleOn_ hdEvt toExpEvt)
 
                 pure { input: modeEvt, output: { input: actHouseEvt, output : { input: newHdEvt, output : res } } }
@@ -235,7 +250,7 @@ buildHouse editor cfg = do
     res <- fst <$> runNode (createHouseBuilder expEvt) (mkNodeEnv editor cfg)
     let parentEl = unsafeCoerce $ editor ^. _parent
         conf     = def # _sizeDyn     .~ (editor ^. _sizeDyn)
-                       # _showSaveDyn .~ (res ^. _houseReady)
+                       # _showSaveDyn .~ step false (res ^. _hasHouse)
     uiEvts <- runMainWidgetInNode parentEl $ houseBuilderUI conf
     
     void $ subscribe (const unit <$> filter ((==) BCSave) uiEvts) toExp

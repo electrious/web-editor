@@ -6,6 +6,7 @@ import API (_auth, _baseUrl)
 import Control.Monad.Except (runExcept)
 import Data.Default (def)
 import Data.Either (Either(..))
+import Data.Filterable (filter)
 import Data.Lens ((.~), (^.))
 import Data.Maybe (Maybe(..))
 import Editor.Common.Lenses (_apiConfig, _houseId, _leadId, _panelType, _panels, _textureInfo)
@@ -17,7 +18,6 @@ import Editor.SceneEvent (size)
 import Effect (Effect)
 import Effect.Class.Console (logShow)
 import Effect.Console (log)
-import FRP.Dynamic (dynEvent)
 import FRP.Event (subscribe)
 import FRP.Event.Extra (delay)
 import Foreign (Foreign)
@@ -26,7 +26,7 @@ import Model.Hardware.PanelTextureInfo (_premium, _standard, _standard72)
 import Model.Hardware.PanelType (PanelType(..))
 import Model.Roof.Panel (Panel)
 import Model.Roof.RoofPlate (RoofPlate)
-import SmartHouse.HouseBuilder (_houseReady, _housesExported, buildHouse)
+import SmartHouse.HouseBuilder (_hasHouse, _housesExported, buildHouse)
 import UI.RoofEditorUI (_editorOp)
 import Web.DOM.NonElementParentNode (getElementById)
 import Web.HTML (window)
@@ -78,7 +78,7 @@ doTest roofDat panelDat = do
 
                     editor <- createEditor el $ def # _sizeDyn .~ sizeDyn
 
-                    let mode = RoofEditing
+                    let mode = HouseBuilding
 
                     if mode /= HouseBuilding
                        then do
@@ -88,9 +88,9 @@ doTest roofDat panelDat = do
                           --void $ subscribe (house ^. _screenshot) logShow
 
                         else do
-                            let builderCfg = def # _leadId   .~ 318872
-                                         
+                            let builderCfg = def # _leadId    .~ 224024   --318872
+                                                 # _apiConfig .~ apiCfg
                             r <- buildHouse editor builderCfg
 
-                            let readyEvt = const unit <$> dynEvent (r ^. _houseReady)
+                            let readyEvt = const unit <$> filter identity (r ^. _hasHouse)
                             void $ subscribe (r ^. _housesExported) (encodeJSON >>> log)

@@ -2,11 +2,16 @@ module API.Image where
 
 import API (API, callAPI')
 import Axios.Types (Method(..))
+import Control.Category ((<<<))
 import Data.Default (class Default)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
+import Data.Lens (Lens')
+import Data.Lens.Iso.Newtype (_Newtype)
+import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
 import Data.Show (class Show)
+import Data.Symbol (SProxy(..))
 import FRP.Event (Event)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
@@ -33,10 +38,14 @@ toJSFieldName "leadId"   = "ID"
 toJSFieldName "provider" = "Provider"
 toJSFieldName _          = ""
 
+_provider :: forall t a r. Newtype t { provider :: a | r } => Lens' t a
+_provider = _Newtype <<< prop (SProxy :: SProxy "provider")
+
+
 -- Image api response data
 newtype ImageResp = ImageResp {
     link          :: String,
-    pixelPerMeter :: Int,
+    pixelPerMeter :: Number,
     provider      :: String
     }
 derive instance genericImageResp :: Generic ImageResp _
@@ -53,6 +62,11 @@ toRespJSField "pixelPerMeter" = "PixelsPerMeter"
 toRespJSField "provider"      = "Provider"
 toRespJSField _               = ""
 
+_link :: forall t a r. Newtype t { link :: a | r } => Lens' t a
+_link = _Newtype <<< prop (SProxy :: SProxy "link")
+
+_pixelPerMeter :: forall t a r. Newtype t { pixelPerMeter :: a | r } => Lens' t a
+_pixelPerMeter = _Newtype <<< prop (SProxy :: SProxy "pixelPerMeter")
 
 getImageMeta :: ImageReq -> API (Event ImageResp)
 getImageMeta req = callAPI' POST "/v3/projects.GetHouseImage" req
