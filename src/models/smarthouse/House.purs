@@ -3,7 +3,9 @@ module Model.SmartHouse.House where
 import Prelude
 
 import Control.Alt ((<|>))
+import Control.Alternative (empty)
 import Data.Array as Arr
+import Data.Default (class Default)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Lens (Lens', (.~), (^.))
@@ -13,10 +15,9 @@ import Data.List (List, fromFoldable, modifyAt, singleton)
 import Data.Maybe (fromMaybe)
 import Data.Meter (Meter, meter, meterVal)
 import Data.Newtype (class Newtype)
-import Data.Show (class Show)
 import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple(..))
-import Data.UUID (UUID, genUUID)
+import Data.UUID (UUID, emptyUUID, genUUID)
 import Editor.Common.Lenses (_floor, _height, _id, _roofs, _slope)
 import Effect (Effect)
 import FRP.Event (Event)
@@ -144,6 +145,14 @@ newtype HouseNode = HouseNode {
 derive instance newtypeHouseNode :: Newtype HouseNode _
 instance hasUUIDHouseNode :: HasUUID HouseNode where
     idLens = _id
+instance defaultHouseNode :: Default HouseNode where
+    def = HouseNode {
+        id         : emptyUUID,
+        roofTapped : empty,
+        wallTapped : empty,
+        updated    : empty,
+        deleted    : empty
+        }
 
 _roofTapped :: forall t a r. Newtype t { roofTapped :: a | r } => Lens' t a
 _roofTapped = _Newtype <<< prop (SProxy :: SProxy "roofTapped")

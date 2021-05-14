@@ -3,30 +3,40 @@ module SmartHouse.HouseEditor where
 import Prelude
 
 import Control.Alt ((<|>))
-import Control.Alternative (empty)
 import Data.Default (def)
 import Data.Lens (view, (.~), (^.))
 import Data.Meter (Meter, meterVal)
 import Data.Traversable (traverse)
-import Editor.Common.Lenses (_floor, _height, _modeDyn, _name, _position, _roofs, _tapped)
+import Editor.Common.Lenses (_floor, _height, _id, _modeDyn, _name, _position, _roofs, _tapped, _updated)
 import Editor.HeightEditor (_min, dragArrowPos, setupHeightEditor)
 import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, latestEvt, sampleDyn)
 import FRP.Event (Event)
 import FRP.Event.Extra (performEvent)
+import Math.LineSeg (mkLineSeg)
 import Model.ActiveMode (ActiveMode)
 import Model.Polygon (Polygon, _polyVerts)
-import Model.SmartHouse.House (House, HouseNode(..), HouseOp(..), flipRoof, updateHeight)
+import Model.SmartHouse.House (House, HouseNode, HouseOp(..), _roofTapped, _trees, _wallTapped, flipRoof, updateHeight)
 import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo)
 import Model.SmartHouse.Roof (_flipped, renderRoof)
 import Model.UUID (idLens)
 import Rendering.DynamicNode (dynamic)
 import Rendering.Node (Node, fixNodeDWith, node, tapMesh)
+import SmartHouse.Algorithm.Edge (_line)
+import SmartHouse.Algorithm.LAV (_edges)
+import SmartHouse.HouseTracer (renderLine)
+import Smarthouse.Algorithm.Subtree (_sinks, _source)
 import Three.Core.Geometry (_bevelEnabled, _depth, mkExtrudeGeometry, mkShape)
 import Three.Core.Material (MeshPhongMaterial, mkMeshPhongMaterial)
 import Three.Math.Vector (Vector3, mkVec3, toVec2, vecX, vecY)
 import Util (latestAnyEvtWith)
+
+
+-- how to render the House
+data HouseRenderMode = EditHouseMode
+                     | Render2DMode
+derive instance eqHouseRenderMode :: Eq HouseRenderMode
 
 editHouse :: Dynamic ActiveMode -> House -> Node HouseTextureInfo HouseNode
 editHouse actDyn house = do
@@ -54,13 +64,10 @@ editHouse actDyn house = do
             newHouseEvt1 = sampleDyn houseDyn $ updateHeight <$> hEvt
             newHouseEvt2 = performEvent $ sampleDyn houseDyn $ flipRoof <$> flipEvt
             newHouseEvt = newHouseEvt1 <|> newHouseEvt2
-            hn = HouseNode {
-                id          : house ^. idLens,
-                roofTapped  : latestAnyEvtWith (view _tapped) roofEvtsDyn,
-                wallTapped  : wallTap,
-                updated     : HouseOpUpdate <$> newHouseEvt,
-                deleted     : empty
-                }
+            hn = def # _id         .~ (house ^. idLens)
+                     # _roofTapped .~ latestAnyEvtWith (view _tapped) roofEvtsDyn
+                     # _wallTapped .~ wallTap
+                     # _updated    .~ (HouseOpUpdate <$> newHouseEvt)
         pure { input: newHouseEvt, output: hn }
 
 
@@ -74,3 +81,11 @@ renderWalls poly height = do
                                                     # _bevelEnabled .~ false
     m <- tapMesh (def # _name .~ "walls") geo wallMat
     pure $ const unit <$> m ^. _tapped
+
+
+-- render the house as 2D wireframe
+renderHouse :: House -> Node HouseTextureInfo HouseNode
+renderHouse house = traverse renderLine (lines <> edgeLines) *> pure (def # _id .~ (house ^. idLens))
+    where lines = join $ mkLines <$> house ^. _trees
+          mkLines t = mkLineSeg (t ^. _source) <$> t ^. _sinks
+          edgeLines = view _line <$> house ^. _edges

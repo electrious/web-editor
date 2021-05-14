@@ -45,7 +45,7 @@ import Rendering.DynamicNode (eventNode)
 import Rendering.Node (Node, fixNodeDWith, fixNodeEWith, getEnv, getParent, localEnv, mkNodeEnv, node, runNode, tapMouseMesh)
 import Rendering.TextureLoader (textureFromUrl)
 import SmartHouse.BuilderMode (BuilderMode(..))
-import SmartHouse.HouseEditor (editHouse)
+import SmartHouse.HouseEditor (HouseRenderMode(..), editHouse, renderHouse)
 import SmartHouse.HouseTracer (traceHouse)
 import SmartHouse.UI (_showSaveDyn, houseBuilderUI)
 import Specular.Dom.Widget (runMainWidgetInNode)
@@ -57,6 +57,11 @@ import UI.EditorUIOp (EditorUIOp(..))
 import UI.RoofEditorUI (_editorOp)
 import Unsafe.Coerce (unsafeCoerce)
 import Util (foldEvtWith)
+
+-- NOTE: global value to toggle between rendering house as full 3D editor or 2D wireframes
+houseRenderMode :: HouseRenderMode
+houseRenderMode = EditHouseMode
+
 
 newtype HouseBuilderConfig = HouseBuilderConfig {
     leadId    :: Int,
@@ -181,7 +186,9 @@ renderHouseDict actHouseDyn modeDyn houses = traverse render houses
                                       | otherwise        = Inactive
           getMode h Nothing Building                     = Inactive
           
-          render h = editHouse (getMode h <$> actHouseDyn <*> modeDyn) h
+          render h = if houseRenderMode == EditHouseMode
+                     then editHouse (getMode h <$> actHouseDyn <*> modeDyn) h
+                     else renderHouse h
 
 
 tracerMode :: Maybe UUID -> BuilderMode -> ActiveMode
