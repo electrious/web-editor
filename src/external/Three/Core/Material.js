@@ -1,4 +1,5 @@
 let three = require('three')
+let lines = require('three/examples/jsm/lines/LineMaterial')
 
 exports.mkMeshBasicMaterial = c => _ => {
     return new three.MeshBasicMaterial({ color: c })
@@ -17,11 +18,11 @@ exports.mkMeshPhongMaterial = c => _ => {
 }
 
 exports.mkLineBasicMaterial = c => w => _ => {
-    return new three.LineBasicMaterial({ color: c, linewidth: w })
+    return new lines.LineMaterial({ color: c, linewidth: 0.001 * w })
 }
 
 exports.mkLineDashedMaterial = c => w => s => ds => gs => _ => {
-    return new three.LineDashedMaterial({ color: c, linewidth: w, scale: s, dashSize: ds, gapSize: gs })
+    return new lines.LineMaterial({ color: c, linewidth: 0.001 * w, scale: s, dashed: true })
 }
 
 exports.setTransparent = _ => t => mat => _ => {

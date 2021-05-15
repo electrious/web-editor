@@ -1,4 +1,5 @@
 const three = require('three')
+const lines = require('three/examples/jsm/lines/Line2')
 
 exports.mkMesh = _ => _ => geo => mat => _ => {
     return new three.Mesh(geo, mat)
@@ -25,5 +26,5 @@ exports.setMaterial = _ => mat => mesh => _ => [
 ]
 
 exports.mkLine = _ => geo => mat => _ => {
-    return new three.Line(geo, mat)
+    return new lines.Line2(geo, mat)
 }

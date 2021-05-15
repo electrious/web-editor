@@ -125,7 +125,7 @@ tempLineTo :: Maybe Vector3 -> TracerState -> Maybe (LineSeg Vector3)
 tempLineTo t s = mkLineSeg <$> t <*> lastVert s
 
 lineMat :: LineBasicMaterial
-lineMat = unsafePerformEffect $ mkLineBasicMaterial 0xeeeeee 2.0
+lineMat = unsafePerformEffect $ mkLineBasicMaterial 0xeeeeee 4.0
 
 renderLine :: forall e. LineSeg Vector3 -> Node e Unit
 renderLine l = void $ line (def # _name .~ "vert-adder-line") vs lineMat
@@ -188,7 +188,7 @@ endHelperLine st (Just p) = foldl f Nothing $ allLines st
 
 -- render helper lines
 helperLineMat :: LineDashedMaterial
-helperLineMat = unsafePerformEffect $ mkLineDashedMaterial 0xe28743 2.0 1.0 3.0 1.0
+helperLineMat = unsafePerformEffect $ mkLineDashedMaterial 0xe28743 4.0 1.0 3.0 1.0
 
 renderHelperLine :: forall e. LineSeg Vector3 -> Node e Unit
 renderHelperLine l = void $ line (def # _name .~ "helper-line") vs helperLineMat
