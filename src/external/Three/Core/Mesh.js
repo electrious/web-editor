@@ -28,3 +28,7 @@ exports.setMaterial = _ => mat => mesh => _ => [
 exports.mkLine = _ => geo => mat => _ => {
     return new lines.Line2(geo, mat)
 }
+
+exports.computeLineDistances = l => _ => {
+    l.computeLineDistances()
+}

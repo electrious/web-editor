@@ -22,7 +22,7 @@ exports.mkLineBasicMaterial = c => w => _ => {
 }
 
 exports.mkLineDashedMaterial = c => w => s => ds => gs => _ => {
-    return new lines.LineMaterial({ color: c, linewidth: 0.001 * w, scale: s, dashed: true })
+    return new lines.LineMaterial({ color: c, linewidth: 0.001 * w, dashed: true, dashSize: ds, gapSize: gs })
 }
 
 exports.setTransparent = _ => t => mat => _ => {

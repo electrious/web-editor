@@ -32,7 +32,7 @@ import Math.LineSeg (LineSeg, _end, _start, distToLineSeg, intersection, lineVec
 import Model.ActiveMode (ActiveMode(..), isActive)
 import Model.Polygon (Polygon, newPolygon)
 import Rendering.DynamicNode (dynamic_)
-import Rendering.Node (Node, _visible, fixNodeE, line, mesh, node)
+import Rendering.Node (Node, _visible, dashLine, fixNodeE, line, mesh, node)
 import Three.Core.Face3 (normal)
 import Three.Core.Geometry (CircleGeometry, mkCircleGeometry)
 import Three.Core.Material (LineBasicMaterial, LineDashedMaterial, MeshBasicMaterial, mkLineBasicMaterial, mkLineDashedMaterial, mkMeshBasicMaterial)
@@ -188,10 +188,10 @@ endHelperLine st (Just p) = foldl f Nothing $ allLines st
 
 -- render helper lines
 helperLineMat :: LineDashedMaterial
-helperLineMat = unsafePerformEffect $ mkLineDashedMaterial 0xe28743 4.0 1.0 3.0 1.0
+helperLineMat = unsafePerformEffect $ mkLineDashedMaterial 0xe28743 4.0 1.0 3.0 2.0
 
 renderHelperLine :: forall e. LineSeg Vector3 -> Node e Unit
-renderHelperLine l = void $ line (def # _name .~ "helper-line") vs helperLineMat
+renderHelperLine l = void $ dashLine (def # _name .~ "helper-line") vs helperLineMat
     where vs = [l ^. _start, l ^. _end]
 
 renderMaybeHelperLine :: forall e. Maybe (LineSeg Vector3) -> Node e Unit
