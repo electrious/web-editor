@@ -2,6 +2,7 @@ module SmartHouse.Algorithm.Vertex where
 
 import Prelude
 
+import Data.Default (def)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Lens (Lens', (^.))
@@ -16,7 +17,7 @@ import Effect (Effect)
 import Math.Line (Line, line)
 import Math.LineSeg (LineSeg, direction)
 import Model.UUID (class HasUUID, idLens)
-import Three.Math.Vector (class Vector, Vector3, normal, vecX, vecY, (<**>), (<+>))
+import Three.Math.Vector (class Vector, Vector3, length, normal, vecX, vecY, (<**>), (<+>))
 
 
 type Ray = Line Vector3
@@ -67,10 +68,10 @@ vertexFrom lavId p leftEdge rightEdge vecL vecR = do
     i <- genUUID
     let leftVec  = direction leftEdge <**> (-1.0)
         rightVec = direction rightEdge
-        lv       = normal $ fromMaybe leftVec vecL
-        rv       = normal $ fromMaybe rightVec vecR
+        lv       = fromMaybe leftVec $ normal <$> vecL
+        rv       = fromMaybe rightVec $ normal <$> vecR
         isReflex = _cross lv rv < 0.0
-        dir      = (leftVec <+> rightVec) <**> (if isReflex then -1.0 else 1.0)
+        dir      = checkLength $ (leftVec <+> rightVec) <**> (if isReflex then -1.0 else 1.0)
     pure $ Vertex {
         id        : i,
         position  : p,
@@ -80,3 +81,6 @@ vertexFrom lavId p leftEdge rightEdge vecL vecR = do
         bisector  : ray p dir,
         lavId     : lavId
     }
+
+checkLength :: Vector3 -> Vector3
+checkLength v = if length v < 0.1 then def else v
