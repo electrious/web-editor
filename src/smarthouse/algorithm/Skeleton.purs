@@ -30,8 +30,8 @@ import Math.Utils (approxSame, epsilon)
 import Model.Polygon (Polygon)
 import Model.UUID (idLens)
 import SmartHouse.Algorithm.Edge (Edge, _leftBisector, _line, _rightBisector)
-import SmartHouse.Algorithm.Event (EdgeE, PointEvent(..), SplitE, _intersection, _oppositeEdge, _vertexA, _vertexB, distance, edgeE, intersectionPoint, splitE)
-import SmartHouse.Algorithm.LAV (LAV, SLAV, _edges, _lavs, _vertices, addLav, delLav, emptySLAV, eventValid, getLav, invalidateVertex, lavFromVertices, length, nextVertex, prevVertex, runSLAV, unifyVerts, updateLav, verticesFromTo)
+import SmartHouse.Algorithm.Event (EdgeE, EdgesE, PointEvent(..), SplitE, _intersection, _oppositeEdge, _vertexA, _vertexB, _vertexC, distance, edgeE, edgesE, intersectionPoint, splitE)
+import SmartHouse.Algorithm.LAV (LAV, SLAV, _edges, _lavs, _vertices, addLav, delLav, emptySLAV, eventValid, getLav, invalidateVertex, lavFromVertices, length, nextVertex, prevVertex, runSLAV, unifyThreeVerts, unifyVerts, updateLav, verticesFromTo)
 import SmartHouse.Algorithm.Vertex (Vertex, _bisector, _cross, _isReflex, _lavId, _leftEdge, _rightEdge, ray, vertexFrom)
 import Smarthouse.Algorithm.Subtree (Subtree, subtree)
 import Three.Math.Vector (class Vector, Vector3, dist, normal, (<**>), (<+>), (<->), (<.>))
@@ -107,27 +107,42 @@ nextEvent lav v = do
         iNext = nextV >>= intersectWith
 
         mkPrevEdgeEvt e pv pi = edgeE (distToLineSeg pi e) pi pv v
-        pEvt = mkPrevEdgeEvt (v ^. _leftEdge) <$> prevV <*> iPrev
         mkNextEdgeEvt e nv ni = edgeE (distToLineSeg ni e) ni v nv
-        nEvt = mkNextEdgeEvt (v ^. _rightEdge) <$> nextV <*> iNext
+        mkEdgesEvt le re pv nv i = let ld = distToLineSeg i le
+                                       rd = distToLineSeg i re
+                                   in edgesE (min ld rd) i pv v nv
 
-        allEvts = append (fromFoldable (compact [pEvt, nEvt])) evts
+        es = if closeEnough iPrev iNext
+             then [mkEdgesEvt (v ^. _leftEdge) (v ^. _rightEdge) <$> prevV <*> nextV <*> iPrev]
+             else [mkPrevEdgeEvt (v ^. _leftEdge) <$> prevV <*> iPrev,
+                   mkNextEdgeEvt (v ^. _rightEdge) <$> nextV <*> iNext ]
+                        
+        allEvts = append (fromFoldable (compact es)) evts
         distF e = dist (v ^. _position) (intersectionPoint e)
     pure $ minimumBy (comparing distF) allEvts
 
 
+closeEnough :: Maybe Vector3 -> Maybe Vector3 -> Boolean
+closeEnough v1 v2 = fromMaybe false $ f <$> v1 <*> v2
+    where f va vb = dist va vb < 0.1
 
 -- check if an edge event's two vertices A, B and A's predecessor C forms a triangle ABC
 isTriangle :: EdgeE -> LAV -> Boolean
 isTriangle e lav = prevVertex (e ^. _vertexA) lav == nextVertex (e ^. _vertexB) lav
 
+-- check if an EdgesE event's vertices A, B, C and A's predecessor D forms a polygon ABCD
+isRectangle :: EdgesE -> LAV -> Boolean
+isRectangle e lav = prevVertex (e ^. _vertexA) lav == nextVertex (e ^. _vertexC) lav
+
 lavForEvt :: PointEvent -> SLAV (Maybe LAV)
 lavForEvt (EdgeEvent e) = getLav $ e ^. _vertexA <<< _lavId
+lavForEvt (EdgesEvent e) = getLav $ e ^. _vertexA <<< _lavId
 lavForEvt (SplitEvent e) = getLav $ e ^. _vertex <<< _lavId
 
 -- handle PointEvents
 handleEvent :: PointEvent -> SLAV (Maybe (Tuple Subtree (List PointEvent)))
 handleEvent (EdgeEvent e)  = handleEdgeEvent e
+handleEvent (EdgesEvent e) = handleEdgesEvent e
 handleEvent (SplitEvent e) = handleSplitEvent e
 
 -- handle edge event
@@ -154,6 +169,41 @@ handleEdgeEvent' e lav =
 
                 let sinks = fromFoldable [va ^. _position, vb ^. _position]
                     edges = Set.fromFoldable [va ^. _leftEdge, va ^. _rightEdge, vb ^. _leftEdge, vb ^. _rightEdge]
+                newEvt <- nextEvent newLav newV
+                let evts = fromFoldable $ compact [newEvt]
+
+                updateLav newLav newV
+                
+                pure $ Tuple (subtree (e ^. _intersection) (e ^. _distance) sinks (Set.toUnfoldable edges)) evts
+
+
+handleEdgesEvent :: EdgesE -> SLAV (Maybe (Tuple Subtree (List PointEvent)))
+handleEdgesEvent e = getLav (e ^. _vertexA <<< _lavId) >>= traverse (handleEdgesEvent' e)
+
+handleEdgesEvent' :: EdgesE -> LAV -> SLAV (Tuple Subtree (List PointEvent))
+handleEdgesEvent' e lav =
+    if isRectangle e lav
+        then do let vs = lav ^. _vertices
+                    sinks = fromFoldable $ view _position <$> vs
+                    edges = Set.fromFoldable $ Arr.concatMap (\v -> [v ^. _leftEdge, v ^. _rightEdge]) vs
+
+                -- delete this LAV and invalidate all vertices in it
+                delLav (lav ^. idLens)
+                traverse_ invalidateVertex vs
+
+                pure $ Tuple (subtree (e ^. _intersection) (e ^. _distance) sinks (Set.toUnfoldable edges)) Nil
+        else do let va = e ^. _vertexA
+                    vb = e ^. _vertexB
+                    vc = e ^. _vertexC
+                Tuple newLav newV <- liftEffect $ unifyThreeVerts va vb vc (e ^. _intersection) lav
+                invalidateVertex va
+                invalidateVertex vb
+                invalidateVertex vc
+
+                let sinks = fromFoldable [va ^. _position, vb ^. _position, vc ^. _position]
+                    edges = Set.fromFoldable [va ^. _leftEdge, va ^. _rightEdge,
+                                              vb ^. _leftEdge, vb ^. _rightEdge,
+                                              vc ^. _leftEdge, vc ^. _rightEdge]
                 newEvt <- nextEvent newLav newV
                 let evts = fromFoldable $ compact [newEvt]
 

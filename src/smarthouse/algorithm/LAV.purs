@@ -34,7 +34,7 @@ import Math.LineSeg (mkLineSeg)
 import Model.Polygon (Polygon, newPolygon, polyWindows)
 import Model.UUID (class HasUUID, idLens)
 import SmartHouse.Algorithm.Edge (Edge, edge)
-import SmartHouse.Algorithm.Event (PointEvent(..), _vertexA, _vertexB)
+import SmartHouse.Algorithm.Event (PointEvent(..), _vertexA, _vertexB, _vertexC)
 import SmartHouse.Algorithm.Vertex (Vertex, _bisector, _lavId, _leftEdge, _rightEdge, vertexFrom)
 import Three.Math.Vector (class Vector, Vector3, getVector, normal, (<->))
 
@@ -123,7 +123,32 @@ unifyVerts va vb point lav = do
         -- delete 1 for all indices larger than the nv index
         updIdx nvi i = if i > nvi then i - 1 else i
 
-        nm = (\ia ib -> updIdx ib <$> M.insert (nv ^. idLens) ia m) <$> idxA <*> idxB
+        nm = (\ia -> updIdx ia <$> M.insert (nv ^. idLens) ia m) <$> idxA
+        
+        newLav = lav # _vertices .~ fromMaybe vs arr
+                     # _indices  .~ fromMaybe om nm
+    pure $ Tuple newLav nv
+
+
+unifyThreeVerts :: Vertex -> Vertex -> Vertex -> Vector3 -> LAV -> Effect (Tuple LAV Vertex)
+unifyThreeVerts va vb vc point lav = do
+    nv <- vertexFrom (lav ^. idLens) point (va ^. _leftEdge) (vc ^. _rightEdge) (Just $ vc ^. _bisector <<< _direction) (Just $ va ^. _bisector <<< _direction)
+
+    let idxA = vertIndex va lav
+        idxB = vertIndex vb lav
+        idxC = vertIndex vc lav
+        
+        vs   = lav ^. _vertices
+        -- new lav array after delete va, vb and add nv
+        arr  = join $ (\ia ib ic -> updateAt ia nv vs >>= deleteAt ib >>= deleteAt ic) <$> idxA <*> idxB <*> idxC
+        
+        -- update the indices map
+        om = lav ^. _indices
+        m  = M.delete (va ^. idLens) $ M.delete (vb ^. idLens) $ M.delete (vc ^. idLens) om
+        -- delete 2 for all indices larger than the nv index
+        updIdx nvi i = if i > nvi then i - 2 else i
+
+        nm = (\ia -> updIdx ia <$> M.insert (nv ^. idLens) ia m) <$> idxA
         
         newLav = lav # _vertices .~ fromMaybe vs arr
                      # _indices  .~ fromMaybe om nm
@@ -217,4 +242,7 @@ isValid v = get >>= view _validStates >>> lookup (v ^. idLens) >>> fromMaybe fal
 -- check if an event is valid or not
 eventValid :: PointEvent -> SLAV Boolean
 eventValid (EdgeEvent e)  = (&&) <$> isValid (e ^. _vertexA) <*> isValid (e ^. _vertexB)
+eventValid (EdgesEvent e) = f <$> isValid (e ^. _vertexA) <*> isValid (e ^. _vertexB) <*> isValid (e ^. _vertexC)
+    where f a b c = a && b && c
 eventValid (SplitEvent e) = isValid (e ^. _vertex)
+

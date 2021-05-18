@@ -14,7 +14,7 @@ import SmartHouse.Algorithm.Edge (Edge)
 import SmartHouse.Algorithm.Vertex (Vertex)
 import Three.Math.Vector (Vector3)
 
-
+-- event to merge two consecutive bisector and shrink an edge to zero
 newtype EdgeE = EdgeE {
     distance     :: Number,
     intersection :: Vector3,
@@ -37,6 +37,24 @@ _vertexB :: forall t a r. Newtype t { vertexB :: a | r } => Lens' t a
 _vertexB = _Newtype <<< prop (SProxy :: SProxy "vertexB")
 
 
+-- event to merge three consecutive bisectors at one intersection point
+newtype EdgesE = EdgesE {
+    distance     :: Number,
+    intersection :: Vector3,
+    vertexA      :: Vertex,
+    vertexB      :: Vertex,
+    vertexC      :: Vertex
+    }
+
+derive instance newtypeEdgesE :: Newtype EdgesE _
+derive instance genericEdgesE :: Generic EdgesE _
+instance showEdgesE :: Show EdgesE where
+    show = genericShow
+
+_vertexC :: forall t a r. Newtype t { vertexC :: a | r } => Lens' t a
+_vertexC = _Newtype <<< prop (SProxy :: SProxy "vertexC")
+
+
 newtype SplitE = SplitE {
     distance     :: Number,
     intersection :: Vector3,
@@ -55,6 +73,7 @@ _oppositeEdge = _Newtype <<< prop (SProxy :: SProxy "oppositeEdge")
 
 
 data PointEvent = EdgeEvent EdgeE
+                | EdgesEvent EdgesE
                 | SplitEvent SplitE
 
 derive instance genericPointEvent :: Generic PointEvent _
@@ -70,6 +89,15 @@ edgeE dist p va vb = EdgeEvent $ EdgeE {
     vertexB      : vb
     }
 
+edgesE :: Number -> Vector3 -> Vertex -> Vertex -> Vertex -> PointEvent
+edgesE dist p va vb vc = EdgesEvent $ EdgesE {
+    distance     : dist,
+    intersection : p,
+    vertexA      : va,
+    vertexB      : vb,
+    vertexC      : vc
+    }
+
 splitE :: Number -> Vector3 -> Vertex -> Edge -> PointEvent
 splitE dist p v e = SplitEvent $ SplitE {
     distance     : dist,
@@ -80,8 +108,10 @@ splitE dist p v e = SplitEvent $ SplitE {
 
 intersectionPoint :: PointEvent -> Vector3
 intersectionPoint (EdgeEvent e)  = e ^. _intersection
+intersectionPoint (EdgesEvent e) = e ^. _intersection
 intersectionPoint (SplitEvent e) = e ^. _intersection
 
 distance :: PointEvent -> Number
 distance (EdgeEvent e)  = e ^. _distance
+distance (EdgesEvent e) = e ^. _distance
 distance (SplitEvent e) = e ^. _distance

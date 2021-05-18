@@ -60,7 +60,7 @@ import Util (foldEvtWith)
 
 -- NOTE: global value to toggle between rendering house as full 3D editor or 2D wireframes
 houseRenderMode :: HouseRenderMode
-houseRenderMode = EditHouseMode
+houseRenderMode = Render2DMode
 
 
 newtype HouseBuilderConfig = HouseBuilderConfig {
