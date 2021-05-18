@@ -131,6 +131,10 @@ renderLine :: forall e. LineSeg Vector3 -> Node e Unit
 renderLine l = void $ line (def # _name .~ "vert-adder-line") vs lineMat
     where vs = [l ^. _start, l ^. _end]
 
+renderLineWith :: forall e. LineSeg Vector3 -> LineBasicMaterial -> Node e Unit
+renderLineWith l mat = void $ line (def # _name .~ "vert-adder-line") vs mat
+    where vs = [l ^. _start, l ^. _end]                       
+
 renderMaybeLine :: forall e. Maybe (LineSeg Vector3) -> Node e Unit
 renderMaybeLine Nothing  = pure unit
 renderMaybeLine (Just l) = renderLine l

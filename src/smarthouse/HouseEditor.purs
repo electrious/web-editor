@@ -4,12 +4,14 @@ import Prelude
 
 import Control.Alt ((<|>))
 import Data.Default (def)
+import Data.Foldable (traverse_)
 import Data.Lens (view, (.~), (^.))
 import Data.Meter (Meter, meterVal)
 import Data.Traversable (traverse)
 import Editor.Common.Lenses (_floor, _height, _id, _modeDyn, _name, _position, _roofs, _tapped, _updated)
 import Editor.HeightEditor (_min, dragArrowPos, setupHeightEditor)
 import Effect.Class (liftEffect)
+import Effect.Random (randomInt)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, latestEvt, sampleDyn)
 import FRP.Event (Event)
@@ -25,10 +27,10 @@ import Rendering.DynamicNode (dynamic)
 import Rendering.Node (Node, fixNodeDWith, node, tapMesh)
 import SmartHouse.Algorithm.Edge (_line)
 import SmartHouse.Algorithm.LAV (_edges)
-import SmartHouse.HouseTracer (renderLine)
+import SmartHouse.HouseTracer (renderLine, renderLineWith)
 import Smarthouse.Algorithm.Subtree (_sinks, _source)
 import Three.Core.Geometry (_bevelEnabled, _depth, mkExtrudeGeometry, mkShape)
-import Three.Core.Material (MeshPhongMaterial, mkMeshPhongMaterial)
+import Three.Core.Material (MeshPhongMaterial, mkLineBasicMaterial, mkMeshPhongMaterial)
 import Three.Math.Vector (Vector3, mkVec3, toVec2, vecX, vecY)
 import Util (latestAnyEvtWith)
 
@@ -85,7 +87,14 @@ renderWalls poly height = do
 
 -- render the house as 2D wireframe
 renderHouse :: House -> Node HouseTextureInfo HouseNode
-renderHouse house = traverse renderLine (lines <> edgeLines) *> pure (def # _id .~ (house ^. idLens))
-    where lines = join $ mkLines <$> house ^. _trees
-          mkLines t = mkLineSeg (t ^. _source) <$> t ^. _sinks
-          edgeLines = view _line <$> house ^. _edges
+renderHouse house = do
+    traverse_ renderLine $ view _line <$> house ^. _edges
+
+    let mkLines t = mkLineSeg (t ^. _source) <$> t ^. _sinks
+        renderTree t = do
+            c <- liftEffect $ randomInt 0 0xffffff
+            mat <- liftEffect $ mkLineBasicMaterial c 4.0
+            traverse_ (flip renderLineWith mat) $ mkLines t
+    traverse_ renderTree $ house ^. _trees
+        
+    pure (def # _id .~ (house ^. idLens))
