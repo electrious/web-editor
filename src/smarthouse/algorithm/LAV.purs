@@ -35,7 +35,7 @@ import Model.Polygon (Polygon, newPolygon, polyWindows)
 import Model.UUID (class HasUUID, idLens)
 import SmartHouse.Algorithm.Edge (Edge, edge)
 import SmartHouse.Algorithm.Event (PointEvent(..), _vertexA, _vertexB, _vertexC)
-import SmartHouse.Algorithm.Vertex (Vertex, _bisector, _lavId, _leftEdge, _rightEdge, vertexFrom)
+import SmartHouse.Algorithm.Vertex (Vertex, _bisector, _lavId, _leftEdge, _rightEdge, _usable, vertexFrom)
 import Three.Math.Vector (class Vector, Vector3, getVector, normal, (<->))
 
 newtype LAV = LAV {
@@ -130,7 +130,7 @@ unifyVerts va vb point lav = do
     pure $ Tuple newLav nv
 
 
-unifyThreeVerts :: Vertex -> Vertex -> Vertex -> Vector3 -> LAV -> Effect (Tuple LAV Vertex)
+unifyThreeVerts :: Vertex -> Vertex -> Vertex -> Vector3 -> LAV -> Effect (Tuple LAV (Maybe Vertex))
 unifyThreeVerts va vb vc point lav = do
     nv <- vertexFrom (lav ^. idLens) point (va ^. _leftEdge) (vc ^. _rightEdge) (Just $ vc ^. _bisector <<< _direction) (Just $ va ^. _bisector <<< _direction)
 
@@ -139,20 +139,31 @@ unifyThreeVerts va vb vc point lav = do
         idxC = vertIndex vc lav
         
         vs   = lav ^. _vertices
-        -- new lav array after delete va, vb and add nv
-        arr  = join $ (\ia ib ic -> updateAt ia nv vs >>= deleteAt ib >>= deleteAt ic) <$> idxA <*> idxB <*> idxC
-        
-        -- update the indices map
-        om = lav ^. _indices
-        m  = M.delete (va ^. idLens) $ M.delete (vb ^. idLens) $ M.delete (vc ^. idLens) om
-        -- delete 2 for all indices larger than the nv index
-        updIdx nvi i = if i > nvi then i - 2 else i
+        om   = lav ^. _indices
+        m    = M.delete (va ^. idLens) $ M.delete (vb ^. idLens) $ M.delete (vc ^. idLens) om
 
-        nm = (\ia -> updIdx ia <$> M.insert (nv ^. idLens) ia m) <$> idxA
+    pure $ if nv ^. _usable
+           then  -- new lav array after delete va, vb and add nv
+               let arr  = join $ (\ia ib ic -> updateAt ia nv vs >>= deleteAt ic >>= deleteAt ib) <$> idxA <*> idxB <*> idxC
         
-        newLav = lav # _vertices .~ fromMaybe vs arr
-                     # _indices  .~ fromMaybe om nm
-    pure $ Tuple newLav nv
+                   -- update the indices map
+                   -- delete 2 for all indices larger than the nv index
+                   updIdx nvi i = if i > nvi then i - 2 else i
+
+                   nm = (\ia -> updIdx ia <$> M.insert (nv ^. idLens) ia m) <$> idxA
+        
+                   newLav = lav # _vertices .~ fromMaybe vs arr
+                                # _indices  .~ fromMaybe om nm
+               in Tuple newLav (Just nv)
+           else let arr = join $ (\ia ib ic -> deleteAt ic vs >>= deleteAt ib >>= deleteAt ia) <$> idxA <*> idxB <*> idxC
+                    -- delete 3 for all indices larger than the nv index
+                    updIdx nvi i = if i > nvi then i - 3 else i
+
+                    nm = (\ia -> updIdx ia <$> m) <$> idxA
+                        
+                    newLav = lav # _vertices .~ fromMaybe vs arr
+                                 # _indices  .~ fromMaybe om nm
+                in Tuple newLav Nothing
 
 
 newtype SLAVState = SLAVState {
@@ -226,10 +237,12 @@ addLav lav nvs = void $ modify f
 delLav :: UUID -> SLAV Unit
 delLav i = void $ modify $ over _lavs $ M.delete i
 
-updateLav :: LAV -> Vertex -> SLAV Unit
-updateLav lav v = void $ modify f
+updateLav :: LAV -> Maybe Vertex -> SLAV Unit
+updateLav lav (Just v) = void $ modify f
     where f s = s # _lavs        %~ M.update (const $ Just lav) (lav ^. idLens)
                   # _validStates %~ M.insert (v ^. idLens) true
+updateLav lav Nothing = void $ modify f
+    where f s = s # _lavs %~ M.update (const $ Just lav) (lav ^. idLens)
 
 -- invalidate a vertex in the SLAV
 invalidateVertex :: Vertex -> SLAV Unit

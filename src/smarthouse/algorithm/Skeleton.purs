@@ -172,7 +172,7 @@ handleEdgeEvent' e lav =
                 newEvt <- nextEvent newLav newV
                 let evts = fromFoldable $ compact [newEvt]
 
-                updateLav newLav newV
+                updateLav newLav (Just newV)
                 
                 pure $ Tuple (subtree (e ^. _intersection) (e ^. _distance) sinks (Set.toUnfoldable edges)) evts
 
@@ -204,8 +204,11 @@ handleEdgesEvent' e lav =
                     edges = Set.fromFoldable [va ^. _leftEdge, va ^. _rightEdge,
                                               vb ^. _leftEdge, vb ^. _rightEdge,
                                               vc ^. _leftEdge, vc ^. _rightEdge]
-                newEvt <- nextEvent newLav newV
-                let evts = fromFoldable $ compact [newEvt]
+                evts <- case newV of
+                    Just nv -> do
+                        newEvt <- nextEvent newLav nv
+                        pure $ fromFoldable $ compact [newEvt]
+                    Nothing -> pure Nil
 
                 updateLav newLav newV
                 

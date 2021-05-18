@@ -11,6 +11,7 @@ import Data.Lens.Record (prop)
 import Data.Maybe (Maybe, fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
+import Data.Tuple (Tuple(..))
 import Data.UUID (UUID, genUUID)
 import Editor.Common.Lenses (_id)
 import Effect (Effect)
@@ -32,7 +33,8 @@ newtype Vertex = Vertex {
     rightEdge :: LineSeg Vector3,
     isReflex  :: Boolean,
     bisector  :: Ray,
-    lavId     :: UUID
+    lavId     :: UUID,
+    usable    :: Boolean  -- whether the vertex will be able to have a next event
     }
 
 derive instance newtypeVertex :: Newtype Vertex _
@@ -59,6 +61,9 @@ _bisector = _Newtype <<< prop (SProxy :: SProxy "bisector")
 _lavId :: forall t a r. Newtype t { lavId :: a | r } => Lens' t a
 _lavId = _Newtype <<< prop (SProxy :: SProxy "lavId")
 
+_usable :: forall t a r. Newtype t { usable :: a | r } => Lens' t a
+_usable = _Newtype <<< prop (SProxy :: SProxy "usable")
+
 _cross :: forall v. Vector v => v -> v -> Number
 _cross v1 v2 = vecX v1 * vecY v2 - vecX v2 * vecY v1
 
@@ -71,7 +76,7 @@ vertexFrom lavId p leftEdge rightEdge vecL vecR = do
         lv       = fromMaybe leftVec $ normal <$> vecL
         rv       = fromMaybe rightVec $ normal <$> vecR
         isReflex = _cross lv rv < 0.0
-        dir      = checkLength $ (leftVec <+> rightVec) <**> (if isReflex then -1.0 else 1.0)
+        Tuple dir usable = checkLength $ (leftVec <+> rightVec) <**> (if isReflex then -1.0 else 1.0)
     pure $ Vertex {
         id        : i,
         position  : p,
@@ -79,8 +84,9 @@ vertexFrom lavId p leftEdge rightEdge vecL vecR = do
         rightEdge : rightEdge,
         isReflex  : isReflex,
         bisector  : ray p dir,
-        lavId     : lavId
+        lavId     : lavId,
+        usable    : usable
     }
 
-checkLength :: Vector3 -> Vector3
-checkLength v = if length v < 0.1 then def else v
+checkLength :: Vector3 -> Tuple Vector3 Boolean
+checkLength v = if length v < 0.1 then Tuple def false else Tuple v true
