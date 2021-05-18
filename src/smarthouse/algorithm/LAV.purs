@@ -123,7 +123,7 @@ unifyVerts va vb point lav = do
         -- delete 1 for all indices larger than the nv index
         updIdx nvi i = if i > nvi then i - 1 else i
 
-        nm = (\ia -> updIdx ia <$> M.insert (nv ^. idLens) ia m) <$> idxA
+        nm = (\ia ib -> updIdx ib <$> M.insert (nv ^. idLens) ia m) <$> idxA <*> idxB
         
         newLav = lav # _vertices .~ fromMaybe vs arr
                      # _indices  .~ fromMaybe om nm
@@ -148,18 +148,24 @@ unifyThreeVerts va vb vc point lav = do
         
                    -- update the indices map
                    -- delete 2 for all indices larger than the nv index
-                   updIdx nvi i = if i > nvi then i - 2 else i
+                   updIdx nvi i = if nvi == 0
+                                  then if i > nvi then i - 1 else i
+                                  else if i > nvi then i - 2 else i
 
-                   nm = (\ia -> updIdx ia <$> M.insert (nv ^. idLens) ia m) <$> idxA
+                   nm = (\ia ic -> updIdx ic <$> M.insert (nv ^. idLens) ia m) <$> idxA <*> idxC
         
                    newLav = lav # _vertices .~ fromMaybe vs arr
                                 # _indices  .~ fromMaybe om nm
                in Tuple newLav (Just nv)
            else let arr = join $ (\ia ib ic -> deleteAt ic vs >>= deleteAt ib >>= deleteAt ia) <$> idxA <*> idxB <*> idxC
                     -- delete 3 for all indices larger than the nv index
-                    updIdx nvi i = if i > nvi then i - 3 else i
+                    updIdx delta nvi i = if i > nvi then i - delta else i
 
-                    nm = (\ia -> updIdx ia <$> m) <$> idxA
+                    getDelta 0 = 1
+                    getDelta 1 = 2
+                    getDelta _ = 3
+
+                    nm = (\ia ic -> updIdx (getDelta ic) ic <$> m) <$> idxA <*> idxC
                         
                     newLav = lav # _vertices .~ fromMaybe vs arr
                                  # _indices  .~ fromMaybe om nm
