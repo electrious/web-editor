@@ -27,7 +27,7 @@ import Data.Tuple (Tuple(..))
 import Data.UUID (UUID, emptyUUID, genUUID)
 import Data.UUIDMap (UUIDMap)
 import Data.UUIDMap as UM
-import Editor.Common.Lenses (_id, _indices, _position)
+import Editor.Common.Lenses (_id, _indices)
 import Effect (Effect)
 import Math.Line (_direction)
 import Math.LineSeg (mkLineSeg)
@@ -213,12 +213,7 @@ slavFromPolygon polys = do
     lavs <- Arr.fromFoldable <$> traverse (lavFromPolygon <<< normalizeContour) polys
     let vs    = Arr.concatMap (view _vertices) lavs
         ns    = fromMaybe vs $ Arr.snoc <$> Arr.tail vs <*> Arr.head vs
-        edges = zipWith f vs ns
-
-        f v n = let vp = v ^. _position
-                    np = n ^. _position
-                in edge (mkLineSeg vp np) (v ^. _bisector) (n ^. _bisector)
-
+        edges = zipWith edge vs ns
     pure $ def # _lavs        .~ UM.fromFoldable lavs
                # _edges       .~ edges
                # _validStates .~ M.fromFoldable (flip Tuple true <<< view idLens <$> vs)

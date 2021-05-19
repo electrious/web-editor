@@ -4,19 +4,20 @@ import Prelude
 
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Lens (Lens')
+import Data.Lens (Lens', (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Math.LineSeg (LineSeg)
-import SmartHouse.Algorithm.Vertex (Ray)
+import Editor.Common.Lenses (_position)
+import Math.LineSeg (LineSeg, mkLineSeg)
+import SmartHouse.Algorithm.Vertex (Vertex)
 import Three.Math.Vector (Vector3)
 
 newtype Edge = Edge {
-    line          :: LineSeg Vector3,
-    leftBisector  :: Ray,
-    rightBisector :: Ray
+    line        :: LineSeg Vector3,
+    leftVertex  :: Vertex,
+    rightVertex :: Vertex
     }
 
 derive instance newtypeEdge :: Newtype Edge _
@@ -27,15 +28,15 @@ instance showEdge :: Show Edge where
 _line :: forall t a r. Newtype t { line :: a | r } => Lens' t a
 _line = _Newtype <<< prop (SProxy :: SProxy "line")
 
-_leftBisector :: forall t a r. Newtype t { leftBisector :: a | r } => Lens' t a
-_leftBisector = _Newtype <<< prop (SProxy :: SProxy "leftBisector")
+_leftVertex :: forall t a r. Newtype t { leftVertex :: a | r } => Lens' t a
+_leftVertex = _Newtype <<< prop (SProxy :: SProxy "leftVertex")
 
-_rightBisector :: forall t a r. Newtype t { rightBisector :: a | r } => Lens' t a
-_rightBisector = _Newtype <<< prop (SProxy :: SProxy "rightBisector")
+_rightVertex :: forall t a r. Newtype t { rightVertex :: a | r } => Lens' t a
+_rightVertex = _Newtype <<< prop (SProxy :: SProxy "rightVertex")
 
-edge :: LineSeg Vector3 -> Ray -> Ray -> Edge
-edge l lb rb = Edge {
-    line          : l,
-    leftBisector  : lb,
-    rightBisector : rb
+edge :: Vertex -> Vertex -> Edge
+edge lv rv = Edge {
+    line        : mkLineSeg (lv ^. _position) (rv ^. _position),
+    leftVertex  : lv,
+    rightVertex : rv
     }

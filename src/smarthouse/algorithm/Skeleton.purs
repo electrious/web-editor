@@ -29,7 +29,7 @@ import Math.LineSeg as S
 import Math.Utils (approxSame, epsilon)
 import Model.Polygon (Polygon)
 import Model.UUID (idLens)
-import SmartHouse.Algorithm.Edge (Edge, _leftBisector, _line, _rightBisector)
+import SmartHouse.Algorithm.Edge (Edge, _leftVertex, _line, _rightVertex)
 import SmartHouse.Algorithm.Event (EdgeE, EdgesE, PointEvent(..), SplitE, _intersection, _oppositeEdge, _vertexA, _vertexB, _vertexC, distance, edgeE, edgesE, intersectionPoint, splitE)
 import SmartHouse.Algorithm.LAV (LAV, SLAV, _edges, _lavs, _vertices, addLav, delLav, emptySLAV, eventValid, getLav, invalidateVertex, lavFromVertices, length, nextVertex, prevVertex, runSLAV, unifyThreeVerts, unifyVerts, updateLav, verticesFromTo)
 import SmartHouse.Algorithm.Vertex (Vertex, _bisector, _cross, _isReflex, _lavId, _leftEdge, _rightEdge, ray, vertexFrom)
@@ -62,10 +62,12 @@ locateB v (Tuple e i) = let linVec   = normal $ v ^. _position <-> i
 -- check eligibility of b
 -- valid b should lie within the area limited by the edge and the bisectors of its two vertices
 validB :: Tuple Edge Vector3 -> Boolean
-validB (Tuple e b) = let xleft = _cross (normal $ e ^. _leftBisector <<< _direction)
-                                        (normal $ b <-> e ^. _leftBisector <<< _origin) > (- epsilon)
-                         xright = _cross (normal $ e ^. _rightBisector <<< _direction)
-                                         (normal $ b <-> e ^. _rightBisector <<< _origin) < epsilon
+validB (Tuple e b) = let lb = e ^. _leftVertex <<< _bisector
+                         rb = e ^. _rightVertex <<< _bisector
+                         xleft = _cross (normal $ lb ^. _direction)
+                                        (normal $ b <-> lb ^. _origin) > (- epsilon)
+                         xright = _cross (normal $ rb ^. _direction)
+                                         (normal $ b <-> rb ^. _origin) < epsilon
                          xedge = _cross (direction $ e ^. _line) (normal $ b <-> e ^. _line <<< _start) < epsilon
                      in xleft && xright && xedge
 

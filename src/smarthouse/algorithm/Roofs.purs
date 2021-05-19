@@ -30,16 +30,15 @@ distanceAlong p e = (p <-> e ^. _start) <.> direction e
 
 -- all nodes in the roof polygon of an edge
 treesForEdge :: Edge -> List Subtree -> List IndexedSubtree
-treesForEdge e ts = filter (elem edge <<< view _edges <<< getSubtree) $ mapWithIndex mkIndexedSubtree ts
-    where edge = e ^. _line
-
+treesForEdge e ts = filter f $ mapWithIndex mkIndexedSubtree ts
+    where f = elem (e ^. _line) <<< view _edges <<< getSubtree
 
 sortedNodes :: Edge -> Angle -> List IndexedSubtree -> List Vector3
 sortedNodes e slope ts =
     let s       = scaleFactor slope
         mkP t   = t ^. _source <+> (upVec <**> (t ^. _height * s))
         edge    = e ^. _line
-        g t1 t2 = compare (distanceAlong t2 edge) (distanceAlong t1 edge)
+        g t1 t2 = comparing (flip distanceAlong edge) t2 t1
     in sortBy g $ mkP <<< getSubtree <$> ts
 
 -- find polygon for an edge
