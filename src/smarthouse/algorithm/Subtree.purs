@@ -3,6 +3,8 @@ module Smarthouse.Algorithm.Subtree where
 import Prelude
 
 import Data.Array (foldl)
+import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Show (genericShow)
 import Data.Lens (Lens', (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
@@ -14,24 +16,36 @@ import Data.Tuple (Tuple(..), fst, snd)
 import Editor.Common.Lenses (_height)
 import Math.LineSeg (LineSeg, mkLineSeg)
 import SmartHouse.Algorithm.LAV (_edges)
+import SmartHouse.Algorithm.Vertex (Vertex)
 import Three.Math.Vector (Vector3, (<**>), (<+>))
+
+data SubtreeType = NormalNode
+                 | MergedNode Vertex Vertex   -- the subtree node is merged from 3 bisectors.
+                                              -- The two vertices carried here should be considered to form one edge
+                                              -- when generting the roofs.
+
+derive instance genericSubtreeType :: Generic SubtreeType _
+instance showSubtreeType :: Show SubtreeType where
+    show = genericShow
 
 newtype Subtree = Subtree {
     source          :: Vector3,
     height          :: Number,
     sinks           :: List Vector3,
     edges           :: List (LineSeg Vector3),
+    subtreeType     :: SubtreeType,
     isGable         :: Boolean,         -- if this subtree node is gable
     originalSubtree :: Maybe Subtree    -- the original subtree after gabled
     }
 
 derive instance newtypeSubtree :: Newtype Subtree _
 instance showSubtree :: Show Subtree where
-    show t = "Subtree { source: "  <> show (t ^. _source) <>
-                     ", height: "  <> show (t ^. _height) <>
-                     ", sinks: "   <> show (t ^. _sinks) <>
-                     ", edges: "   <> show (t ^. _edges) <>
-                     ", isGable: " <> show (t ^. _isGable) <>
+    show t = "Subtree { source: "      <> show (t ^. _source) <>
+                     ", height: "      <> show (t ^. _height) <>
+                     ", sinks: "       <> show (t ^. _sinks) <>
+                     ", edges: "       <> show (t ^. _edges) <>
+                     ", subtreeType: " <> show (t ^. _subtreeType) <>
+                     ", isGable: "     <> show (t ^. _isGable) <>
                      "}"
     
 _source :: forall t a r. Newtype t { source :: a | r } => Lens' t a
@@ -40,6 +54,9 @@ _source = _Newtype <<< prop (SProxy :: SProxy "source")
 _sinks :: forall t a r. Newtype t { sinks :: a | r } => Lens' t a
 _sinks = _Newtype <<< prop (SProxy :: SProxy "sinks")
 
+_subtreeType :: forall t a r. Newtype t { subtreeType :: a | r } => Lens' t a
+_subtreeType = _Newtype <<< prop (SProxy :: SProxy "subtreeType")
+
 _isGable :: forall t a r. Newtype t { isGable :: a | r } => Lens' t a
 _isGable = _Newtype <<< prop (SProxy :: SProxy "isGable")
 
@@ -47,12 +64,13 @@ _originalSubtree :: forall t a r. Newtype t { originalSubtree :: a | r } => Lens
 _originalSubtree = _Newtype <<< prop (SProxy :: SProxy "originalSubtree")
 
 
-subtree :: Vector3 -> Number -> List Vector3 -> List (LineSeg Vector3) -> Subtree
-subtree source h ss es = Subtree {
+subtree :: SubtreeType -> Vector3 -> Number -> List Vector3 -> List (LineSeg Vector3) -> Subtree
+subtree t source h ss es = Subtree {
     source          : source,
     height          : h,
     sinks           : ss,
     edges           : es,
+    subtreeType     : t,
     isGable         : false,
     originalSubtree : Nothing
     }

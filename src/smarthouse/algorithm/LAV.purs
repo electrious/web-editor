@@ -175,7 +175,6 @@ unifyThreeVerts va vb vc point lav = do
 newtype SLAVState = SLAVState {
     lavs        :: UUIDMap LAV,
     edges       :: Array Edge,
-
     validStates :: UUIDMap Boolean
     }
 

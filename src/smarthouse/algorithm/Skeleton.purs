@@ -33,7 +33,7 @@ import SmartHouse.Algorithm.Edge (Edge, _leftVertex, _line, _rightVertex)
 import SmartHouse.Algorithm.Event (EdgeE, EdgesE, PointEvent(..), SplitE, _intersection, _oppositeEdge, _vertexA, _vertexB, _vertexC, distance, edgeE, edgesE, intersectionPoint, splitE)
 import SmartHouse.Algorithm.LAV (LAV, SLAV, _edges, _lavs, _vertices, addLav, delLav, emptySLAV, eventValid, getLav, invalidateVertex, lavFromVertices, length, nextVertex, prevVertex, runSLAV, unifyThreeVerts, unifyVerts, updateLav, verticesFromTo)
 import SmartHouse.Algorithm.Vertex (Vertex, _bisector, _cross, _isReflex, _lavId, _leftEdge, _rightEdge, ray, vertexFrom)
-import Smarthouse.Algorithm.Subtree (Subtree, subtree)
+import Smarthouse.Algorithm.Subtree (Subtree, SubtreeType(..), subtree)
 import Three.Math.Vector (class Vector, Vector3, dist, normal, (<**>), (<+>), (<->), (<.>))
 import Three.Math.Vector as V
 
@@ -117,7 +117,7 @@ nextEvent lav v = do
         es = if closeEnough iPrev iNext
              then [mkEdgesEvt (v ^. _leftEdge) (v ^. _rightEdge) <$> prevV <*> nextV <*> iPrev]
              else [mkPrevEdgeEvt (v ^. _leftEdge) <$> prevV <*> iPrev,
-                   mkNextEdgeEvt (v ^. _rightEdge) <$> nextV <*> iNext ]
+                   mkNextEdgeEvt (v ^. _rightEdge) <$> nextV <*> iNext]
                         
         allEvts = append (fromFoldable (compact es)) evts
         distF e = dist (v ^. _position) (intersectionPoint e)
@@ -162,7 +162,7 @@ handleEdgeEvent' e lav =
                 delLav (lav ^. idLens)
                 traverse_ invalidateVertex vs
 
-                pure $ Tuple (subtree (e ^. _intersection) (e ^. _distance) sinks (Set.toUnfoldable edges)) Nil
+                pure $ Tuple (subtree NormalNode (e ^. _intersection) (e ^. _distance) sinks (Set.toUnfoldable edges)) Nil
         else do let va = e ^. _vertexA
                     vb = e ^. _vertexB
                 Tuple newLav newV <- liftEffect $ unifyVerts va vb (e ^. _intersection) lav
@@ -176,7 +176,7 @@ handleEdgeEvent' e lav =
 
                 updateLav newLav (Just newV)
                 
-                pure $ Tuple (subtree (e ^. _intersection) (e ^. _distance) sinks (Set.toUnfoldable edges)) evts
+                pure $ Tuple (subtree NormalNode (e ^. _intersection) (e ^. _distance) sinks (Set.toUnfoldable edges)) evts
 
 
 handleEdgesEvent :: EdgesE -> SLAV (Maybe (Tuple Subtree (List PointEvent)))
@@ -193,7 +193,7 @@ handleEdgesEvent' e lav =
                 delLav (lav ^. idLens)
                 traverse_ invalidateVertex vs
 
-                pure $ Tuple (subtree (e ^. _intersection) (e ^. _distance) sinks (Set.toUnfoldable edges)) Nil
+                pure $ Tuple (subtree NormalNode (e ^. _intersection) (e ^. _distance) sinks (Set.toUnfoldable edges)) Nil
         else do let va = e ^. _vertexA
                     vb = e ^. _vertexB
                     vc = e ^. _vertexC
@@ -206,6 +206,7 @@ handleEdgesEvent' e lav =
                     edges = Set.fromFoldable [va ^. _leftEdge, va ^. _rightEdge,
                                               vb ^. _leftEdge, vb ^. _rightEdge,
                                               vc ^. _leftEdge, vc ^. _rightEdge]
+                    nodeT = MergedNode va vc
                 evts <- case newV of
                     Just nv -> do
                         newEvt <- nextEvent newLav nv
@@ -214,7 +215,7 @@ handleEdgesEvent' e lav =
 
                 updateLav newLav newV
                 
-                pure $ Tuple (subtree (e ^. _intersection) (e ^. _distance) sinks (Set.toUnfoldable edges)) evts
+                pure $ Tuple (subtree nodeT (e ^. _intersection) (e ^. _distance) sinks (Set.toUnfoldable edges)) evts
 
 
 handleSplitEvent :: SplitE -> SLAV (Maybe (Tuple Subtree (List PointEvent)))
@@ -259,7 +260,7 @@ handleSplitEvent' e (Tuple x y) = do
 
     invalidateVertex v
     
-    pure $ Tuple (subtree intPos (e ^. _distance) (Cons (v ^. _position) sinks) (Set.toUnfoldable $ edges <> es)) evts
+    pure $ Tuple (subtree NormalNode intPos (e ^. _distance) (Cons (v ^. _position) sinks) (Set.toUnfoldable $ edges <> es)) evts
 
 
 processNewLAV :: LAV -> List Vertex -> SLAV (Triple (List PointEvent) (List Vector3) (Set.Set (LineSeg Vector3)))
