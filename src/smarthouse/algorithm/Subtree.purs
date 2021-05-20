@@ -16,12 +16,12 @@ import Data.Tuple (Tuple(..), fst, snd)
 import Editor.Common.Lenses (_height)
 import Math.LineSeg (LineSeg, mkLineSeg)
 import SmartHouse.Algorithm.LAV (_edges)
-import SmartHouse.Algorithm.Vertex (Vertex)
 import Three.Math.Vector (Vector3, (<**>), (<+>))
 
 data SubtreeType = NormalNode
-                 | MergedNode Vertex Vertex   -- the subtree node is merged from 3 bisectors.
-                                              -- The two vertices carried here should be considered to form one edge
+                 | MergedNode (LineSeg Vector3) (LineSeg Vector3)
+                                              -- the subtree node is merged from 3 bisectors.
+                                              -- The two edges carried here should be considered to form one edge
                                               -- when generting the roofs.
 
 derive instance genericSubtreeType :: Generic SubtreeType _

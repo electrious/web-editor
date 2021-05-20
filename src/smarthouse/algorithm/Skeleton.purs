@@ -206,7 +206,7 @@ handleEdgesEvent' e lav =
                     edges = Set.fromFoldable [va ^. _leftEdge, va ^. _rightEdge,
                                               vb ^. _leftEdge, vb ^. _rightEdge,
                                               vc ^. _leftEdge, vc ^. _rightEdge]
-                    nodeT = MergedNode va vc
+                    nodeT = MergedNode (va ^. _leftEdge) (vc ^. _rightEdge)
                 evts <- case newV of
                     Just nv -> do
                         newEvt <- nextEvent newLav nv

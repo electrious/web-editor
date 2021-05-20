@@ -21,7 +21,7 @@ import Data.Map as M
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Data.Traversable (class Traversable, traverse)
+import Data.Traversable (class Traversable, sequence, traverse)
 import Data.Triple (Triple(..))
 import Data.Tuple (Tuple(..))
 import Data.UUID (UUID, emptyUUID, genUUID)
@@ -212,7 +212,7 @@ slavFromPolygon polys = do
     lavs <- Arr.fromFoldable <$> traverse (lavFromPolygon <<< normalizeContour) polys
     let vs    = Arr.concatMap (view _vertices) lavs
         ns    = fromMaybe vs $ Arr.snoc <$> Arr.tail vs <*> Arr.head vs
-        edges = zipWith edge vs ns
+    edges <- sequence $ zipWith edge vs ns
     pure $ def # _lavs        .~ UM.fromFoldable lavs
                # _edges       .~ edges
                # _validStates .~ M.fromFoldable (flip Tuple true <<< view idLens <$> vs)
