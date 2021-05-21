@@ -4,7 +4,7 @@ import Prelude
 
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Lens (Lens', (^.))
+import Data.Lens (Lens', view, (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
@@ -28,6 +28,8 @@ derive instance newtypeEdge :: Newtype Edge _
 derive instance genericEdge :: Generic Edge _
 instance eqEdge :: Eq Edge where
     eq e1 e2 = e1 ^. idLens == e2 ^. idLens
+instance ordEdge :: Ord Edge where
+    compare = comparing (view idLens)
 instance showEdge :: Show Edge where
     show = genericShow
 instance hasUUIDEdge :: HasUUID Edge where

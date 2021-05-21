@@ -5,14 +5,14 @@ import Prelude
 import Data.Array (foldl)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Lens (Lens', (.~), (^.))
+import Data.Lens (Lens', view, (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (List(..), elem, (:))
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Data.Tuple (Tuple(..), fst, snd)
+import Data.Tuple (Tuple(..))
 import Data.UUID (UUID, genUUID)
 import Editor.Common.Lenses (_height, _id)
 import Effect (Effect)
@@ -45,6 +45,8 @@ newtype Subtree = Subtree {
 derive instance newtypeSubtree :: Newtype Subtree _
 instance eqSubtree :: Eq Subtree where
     eq t1 t2 = t1 ^. idLens == t2 ^. idLens
+instance ordSubtree :: Ord Subtree where
+    compare = comparing (view idLens)
 instance hasUUIDSubtree :: HasUUID Subtree where
     idLens = _id
 instance showSubtree :: Show Subtree where
@@ -108,15 +110,3 @@ flipSubtree :: Subtree -> List Vector3 -> Subtree
 flipSubtree t vs = if t ^. _isGable
                    then fromMaybe t $ t ^. _originalSubtree
                    else gableSubtree t vs
-
-
-type IndexedSubtree = Tuple Int Subtree
-
-mkIndexedSubtree :: Int -> Subtree -> IndexedSubtree
-mkIndexedSubtree = Tuple
-
-getIndex :: IndexedSubtree -> Int
-getIndex = fst
-
-getSubtree :: IndexedSubtree -> Subtree
-getSubtree = snd

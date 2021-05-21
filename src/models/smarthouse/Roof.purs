@@ -10,13 +10,17 @@ import Data.Generic.Rep.Show (genericShow)
 import Data.Lens (Lens', (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.List (List(..), (:), length)
+import Data.List (List(..), (:))
+import Data.Map as M
 import Data.Maybe (Maybe(..))
 import Data.Meter (Meter, meterVal)
 import Data.Newtype (class Newtype)
+import Data.Set (Set)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse_)
 import Data.UUID (UUID, genUUID)
+import Data.UUIDMap (UUIDMap)
+import Data.UUIDMap as UM
 import Editor.Common.Lenses (_id, _name, _polygon, _tapped)
 import Effect (Effect)
 import Effect.Class (liftEffect)
@@ -34,7 +38,7 @@ import Model.UUID (class HasUUID, idLens)
 import Rendering.Node (Node, getEnv, tapMesh)
 import SmartHouse.HouseTracer (renderLine)
 import SmartHouse.PolyGeometry (mkPolyGeometry, mkPolyGeometryWithUV)
-import Smarthouse.Algorithm.Subtree (IndexedSubtree, _isGable, getIndex, getSubtree)
+import Smarthouse.Algorithm.Subtree (Subtree, _isGable)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial, mkMeshBasicMaterialWithTexture)
 import Three.Math.Vector (Vector3, mkVec3, vecX, vecY, vecZ)
 
@@ -47,7 +51,7 @@ derive instance eqRoofState :: Eq RoofState
 newtype Roof = Roof {
     id       :: UUID,
     polygon  :: Polygon Vector3,
-    subtrees :: List IndexedSubtree
+    subtrees :: UUIDMap Subtree
     }
 
 derive instance newtypeRoof :: Newtype Roof _
@@ -60,24 +64,24 @@ instance hasUUIDRoof :: HasUUID Roof where
 _subtrees :: forall t a r. Newtype t { subtrees :: a | r } => Lens' t a
 _subtrees = _Newtype <<< prop (SProxy :: SProxy "subtrees")
 
-createRoofFrom :: Polygon Vector3 -> List IndexedSubtree -> Effect Roof
+createRoofFrom :: Polygon Vector3 -> Set Subtree -> Effect Roof
 createRoofFrom p ts = do
     i <- genUUID
-    pure $ Roof { id : i, polygon : p, subtrees : ts }
+    pure $ Roof { id : i, polygon : p, subtrees : UM.fromSet ts }
 
 -- check if a roof can be gable
 canBeGable :: Roof -> Boolean
-canBeGable r = length (r ^. _subtrees) < 2
+canBeGable r = M.size (r ^. _subtrees) < 2
 
 -- | get the roof's current state, if it's gable or not
 roofState :: Roof -> RoofState
-roofState r = case r ^. _subtrees of
-    (t:Nil) -> if (getSubtree t) ^. _isGable then Gable else SlopeRoof
+roofState r = case M.values $ r ^. _subtrees of
+    (t:Nil) -> if t ^. _isGable then Gable else SlopeRoof
     _       -> SlopeRoof
 
-subtreeIndex :: Roof -> Maybe Int
-subtreeIndex r = case r ^. _subtrees of
-    (t:Nil) -> Just $ getIndex t
+subtreeIndex :: Roof -> Maybe UUID
+subtreeIndex r = case M.values $ r ^. _subtrees of
+    (t:Nil) -> Just $ t ^. idLens
     _       -> Nothing
 
 exportRoof :: Meter -> Roof -> JSRoof
@@ -102,7 +106,7 @@ instance decodeJSRoof :: Decode JSRoof where
 
 newtype RoofEvents = RoofEvents {
     tapped  :: Event UUID,
-    flipped :: Event Int   -- event to flip the roof state, the Int is index of the subtree
+    flipped :: Event UUID   -- event to flip the roof state, the Int is index of the subtree
     }
 
 derive instance newtypeRoofEvents :: Newtype RoofEvents _

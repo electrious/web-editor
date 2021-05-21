@@ -11,13 +11,17 @@ import Data.Generic.Rep.Show (genericShow)
 import Data.Lens (Lens', (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.List (List, fromFoldable, modifyAt, singleton)
-import Data.Maybe (fromMaybe)
+import Data.List (List, fromFoldable, singleton)
+import Data.Map as M
+import Data.Maybe (Maybe(..))
 import Data.Meter (Meter, meter, meterVal)
 import Data.Newtype (class Newtype)
+import Data.Set as S
 import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple(..))
 import Data.UUID (UUID, emptyUUID, genUUID)
+import Data.UUIDMap (UUIDMap)
+import Data.UUIDMap as UM
 import Editor.Common.Lenses (_floor, _height, _id, _roofs, _slope)
 import Effect (Effect)
 import FRP.Event (Event)
@@ -40,7 +44,7 @@ newtype House = House {
     floor  :: Polygon Vector3,
     height :: Meter,
     slope  :: Angle,
-    trees  :: List Subtree,
+    trees  :: UUIDMap Subtree,
     edges  :: List Edge,
     roofs  :: List Roof
     }
@@ -61,14 +65,14 @@ createHouseFrom :: Angle -> Polygon Vector3 -> Effect House
 createHouseFrom slope poly = do
     i <- genUUID
     Tuple trees edges <- skeletonize $ singleton $ counterClockPoly poly
-    roofs <- generateRoofs slope trees edges
+    roofs <- generateRoofs slope (S.fromFoldable trees) edges
     
     pure $ House {
         id     : i,
         floor  : poly,
         height : meter 3.5,   -- default height
         slope  : slope,
-        trees  : trees,
+        trees  : UM.fromFoldable trees,
         edges  : edges,
         roofs  : roofs
         }
@@ -78,14 +82,14 @@ updateHeight :: Meter -> House -> House
 updateHeight height h = h # _height .~ height
 
 -- flip a roof to/from gable
-flipRoof :: Int -> House -> Effect House
-flipRoof idx h = do
+flipRoof :: UUID -> House -> Effect House
+flipRoof i h = do
     let vs  = fromFoldable $ h ^. _floor <<< _polyVerts
         ts  = h ^. _trees
         -- flip the subtree at idx
-        nts = fromMaybe ts $ modifyAt idx (flip flipSubtree vs) ts
+        nts = M.update (Just <<< flip flipSubtree vs) i ts
     -- generate new roofs
-    roofs <- generateRoofs (h ^. _slope) nts (h ^. _edges)
+    roofs <- generateRoofs (h ^. _slope) (S.fromFoldable nts) (h ^. _edges)
     pure $ h # _roofs .~ roofs
              # _trees .~ nts
 
