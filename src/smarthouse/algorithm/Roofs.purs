@@ -4,15 +4,18 @@ import Prelude
 
 import Data.Lens (view, (^.))
 import Data.List (List(..), elem, singleton, sortBy)
+import Data.Newtype (class Newtype)
 import Data.Set (Set)
 import Data.Set as S
 import Data.Traversable (traverse)
-import Editor.Common.Lenses (_height)
+import Data.UUID (UUID)
+import Editor.Common.Lenses (_height, _id)
 import Effect (Effect)
 import Math.Angle (Angle, degreeVal, tan)
 import Math.LineSeg (LineSeg, _end, _start, direction)
 import Model.Polygon (newPolygon)
 import Model.SmartHouse.Roof (Roof, createRoofFrom)
+import Model.UUID (class HasUUID, idLens)
 import SmartHouse.Algorithm.Edge (Edge, _line)
 import SmartHouse.Algorithm.LAV (_edges)
 import Smarthouse.Algorithm.Subtree (Subtree, _source)
@@ -28,6 +31,21 @@ upVec = mkVec3 0.0 0.0 1.0
 
 distanceAlong :: Vector3 -> LineSeg Vector3 -> Number
 distanceAlong p e = (p <-> e ^. _start) <.> direction e
+
+-- data accumulated to generate a single roof
+newtype RoofData = RoofData {
+    id        :: UUID,
+    subtrees  :: Set Subtree,
+    edges     :: List Edge
+    }
+
+derive instance newtypeRoofData :: Newtype RoofData _
+instance hasUUIDRoofData :: HasUUID RoofData where
+    idLens = _id
+instance eqRoofData :: Eq RoofData where
+    eq r1 r2 = r1 ^. idLens == r2 ^. idLens
+instance ordRoofData :: Ord RoofData where
+    compare = comparing (view idLens)
 
 -- all nodes in the roof polygon of an edge
 treesForEdge :: Edge -> Set Subtree -> Set Subtree
