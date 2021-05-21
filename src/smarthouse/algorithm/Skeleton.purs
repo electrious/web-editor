@@ -162,7 +162,9 @@ handleEdgeEvent' e lav =
                 delLav (lav ^. idLens)
                 traverse_ invalidateVertex vs
 
-                pure $ Tuple (subtree NormalNode (e ^. _intersection) (e ^. _distance) sinks (Set.toUnfoldable edges)) Nil
+                t <- liftEffect $ subtree NormalNode (e ^. _intersection) (e ^. _distance) sinks (Set.toUnfoldable edges)
+                
+                pure $ Tuple t Nil
         else do let va = e ^. _vertexA
                     vb = e ^. _vertexB
                 Tuple newLav newV <- liftEffect $ unifyVerts va vb (e ^. _intersection) lav
@@ -175,8 +177,9 @@ handleEdgeEvent' e lav =
                 let evts = fromFoldable $ compact [newEvt]
 
                 updateLav newLav (Just newV)
-                
-                pure $ Tuple (subtree NormalNode (e ^. _intersection) (e ^. _distance) sinks (Set.toUnfoldable edges)) evts
+
+                t <- liftEffect $ subtree NormalNode (e ^. _intersection) (e ^. _distance) sinks (Set.toUnfoldable edges)
+                pure $ Tuple t evts
 
 
 handleEdgesEvent :: EdgesE -> SLAV (Maybe (Tuple Subtree (List PointEvent)))
@@ -193,7 +196,8 @@ handleEdgesEvent' e lav =
                 delLav (lav ^. idLens)
                 traverse_ invalidateVertex vs
 
-                pure $ Tuple (subtree NormalNode (e ^. _intersection) (e ^. _distance) sinks (Set.toUnfoldable edges)) Nil
+                t <- liftEffect $ subtree NormalNode (e ^. _intersection) (e ^. _distance) sinks (Set.toUnfoldable edges)
+                pure $ Tuple t Nil
         else do let va = e ^. _vertexA
                     vb = e ^. _vertexB
                     vc = e ^. _vertexC
@@ -214,8 +218,9 @@ handleEdgesEvent' e lav =
                     Nothing -> pure Nil
 
                 updateLav newLav newV
-                
-                pure $ Tuple (subtree nodeT (e ^. _intersection) (e ^. _distance) sinks (Set.toUnfoldable edges)) evts
+
+                t <- liftEffect $ subtree nodeT (e ^. _intersection) (e ^. _distance) sinks (Set.toUnfoldable edges)
+                pure $ Tuple t evts
 
 
 handleSplitEvent :: SplitE -> SLAV (Maybe (Tuple Subtree (List PointEvent)))
@@ -259,8 +264,10 @@ handleSplitEvent' e (Tuple x y) = do
                                 pure $ Triple (evts1 <> evts2) (sinks1 <> sinks2) (edges1 <> edges2)
 
     invalidateVertex v
+
+    t <- liftEffect $ subtree NormalNode intPos (e ^. _distance) (Cons (v ^. _position) sinks) (Set.toUnfoldable $ edges <> es)
     
-    pure $ Tuple (subtree NormalNode intPos (e ^. _distance) (Cons (v ^. _position) sinks) (Set.toUnfoldable $ edges <> es)) evts
+    pure $ Tuple t evts
 
 
 processNewLAV :: LAV -> List Vertex -> SLAV (Triple (List PointEvent) (List Vector3) (Set.Set (LineSeg Vector3)))

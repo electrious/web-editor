@@ -13,8 +13,11 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple(..), fst, snd)
-import Editor.Common.Lenses (_height)
+import Data.UUID (UUID, genUUID)
+import Editor.Common.Lenses (_height, _id)
+import Effect (Effect)
 import Math.LineSeg (LineSeg, mkLineSeg)
+import Model.UUID (class HasUUID, idLens)
 import SmartHouse.Algorithm.LAV (_edges)
 import Three.Math.Vector (Vector3, (<**>), (<+>))
 
@@ -29,6 +32,7 @@ instance showSubtreeType :: Show SubtreeType where
     show = genericShow
 
 newtype Subtree = Subtree {
+    id              :: UUID,
     source          :: Vector3,
     height          :: Number,
     sinks           :: List Vector3,
@@ -39,6 +43,10 @@ newtype Subtree = Subtree {
     }
 
 derive instance newtypeSubtree :: Newtype Subtree _
+instance eqSubtree :: Eq Subtree where
+    eq t1 t2 = t1 ^. idLens == t2 ^. idLens
+instance hasUUIDSubtree :: HasUUID Subtree where
+    idLens = _id
 instance showSubtree :: Show Subtree where
     show t = "Subtree { source: "      <> show (t ^. _source) <>
                      ", height: "      <> show (t ^. _height) <>
@@ -64,16 +72,19 @@ _originalSubtree :: forall t a r. Newtype t { originalSubtree :: a | r } => Lens
 _originalSubtree = _Newtype <<< prop (SProxy :: SProxy "originalSubtree")
 
 
-subtree :: SubtreeType -> Vector3 -> Number -> List Vector3 -> List (LineSeg Vector3) -> Subtree
-subtree t source h ss es = Subtree {
-    source          : source,
-    height          : h,
-    sinks           : ss,
-    edges           : es,
-    subtreeType     : t,
-    isGable         : false,
-    originalSubtree : Nothing
-    }
+subtree :: SubtreeType -> Vector3 -> Number -> List Vector3 -> List (LineSeg Vector3) -> Effect Subtree
+subtree t source h ss es = do
+    i <- genUUID
+    pure $ Subtree {
+        id              : i,
+        source          : source,
+        height          : h,
+        sinks           : ss,
+        edges           : es,
+        subtreeType     : t,
+        isGable         : false,
+        originalSubtree : Nothing
+        }
 
 
 treeLines :: Subtree -> List (LineSeg Vector3)
