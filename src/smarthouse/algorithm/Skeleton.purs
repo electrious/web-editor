@@ -35,6 +35,7 @@ import SmartHouse.Algorithm.LAV (LAV, SLAV, _edges, _lavs, _vertices, addLav, de
 import SmartHouse.Algorithm.Ray (ray)
 import SmartHouse.Algorithm.VertInfo (_bisector, _cross, _isReflex)
 import SmartHouse.Algorithm.Vertex (Vertex, _lavId, _leftEdge, _rightEdge, vertexFrom)
+import SmartHouse.HouseTracer (almostParallel)
 import Smarthouse.Algorithm.Subtree (Subtree, SubtreeType(..), subtree)
 import Three.Math.Vector (class Vector, Vector3, dist, normal, (<**>), (<+>), (<->), (<.>))
 import Three.Math.Vector as V
@@ -116,7 +117,16 @@ nextEvent lav v = do
                                        rd = distToLineSeg i re
                                    in edgesE (min ld rd) i pv v nv
 
-        es = if closeEnough iPrev iNext
+        -- if prev and next intersection is very close, and left edge of prev vert
+        -- is almost parallel to the right edge of next vert, BUT NOT the same,
+        -- then it's a MergedNode, otherwise it should be NormalNode
+        prevLeftE = view _leftEdge <$> prevV
+        nextRightE = view _rightEdge <$> nextV
+
+        isSame = prevLeftE == nextRightE
+        isPara = fromMaybe false $ almostParallel <$> (view _line <$> prevLeftE) <*> (view _line <$> nextRightE)
+    
+        es = if closeEnough iPrev iNext && not isSame && isPara
              then [mkEdgesEvt (v ^. _leftEdge <<< _line) (v ^. _rightEdge <<< _line) <$> prevV <*> nextV <*> iPrev]
              else [mkPrevEdgeEvt (v ^. _leftEdge <<< _line) <$> prevV <*> iPrev,
                    mkNextEdgeEvt (v ^. _rightEdge <<< _line) <$> nextV <*> iNext]
