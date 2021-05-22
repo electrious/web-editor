@@ -21,6 +21,8 @@ import Three.Math.Vector (Vector3)
 newtype Edge = Edge {
     id            :: UUID,
     line          :: LineSeg Vector3,
+    leftVertex    :: Vector3,
+    rightVertex   :: Vector3,
     leftBisector  :: Ray,
     rightBisector :: Ray
     }
@@ -39,6 +41,12 @@ instance hasUUIDEdge :: HasUUID Edge where
 _line :: forall t a r. Newtype t { line :: a | r } => Lens' t a
 _line = _Newtype <<< prop (SProxy :: SProxy "line")
 
+_leftVertex :: forall t a r. Newtype t { leftVertex :: a | r } => Lens' t a
+_leftVertex = _Newtype <<< prop (SProxy :: SProxy "leftVertex")
+
+_rightVertex :: forall t a r. Newtype t { rightVertex :: a | r } => Lens' t a
+_rightVertex = _Newtype <<< prop (SProxy :: SProxy "rightVertex")
+
 _leftBisector :: forall t a r. Newtype t { leftBisector :: a | r } => Lens' t a
 _leftBisector = _Newtype <<< prop (SProxy :: SProxy "leftBisector")
 
@@ -48,9 +56,13 @@ _rightBisector = _Newtype <<< prop (SProxy :: SProxy "rightBisector")
 edge :: VertInfo -> VertInfo -> Effect Edge
 edge lv rv = do
     i <- genUUID
+    let lp = lv ^. _position
+        rp = rv ^. _position
     pure $ Edge {
         id            : i,
-        line          : mkLineSeg (lv ^. _position) (rv ^. _position),
+        line          : mkLineSeg lp rp,
+        leftVertex    : lp,
+        rightVertex   : rp,
         leftBisector  : lv ^. _bisector,
         rightBisector : rv ^. _bisector
         }

@@ -2,24 +2,30 @@ module Smarthouse.Algorithm.Roofs where
 
 import Prelude
 
+import Data.Array (foldl)
 import Data.Lens (Lens', view, (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (List(..), elem, singleton, sortBy, (:))
+import Data.Map as M
 import Data.Newtype (class Newtype)
 import Data.Set (Set)
 import Data.Set as S
 import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
-import Editor.Common.Lenses (_height, _position)
+import Data.UUID (UUID)
+import Data.UUIDMap (UUIDMap)
+import Data.UUIDMap as UM
+import Editor.Common.Lenses (_height, _id)
 import Effect (Effect)
 import Math.Angle (Angle, degreeVal, tan)
-import Math.LineSeg (LineSeg, _end, _start, direction)
+import Math.LineSeg (LineSeg, _start, direction)
 import Model.Polygon (newPolygon)
 import Model.SmartHouse.Roof (Roof, _subtrees, createRoofFrom)
-import SmartHouse.Algorithm.Edge (Edge(..),  _line)
+import Model.UUID (class HasUUID, idLens)
+import SmartHouse.Algorithm.Edge (Edge, _leftVertex, _line, _rightVertex)
 import SmartHouse.Algorithm.LAV (_edges)
-import Smarthouse.Algorithm.Subtree (Subtree, _source)
+import Smarthouse.Algorithm.Subtree (Subtree, SubtreeType(..), _source, _subtreeType, normalSubtree)
 import Three.Math.Vector (Vector3, mkVec3, (<**>), (<+>), (<->), (<.>))
 
 
@@ -35,12 +41,19 @@ distanceAlong p e = (p <-> e ^. _start) <.> direction e
 
 -- data accumulated to generate a single roof
 newtype RoofData = RoofData {
+    id        :: UUID,
     subtrees  :: Set Subtree,
     edgeNodes :: List Vector3,
-    edge      :: Edge
+    edge      :: Edge   -- used only for calculating distance to edge
     }
 
 derive instance newtypeRoofData :: Newtype RoofData _
+instance hasUUIDRoofData :: HasUUID RoofData where
+    idLens = _id
+instance eqRoofData :: Eq RoofData where
+    eq r1 r2 = r1 ^. idLens == r2 ^. idLens
+instance ordRoofData :: Ord RoofData where
+    compare = comparing (view idLens)
 
 _edgeNodes :: forall t a r. Newtype t { edgeNodes :: a | r } => Lens' t a
 _edgeNodes = _Newtype <<< prop (SProxy :: SProxy "edgeNodes")
@@ -51,13 +64,14 @@ _edge = _Newtype <<< prop (SProxy :: SProxy "edge")
 -- all nodes in the roof polygon of an edge
 treesForEdge :: Edge -> Set Subtree -> Set Subtree
 treesForEdge e ts = S.filter f ts
-    where f = elem (e ^. _line) <<< view _edges
+    where f = elem e <<< view _edges
 
-roofDataForEdge :: Edge -> Set Subtree -> RoofData
-roofDataForEdge e ts =
+roofDataForEdge :: Set Subtree -> Edge -> RoofData
+roofDataForEdge ts e =
     let lv = e ^. _leftVertex
         rv = e ^. _rightVertex
     in RoofData {
+        id        : e ^. idLens,
         subtrees  : treesForEdge e ts,
         edgeNodes : (lv : rv : Nil),
         edge      : e
@@ -69,6 +83,7 @@ mergeRoofDataWith node lr rr =
     let lns = lr ^. _edgeNodes
         rns = rr ^. _edgeNodes
     in RoofData {
+        id        : lr ^. idLens,
         subtrees  : S.union (lr ^. _subtrees) (rr ^. _subtrees),
         edgeNodes : lns <> singleton node <> rns,
         edge      : lr ^. _edge
@@ -89,5 +104,34 @@ roofForEdge slope rd = do
         nodes  = sorted <> rd ^. _edgeNodes
     createRoofFrom (newPolygon nodes) (rd ^. _subtrees)
 
+
+procMerge :: UUIDMap RoofData -> Subtree -> UUIDMap RoofData
+procMerge m t = case t ^. _subtreeType of
+    NormalNode -> m
+    MergedNode le re ->
+        let li = le ^. idLens
+            ri = re ^. idLens
+            lrd = M.lookup li m
+            rrd = M.lookup ri m
+
+            newrd = mergeRoofDataWith (t ^. _source) <$> lrd <*> rrd
+
+        in M.update (const newrd) li $ M.update (const newrd) ri m
+        
+    
 generateRoofs :: Angle -> Set Subtree -> List Edge -> Effect (List Roof)
-generateRoofs slope ts = traverse (roofForEdge slope ts)
+generateRoofs slope ts edges = do
+    let -- normal node subtrees
+        nts = S.filter normalSubtree ts
+        -- MergedNode subtrees
+        mts = S.filter (not <<< normalSubtree) ts
+
+        -- map from edge id to roof data
+        rdm = UM.fromFoldable $ roofDataForEdge nts <$> edges
+
+        newRDM = foldl procMerge rdm mts
+
+        newRds = S.toUnfoldable $ S.fromFoldable $ M.values newRDM
+
+    traverse (roofForEdge slope) newRds
+    

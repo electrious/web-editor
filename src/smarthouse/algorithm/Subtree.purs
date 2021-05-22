@@ -29,6 +29,7 @@ data SubtreeType = NormalNode
                                               -- when generting the roofs.
 
 derive instance genericSubtreeType :: Generic SubtreeType _
+derive instance eqSubtreeType :: Eq SubtreeType
 instance showSubtreeType :: Show SubtreeType where
     show = genericShow
 
@@ -89,6 +90,8 @@ subtree t source h ss es = do
         originalSubtree : Nothing
         }
 
+normalSubtree :: Subtree -> Boolean
+normalSubtree = (==) NormalNode <<< view _subtreeType
 
 treeLines :: Subtree -> List (LineSeg Vector3)
 treeLines t = mkLineSeg s <$> t ^. _sinks
