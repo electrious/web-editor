@@ -93,6 +93,12 @@ subtree t source h ss es = do
 normalSubtree :: Subtree -> Boolean
 normalSubtree = (==) NormalNode <<< view _subtreeType
 
+-- check if an edge should be merged by the subtree
+mergedEdge :: Edge -> Subtree -> Boolean
+mergedEdge e t = case t ^. _subtreeType of
+    NormalNode -> false
+    MergedNode le re -> e == le || e == re
+
 treeLines :: Subtree -> List (LineSeg Vector3)
 treeLines t = mkLineSeg s <$> t ^. _sinks
     where s = t ^. _source
