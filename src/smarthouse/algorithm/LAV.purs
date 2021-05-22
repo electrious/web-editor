@@ -5,7 +5,7 @@ import Prelude hiding (degree)
 import Algorithm.MeshFlatten (_vertex)
 import Control.Monad.RWS (get, modify)
 import Control.Monad.State (StateT, evalStateT)
-import Data.Array (deleteAt, filter, foldl, index, last, updateAt, zipWith)
+import Data.Array (deleteAt, filter, foldl, index, last, updateAt, zip, zipWith)
 import Data.Array as Arr
 import Data.Default (class Default, def)
 import Data.Foldable (class Foldable)
@@ -64,10 +64,9 @@ lavFromPolygon :: Array VertInfo -> Array Edge -> Effect LAV
 lavFromPolygon vis es = do
     i <- genUUID
     let pes = fromMaybe es $ Arr.cons <$> Arr.last es <*> Arr.init es
-        ets = Tuple <$> pes <*> es
 
         mkV vi (Tuple le re) = vertexFromVertInfo i le re vi
-    vs <- sequence $ zipWith mkV vis ets
+    vs <- sequence $ zipWith mkV vis $ zip pes es
     
     let idxMap = M.fromFoldable $ mapWithIndex (\idx v -> Tuple (v ^. idLens) idx) vs
     pure $ def # _id       .~ i
