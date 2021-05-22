@@ -14,14 +14,15 @@ import Editor.Common.Lenses (_id, _position)
 import Effect (Effect)
 import Math.LineSeg (LineSeg, mkLineSeg)
 import Model.UUID (class HasUUID, idLens)
-import SmartHouse.Algorithm.Vertex (Vertex)
+import SmartHouse.Algorithm.Ray (Ray)
+import SmartHouse.Algorithm.VertInfo (VertInfo, _bisector)
 import Three.Math.Vector (Vector3)
 
 newtype Edge = Edge {
-    id          :: UUID,
-    line        :: LineSeg Vector3,
-    leftVertex  :: Vertex,
-    rightVertex :: Vertex
+    id            :: UUID,
+    line          :: LineSeg Vector3,
+    leftBisector  :: Ray,
+    rightBisector :: Ray
     }
 
 derive instance newtypeEdge :: Newtype Edge _
@@ -38,18 +39,18 @@ instance hasUUIDEdge :: HasUUID Edge where
 _line :: forall t a r. Newtype t { line :: a | r } => Lens' t a
 _line = _Newtype <<< prop (SProxy :: SProxy "line")
 
-_leftVertex :: forall t a r. Newtype t { leftVertex :: a | r } => Lens' t a
-_leftVertex = _Newtype <<< prop (SProxy :: SProxy "leftVertex")
+_leftBisector :: forall t a r. Newtype t { leftBisector :: a | r } => Lens' t a
+_leftBisector = _Newtype <<< prop (SProxy :: SProxy "leftBisector")
 
-_rightVertex :: forall t a r. Newtype t { rightVertex :: a | r } => Lens' t a
-_rightVertex = _Newtype <<< prop (SProxy :: SProxy "rightVertex")
+_rightBisector :: forall t a r. Newtype t { rightBisector :: a | r } => Lens' t a
+_rightBisector = _Newtype <<< prop (SProxy :: SProxy "rightBisector")
 
-edge :: Vertex -> Vertex -> Effect Edge
+edge :: VertInfo -> VertInfo -> Effect Edge
 edge lv rv = do
     i <- genUUID
     pure $ Edge {
-        id          : i,
-        line        : mkLineSeg (lv ^. _position) (rv ^. _position),
-        leftVertex  : lv,
-        rightVertex : rv
+        id            : i,
+        line          : mkLineSeg (lv ^. _position) (rv ^. _position),
+        leftBisector  : lv ^. _bisector,
+        rightBisector : rv ^. _bisector
         }

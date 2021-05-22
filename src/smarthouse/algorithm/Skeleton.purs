@@ -16,7 +16,7 @@ import Data.Maybe (Maybe(..), fromMaybe, maybe)
 import Data.PQueue (PQueue)
 import Data.PQueue as PQ
 import Data.Set as Set
-import Data.Traversable (class Traversable, traverse)
+import Data.Traversable (traverse)
 import Data.Triple (Triple(..))
 import Data.Tuple (Tuple(..), snd)
 import Editor.Common.Lenses (_distance, _position)
@@ -29,10 +29,12 @@ import Math.LineSeg as S
 import Math.Utils (approxSame, epsilon)
 import Model.Polygon (Polygon)
 import Model.UUID (idLens)
-import SmartHouse.Algorithm.Edge (Edge, _leftVertex, _line, _rightVertex)
+import SmartHouse.Algorithm.Edge (Edge, _leftBisector, _line, _rightBisector)
 import SmartHouse.Algorithm.Event (EdgeE, EdgesE, PointEvent(..), SplitE, _intersection, _oppositeEdge, _vertexA, _vertexB, _vertexC, distance, edgeE, edgesE, intersectionPoint, splitE)
 import SmartHouse.Algorithm.LAV (LAV, SLAV, _edges, _lavs, _vertices, addLav, delLav, emptySLAV, eventValid, getLav, invalidateVertex, lavFromVertices, length, nextVertex, prevVertex, runSLAV, unifyThreeVerts, unifyVerts, updateLav, verticesFromTo)
-import SmartHouse.Algorithm.Vertex (Vertex, _bisector, _cross, _isReflex, _lavId, _leftEdge, _rightEdge, ray, vertexFrom)
+import SmartHouse.Algorithm.Ray (ray)
+import SmartHouse.Algorithm.VertInfo (_bisector, _cross, _isReflex)
+import SmartHouse.Algorithm.Vertex (Vertex, _lavId, _leftEdge, _rightEdge, vertexFrom)
 import Smarthouse.Algorithm.Subtree (Subtree, SubtreeType(..), subtree)
 import Three.Math.Vector (class Vector, Vector3, dist, normal, (<**>), (<+>), (<->), (<.>))
 import Three.Math.Vector as V
@@ -62,8 +64,8 @@ locateB v (Tuple e i) = let linVec   = normal $ v ^. _position <-> i
 -- check eligibility of b
 -- valid b should lie within the area limited by the edge and the bisectors of its two vertices
 validB :: Tuple Edge Vector3 -> Boolean
-validB (Tuple e b) = let lb = e ^. _leftVertex <<< _bisector
-                         rb = e ^. _rightVertex <<< _bisector
+validB (Tuple e b) = let lb = e ^. _leftBisector
+                         rb = e ^. _rightBisector
                          xleft = _cross (normal $ lb ^. _direction)
                                         (normal $ b <-> lb ^. _origin) > (- epsilon)
                          xright = _cross (normal $ rb ^. _direction)
@@ -75,8 +77,8 @@ validB (Tuple e b) = let lb = e ^. _leftVertex <<< _bisector
 nextEvtForReflex :: Vertex -> SLAV (List PointEvent)
 nextEvtForReflex v = do
     originEdges <- view _edges <$> get
-    let lEdge = v ^. _leftEdge
-        rEdge = v ^. _rightEdge
+    let lEdge = v ^. _leftEdge <<< _line
+        rEdge = v ^. _rightEdge <<< _line
 
         -- check if an edge is the left/right edge of the vertex v
         notNearby e = not $ e ^. _line == lEdge || e ^. _line == rEdge
@@ -115,9 +117,9 @@ nextEvent lav v = do
                                    in edgesE (min ld rd) i pv v nv
 
         es = if closeEnough iPrev iNext
-             then [mkEdgesEvt (v ^. _leftEdge) (v ^. _rightEdge) <$> prevV <*> nextV <*> iPrev]
-             else [mkPrevEdgeEvt (v ^. _leftEdge) <$> prevV <*> iPrev,
-                   mkNextEdgeEvt (v ^. _rightEdge) <$> nextV <*> iNext]
+             then [mkEdgesEvt (v ^. _leftEdge <<< _line) (v ^. _rightEdge <<< _line) <$> prevV <*> nextV <*> iPrev]
+             else [mkPrevEdgeEvt (v ^. _leftEdge <<< _line) <$> prevV <*> iPrev,
+                   mkNextEdgeEvt (v ^. _rightEdge <<< _line) <$> nextV <*> iNext]
                         
         allEvts = append (fromFoldable (compact es)) evts
         distF e = dist (v ^. _position) (intersectionPoint e)
@@ -230,8 +232,8 @@ handleSplitEvent' :: SplitE -> Tuple Vertex Vertex -> SLAV (Tuple Subtree (List 
 handleSplitEvent' e (Tuple x y) = do
     let lavId  = e ^. _vertex <<< _lavId
         intPos = e ^. _intersection
-    v1 <- liftEffect $ vertexFrom lavId intPos (e ^. _vertex <<< _leftEdge) (e ^. _oppositeEdge <<< _line) Nothing Nothing
-    v2 <- liftEffect $ vertexFrom lavId intPos (e ^. _oppositeEdge <<< _line) (e ^. _vertex <<< _rightEdge) Nothing Nothing
+    v1 <- liftEffect $ vertexFrom lavId intPos (e ^. _vertex <<< _leftEdge) (e ^. _oppositeEdge) Nothing Nothing
+    v2 <- liftEffect $ vertexFrom lavId intPos (e ^. _oppositeEdge) (e ^. _vertex <<< _rightEdge) Nothing Nothing
 
     lav <- getLav lavId
     let v = e ^. _vertex
@@ -270,7 +272,7 @@ handleSplitEvent' e (Tuple x y) = do
     pure $ Tuple t evts
 
 
-processNewLAV :: LAV -> List Vertex -> SLAV (Triple (List PointEvent) (List Vector3) (Set.Set (LineSeg Vector3)))
+processNewLAV :: LAV -> List Vertex -> SLAV (Triple (List PointEvent) (List Vector3) (Set.Set Edge))
 processNewLAV lav nvs = if length lav > 2
                         then do addLav lav nvs
                                 evts <- traverse (nextEvent lav) nvs
@@ -305,9 +307,9 @@ testV eStart eNorm p v = do
                               xright = _cross (normal $ x ^. _bisector <<< _direction) (normal $ p <-> x ^. _position) <= epsilon
                           in if xleft && xright then Just t else Nothing
 
-    pure $ if eNorm == direction (v ^. _leftEdge) && eStart == v ^. _leftEdge <<< _start
+    pure $ if eNorm == direction (v ^. _leftEdge <<< _line) && eStart == v ^. _leftEdge <<< _line <<< _start
            then lav >>= prevVertex v >>= Tuple v >>> f
-           else if eNorm == direction (v ^. _rightEdge) && eStart == v ^. _rightEdge <<< _start
+           else if eNorm == direction (v ^. _rightEdge <<< _line) && eStart == v ^. _rightEdge <<< _line <<< _start
                 then lav >>= nextVertex v >>= flip Tuple v >>> f
                 else Nothing
 
@@ -316,7 +318,7 @@ addEvtsToQueue :: forall f. Foldable f => PQueue Number PointEvent -> f PointEve
 addEvtsToQueue = foldl (\q' e -> PQ.insert (distance e) e q')
 
 -- Compute Straight Skeleton of a polygon
-skeletonize :: forall f v. Functor f => Foldable f => Traversable f => Eq v => Vector v => f (Polygon v) -> Effect (Tuple (List Subtree) (List Edge))
+skeletonize :: forall v. Eq v => Vector v => Polygon v -> Effect (Tuple (List Subtree) (List Edge))
 skeletonize = runSLAV do
     trees <- skeletonize'
     edges <- fromFoldable <<< view _edges <$> get

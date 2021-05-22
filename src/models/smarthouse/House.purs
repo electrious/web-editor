@@ -64,7 +64,7 @@ _trees = _Newtype <<< prop (SProxy :: SProxy "trees")
 createHouseFrom :: Angle -> Polygon Vector3 -> Effect House
 createHouseFrom slope poly = do
     i <- genUUID
-    Tuple trees edges <- skeletonize $ singleton $ counterClockPoly poly
+    Tuple trees edges <- skeletonize $ counterClockPoly poly
     roofs <- generateRoofs slope (S.fromFoldable trees) edges
     
     pure $ House {

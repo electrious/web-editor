@@ -18,11 +18,12 @@ import Editor.Common.Lenses (_height, _id)
 import Effect (Effect)
 import Math.LineSeg (LineSeg, mkLineSeg)
 import Model.UUID (class HasUUID, idLens)
+import SmartHouse.Algorithm.Edge (Edge)
 import SmartHouse.Algorithm.LAV (_edges)
 import Three.Math.Vector (Vector3, (<**>), (<+>))
 
 data SubtreeType = NormalNode
-                 | MergedNode (LineSeg Vector3) (LineSeg Vector3)
+                 | MergedNode Edge Edge
                                               -- the subtree node is merged from 3 bisectors.
                                               -- The two edges carried here should be considered to form one edge
                                               -- when generting the roofs.
@@ -36,7 +37,7 @@ newtype Subtree = Subtree {
     source          :: Vector3,
     height          :: Number,
     sinks           :: List Vector3,
-    edges           :: List (LineSeg Vector3),
+    edges           :: List Edge,
     subtreeType     :: SubtreeType,
     isGable         :: Boolean,         -- if this subtree node is gable
     originalSubtree :: Maybe Subtree    -- the original subtree after gabled
@@ -74,7 +75,7 @@ _originalSubtree :: forall t a r. Newtype t { originalSubtree :: a | r } => Lens
 _originalSubtree = _Newtype <<< prop (SProxy :: SProxy "originalSubtree")
 
 
-subtree :: SubtreeType -> Vector3 -> Number -> List Vector3 -> List (LineSeg Vector3) -> Effect Subtree
+subtree :: SubtreeType -> Vector3 -> Number -> List Vector3 -> List Edge -> Effect Subtree
 subtree t source h ss es = do
     i <- genUUID
     pure $ Subtree {

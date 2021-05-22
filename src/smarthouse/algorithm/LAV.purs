@@ -21,12 +21,11 @@ import Data.Map as M
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Data.Traversable (class Traversable, sequence, traverse)
+import Data.Traversable (sequence)
 import Data.Triple (Triple(..))
 import Data.Tuple (Tuple(..))
 import Data.UUID (UUID, emptyUUID, genUUID)
 import Data.UUIDMap (UUIDMap)
-import Data.UUIDMap as UM
 import Editor.Common.Lenses (_id, _indices)
 import Effect (Effect)
 import Math.Line (_direction)
@@ -35,7 +34,8 @@ import Model.Polygon (Polygon, newPolygon, polyWindows)
 import Model.UUID (class HasUUID, idLens)
 import SmartHouse.Algorithm.Edge (Edge, edge)
 import SmartHouse.Algorithm.Event (PointEvent(..), _vertexA, _vertexB, _vertexC)
-import SmartHouse.Algorithm.Vertex (Vertex, _bisector, _lavId, _leftEdge, _rightEdge, _usable, vertexFrom)
+import SmartHouse.Algorithm.VertInfo (VertInfo, _bisector, _usable, vertInfoFrom)
+import SmartHouse.Algorithm.Vertex (Vertex, _lavId, _leftEdge, _rightEdge, vertexFrom, vertexFromVertInfo)
 import Three.Math.Vector (class Vector, Vector3, getVector, normal, (<->))
 
 newtype LAV = LAV {
@@ -60,11 +60,15 @@ instance defaultLAV :: Default LAV where
         }
 
 -- create a LAV for a polygon
-lavFromPolygon :: forall v. Vector v => Polygon v -> Effect LAV
-lavFromPolygon poly = do
+lavFromPolygon :: Array VertInfo -> Array Edge -> Effect LAV
+lavFromPolygon vis es = do
     i <- genUUID
-    let mkV (Triple prev p next) = vertexFrom i p (mkLineSeg prev p) (mkLineSeg p next) Nothing Nothing
-    vs <- traverse mkV $ polyWindows $ getVector <$> poly
+    let pes = fromMaybe es $ Arr.cons <$> Arr.last es <*> Arr.init es
+        ets = Tuple <$> pes <*> es
+
+        mkV vi (Tuple le re) = vertexFromVertInfo i le re vi
+    vs <- sequence $ zipWith mkV vis ets
+    
     let idxMap = M.fromFoldable $ mapWithIndex (\idx v -> Tuple (v ^. idLens) idx) vs
     pure $ def # _id       .~ i
                # _vertices .~ vs
@@ -207,19 +211,25 @@ normalizeContour = newPolygon <<< map g <<< filter f <<< polyWindows
           g (Triple _ p _) = p
 
 
-slavFromPolygon :: forall f v. Functor f => Foldable f => Traversable f => Eq v => Vector v => f (Polygon v) -> Effect SLAVState
-slavFromPolygon polys = do
-    lavs <- Arr.fromFoldable <$> traverse (lavFromPolygon <<< normalizeContour) polys
-    let vs    = Arr.concatMap (view _vertices) lavs
-        ns    = fromMaybe vs $ Arr.snoc <$> Arr.tail vs <*> Arr.head vs
-    edges <- sequence $ zipWith edge vs ns
-    pure $ def # _lavs        .~ UM.fromFoldable lavs
+slavFromPolygon :: forall v. Eq v => Vector v => Polygon v -> Effect SLAVState
+slavFromPolygon poly = do
+    let mkVi (Triple prev p next) = vertInfoFrom p (mkLineSeg prev p) (mkLineSeg p next) Nothing Nothing
+        vis = mkVi <$> polyWindows (getVector <$> normalizeContour poly)
+        ns  = fromMaybe vis $ Arr.snoc <$> Arr.tail vis <*> Arr.head vis
+
+    edges <- sequence $ zipWith edge vis ns
+    
+    lav <- lavFromPolygon vis edges
+
+    let vs = lav ^. _vertices
+
+    pure $ def # _lavs        .~ M.singleton (lav ^. idLens) lav
                # _edges       .~ edges
                # _validStates .~ M.fromFoldable (flip Tuple true <<< view idLens <$> vs)
 
 -- run a SLAV action with a list of polygons
-runSLAV :: forall a f v. Functor f => Foldable f => Traversable f => Eq v => Vector v => SLAV a -> f (Polygon v) -> Effect a
-runSLAV slav ps = slavFromPolygon ps >>= evalStateT slav
+runSLAV :: forall a v. Eq v => Vector v => SLAV a -> Polygon v -> Effect a
+runSLAV slav poly = slavFromPolygon poly >>= evalStateT slav
 
 emptySLAV :: SLAV Boolean
 emptySLAV = M.isEmpty <<< view _lavs <$> get

@@ -17,7 +17,7 @@ import Math.Angle (Angle, degreeVal, tan)
 import Math.LineSeg (LineSeg, _end, _start, direction)
 import Model.Polygon (newPolygon)
 import Model.SmartHouse.Roof (Roof, _subtrees, createRoofFrom)
-import SmartHouse.Algorithm.Edge (Edge(..), _leftVertex, _line, _rightVertex)
+import SmartHouse.Algorithm.Edge (Edge(..),  _line)
 import SmartHouse.Algorithm.LAV (_edges)
 import Smarthouse.Algorithm.Subtree (Subtree, _source)
 import Three.Math.Vector (Vector3, mkVec3, (<**>), (<+>), (<->), (<.>))
@@ -55,8 +55,8 @@ treesForEdge e ts = S.filter f ts
 
 roofDataForEdge :: Edge -> Set Subtree -> RoofData
 roofDataForEdge e ts =
-    let lv = e ^. _leftVertex <<< _position
-        rv = e ^. _rightVertex <<< _position
+    let lv = e ^. _leftVertex
+        rv = e ^. _rightVertex
     in RoofData {
         subtrees  : treesForEdge e ts,
         edgeNodes : (lv : rv : Nil),
