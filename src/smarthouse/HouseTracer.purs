@@ -26,7 +26,7 @@ import Editor.SceneEvent (SceneMouseMoveEvent)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, sampleDyn, step)
 import FRP.Event (Event)
-import FRP.Event.Extra (delay, multicast, performEvent)
+import FRP.Event.Extra (delay, distinct, multicast, performEvent)
 import Math.Angle (degreeVal)
 import Math.LineSeg (LineSeg, _end, _start, distToLineSeg, intersection, lineVec, linesAngle, mkLineSeg, perpendicularLineSeg, projPointWithLineSeg)
 import Model.ActiveMode (ActiveMode(..), isActive)
@@ -58,6 +58,10 @@ data TracerMode = Waiting  -- waiting user to start tracing
                 | Tracing
 
 derive instance eqTracerMode :: Eq TracerMode
+
+fromBoolean :: Boolean -> TracerMode
+fromBoolean true  = Waiting
+fromBoolean false = Tracing
 
 -- result data type of the house tracer
 newtype TracerResult = TracerResult {
@@ -343,6 +347,9 @@ traceHouse conf = node (def # _name    .~ "house-tracer"
             -- reset state after finish tracing a new house
             newStAfterFinishEvt = delay 20 $ const def <$> polyEvt
 
+            modeEvt = fromBoolean <$> distinct (view _finished <$> stEvt)
+
             res = def # _tracedPolygon .~ polyEvt
+                      # _tracerMode    .~ modeEvt
 
         pure { input: multicast (newStAfterFinishEvt <|> newStEvt), output: res }
