@@ -53,6 +53,8 @@ instance defaultHouseTracerConf :: Default HouseTracerConf where
         stopTracing : empty
         }
 
+_stopTracing :: forall t a r. Newtype t { stopTracing :: a | r } => Lens' t a
+_stopTracing = _Newtype <<< prop (SProxy :: SProxy "stopTracing")
 
 data TracerMode = Waiting  -- waiting user to start tracing
                 | Tracing
@@ -114,6 +116,9 @@ addNewVert v s = case s ^. _firstVert of
                else s # _tracedVerts %~ Cons v
     Nothing -> s # _tracedVerts %~ Cons v
                  # _firstVert   .~ Just v
+
+resetTracer :: Unit -> TracerState -> TracerState
+resetTracer _ _ = def
 
 lastVert :: TracerState -> Maybe Vector3
 lastVert s = head $ s ^. _tracedVerts
@@ -341,7 +346,8 @@ traceHouse conf = node (def # _name    .~ "house-tracer"
         -- render the vertex adder
         newVertEvt <- vertAdder conf stDyn
 
-        let newStEvt = multicast $ sampleDyn stDyn $ addNewVert <$> newVertEvt
+        let newStEvt = multicast $ sampleDyn stDyn $ (addNewVert <$> newVertEvt) <|>
+                                                     (resetTracer <$> conf ^. _stopTracing)
             polyEvt  = multicast $ newPolygon <<< view _tracedVerts <$> filter (view _finished) newStEvt
 
             -- reset state after finish tracing a new house
