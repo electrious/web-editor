@@ -46,7 +46,7 @@ import Rendering.Node (Node, fixNodeDWith, fixNodeEWith, getEnv, getParent, loca
 import Rendering.TextureLoader (textureFromUrl)
 import SmartHouse.BuilderMode (BuilderMode(..))
 import SmartHouse.HouseEditor (HouseRenderMode(..), editHouse, renderHouse)
-import SmartHouse.HouseTracer (traceHouse)
+import SmartHouse.HouseTracer (_tracedPolygon, traceHouse)
 import SmartHouse.UI (_showSaveDyn, houseBuilderUI)
 import Specular.Dom.Widget (runMainWidgetInNode)
 import Three.Core.Geometry (mkPlaneGeometry)
@@ -226,9 +226,9 @@ builderForHouse exportEvt tInfo =
                     actEvt      = keepLatest $ getActivated <$> nodesEvt
                     actHouseEvt = (Just <$> actEvt) <|> deactEvt
                 
-                floorPlanEvt <- traceHouse $ def # _modeDyn   .~ (tracerMode <$> actHouseDyn <*> modeDyn)
-                                                 # _mouseMove .~ helper ^. _mouseMove
-                let houseEvt = performEvent $ createHouseFrom (degree 30.0) <$> floorPlanEvt
+                traceRes <- traceHouse $ def # _modeDyn   .~ (tracerMode <$> actHouseDyn <*> modeDyn)
+                                             # _mouseMove .~ helper ^. _mouseMove
+                let houseEvt = performEvent $ createHouseFrom (degree 30.0) <$> (traceRes ^. _tracedPolygon)
                     addHouseEvt = HouseOpCreate <$> houseEvt
                     updHouseEvt = keepLatest (getHouseUpd <$> nodesEvt)
 

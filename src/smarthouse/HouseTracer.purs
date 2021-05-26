@@ -40,18 +40,45 @@ import Three.Core.Object3D (worldToLocal)
 import Three.Math.Vector (Vector3, addScaled, dist, mkVec3, toVec2, toVec3)
 
 newtype HouseTracerConf = HouseTracerConf {
-    modeDyn   :: Dynamic ActiveMode,
-    mouseMove :: Event SceneMouseMoveEvent
+    modeDyn     :: Dynamic ActiveMode,
+    mouseMove   :: Event SceneMouseMoveEvent,
+    stopTracing :: Event Unit
     }
 
 derive instance newtypeHouseTracerConf :: Newtype HouseTracerConf _
 instance defaultHouseTracerConf :: Default HouseTracerConf where
     def = HouseTracerConf {
-        modeDyn   : pure Active,
-        mouseMove : empty
+        modeDyn     : pure Active,
+        mouseMove   : empty,
+        stopTracing : empty
         }
 
 
+data TracerMode = Waiting  -- waiting user to start tracing
+                | Tracing
+
+derive instance eqTracerMode :: Eq TracerMode
+
+-- result data type of the house tracer
+newtype TracerResult = TracerResult {
+    tracedPolygon :: Event (Polygon Vector3),
+    tracerMode    :: Event TracerMode
+    }
+
+derive instance newtypeTracerResult :: Newtype TracerResult _
+instance defaultTracerResult :: Default TracerResult where
+    def = TracerResult {
+        tracedPolygon : empty,
+        tracerMode    : empty
+        }
+
+_tracedPolygon :: forall t a r. Newtype t { tracedPolygon :: a | r } => Lens' t a
+_tracedPolygon = _Newtype <<< prop (SProxy :: SProxy "tracedPolygon")
+
+_tracerMode :: forall t a r. Newtype t { tracerMode :: a | r } => Lens' t a
+_tracerMode = _Newtype <<< prop (SProxy :: SProxy "tracerMode")
+
+-- internal state data
 newtype TracerState = TracerState {
     tracedVerts :: List Vector3,    -- all traced points in reverse order
     firstVert   :: Maybe Vector3,
@@ -299,7 +326,7 @@ vertAdder conf stDyn = do
     pure $ view _position <$> addedPntEvt
 
 
-traceHouse :: forall e. HouseTracerConf -> Node e (Event (Polygon Vector3))
+traceHouse :: forall e. HouseTracerConf -> Node e TracerResult
 traceHouse conf = node (def # _name    .~ "house-tracer"
                             # _visible .~ (isActive <$> conf ^. _modeDyn)) $
     fixNodeE \stEvt -> do
@@ -316,4 +343,6 @@ traceHouse conf = node (def # _name    .~ "house-tracer"
             -- reset state after finish tracing a new house
             newStAfterFinishEvt = delay 20 $ const def <$> polyEvt
 
-        pure { input: multicast (newStAfterFinishEvt <|> newStEvt), output: polyEvt }
+            res = def # _tracedPolygon .~ polyEvt
+
+        pure { input: multicast (newStAfterFinishEvt <|> newStEvt), output: res }
