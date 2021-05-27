@@ -47,12 +47,12 @@ import Rendering.TextureLoader (textureFromUrl)
 import SmartHouse.BuilderMode (BuilderMode(..))
 import SmartHouse.HouseEditor (HouseRenderMode(..), editHouse, renderHouse)
 import SmartHouse.HouseTracer (_tracedPolygon, traceHouse)
-import SmartHouse.UI (_showSaveDyn, houseBuilderUI)
+import SmartHouse.UI (houseBuilderUI)
 import Specular.Dom.Widget (runMainWidgetInNode)
 import Three.Core.Geometry (mkPlaneGeometry)
 import Three.Core.Material (mkMeshBasicMaterialWithTexture)
 import Three.Loader.TextureLoader (clampToEdgeWrapping, repeatWrapping, setRepeat, setWrapS, setWrapT, textureHeight, textureWidth)
-import UI.ButtonPane (ButtonClicked(..))
+import UI.ButtonPane (_close, _save, _showSaveDyn)
 import UI.EditorUIOp (EditorUIOp(..))
 import UI.RoofEditorUI (_editorOp)
 import Unsafe.Coerce (unsafeCoerce)
@@ -259,6 +259,6 @@ buildHouse editor cfg = do
                        # _showSaveDyn .~ step false (res ^. _hasHouse)
     uiEvts <- runMainWidgetInNode parentEl $ houseBuilderUI conf
     
-    void $ subscribe (const unit <$> filter ((==) BCSave) uiEvts) toExp
+    void $ subscribe (const unit <$> uiEvts ^. _save) toExp
 
-    pure $ res # _editorOp .~ (const Close <$> filter ((==) BCClose) uiEvts)
+    pure $ res # _editorOp .~ (const Close <$> uiEvts ^. _close)

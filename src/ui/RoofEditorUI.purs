@@ -6,7 +6,7 @@ import API (APIConfig, runAPI)
 import API.Roofplate (buildRoofplates)
 import Control.Alt ((<|>))
 import Data.Default (class Default, def)
-import Data.Lens (Lens', (^.))
+import Data.Lens (Lens', (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..), isJust)
@@ -25,11 +25,11 @@ import FRP.Event.Extra (multicast, performEvent)
 import Model.Roof.RoofPlate (RoofEdited)
 import Specular.Dom.Element (attrs, attrsD, classWhenD, class_, classes, el)
 import Specular.Dom.Widget (Widget)
-import Specular.FRP (filterEvent, filterJustEvent, leftmost, tagDyn)
+import Specular.FRP (filterJustEvent, leftmost, tagDyn)
 import Specular.FRP as S
 import UI.ArrayEditorUI (ArrayEditorUIOpt, arrayEditorPane)
-import UI.Bridge (fromUIEvent, toUIDyn)
-import UI.ButtonPane (ButtonClicked(..), buttons)
+import UI.Bridge (fromUIEvent, toUIDyn, toUIEvent)
+import UI.ButtonPane (_close, _save, _showCloseDyn, _showSaveDyn, buttons)
 import UI.ConfirmDialog (askConfirm)
 import UI.EditorUIOp (EditorUIOp(..))
 import UI.RoofInstructions (roofInstructions)
@@ -98,11 +98,12 @@ roofEditorUI opt = do
 
         let showSaveDyn = (&&) <$> ((==) RoofEditing <$> modeD) <*> (isJust <$> rsDyn)
             showCloseDyn = ((/=) Showing) <$> modeD
-        opEvt <- buttons showSaveDyn showCloseDyn
+        btnPane <- buttons $ def # _showSaveDyn  .~ showSaveDyn
+                                 # _showCloseDyn .~ showCloseDyn
 
         -- Save events means the save button clicked here
-        let saveClickedEvt = filterEvent ((==) BCSave) opEvt
-        closeEvt   <- fromUIEvent $ const Close <$> filterEvent ((==) BCClose) opEvt
+        saveClickedEvt <- liftEffect $ toUIEvent $ btnPane ^. _save
+        let closeEvt = const Close <$> (btnPane ^. _close)
         
         canSaveEvt <- askConfirm $ const unit <$> saveClickedEvt
         toSaveEvt  <- fromUIEvent $ filterJustEvent $ tagDyn rsDyn $ const unit <$> canSaveEvt
