@@ -21,12 +21,11 @@ import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple(..), fst)
 import Editor.Common.Lenses (_face, _modeDyn, _mouseMove, _name, _parent, _point, _position)
 import Editor.ObjectAdder (createObjectAdder, mkCandidatePoint)
-import Editor.PanelAPIInterpreter (_finished)
 import Editor.SceneEvent (SceneMouseMoveEvent)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, sampleDyn, step)
-import FRP.Event (Event)
-import FRP.Event.Extra (delay, distinct, multicast, performEvent)
+import FRP.Event (Event, withLast)
+import FRP.Event.Extra (delay, multicast, performEvent)
 import Math.Angle (degreeVal)
 import Math.LineSeg (LineSeg, _end, _start, distToLineSeg, intersection, lineVec, linesAngle, mkLineSeg, perpendicularLineSeg, projPointWithLineSeg)
 import Model.ActiveMode (ActiveMode(..), isActive)
@@ -91,7 +90,7 @@ _tracerMode = _Newtype <<< prop (SProxy :: SProxy "tracerMode")
 newtype TracerState = TracerState {
     tracedVerts :: List Vector3,    -- all traced points in reverse order
     firstVert   :: Maybe Vector3,
-    finished    :: Boolean
+    tracerMode  :: TracerMode
     }
 
 derive instance newtypeTracerState :: Newtype TracerState _
@@ -100,7 +99,7 @@ instance defaultTracerState :: Default TracerState where
     def = TracerState {
         tracedVerts : Nil,
         firstVert   : Nothing,
-        finished    : false
+        tracerMode  : Waiting
         }
 instance showTracerState :: Show TracerState where
     show = genericShow
@@ -114,11 +113,12 @@ _firstVert = _Newtype <<< prop (SProxy :: SProxy "firstVert")
 addNewVert :: Vector3 -> TracerState -> TracerState
 addNewVert v s = case s ^. _firstVert of
     Just fv -> if dist v fv < 0.2
-               then s # _finished .~ true
+               then s # _tracerMode  .~ Waiting
                       # _tracedVerts %~ Cons fv
                else s # _tracedVerts %~ Cons v
     Nothing -> s # _tracedVerts %~ Cons v
                  # _firstVert   .~ Just v
+                 # _tracerMode  .~ Tracing
 
 resetTracer :: Unit -> TracerState -> TracerState
 resetTracer _ _ = def
@@ -351,12 +351,19 @@ traceHouse conf = node (def # _name    .~ "house-tracer"
 
         let newStEvt = multicast $ sampleDyn stDyn $ (addNewVert <$> newVertEvt) <|>
                                                      (resetTracer <$> conf ^. _stopTracing)
-            polyEvt  = multicast $ newPolygon <<< view _tracedVerts <$> filter (view _finished) newStEvt
+
+            modeEvt = multicast $ view _tracerMode <$> stEvt
+
+            -- only fire the new polygon event when the mode turns from Tracing to Waiting
+            f { last : l, now : n } = case l of
+                Just ls -> ls ^. _tracerMode == Tracing && n ^. _tracerMode == Waiting
+                Nothing -> false
+            g { now: n } = n ^. _tracedVerts
+            
+            polyEvt  = multicast $ newPolygon <<< g <$> filter f (withLast newStEvt)
 
             -- reset state after finish tracing a new house
             newStAfterFinishEvt = delay 20 $ const def <$> polyEvt
-
-            modeEvt = multicast $ fromBoolean <$> distinct (view _finished <$> stEvt)
 
             res = def # _tracedPolygon .~ polyEvt
                       # _tracerMode    .~ modeEvt
