@@ -245,8 +245,9 @@ builderForHouse evts tInfo =
                     actEvt      = keepLatest $ getActivated <$> nodesEvt
                     actHouseEvt = (Just <$> actEvt) <|> deactEvt
                 
-                traceRes <- traceHouse $ def # _modeDyn   .~ (tracerMode <$> actHouseDyn <*> modeDyn)
-                                             # _mouseMove .~ helper ^. _mouseMove
+                traceRes <- traceHouse $ def # _modeDyn     .~ (tracerMode <$> actHouseDyn <*> modeDyn)
+                                             # _mouseMove   .~ helper ^. _mouseMove
+                                             # _stopTracing .~ (evts ^. _stopTracing)
                 let houseEvt = performEvent $ createHouseFrom (degree 30.0) <$> (traceRes ^. _tracedPolygon)
                     addHouseEvt = HouseOpCreate <$> houseEvt
                     updHouseEvt = keepLatest (getHouseUpd <$> nodesEvt)

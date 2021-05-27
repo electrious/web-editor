@@ -95,7 +95,7 @@ buttons conf =
                    # _reset .~ rstEvt
 
 saveBtn :: Boolean -> Widget (S.Event Unit)
-saveBtn true  = buttonOnClick (pure $ mkAttrs ["class" :~ "uk-button"]) (text "Save")
+saveBtn true  = buttonOnClick (pure $ mkAttrs ["class" :~ "uk-button uk-margin-left"]) (text "Save")
 saveBtn false = pure never
 
 
