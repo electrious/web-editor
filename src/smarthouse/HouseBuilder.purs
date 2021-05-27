@@ -10,7 +10,6 @@ import Custom.Mesh (TapMouseMesh)
 import Data.Array (fromFoldable)
 import Data.Compactable (compact)
 import Data.Default (class Default, def)
-import Data.Filterable (filter)
 import Data.Foldable (class Foldable)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
@@ -46,13 +45,13 @@ import Rendering.Node (Node, fixNodeDWith, fixNodeEWith, getEnv, getParent, loca
 import Rendering.TextureLoader (textureFromUrl)
 import SmartHouse.BuilderMode (BuilderMode(..))
 import SmartHouse.HouseEditor (HouseRenderMode(..), editHouse, renderHouse)
-import SmartHouse.HouseTracer (_tracedPolygon, traceHouse)
+import SmartHouse.HouseTracer (TracerMode(..), _stopTracing, _tracedPolygon, _tracerMode, traceHouse)
 import SmartHouse.UI (houseBuilderUI)
 import Specular.Dom.Widget (runMainWidgetInNode)
 import Three.Core.Geometry (mkPlaneGeometry)
 import Three.Core.Material (mkMeshBasicMaterialWithTexture)
 import Three.Loader.TextureLoader (clampToEdgeWrapping, repeatWrapping, setRepeat, setWrapS, setWrapT, textureHeight, textureWidth)
-import UI.ButtonPane (_close, _save, _showSaveDyn)
+import UI.ButtonPane (_close, _reset, _save, _showResetDyn, _showSaveDyn)
 import UI.EditorUIOp (EditorUIOp(..))
 import UI.RoofEditorUI (_editorOp)
 import Unsafe.Coerce (unsafeCoerce)
@@ -76,6 +75,7 @@ newtype HouseBuilt = HouseBuilt {
     filesExported  :: Event MeshFiles,
     housesExported :: Event JSHouses,
     hasHouse       :: Event Boolean,
+    tracerMode     :: Event TracerMode,
     editorOp       :: Event EditorUIOp
     }
 
@@ -85,6 +85,7 @@ instance defaultHouseBuilt :: Default HouseBuilt where
         filesExported  : empty,
         housesExported : empty,
         hasHouse       : empty,
+        tracerMode     : empty,
         editorOp       : empty
         }
 
@@ -101,6 +102,7 @@ compactHouseBuilt :: Event HouseBuilt -> HouseBuilt
 compactHouseBuilt e = def # _filesExported  .~ keepLatest (view _filesExported <$> e)
                           # _housesExported .~ keepLatest (view _housesExported <$> e)
                           # _hasHouse       .~ keepLatest (view _hasHouse <$> e)
+                          # _tracerMode     .~ keepLatest (view _tracerMode <$> e)
                           # _editorOp       .~ keepLatest (view _editorOp <$> e)
 
 
@@ -195,8 +197,24 @@ tracerMode :: Maybe UUID -> BuilderMode -> ActiveMode
 tracerMode _ Showing  = Inactive
 tracerMode h Building = fromBoolean $ isNothing h
 
-createHouseBuilder :: Event Unit -> Node HouseBuilderConfig HouseBuilt
-createHouseBuilder exportEvt = node (def # _name .~ "house-builder") $ do
+newtype BuilderInputEvts = BuilderInputEvts {
+    export      :: Event Unit,
+    stopTracing :: Event Unit
+    }
+
+derive instance newtypeBuilderInputEvts :: Newtype BuilderInputEvts _
+instance defaultBuilderInputEvts :: Default BuilderInputEvts where
+    def = BuilderInputEvts {
+        export      : empty,
+        stopTracing : empty
+        }
+
+_export :: forall t a r. Newtype t { export :: a | r } => Lens' t a
+_export = _Newtype <<< prop (SProxy :: SProxy "export")
+
+
+createHouseBuilder :: BuilderInputEvts -> Node HouseBuilderConfig HouseBuilt
+createHouseBuilder evts = node (def # _name .~ "house-builder") $ do
     cfg <- getEnv
     let lId = cfg ^. _leadId
 
@@ -205,11 +223,12 @@ createHouseBuilder exportEvt = node (def # _name .~ "house-builder") $ do
 
     -- load texture image
     let tInfoEvt = keepLatest $ loadHouseTexture <$> imgEvt
-    evt <- eventNode $ builderForHouse exportEvt <$> tInfoEvt
+    evt <- eventNode $ builderForHouse evts <$> tInfoEvt
     pure $ compactHouseBuilt evt
 
-builderForHouse :: Event Unit -> HouseTextureInfo -> Node HouseBuilderConfig HouseBuilt
-builderForHouse exportEvt tInfo =
+
+builderForHouse :: BuilderInputEvts -> HouseTextureInfo -> Node HouseBuilderConfig HouseBuilt
+builderForHouse evts tInfo =
     fixNodeEWith def \hdEvt ->
         fixNodeDWith Nothing \actHouseDyn ->
             fixNodeDWith Building \modeDyn -> do
@@ -236,10 +255,13 @@ builderForHouse exportEvt tInfo =
 
                     newHdEvt = multicast $ sampleOn hdEvt $ applyHouseOp <$> opEvt
 
+                    exportEvt = multicast $ evts ^. _export
+                    
                     modeEvt = (const Showing <$> exportEvt) <|> 
                               (const Building <$> delay 30 exportEvt)
                     toExpEvt = delay 15 exportEvt
                     res = def # _hasHouse       .~ (hasHouse <$> hdEvt)
+                              # _tracerMode     .~ (traceRes ^. _tracerMode)
                               # _filesExported  .~ performEvent (const (exportObject pNode) <$> toExpEvt)
                               # _housesExported .~ (exportHouses <$> sampleOn_ hdEvt toExpEvt)
 
@@ -252,13 +274,19 @@ buildHouse editor cfg = do
     setMode editor EditorMode.HouseBuilding
     
     { event: expEvt, push: toExp } <- create
+    { event: stopTracingEvt, push: toStopTracing } <- create
 
-    res <- fst <$> runNode (createHouseBuilder expEvt) (mkNodeEnv editor cfg)
+    let inputEvts = def # _export      .~ expEvt
+                        # _stopTracing .~ stopTracingEvt
+
+    res <- fst <$> runNode (createHouseBuilder inputEvts) (mkNodeEnv editor cfg)
     let parentEl = unsafeCoerce $ editor ^. _parent
         conf     = def # _sizeDyn     .~ (editor ^. _sizeDyn)
                        # _showSaveDyn .~ step false (res ^. _hasHouse)
+                       # _showResetDyn .~ step false ((==) Tracing <$> (res ^. _tracerMode))
     uiEvts <- runMainWidgetInNode parentEl $ houseBuilderUI conf
-    
+
     void $ subscribe (const unit <$> uiEvts ^. _save) toExp
+    void $ subscribe (const unit <$> uiEvts ^. _reset) toStopTracing
 
     pure $ res # _editorOp .~ (const Close <$> uiEvts ^. _close)

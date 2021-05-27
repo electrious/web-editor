@@ -11,7 +11,7 @@ import Data.Generic.Rep.Show (genericShow)
 import Data.Lens (Lens', (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.List (List, fromFoldable, singleton)
+import Data.List (List, fromFoldable)
 import Data.Map as M
 import Data.Maybe (Maybe(..))
 import Data.Meter (Meter, meter, meterVal)

@@ -59,7 +59,10 @@ _stopTracing = _Newtype <<< prop (SProxy :: SProxy "stopTracing")
 data TracerMode = Waiting  -- waiting user to start tracing
                 | Tracing
 
+derive instance genericTracerMode :: Generic TracerMode _
 derive instance eqTracerMode :: Eq TracerMode
+instance showTracerMode :: Show TracerMode where
+    show = genericShow
 
 fromBoolean :: Boolean -> TracerMode
 fromBoolean true  = Waiting
@@ -353,7 +356,7 @@ traceHouse conf = node (def # _name    .~ "house-tracer"
             -- reset state after finish tracing a new house
             newStAfterFinishEvt = delay 20 $ const def <$> polyEvt
 
-            modeEvt = fromBoolean <$> distinct (view _finished <$> stEvt)
+            modeEvt = multicast $ fromBoolean <$> distinct (view _finished <$> stEvt)
 
             res = def # _tracedPolygon .~ polyEvt
                       # _tracerMode    .~ modeEvt

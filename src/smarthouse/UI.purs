@@ -13,7 +13,7 @@ import FRP.Dynamic (Dynamic)
 import Specular.Dom.Element (attrsD, class_)
 import Specular.Dom.Widget (Widget)
 import UI.Bridge (toUIDyn)
-import UI.ButtonPane (ButtonsPane, _showCloseDyn, _showSaveDyn, buttons)
+import UI.ButtonPane (ButtonsPane, _showCloseDyn, _showResetDyn, _showSaveDyn, buttons)
 import UI.Utils (div, mkStyle, (:~))
 
 newtype BuilderUIConf = BuilderUIConf {
@@ -42,5 +42,7 @@ houseBuilderUI cfg = do
     sizeD <- liftEffect $ toUIDyn $ cfg ^. _sizeDyn
     div [attrsD $ style <$> sizeD, class_ "uk-inline"] do
         showD <- liftEffect $ toUIDyn $ cfg ^. _showSaveDyn
+        showR <- liftEffect $ toUIDyn $ cfg ^. _showResetDyn
         buttons $ def # _showSaveDyn  .~ showD
                       # _showCloseDyn .~ pure true
+                      # _showResetDyn .~ showR
