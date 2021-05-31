@@ -11,15 +11,34 @@ import Data.Lens (Lens', view, (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
+import Data.Show (class Show)
 import Data.Symbol (SProxy(..))
 import FRP.Event (Event, keepLatest)
 import FRP.Event.Extra (delay)
 import Foreign (Foreign)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode)
+import Model.ActiveMode (ActiveMode(..))
 import Model.SmartHouse.House (JSHouses)
 import OBJExporter (MeshFiles, _mtl, _obj)
 
+
+data SavingStep = NotSaving
+                | UploadingFiles
+                | CreatingHouse
+                | WaitingForReady
+
+derive instance genericSavingStep :: Generic SavingStep _
+derive instance eqSavingStep :: Eq SavingStep
+instance showSavingStep :: Show SavingStep where
+    show NotSaving       = "Not saving"
+    show UploadingFiles  = "Uploading mesh files for the new house..."
+    show CreatingHouse   = "Elli is analysing the new house data..."
+    show WaitingForReady = "Elli is analysing the new house data..."
+
+stepMode :: SavingStep -> ActiveMode
+stepMode NotSaving = Inactive
+stepMode _         = Active
 
 newtype UploadReq = UploadReq {
     obj     :: String,

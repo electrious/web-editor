@@ -1,4 +1,4 @@
-module SmartHouse.HouseBuilder (buildHouse, HouseBuilderConfig, HouseBuilt, _filesExported, _housesExported, _hasHouse) where
+module SmartHouse.HouseBuilder (buildHouse, HouseBuilderConfig, HouseBuilt,  _hasHouse) where
 
 import Prelude hiding (degree)
 
@@ -39,7 +39,7 @@ import Model.ActiveMode (ActiveMode(..), fromBoolean)
 import Model.SmartHouse.House (House, HouseNode, HouseOp(..), JSHouses(..), createHouseFrom, exportHouse, houseTapped)
 import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo, _size, _texture, mkHouseTextureInfo)
 import Model.UUID (idLens)
-import OBJExporter (MeshFiles, exportObject)
+import OBJExporter (exportObject)
 import Rendering.DynamicNode (eventNode)
 import Rendering.Node (Node, fixNodeDWith, fixNodeEWith, getEnv, getParent, localEnv, mkNodeEnv, node, runNode, tapMouseMesh)
 import Rendering.TextureLoader (textureFromUrl)
@@ -72,8 +72,6 @@ instance defaultHouseBuilderConfig :: Default HouseBuilderConfig where
     def = HouseBuilderConfig { leadId : 0, apiConfig : def }
 
 newtype HouseBuilt = HouseBuilt {
-    filesExported  :: Event MeshFiles,
-    housesExported :: Event JSHouses,
     hasHouse       :: Event Boolean,
     tracerMode     :: Event TracerMode,
     editorOp       :: Event EditorUIOp
@@ -82,26 +80,16 @@ newtype HouseBuilt = HouseBuilt {
 derive instance newtypeHouseBuilt :: Newtype HouseBuilt _
 instance defaultHouseBuilt :: Default HouseBuilt where
     def = HouseBuilt {
-        filesExported  : empty,
-        housesExported : empty,
         hasHouse       : empty,
         tracerMode     : empty,
         editorOp       : empty
         }
 
-_filesExported :: forall t a r. Newtype t { filesExported :: a | r } => Lens' t a
-_filesExported = _Newtype <<< prop (SProxy :: SProxy "filesExported")
-
-_housesExported :: forall t a r. Newtype t { housesExported :: a | r } => Lens' t a
-_housesExported = _Newtype <<< prop (SProxy :: SProxy "housesExported")
-
 _hasHouse :: forall t a r. Newtype t { hasHouse :: a | r } => Lens' t a
 _hasHouse = _Newtype <<< prop (SProxy :: SProxy "hasHouse")
 
 compactHouseBuilt :: Event HouseBuilt -> HouseBuilt
-compactHouseBuilt e = def # _filesExported  .~ keepLatest (view _filesExported <$> e)
-                          # _housesExported .~ keepLatest (view _housesExported <$> e)
-                          # _hasHouse       .~ keepLatest (view _hasHouse <$> e)
+compactHouseBuilt e = def # _hasHouse       .~ keepLatest (view _hasHouse <$> e)
                           # _tracerMode     .~ keepLatest (view _tracerMode <$> e)
                           # _editorOp       .~ keepLatest (view _editorOp <$> e)
 
@@ -262,10 +250,12 @@ builderForHouse evts tInfo =
                     modeEvt = (const Showing <$> exportEvt) <|> 
                               (const Building <$> delay 30 exportEvt)
                     toExpEvt = delay 15 exportEvt
+
+                    meshFilesEvt = performEvent (const (exportObject pNode) <$> toExpEvt)
+                    housesEvt    = exportHouses <$> sampleOn_ hdEvt toExpEvt
+                    
                     res = def # _hasHouse       .~ (hasHouse <$> hdEvt)
                               # _tracerMode     .~ (traceRes ^. _tracerMode)
-                              # _filesExported  .~ performEvent (const (exportObject pNode) <$> toExpEvt)
-                              # _housesExported .~ (exportHouses <$> sampleOn_ hdEvt toExpEvt)
 
                 pure { input: modeEvt, output: { input: actHouseEvt, output : { input: newHdEvt, output : res } } }
                 
