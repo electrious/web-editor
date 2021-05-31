@@ -50,7 +50,7 @@ import SmartHouse.UI (houseBuilderUI)
 import Specular.Dom.Widget (runMainWidgetInNode)
 import Three.Core.Geometry (mkPlaneGeometry)
 import Three.Core.Material (mkMeshBasicMaterialWithTexture)
-import Three.Loader.TextureLoader (clampToEdgeWrapping, repeatWrapping, setRepeat, setWrapS, setWrapT, textureHeight, textureWidth)
+import Three.Loader.TextureLoader (clampToEdgeWrapping, repeatWrapping, setRepeat, setWrapS, setWrapT, textureDataURI, textureHeight, textureWidth)
 import UI.ButtonPane (_close, _reset, _save, _showResetDyn, _showSaveDyn)
 import UI.EditorUIOp (EditorUIOp(..))
 import UI.RoofEditorUI (_editorOp)
@@ -114,7 +114,8 @@ loadHouseTexture img = performEvent $ f <$> textureFromUrl (img ^. _link)
               setRepeat 1.0 1.0 t
 
               let s = size (textureWidth t) (textureHeight t)
-              pure $ mkHouseTextureInfo t s (img ^. _pixelPerMeter)
+                  d = textureDataURI t
+              pure $ mkHouseTextureInfo t s d (img ^. _pixelPerMeter)
 
 
 mkHelperPlane :: forall e. HouseTextureInfo -> Node e TapMouseMesh

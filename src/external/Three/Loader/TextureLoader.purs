@@ -23,3 +23,4 @@ foreign import loadTextureAsync :: String -> TextureLoader -> (Texture -> Effect
 foreign import dispose :: Texture -> Effect Unit
 foreign import textureWidth :: Texture -> Int
 foreign import textureHeight :: Texture -> Int
+foreign import textureDataURI :: Texture -> String

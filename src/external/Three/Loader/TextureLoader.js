@@ -24,6 +24,25 @@ exports.textureHeight = t => {
     return t.image.height
 }
 
+exports.textureDataURI = t => {
+    let img = t.image;
+    
+     // Create an empty canvas element
+    var canvas = document.createElement("canvas");
+    canvas.width = img.width;
+    canvas.height = img.height;
+
+    // Copy the image contents to the canvas
+    var ctx = canvas.getContext("2d");
+    ctx.drawImage(img, 0, 0);
+
+    // Get the data-URL formatted image
+    // Firefox supports PNG and JPEG. You could check img.src to
+    // guess the original format, but be aware the using "image/jpg"
+    // will re-encode the image.
+    return canvas.toDataURL("image/png");
+}
+
 // texture wrapping mode
 exports.clampToEdgeWrapping = three.ClampToEdgeWrapping
 exports.repeatWrapping = three.RepeatWrapping

@@ -17,20 +17,22 @@ import Three.Loader.TextureLoader (Texture)
 newtype HouseTextureInfo = HouseTextureInfo {
     texture       :: Texture,
     imageSize     :: S.Size,
+    imageDataURI  :: String,
     pixelPerMeter :: Number,
     size          :: Size
     }
 
 derive instance newtypeHouseTextureInfo :: Newtype HouseTextureInfo _
 
-mkHouseTextureInfo :: Texture -> S.Size -> Number -> HouseTextureInfo
-mkHouseTextureInfo t imgSz ppm = HouseTextureInfo {
-    texture : t,
-    imageSize : imgSz,
+mkHouseTextureInfo :: Texture -> S.Size -> String -> Number -> HouseTextureInfo
+mkHouseTextureInfo t imgSz datUri ppm = HouseTextureInfo {
+    texture       : t,
+    imageSize     : imgSz,
+    imageDataURI  : datUri,
     pixelPerMeter : ppm,
-    size : Size { width  : meter $ toNumber (imgSz ^. _width) / ppm,
-                  height : meter $ toNumber (imgSz ^. _height) / ppm
-                }
+    size          : Size { width  : meter $ toNumber (imgSz ^. _width) / ppm,
+                           height : meter $ toNumber (imgSz ^. _height) / ppm
+                         }
     }
 
 _texture :: forall t a r. Newtype t { texture :: a | r } => Lens' t a
@@ -41,3 +43,6 @@ _size = _Newtype <<< prop (SProxy :: SProxy "size")
 
 _imageSize :: forall t a r. Newtype t { imageSize :: a | r } => Lens' t a
 _imageSize = _Newtype <<< prop (SProxy :: SProxy "imageSize")
+
+_imageDataURI :: forall t a r. Newtype t { imageDataURI :: a | r } => Lens' t a
+_imageDataURI = _Newtype <<< prop (SProxy :: SProxy "imageDataURI")
