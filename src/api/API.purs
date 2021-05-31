@@ -23,6 +23,7 @@ import Effect (Effect)
 import Effect.Aff (Aff, Error, error, killFiber, launchAff_, runAff)
 import Effect.Class.Console (errorShow)
 import FRP.Event (Event, makeEvent, subscribe)
+import FRP.Event.Extra (performEvent)
 import Foreign.Generic (class Decode, class Encode, F, ForeignError(..), defaultOptions, genericDecode)
 import Partial.Unsafe (unsafePartial)
 
@@ -79,6 +80,12 @@ foreign import getErrorMessage :: Error -> String
 
 runAPI :: forall a. API a -> APIConfig -> Effect a
 runAPI (API a) = runReaderT a
+
+
+performAPIEvent :: forall a. Event (API a) -> API (Event a)
+performAPIEvent e = do
+    cfg <- ask
+    pure $ performEvent $ flip runAPI cfg <$> e
 
 
 data APIDataType = JSON

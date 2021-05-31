@@ -2,11 +2,15 @@ module API.SmartHouse where
 
 import Prelude
 
-import API (API, callAPI', formAPI')
+import API (API, callAPI', formAPI', performAPIEvent)
 import Axios.Types (Method(..))
 import Data.Generic.Rep (class Generic)
-import Data.Lens ((^.))
+import Data.Lens (Lens', (^.))
+import Data.Lens.Iso.Newtype (_Newtype)
+import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
+import Data.Symbol (SProxy(..))
+import Effect.Class (liftEffect)
 import FRP.Event (Event)
 import Foreign (Foreign)
 import Foreign.Class (class Decode, class Encode)
@@ -71,6 +75,20 @@ fieldTrans "success" = "success"
 fieldTrans "houseId" = "house_id"
 fieldTrans _         = ""
 
+
+_success :: forall t a r. Newtype t { sucess :: a | r } => Lens' t a
+_success = _Newtype <<< prop (SProxy :: SProxy "sucess")
+
+
 -- API to check if the house is aready or not
 checkReady :: Int -> API (Event ReadyAPIResp)
 checkReady lid = callAPI' POST ("/v1/lead/" <> show lid <> "/ready") {}
+
+-- check if the 2d house is ready or not repeatedly with a 2 seconds sleep, until it's ready.
+repeatCheckUntilReady :: Int -> API (Event ReadyAPIResp)
+repeatCheckUntilReady lid = f
+    where f = checkReady lid >>> processEvt
+          processEvt e = performAPIEvent $ g <$> e
+          g resp = if resp ^. _success
+                   then pure resp
+                   else checkReady lid
