@@ -11,6 +11,7 @@ import Custom.Mesh (TapMouseMesh)
 import Data.Array (fromFoldable)
 import Data.Compactable (compact)
 import Data.Default (class Default, def)
+import Data.Filterable (filter)
 import Data.Foldable (class Foldable)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
@@ -47,7 +48,7 @@ import Rendering.TextureLoader (textureFromUrl)
 import SmartHouse.BuilderMode (BuilderMode(..))
 import SmartHouse.HouseEditor (HouseRenderMode(..), editHouse, renderHouse)
 import SmartHouse.HouseTracer (TracerMode(..), _stopTracing, _tracedPolygon, _tracerMode, traceHouse)
-import SmartHouse.UI (houseBuilderUI)
+import SmartHouse.UI (_savingStepDyn, houseBuilderUI)
 import Specular.Dom.Widget (runMainWidgetInNode)
 import Three.Core.Geometry (mkPlaneGeometry)
 import Three.Core.Material (mkMeshBasicMaterialWithTexture)
@@ -257,14 +258,15 @@ builderForHouse evts tInfo =
 
                     exportEvt = multicast $ evts ^. _export
                     
-                    modeEvt = (const Showing <$> exportEvt) <|> 
-                              (const Building <$> delay 30 exportEvt)
                     toExpEvt = delay 15 exportEvt
 
                     meshFilesEvt = performEvent $ const (exportObject pNode) <$> toExpEvt
                     housesEvt    = exportHouses <$> sampleOn_ hdEvt toExpEvt
 
-                    stepEvt = saveMeshes cfg (tInfo ^. _imageDataURI) meshFilesEvt housesEvt 
+                    stepEvt = multicast $ saveMeshes cfg (tInfo ^. _imageDataURI) meshFilesEvt housesEvt
+
+                    modeEvt = (const Showing <$> exportEvt) <|> 
+                              (const Building <$> filter ((==) Finished) stepEvt)
                     
                     res = def # _hasHouse    .~ (hasHouse <$> hdEvt)
                               # _tracerMode  .~ (traceRes ^. _tracerMode)
@@ -308,9 +310,10 @@ buildHouse editor cfg = do
 
     res <- fst <$> runNode (createHouseBuilder inputEvts) (mkNodeEnv editor cfg)
     let parentEl = unsafeCoerce $ editor ^. _parent
-        conf     = def # _sizeDyn     .~ (editor ^. _sizeDyn)
-                       # _showSaveDyn .~ step false (res ^. _hasHouse)
-                       # _showResetDyn .~ step false ((==) Tracing <$> (res ^. _tracerMode))
+        conf     = def # _sizeDyn       .~ (editor ^. _sizeDyn)
+                       # _showSaveDyn   .~ step false (res ^. _hasHouse)
+                       # _showResetDyn  .~ step false ((==) Tracing <$> (res ^. _tracerMode))
+                       # _savingStepDyn .~ step NotSaving (res ^. _saveStepEvt)
     uiEvts <- runMainWidgetInNode parentEl $ houseBuilderUI conf
 
     void $ subscribe (const unit <$> uiEvts ^. _save) toExp
