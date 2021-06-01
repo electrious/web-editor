@@ -2,8 +2,9 @@ module SmartHouse.HouseBuilder (buildHouse, HouseBuilderConfig, HouseBuilt,  _ha
 
 import Prelude hiding (degree)
 
-import API (APIConfig, runAPI)
+import API (API, APIConfig, runAPI)
 import API.Image (ImageResp, _link, _pixelPerMeter, getImageMeta)
+import API.SmartHouse (SavingStep(..), createManual, repeatCheckUntilReady, uploadMeshFiles)
 import Control.Alt ((<|>))
 import Control.Alternative (empty)
 import Custom.Mesh (TapMouseMesh)
@@ -37,9 +38,9 @@ import FRP.Event.Extra (delay, multicast, performEvent)
 import Math.Angle (degree)
 import Model.ActiveMode (ActiveMode(..), fromBoolean)
 import Model.SmartHouse.House (House, HouseNode, HouseOp(..), JSHouses(..), createHouseFrom, exportHouse, houseTapped)
-import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo, _size, _texture, mkHouseTextureInfo)
+import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo, _imageDataURI, _size, _texture, mkHouseTextureInfo)
 import Model.UUID (idLens)
-import OBJExporter (exportObject)
+import OBJExporter (MeshFiles, exportObject)
 import Rendering.DynamicNode (eventNode)
 import Rendering.Node (Node, fixNodeDWith, fixNodeEWith, getEnv, getParent, localEnv, mkNodeEnv, node, runNode, tapMouseMesh)
 import Rendering.TextureLoader (textureFromUrl)
@@ -72,26 +73,32 @@ instance defaultHouseBuilderConfig :: Default HouseBuilderConfig where
     def = HouseBuilderConfig { leadId : 0, apiConfig : def }
 
 newtype HouseBuilt = HouseBuilt {
-    hasHouse       :: Event Boolean,
-    tracerMode     :: Event TracerMode,
-    editorOp       :: Event EditorUIOp
+    hasHouse    :: Event Boolean,
+    tracerMode  :: Event TracerMode,
+    saveStepEvt :: Event SavingStep,
+    editorOp    :: Event EditorUIOp
     }
 
 derive instance newtypeHouseBuilt :: Newtype HouseBuilt _
 instance defaultHouseBuilt :: Default HouseBuilt where
     def = HouseBuilt {
-        hasHouse       : empty,
-        tracerMode     : empty,
-        editorOp       : empty
+        hasHouse    : empty,
+        tracerMode  : empty,
+        saveStepEvt : empty,
+        editorOp    : empty
         }
 
 _hasHouse :: forall t a r. Newtype t { hasHouse :: a | r } => Lens' t a
 _hasHouse = _Newtype <<< prop (SProxy :: SProxy "hasHouse")
 
+_saveStepEvt :: forall t a r. Newtype t { saveStepEvt :: a | r } => Lens' t a
+_saveStepEvt = _Newtype <<< prop (SProxy :: SProxy "saveStepEvt")
+
 compactHouseBuilt :: Event HouseBuilt -> HouseBuilt
-compactHouseBuilt e = def # _hasHouse       .~ keepLatest (view _hasHouse <$> e)
-                          # _tracerMode     .~ keepLatest (view _tracerMode <$> e)
-                          # _editorOp       .~ keepLatest (view _editorOp <$> e)
+compactHouseBuilt e = def # _hasHouse    .~ keepLatest (view _hasHouse    <$> e)
+                          # _tracerMode  .~ keepLatest (view _tracerMode  <$> e)
+                          # _saveStepEvt .~ keepLatest (view _saveStepEvt <$> e)
+                          # _editorOp    .~ keepLatest (view _editorOp    <$> e)
 
 
 loadHouseTexture :: ImageResp -> Event HouseTextureInfo
@@ -222,6 +229,7 @@ builderForHouse evts tInfo =
         fixNodeDWith Nothing \actHouseDyn ->
             fixNodeDWith Building \modeDyn -> do
                 pNode <- getParent
+                cfg   <- getEnv
                 
                 -- add helper plane that accepts tap and drag events
                 helper <- mkHelperPlane tInfo
@@ -233,7 +241,8 @@ builderForHouse evts tInfo =
                 let deactEvt    = multicast $ const Nothing <$> helper ^. _tapped
                     actEvt      = keepLatest $ getActivated <$> nodesEvt
                     actHouseEvt = (Just <$> actEvt) <|> deactEvt
-                
+
+                -- trace new house
                 traceRes <- traceHouse $ def # _modeDyn     .~ (tracerMode <$> actHouseDyn <*> modeDyn)
                                              # _mouseMove   .~ helper ^. _mouseMove
                                              # _stopTracing .~ (evts ^. _stopTracing)
@@ -243,6 +252,7 @@ builderForHouse evts tInfo =
 
                     opEvt = addHouseEvt <|> updHouseEvt
 
+                    -- update HouseDictData by applying the house operations
                     newHdEvt = multicast $ sampleOn hdEvt $ applyHouseOp <$> opEvt
 
                     exportEvt = multicast $ evts ^. _export
@@ -251,14 +261,39 @@ builderForHouse evts tInfo =
                               (const Building <$> delay 30 exportEvt)
                     toExpEvt = delay 15 exportEvt
 
-                    meshFilesEvt = performEvent (const (exportObject pNode) <$> toExpEvt)
+                    meshFilesEvt = performEvent $ const (exportObject pNode) <$> toExpEvt
                     housesEvt    = exportHouses <$> sampleOn_ hdEvt toExpEvt
+
+                    stepEvt = saveMeshes cfg (tInfo ^. _imageDataURI) meshFilesEvt housesEvt 
                     
-                    res = def # _hasHouse       .~ (hasHouse <$> hdEvt)
-                              # _tracerMode     .~ (traceRes ^. _tracerMode)
+                    res = def # _hasHouse    .~ (hasHouse <$> hdEvt)
+                              # _tracerMode  .~ (traceRes ^. _tracerMode)
+                              # _saveStepEvt .~ stepEvt
 
                 pure { input: modeEvt, output: { input: actHouseEvt, output : { input: newHdEvt, output : res } } }
-                
+
+
+runAPIEvent :: forall a. APIConfig -> Event (API (Event a)) -> Event a
+runAPIEvent apiCfg = keepLatest <<< performEvent <<< map (flip runAPI apiCfg)
+
+saveMeshes :: HouseBuilderConfig -> String -> Event MeshFiles -> Event JSHouses -> Event SavingStep
+saveMeshes cfg imgStr mFilesEvt houseEvt =
+    let leadId = cfg ^. _leadId
+        apiCfg = cfg ^. _apiConfig
+        
+        doUpload fs = uploadMeshFiles leadId fs imgStr
+        uploadedEvt = multicast $ runAPIEvent apiCfg $ doUpload <$> mFilesEvt
+
+        toCreateEvt = multicast $ sampleOn_ houseEvt uploadedEvt
+        createdEvt  = multicast $ runAPIEvent apiCfg $ createManual leadId <$> toCreateEvt
+
+        readyEvt = runAPIEvent apiCfg $ const (repeatCheckUntilReady leadId) <$> createdEvt
+
+    in (const UploadingFiles  <$> mFilesEvt)   <|>
+       (const CreatingHouse   <$> toCreateEvt) <|>
+       (const WaitingForReady <$> createdEvt)  <|>
+       (const Finished        <$> readyEvt)
+
 
 -- | external API to build a 3D house for 2D lead
 buildHouse :: Editor -> HouseBuilderConfig -> Effect HouseBuilt

@@ -11,7 +11,6 @@ import Data.Lens (Lens', view, (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
-import Data.Show (class Show)
 import Data.Symbol (SProxy(..))
 import FRP.Event (Event, keepLatest)
 import FRP.Event.Extra (delay)
@@ -27,6 +26,7 @@ data SavingStep = NotSaving
                 | UploadingFiles
                 | CreatingHouse
                 | WaitingForReady
+                | Finished
 
 derive instance genericSavingStep :: Generic SavingStep _
 derive instance eqSavingStep :: Eq SavingStep
@@ -35,9 +35,11 @@ instance showSavingStep :: Show SavingStep where
     show UploadingFiles  = "Uploading mesh files for the new house..."
     show CreatingHouse   = "Elli is analysing the new house data..."
     show WaitingForReady = "Elli is analysing the new house data..."
+    show Finished        = "Finished creating the new house"
 
 stepMode :: SavingStep -> ActiveMode
 stepMode NotSaving = Inactive
+stepMode Finished  = Inactive
 stepMode _         = Active
 
 newtype UploadReq = UploadReq {
