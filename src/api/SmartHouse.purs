@@ -14,6 +14,7 @@ import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import FRP.Event (Event, keepLatest)
 import FRP.Event.Extra (delay)
+import Web.File (File)
 import Foreign (Foreign)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode)
@@ -43,9 +44,9 @@ stepMode Finished  = Inactive
 stepMode _         = Active
 
 newtype UploadReq = UploadReq {
-    obj     :: String,
-    mtl     :: String,
-    texture :: String
+    obj     :: File,
+    mtl     :: File,
+    texture :: File
     }
 
 derive instance newtypeUploadReq :: Newtype UploadReq _
@@ -55,7 +56,7 @@ foreign import toFormData :: UploadReq -> Foreign
 instance encodeUploadReq :: Encode UploadReq where
     encode = toFormData
 
-mkUploadReq :: MeshFiles -> String -> UploadReq
+mkUploadReq :: MeshFiles -> File -> UploadReq
 mkUploadReq m t = UploadReq {
     obj     : m ^. _obj,
     mtl     : m ^. _mtl,
@@ -72,7 +73,7 @@ instance decodeAPIResp :: Decode APIResp where
     decode = genericDecode (defaultOptions { unwrapSingleConstructors = true })
 
 -- API to upload obj/mtl/texture files
-uploadMeshFiles :: Int -> MeshFiles -> String -> API (Event APIResp)
+uploadMeshFiles :: Int -> MeshFiles -> File -> API (Event APIResp)
 uploadMeshFiles lid m t = formAPI' POST ("/v1/lead/" <> show lid <> "/scene/upload") $ mkUploadReq
  m t
 

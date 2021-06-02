@@ -182,7 +182,7 @@ exports.exportObject = object => _ => {
 	}
 
 	return {
-	    obj: output,
-	    mtl: mtlOutput
-	}
+	    obj: new File([output], "scene.obj"),
+	    mtl: new File([mtlOutput], "scene.mtl")
+	};
 };

@@ -24,7 +24,7 @@ exports.textureHeight = t => {
     return t.image.height
 }
 
-exports.textureDataURI = t => {
+exports.textureImage = t => cb => _ => {
     let img = t.image;
     
      // Create an empty canvas element
@@ -36,11 +36,10 @@ exports.textureDataURI = t => {
     var ctx = canvas.getContext("2d");
     ctx.drawImage(img, 0, 0);
 
-    // Get the data-URL formatted image
-    // Firefox supports PNG and JPEG. You could check img.src to
-    // guess the original format, but be aware the using "image/jpg"
-    // will re-encode the image.
-    return canvas.toDataURL("image/png");
+    var name = img.src.substring(img.src.lastIndexOf('/')+1);
+    canvas.toBlob(blob => {
+        cb(new File([blob], name))();
+    });
 }
 
 // texture wrapping mode

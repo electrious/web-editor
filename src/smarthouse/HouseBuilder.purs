@@ -39,7 +39,7 @@ import FRP.Event.Extra (delay, multicast, performEvent)
 import Math.Angle (degree)
 import Model.ActiveMode (ActiveMode(..), fromBoolean)
 import Model.SmartHouse.House (House, HouseNode, HouseOp(..), JSHouses(..), createHouseFrom, exportHouse, houseTapped)
-import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo, _imageDataURI, _size, _texture, mkHouseTextureInfo)
+import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo, _imageFile, _size, _texture, mkHouseTextureInfo)
 import Model.UUID (idLens)
 import OBJExporter (MeshFiles, exportObject)
 import Rendering.DynamicNode (eventNode)
@@ -52,12 +52,13 @@ import SmartHouse.UI (_savingStepDyn, houseBuilderUI)
 import Specular.Dom.Widget (runMainWidgetInNode)
 import Three.Core.Geometry (mkPlaneGeometry)
 import Three.Core.Material (mkMeshBasicMaterialWithTexture)
-import Three.Loader.TextureLoader (clampToEdgeWrapping, repeatWrapping, setRepeat, setWrapS, setWrapT, textureDataURI, textureHeight, textureWidth)
+import Three.Loader.TextureLoader (clampToEdgeWrapping, repeatWrapping, setRepeat, setWrapS, setWrapT, textureHeight, textureImageEvt, textureWidth)
 import UI.ButtonPane (_close, _reset, _save, _showResetDyn, _showSaveDyn)
 import UI.EditorUIOp (EditorUIOp(..))
 import UI.RoofEditorUI (_editorOp)
 import Unsafe.Coerce (unsafeCoerce)
 import Util (foldEvtWith)
+import Web.File (File)
 
 -- NOTE: global value to toggle between rendering house as full 3D editor or 2D wireframes
 houseRenderMode :: HouseRenderMode
@@ -110,7 +111,7 @@ loadHouseTexture img = performEvent $ f <$> textureFromUrl (img ^. _link)
               setRepeat 1.0 1.0 t
 
               let s = size (textureWidth t) (textureHeight t)
-                  d = textureDataURI t
+                  d = textureImageEvt t
               pure $ mkHouseTextureInfo t s d (img ^. _pixelPerMeter)
 
 
@@ -263,7 +264,7 @@ builderForHouse evts tInfo =
                     meshFilesEvt = performEvent $ const (exportObject pNode) <$> toExpEvt
                     housesEvt    = exportHouses <$> sampleOn_ hdEvt toExpEvt
 
-                    stepEvt = multicast $ saveMeshes cfg (tInfo ^. _imageDataURI) meshFilesEvt housesEvt
+                    stepEvt = multicast $ saveMeshes cfg (tInfo ^. _imageFile) meshFilesEvt housesEvt
 
                     modeEvt = (const Showing <$> exportEvt) <|> 
                               (const Building <$> filter ((==) Finished) stepEvt)
@@ -278,13 +279,13 @@ builderForHouse evts tInfo =
 runAPIEvent :: forall a. APIConfig -> Event (API (Event a)) -> Event a
 runAPIEvent apiCfg = keepLatest <<< performEvent <<< map (flip runAPI apiCfg)
 
-saveMeshes :: HouseBuilderConfig -> String -> Event MeshFiles -> Event JSHouses -> Event SavingStep
-saveMeshes cfg imgStr mFilesEvt houseEvt =
+saveMeshes :: HouseBuilderConfig -> Event File -> Event MeshFiles -> Event JSHouses -> Event SavingStep
+saveMeshes cfg imgEvt mFilesEvt houseEvt =
     let leadId = cfg ^. _leadId
         apiCfg = cfg ^. _apiConfig
         
-        doUpload fs = uploadMeshFiles leadId fs imgStr
-        uploadedEvt = multicast $ runAPIEvent apiCfg $ doUpload <$> mFilesEvt
+        doUpload fs img = uploadMeshFiles leadId fs img
+        uploadedEvt = multicast $ runAPIEvent apiCfg $ doUpload <$> mFilesEvt <*> imgEvt
 
         toCreateEvt = multicast $ sampleOn_ houseEvt uploadedEvt
         createdEvt  = multicast $ runAPIEvent apiCfg $ createManual leadId <$> toCreateEvt
