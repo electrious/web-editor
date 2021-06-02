@@ -3,6 +3,8 @@ module Three.Loader.TextureLoader where
 import Prelude
 
 import Effect (Effect)
+import FRP.Event (Event, makeEvent)
+import Web.File (File)
 
 foreign import data Texture  :: Type
 foreign import data WrapMode :: Type
@@ -23,3 +25,9 @@ foreign import loadTextureAsync :: String -> TextureLoader -> (Texture -> Effect
 foreign import dispose :: Texture -> Effect Unit
 foreign import textureWidth :: Texture -> Int
 foreign import textureHeight :: Texture -> Int
+foreign import textureImage :: Texture -> (File -> Effect Unit) -> Effect Unit
+
+textureImageEvt :: Texture -> Event File
+textureImageEvt t = makeEvent \k -> do
+    textureImage t k
+    pure $ pure unit

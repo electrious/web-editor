@@ -12,25 +12,29 @@ import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Editor.Common.Lenses (_height, _width)
 import Editor.SceneEvent as S
+import FRP.Event (Event)
 import Three.Loader.TextureLoader (Texture)
+import Web.File (File)
 
 newtype HouseTextureInfo = HouseTextureInfo {
     texture       :: Texture,
     imageSize     :: S.Size,
+    imageFile     :: Event File,
     pixelPerMeter :: Number,
     size          :: Size
     }
 
 derive instance newtypeHouseTextureInfo :: Newtype HouseTextureInfo _
 
-mkHouseTextureInfo :: Texture -> S.Size -> Number -> HouseTextureInfo
-mkHouseTextureInfo t imgSz ppm = HouseTextureInfo {
-    texture : t,
-    imageSize : imgSz,
+mkHouseTextureInfo :: Texture -> S.Size -> Event File -> Number -> HouseTextureInfo
+mkHouseTextureInfo t imgSz img ppm = HouseTextureInfo {
+    texture       : t,
+    imageSize     : imgSz,
+    imageFile     : img,
     pixelPerMeter : ppm,
-    size : Size { width  : meter $ toNumber (imgSz ^. _width) / ppm,
-                  height : meter $ toNumber (imgSz ^. _height) / ppm
-                }
+    size          : Size { width  : meter $ toNumber (imgSz ^. _width) / ppm,
+                           height : meter $ toNumber (imgSz ^. _height) / ppm
+                         }
     }
 
 _texture :: forall t a r. Newtype t { texture :: a | r } => Lens' t a
@@ -41,3 +45,6 @@ _size = _Newtype <<< prop (SProxy :: SProxy "size")
 
 _imageSize :: forall t a r. Newtype t { imageSize :: a | r } => Lens' t a
 _imageSize = _Newtype <<< prop (SProxy :: SProxy "imageSize")
+
+_imageFile :: forall t a r. Newtype t { imageFile :: a | r } => Lens' t a
+_imageFile = _Newtype <<< prop (SProxy :: SProxy "imageFile")

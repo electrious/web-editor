@@ -24,6 +24,24 @@ exports.textureHeight = t => {
     return t.image.height
 }
 
+exports.textureImage = t => cb => _ => {
+    let img = t.image;
+    
+     // Create an empty canvas element
+    var canvas = document.createElement("canvas");
+    canvas.width = img.width;
+    canvas.height = img.height;
+
+    // Copy the image contents to the canvas
+    var ctx = canvas.getContext("2d");
+    ctx.drawImage(img, 0, 0);
+
+    var name = img.src.substring(img.src.lastIndexOf('/')+1);
+    canvas.toBlob(blob => {
+        cb(new File([blob], name))();
+    });
+}
+
 // texture wrapping mode
 exports.clampToEdgeWrapping = three.ClampToEdgeWrapping
 exports.repeatWrapping = three.RepeatWrapping

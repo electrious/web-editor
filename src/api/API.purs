@@ -23,6 +23,7 @@ import Effect (Effect)
 import Effect.Aff (Aff, Error, error, killFiber, launchAff_, runAff)
 import Effect.Class.Console (errorShow)
 import FRP.Event (Event, makeEvent, subscribe)
+import FRP.Event.Extra (performEvent)
 import Foreign.Generic (class Decode, class Encode, F, ForeignError(..), defaultOptions, genericDecode)
 import Partial.Unsafe (unsafePartial)
 
@@ -80,10 +81,25 @@ foreign import getErrorMessage :: Error -> String
 runAPI :: forall a. API a -> APIConfig -> Effect a
 runAPI (API a) = runReaderT a
 
-apiAction :: forall req res. Encode req => Decode res => Method -> String -> req -> API (Aff (Either Error res))
-apiAction m url req = do
+
+performAPIEvent :: forall a. Event (API a) -> API (Event a)
+performAPIEvent e = do
     cfg <- ask
-    let defHeaders = [Header "Content-Type" "application/json"]
+    pure $ performEvent $ flip runAPI cfg <$> e
+
+
+data APIDataType = JSON
+                 | Form
+
+contentType :: APIDataType -> Header
+contentType JSON = Header "Content-Type" "application/json"
+contentType Form = Header "Content-Type" "multipart/form-data"
+
+
+apiAction :: forall req res. Encode req => Decode res => Method -> String -> APIDataType -> req -> API (Aff (Either Error res))
+apiAction m url dt req = do
+    cfg <- ask
+    let defHeaders = [contentType dt]
         authHeader = fromMaybe [] $ Array.singleton <<< Header "Authorization" <$> cfg ^. _auth
         userHeader = fromMaybe [] $ Array.singleton <<< Header "x-user-id" <<< show <$> cfg ^. _xUserId
     
@@ -93,12 +109,25 @@ apiAction m url req = do
 
 -- | call an API and get the result Event
 callAPI :: forall req res. Encode req => Decode res => Method -> String -> req -> API (Event (F res))
-callAPI m url req = apiAction m url req >>= affEvt >>> map (join >>> toF) >>> pure
+callAPI m url req = apiAction m url JSON req >>= affEvt >>> map (join >>> toF) >>> pure
     where toF (Left e)  = throwError $ singleton $ ForeignError $ getErrorMessage e
           toF (Right v) = pure v
 
 -- | call an API, log any errors to console and return only valid result
 callAPI' :: forall req res. Encode req => Decode res => Method -> String -> req -> API (Event res)
 callAPI' m url req = (map runExcept >>> tap logLeft >>> onlyRight) <$> callAPI m url req
+    where logLeft (Left e) = errorShow e
+          logLeft _        = pure unit
+
+
+-- | call an API with form data request
+formAPI :: forall req res. Encode req => Decode res => Method -> String -> req -> API (Event (F res))
+formAPI m url req = apiAction m url Form req >>= affEvt >>> map (join >>> toF) >>> pure
+    where toF (Left e)  = throwError $ singleton $ ForeignError $ getErrorMessage e
+          toF (Right v) = pure v
+
+-- | call a form API, log any errors to console and return only valid result
+formAPI' :: forall req res. Encode req => Decode res => Method -> String -> req -> API (Event res)
+formAPI' m url req = (map runExcept >>> tap logLeft >>> onlyRight) <$> formAPI m url req
     where logLeft (Left e) = errorShow e
           logLeft _        = pure unit

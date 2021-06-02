@@ -1,15 +1,17 @@
-module SmartHouse.HouseBuilder (buildHouse, HouseBuilderConfig, HouseBuilt, _filesExported, _housesExported, _hasHouse) where
+module SmartHouse.HouseBuilder (buildHouse, HouseBuilderConfig, HouseBuilt,  _hasHouse) where
 
 import Prelude hiding (degree)
 
-import API (APIConfig, runAPI)
+import API (API, APIConfig, runAPI)
 import API.Image (ImageResp, _link, _pixelPerMeter, getImageMeta)
+import API.SmartHouse (SavingStep(..), createManual, repeatCheckUntilReady, uploadMeshFiles)
 import Control.Alt ((<|>))
 import Control.Alternative (empty)
 import Custom.Mesh (TapMouseMesh)
 import Data.Array (fromFoldable)
 import Data.Compactable (compact)
 import Data.Default (class Default, def)
+import Data.Filterable (filter)
 import Data.Foldable (class Foldable)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
@@ -37,7 +39,7 @@ import FRP.Event.Extra (delay, multicast, performEvent)
 import Math.Angle (degree)
 import Model.ActiveMode (ActiveMode(..), fromBoolean)
 import Model.SmartHouse.House (House, HouseNode, HouseOp(..), JSHouses(..), createHouseFrom, exportHouse, houseTapped)
-import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo, _size, _texture, mkHouseTextureInfo)
+import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo, _imageFile, _size, _texture, mkHouseTextureInfo)
 import Model.UUID (idLens)
 import OBJExporter (MeshFiles, exportObject)
 import Rendering.DynamicNode (eventNode)
@@ -46,16 +48,17 @@ import Rendering.TextureLoader (textureFromUrl)
 import SmartHouse.BuilderMode (BuilderMode(..))
 import SmartHouse.HouseEditor (HouseRenderMode(..), editHouse, renderHouse)
 import SmartHouse.HouseTracer (TracerMode(..), _stopTracing, _tracedPolygon, _tracerMode, traceHouse)
-import SmartHouse.UI (houseBuilderUI)
+import SmartHouse.UI (_savingStepDyn, houseBuilderUI)
 import Specular.Dom.Widget (runMainWidgetInNode)
 import Three.Core.Geometry (mkPlaneGeometry)
 import Three.Core.Material (mkMeshBasicMaterialWithTexture)
-import Three.Loader.TextureLoader (clampToEdgeWrapping, repeatWrapping, setRepeat, setWrapS, setWrapT, textureHeight, textureWidth)
+import Three.Loader.TextureLoader (clampToEdgeWrapping, repeatWrapping, setRepeat, setWrapS, setWrapT, textureHeight, textureImageEvt, textureWidth)
 import UI.ButtonPane (_close, _reset, _save, _showResetDyn, _showSaveDyn)
 import UI.EditorUIOp (EditorUIOp(..))
 import UI.RoofEditorUI (_editorOp)
 import Unsafe.Coerce (unsafeCoerce)
 import Util (foldEvtWith)
+import Web.File (File)
 
 -- NOTE: global value to toggle between rendering house as full 3D editor or 2D wireframes
 houseRenderMode :: HouseRenderMode
@@ -72,38 +75,32 @@ instance defaultHouseBuilderConfig :: Default HouseBuilderConfig where
     def = HouseBuilderConfig { leadId : 0, apiConfig : def }
 
 newtype HouseBuilt = HouseBuilt {
-    filesExported  :: Event MeshFiles,
-    housesExported :: Event JSHouses,
-    hasHouse       :: Event Boolean,
-    tracerMode     :: Event TracerMode,
-    editorOp       :: Event EditorUIOp
+    hasHouse    :: Event Boolean,
+    tracerMode  :: Event TracerMode,
+    saveStepEvt :: Event SavingStep,
+    editorOp    :: Event EditorUIOp
     }
 
 derive instance newtypeHouseBuilt :: Newtype HouseBuilt _
 instance defaultHouseBuilt :: Default HouseBuilt where
     def = HouseBuilt {
-        filesExported  : empty,
-        housesExported : empty,
-        hasHouse       : empty,
-        tracerMode     : empty,
-        editorOp       : empty
+        hasHouse    : empty,
+        tracerMode  : empty,
+        saveStepEvt : empty,
+        editorOp    : empty
         }
-
-_filesExported :: forall t a r. Newtype t { filesExported :: a | r } => Lens' t a
-_filesExported = _Newtype <<< prop (SProxy :: SProxy "filesExported")
-
-_housesExported :: forall t a r. Newtype t { housesExported :: a | r } => Lens' t a
-_housesExported = _Newtype <<< prop (SProxy :: SProxy "housesExported")
 
 _hasHouse :: forall t a r. Newtype t { hasHouse :: a | r } => Lens' t a
 _hasHouse = _Newtype <<< prop (SProxy :: SProxy "hasHouse")
 
+_saveStepEvt :: forall t a r. Newtype t { saveStepEvt :: a | r } => Lens' t a
+_saveStepEvt = _Newtype <<< prop (SProxy :: SProxy "saveStepEvt")
+
 compactHouseBuilt :: Event HouseBuilt -> HouseBuilt
-compactHouseBuilt e = def # _filesExported  .~ keepLatest (view _filesExported <$> e)
-                          # _housesExported .~ keepLatest (view _housesExported <$> e)
-                          # _hasHouse       .~ keepLatest (view _hasHouse <$> e)
-                          # _tracerMode     .~ keepLatest (view _tracerMode <$> e)
-                          # _editorOp       .~ keepLatest (view _editorOp <$> e)
+compactHouseBuilt e = def # _hasHouse    .~ keepLatest (view _hasHouse    <$> e)
+                          # _tracerMode  .~ keepLatest (view _tracerMode  <$> e)
+                          # _saveStepEvt .~ keepLatest (view _saveStepEvt <$> e)
+                          # _editorOp    .~ keepLatest (view _editorOp    <$> e)
 
 
 loadHouseTexture :: ImageResp -> Event HouseTextureInfo
@@ -114,7 +111,8 @@ loadHouseTexture img = performEvent $ f <$> textureFromUrl (img ^. _link)
               setRepeat 1.0 1.0 t
 
               let s = size (textureWidth t) (textureHeight t)
-              pure $ mkHouseTextureInfo t s (img ^. _pixelPerMeter)
+                  d = textureImageEvt t
+              pure $ mkHouseTextureInfo t s d (img ^. _pixelPerMeter)
 
 
 mkHelperPlane :: forall e. HouseTextureInfo -> Node e TapMouseMesh
@@ -233,6 +231,7 @@ builderForHouse evts tInfo =
         fixNodeDWith Nothing \actHouseDyn ->
             fixNodeDWith Building \modeDyn -> do
                 pNode <- getParent
+                cfg   <- getEnv
                 
                 -- add helper plane that accepts tap and drag events
                 helper <- mkHelperPlane tInfo
@@ -244,7 +243,8 @@ builderForHouse evts tInfo =
                 let deactEvt    = multicast $ const Nothing <$> helper ^. _tapped
                     actEvt      = keepLatest $ getActivated <$> nodesEvt
                     actHouseEvt = (Just <$> actEvt) <|> deactEvt
-                
+
+                -- trace new house
                 traceRes <- traceHouse $ def # _modeDyn     .~ (tracerMode <$> actHouseDyn <*> modeDyn)
                                              # _mouseMove   .~ helper ^. _mouseMove
                                              # _stopTracing .~ (evts ^. _stopTracing)
@@ -254,20 +254,49 @@ builderForHouse evts tInfo =
 
                     opEvt = addHouseEvt <|> updHouseEvt
 
+                    -- update HouseDictData by applying the house operations
                     newHdEvt = multicast $ sampleOn hdEvt $ applyHouseOp <$> opEvt
 
                     exportEvt = multicast $ evts ^. _export
                     
-                    modeEvt = (const Showing <$> exportEvt) <|> 
-                              (const Building <$> delay 30 exportEvt)
                     toExpEvt = delay 15 exportEvt
-                    res = def # _hasHouse       .~ (hasHouse <$> hdEvt)
-                              # _tracerMode     .~ (traceRes ^. _tracerMode)
-                              # _filesExported  .~ performEvent (const (exportObject pNode) <$> toExpEvt)
-                              # _housesExported .~ (exportHouses <$> sampleOn_ hdEvt toExpEvt)
+
+                    meshFilesEvt = performEvent $ const (exportObject pNode) <$> toExpEvt
+                    housesEvt    = exportHouses <$> sampleOn_ hdEvt toExpEvt
+
+                    stepEvt = multicast $ saveMeshes cfg (tInfo ^. _imageFile) meshFilesEvt housesEvt
+
+                    modeEvt = (const Showing <$> exportEvt) <|> 
+                              (const Building <$> filter ((==) Finished) stepEvt)
+                    
+                    res = def # _hasHouse    .~ (hasHouse <$> hdEvt)
+                              # _tracerMode  .~ (traceRes ^. _tracerMode)
+                              # _saveStepEvt .~ stepEvt
 
                 pure { input: modeEvt, output: { input: actHouseEvt, output : { input: newHdEvt, output : res } } }
-                
+
+
+runAPIEvent :: forall a. APIConfig -> Event (API (Event a)) -> Event a
+runAPIEvent apiCfg = keepLatest <<< performEvent <<< map (flip runAPI apiCfg)
+
+saveMeshes :: HouseBuilderConfig -> Event File -> Event MeshFiles -> Event JSHouses -> Event SavingStep
+saveMeshes cfg imgEvt mFilesEvt houseEvt =
+    let leadId = cfg ^. _leadId
+        apiCfg = cfg ^. _apiConfig
+        
+        doUpload fs img = uploadMeshFiles leadId fs img
+        uploadedEvt = multicast $ runAPIEvent apiCfg $ doUpload <$> mFilesEvt <*> imgEvt
+
+        toCreateEvt = multicast $ sampleOn_ houseEvt uploadedEvt
+        createdEvt  = multicast $ runAPIEvent apiCfg $ createManual leadId <$> toCreateEvt
+
+        readyEvt = runAPIEvent apiCfg $ const (repeatCheckUntilReady leadId) <$> createdEvt
+
+    in (const UploadingFiles  <$> mFilesEvt)   <|>
+       (const CreatingHouse   <$> toCreateEvt) <|>
+       (const WaitingForReady <$> createdEvt)  <|>
+       (const Finished        <$> readyEvt)
+
 
 -- | external API to build a 3D house for 2D lead
 buildHouse :: Editor -> HouseBuilderConfig -> Effect HouseBuilt
@@ -282,9 +311,10 @@ buildHouse editor cfg = do
 
     res <- fst <$> runNode (createHouseBuilder inputEvts) (mkNodeEnv editor cfg)
     let parentEl = unsafeCoerce $ editor ^. _parent
-        conf     = def # _sizeDyn     .~ (editor ^. _sizeDyn)
-                       # _showSaveDyn .~ step false (res ^. _hasHouse)
-                       # _showResetDyn .~ step false ((==) Tracing <$> (res ^. _tracerMode))
+        conf     = def # _sizeDyn       .~ (editor ^. _sizeDyn)
+                       # _showSaveDyn   .~ step false (res ^. _hasHouse)
+                       # _showResetDyn  .~ step false ((==) Tracing <$> (res ^. _tracerMode))
+                       # _savingStepDyn .~ step NotSaving (res ^. _saveStepEvt)
     uiEvts <- runMainWidgetInNode parentEl $ houseBuilderUI conf
 
     void $ subscribe (const unit <$> uiEvts ^. _save) toExp

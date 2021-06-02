@@ -17,16 +17,15 @@ import Editor.HouseLoader (editHouse)
 import Editor.SceneEvent (size)
 import Effect (Effect)
 import Effect.Class.Console (logShow)
-import Effect.Console (log)
 import FRP.Event (subscribe)
 import FRP.Event.Extra (delay)
 import Foreign (Foreign)
-import Foreign.Generic (decode, encodeJSON)
+import Foreign.Generic (decode)
 import Model.Hardware.PanelTextureInfo (_premium, _standard, _standard72)
 import Model.Hardware.PanelType (PanelType(..))
 import Model.Roof.Panel (Panel)
 import Model.Roof.RoofPlate (RoofPlate)
-import SmartHouse.HouseBuilder (_hasHouse, _housesExported, buildHouse)
+import SmartHouse.HouseBuilder (_hasHouse, buildHouse)
 import UI.RoofEditorUI (_editorOp)
 import Web.DOM.NonElementParentNode (getElementById)
 import Web.HTML (window)
@@ -93,4 +92,5 @@ doTest roofDat panelDat = do
                             r <- buildHouse editor builderCfg
 
                             let readyEvt = const unit <$> filter identity (r ^. _hasHouse)
-                            void $ subscribe (r ^. _housesExported) (encodeJSON >>> log)
+                            
+                            pure unit
