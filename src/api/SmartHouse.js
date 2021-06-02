@@ -1,8 +1,8 @@
 exports.toFormData = req => {
     let d = new FormData();
-    d.append("obj", d.obj);
-    d.append("mtl", d.mtl);
-    d.append("texture", d.texture);
+    d.append("obj", req.obj);
+    d.append("mtl", req.mtl);
+    d.append("texture", req.texture);
 
     return d;
 };
