@@ -7,15 +7,18 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Lens (view, (^.), (.~), (%~))
 import Data.List (List(..), (:))
+import Data.Maybe (Maybe(..))
 import Data.Meter (Meter, meter, meterVal)
 import Data.Newtype (class Newtype)
 import Data.UUID (UUID, emptyUUID)
 import Editor.Common.Lenses (_arrayNumber, _height, _id, _orientation, _width, _x, _y, _z)
-import Math.Angle (Angle, degree)
+import Math (pi)
+import Math.Angle (Angle, degree, radianVal, sin)
 import Model.ArrayComponent (class ArrayComponent)
-import Model.Roof.Panel (Orientation(..), panelLong, panelShort)
+import Model.Roof.Panel (Orientation(..), panelLong, panelShort, validatedSlope)
 import Model.RoofComponent (class RoofComponent, compX, compY, size)
 import Model.UUID (class HasUUID)
+import Three.Math.Euler (Euler, mkEuler)
 import Three.Math.Vector (Vector3, mkVec3, vecX, vecY)
 
 plusBtnZ :: Meter
@@ -76,3 +79,19 @@ btnVertices pb = v1 : v2 : v3 : v4 : Nil
 addDelta :: Vector3 -> PlusButton -> PlusButton
 addDelta delta p = p # _x %~ (+) (meter $ vecX delta)
                      # _y %~ (+) (meter $ vecY delta)
+
+
+btnRotation :: PlusButton -> Euler
+btnRotation pb = case validatedSlope pb of
+    Just slope -> if pb ^. _orientation == Portrait
+                  then mkEuler 0.0 (- radianVal slope) (pi / 2.0)
+                  else mkEuler (radianVal slope) 0.0 0.0
+    Nothing    -> if pb ^. _orientation == Portrait
+                  then mkEuler 0.0 0.0 (pi / 2.0)
+                  else def
+
+btnPosition :: PlusButton -> Vector3
+btnPosition pb = case validatedSlope pb of
+    Just slope -> let h = meterVal (size pb ^. _height) * 0.5 * sin slope
+                  in mkVec3 (meterVal $ pb ^. _x) (meterVal $ pb ^. _y) (meterVal (pb ^. _z) + h)
+    Nothing    -> mkVec3 (meterVal $ pb ^. _x) (meterVal $ pb ^. _y) (meterVal $ pb ^. _z)

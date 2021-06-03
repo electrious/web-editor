@@ -36,7 +36,7 @@ import Editor.PanelAPIInterpreter (PanelAPIInterpreter, _finished, mkPanelAPIInt
 import Editor.PanelArrayLayout (PanelsLayout, _arrays, _tree, defaultLayout, findActiveArray, getArrayAt, layoutPanels, neighbors)
 import Editor.PanelNode (PanelOpacity)
 import Editor.PanelOperation (ArrayOperation(..), PanelOperation(..))
-import Editor.Rendering.ButtonsRenderer (ButtonOperation(..), ButtonsRenderer, _plusDragged, _plusTapped, _rotTapped, mkButtonsRenderer)
+import Editor.Rendering.ButtonsRenderer (ButtonOperation(..), ButtonsEvents, _plusDragged, _plusTapped, _rotTapped, mkButtonsRenderer)
 import Editor.Rendering.PanelRendering (PanelRenderer, PanelRendererConfig(..), _opacity, _operations, createPanelRenderer)
 import Editor.SceneEvent (isDrag, isDragEnd, isDragStart)
 import Editor.UI.DragInfo (DragInfo, mkDragInfo)
@@ -90,7 +90,7 @@ _initPanels = _Newtype <<< prop (SProxy :: SProxy "initPanels")
 newtype PanelLayer = PanelLayer {
     object              :: Object3D,
     renderer            :: PanelRenderer,
-    btnsRenderer        :: ButtonsRenderer,
+    btnsEvents          :: ButtonsEvents,
     apiInterpreter      :: PanelAPIInterpreter,
 
     disposable          :: Effect Unit,
