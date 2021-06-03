@@ -13,14 +13,14 @@ import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import FRP.Event (Event, keepLatest)
-import FRP.Event.Extra (delay)
-import Web.File (File)
+import FRP.Event.Extra (delay, multicast)
 import Foreign (Foreign)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode)
 import Model.ActiveMode (ActiveMode(..))
 import Model.SmartHouse.House (JSHouses)
 import OBJExporter (MeshFiles, _mtl, _obj)
+import Web.File (File)
 
 
 data SavingStep = NotSaving
@@ -34,8 +34,8 @@ derive instance eqSavingStep :: Eq SavingStep
 instance showSavingStep :: Show SavingStep where
     show NotSaving       = "Not saving"
     show UploadingFiles  = "Uploading mesh files for the new house..."
-    show CreatingHouse   = "Elli is analysing the new house data..."
-    show WaitingForReady = "Elli is analysing the new house data..."
+    show CreatingHouse   = "Elli is analyzing the new house data..."
+    show WaitingForReady = "Elli is analyzing the new house data..."
     show Finished        = "Finished creating the new house"
 
 stepMode :: SavingStep -> ActiveMode
@@ -95,7 +95,7 @@ instance decodeReadyAPIResp :: Decode ReadyAPIResp where
                                            })
 
 fieldTrans :: String -> String
-fieldTrans "success" = "success"
+fieldTrans "success" = "ready"
 fieldTrans "houseId" = "house_id"
 fieldTrans _         = ""
 
@@ -114,7 +114,7 @@ checkReady lid = callAPI' POST ("/v1/lead/" <> show lid <> "/ready") {}
 -- check if the 2d house is ready or not repeatedly with a 2 seconds sleep, until it's ready.
 repeatCheckUntilReady :: Int -> API (Event ReadyAPIResp)
 repeatCheckUntilReady lid = do
-    re <- checkReady lid
+    re <- multicast <$> checkReady lid
     let se = filter succeeded re
         fe = filter (not <<< succeeded) re
 
