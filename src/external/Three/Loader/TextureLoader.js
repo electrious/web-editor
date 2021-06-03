@@ -36,9 +36,8 @@ exports.textureImage = t => cb => _ => {
     var ctx = canvas.getContext("2d");
     ctx.drawImage(img, 0, 0);
 
-    var name = img.src.substring(img.src.lastIndexOf('/')+1);
     canvas.toBlob(blob => {
-        cb(new File([blob], name))();
+        cb(new File([blob], "scene.png"))();
     });
 }
 
