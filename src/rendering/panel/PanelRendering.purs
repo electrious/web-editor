@@ -1,5 +1,5 @@
 module Editor.Rendering.PanelRendering (PanelRendererConfig(..), _operations,
-    _opacity, PanelRenderer, _allPanels, createPanelRenderer) where
+    _opacity, PanelEvents, _allPanels) where
 
 import Prelude hiding (add)
 
@@ -49,13 +49,13 @@ _opacity :: forall t a r. Newtype t { opacity :: a | r } => Lens' t a
 _opacity = _Newtype <<< prop (SProxy :: SProxy "opacity")
 
 -- | Panel Renderer that manages all panels rendered
-newtype PanelRenderer = PanelRenderer {
+newtype PanelEvents = PanelEvents {
     tapped    :: Event Panel,
     dragged   :: Event (DragInfo Panel),
     allPanels :: Dynamic (List Panel)
 }
 
-derive instance newtypePanelRenderer :: Newtype PanelRenderer _
+derive instance newtypePanelEvents :: Newtype PanelEvents _
 
 _allPanels :: forall t a r. Newtype t { allPanels :: a | r } => Lens' t a
 _allPanels = _Newtype <<< prop (SProxy :: SProxy "allPanels")
@@ -63,8 +63,8 @@ _allPanels = _Newtype <<< prop (SProxy :: SProxy "allPanels")
 -- | internal state of the panel renderer, which manages all rendered panels
 -- and temporary panels
 newtype RendererState = RendererState {
-    renderedPanels :: Map UUID PanelNode,
-    tempPanelNodes :: List PanelNode
+    renderedPanels :: Map UUID Panel,
+    tempPanelNodes :: List Panel
 }
 
 derive instance newtypeRendererState :: Newtype RendererState _
@@ -184,8 +184,8 @@ renderTempPanels textInfo arrCfg panelType ps st = do
         pure $ st # _tempPanelNodes .~ updNodes
 
 
-createPanelRenderer :: PanelRendererConfig -> ArrayBuilder PanelRenderer
-createPanelRenderer cfg = do
+createPanelEvents :: PanelRendererConfig -> ArrayBuilder PanelEvents
+createPanelEvents cfg = do
     arrCfgDyn    <- getArrayConfig
     textureInfo  <- getTextureInfo
     panelTypeDyn <- getPanelType
@@ -210,7 +210,7 @@ createPanelRenderer cfg = do
 
         panelNodesEvt = multicast $ values <<< view _renderedPanels <$> stateEvt
 
-    pure $ PanelRenderer {
+    pure $ PanelEvents {
         tapped    : multicast $ keepLatest $ anyEvt <<< map (view _tapped) <$> panelNodesEvt,
         dragged   : multicast $ keepLatest $ anyEvt <<< map (view _dragged) <$> panelNodesEvt,
         allPanels : allPanelsRendered <$> statesDyn

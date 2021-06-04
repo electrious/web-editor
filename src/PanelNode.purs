@@ -25,6 +25,7 @@ import Editor.UI.DragInfo (DragInfo, mkDragInfo)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
+import FRP.Dynamic (Dynamic)
 import FRP.Event (Event)
 import Math (pi)
 import Math.Angle (radianVal, sin)
@@ -155,9 +156,25 @@ mkRightFrame = mesh (def # _name        .~ "right"
                          # _renderOrder .~ 9
                     )
 
+
+newtype PanelNodeConf = PanelNodeConf {
+    panel       :: Dynamic Panel,
+    arrayConfig :: Dynamic ArrayConfig,
+    opacity     :: Dynamic PanelOpacity,
+    textureInfo :: PanelTextureInfo,
+    panelType   :: PanelType,
+    isTemp      :: Dynamic Boolean
+    }
+
+derive instance newtypePanelNodeConf :: Newtype PanelNodeConf _
+
+_isTemp :: forall t a r. Newtype t { isTemp :: a | r } => Lens' t a
+_isTemp = _Newtype <<< prop (SProxy :: SProxy "isTemp")
+
 -- | make a default panel mesh node
-mkPanelNode :: forall e. ArrayConfig -> PanelTextureInfo -> PanelType -> Panel -> Boolean -> Node e PanelNode
-mkPanelNode arrCfg info panelType p isTemp = 
+mkPanelNode :: forall e. PanelNodeConf -> Node e PanelNode
+mkPanelNode conf = do
+    let p = conf ^. _panel
     node (def # _name     .~ "panel"
               # _position .~ pure (calcPosition p arrCfg)
               # _rotation .~ pure (calcRotation p)
