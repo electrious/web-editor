@@ -21,7 +21,7 @@ import Data.Tuple (Tuple(..))
 import Data.UUID (UUID)
 import Editor.ArrayBuilder (ArrayBuilder, getArrayConfig, getPanelType, getTextureInfo)
 import Editor.Common.Lenses (_dragged, _parent, _tapped)
-import Editor.PanelNode (PanelNode, PanelOpacity, _panel, changePanel, changeToNormal, enableShadows, isOpaque, mkPanelNode, moveBy, updateOpacity)
+import Editor.PanelNode (PanelNode, PanelOpacity, _panel, isOpaque, mkPanelNode, updateOpacity)
 import Editor.PanelOperation (ArrayOperation(..), PanelOperation(..))
 import Editor.UI.DragInfo (DragInfo)
 import Effect (Effect)
@@ -36,7 +36,6 @@ import Three.Core.Object3D (Object3D, add, remove)
 
 -- | parameters for setting up a panel renderer.
 newtype PanelRendererConfig = PanelRendererConfig {
-    parent     :: Object3D,
     operations :: Event ArrayOperation,
     opacity    :: Dynamic PanelOpacity
 }
@@ -64,7 +63,6 @@ _allPanels = _Newtype <<< prop (SProxy :: SProxy "allPanels")
 -- | internal state of the panel renderer, which manages all rendered panels
 -- and temporary panels
 newtype RendererState = RendererState {
-    parent         :: Object3D,
     renderedPanels :: Map UUID PanelNode,
     tempPanelNodes :: List PanelNode
 }
