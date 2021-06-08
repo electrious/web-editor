@@ -9,6 +9,7 @@ import Control.Plus (empty)
 import Custom.Mesh (TappableMesh)
 import Data.Array (head, init, snoc)
 import Data.Default (class Default, def)
+import Data.Generic.Rep (class Generic)
 import Data.Lens (Lens', view, (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
@@ -24,7 +25,7 @@ import Editor.Common.Lenses (_active, _alignment, _center, _houseId, _id, _mesh,
 import Editor.Disposable (class Disposable, dispose)
 import Editor.EditorMode (EditorMode(..))
 import Editor.HouseEditor (_heatmap)
-import Editor.PanelLayer (PanelLayer, PanelLayerConfig(..), _activeArray, _currentPanels, _inactiveRoofTapped, _initPanels, _mainOrientation, _roofActive, _serverUpdated, canEdit, createPanelLayer)
+import Editor.PanelLayer (PanelLayer, PanelLayerConfig(..), _activeArray, _currentPanels, _inactiveRoofTapped, _initPanels, _mainOrientation, _roofActive, _serverUpdated, createPanelLayer)
 import Editor.PanelNode (PanelOpacity(..))
 import Editor.PolygonEditor (_delete, createPolyEditor)
 import Editor.Rendering.PanelRendering (_opacity)
@@ -32,7 +33,7 @@ import Effect (Effect)
 import Effect.Class (liftEffect)
 import Effect.Timer (setTimeout)
 import Effect.Unsafe (unsafePerformEffect)
-import FRP.Dynamic (Dynamic, current, debugDyn, dynEvent, performDynamic, step, subscribeDyn, withLast)
+import FRP.Dynamic (Dynamic, current, dynEvent, performDynamic, step, subscribeDyn, withLast)
 import FRP.Event (Event, create, keepLatest)
 import FRP.Event.Extra (multicast)
 import Math (pi)
@@ -51,8 +52,21 @@ import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial, setOpacity, 
 import Three.Core.Mesh (Mesh, geometry, mkMesh)
 import Three.Core.Object3D (class IsObject3D, Object3D, add, matrix, mkObject3D, remove, rotateX, rotateZ, setName, setPosition, setVisible, updateMatrix, updateMatrixWorld, worldToLocal)
 import Three.Math.Vector (class Vector, Vector2, Vector3, applyMatrix, mkVec2, mkVec3, vecX, vecY, vecZ)
+import UI.RoofEditorUI (_mode)
+
+
+-- which env is the roof node used.
+-- by default, it's used in the house editor
+-- but it can also be used in 3D house builder to allow array editing directly in builder
+data RoofNodeMode = RoofInEditor
+                  | RoofInBuilder
+
+derive instance genericRoofNodeMode :: Generic RoofNodeMode _
+derive instance eqRoofNodeMode :: Eq RoofNodeMode
+
 
 newtype RoofNodeConfig = RoofNodeConfig {
+    mode            :: RoofNodeMode,
     houseId         :: Int,
     roof            :: RoofPlate,
     roofActive      :: Dynamic Boolean,
@@ -68,6 +82,7 @@ newtype RoofNodeConfig = RoofNodeConfig {
 derive instance newtypeRoofNodeConfig :: Newtype RoofNodeConfig _
 instance defaultRoofNodeConfig :: Default RoofNodeConfig where
     def = RoofNodeConfig {
+        mode            : RoofInEditor,
         houseId         : 0,
         roof            : def,
         roofActive      : pure false,
@@ -262,10 +277,15 @@ createRoofNode cfg = do
     -- render panels
     panelLayer <- renderPanels cfg content
     
-    let -- get the panel tap event on inactive roofs
+    let mode = cfg ^. _mode
+        -- get the panel tap event on inactive roofs
         roofTapOnPanelEvt = panelLayer ^. _inactiveRoofTapped
 
-        canEditRoofDyn = (==) RoofEditing <$> modeDyn
+        -- roof only editable in Editor mode, not in Builder mode
+        canEditRoofDyn = if mode == RoofInEditor
+                         then (==) RoofEditing <$> modeDyn
+                         else pure false
+        
         roof           = cfg ^. _roof
         rid            = roof ^. _id
         isActive       = cfg ^. _roofActive
