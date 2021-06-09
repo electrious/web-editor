@@ -3,13 +3,19 @@ module SmartHouse.HouseEditor where
 import Prelude
 
 import Control.Alt ((<|>))
-import Data.Default (def)
+import Control.Plus (empty)
+import Data.Default (class Default, def)
 import Data.Foldable (traverse_)
-import Data.Lens (view, (.~), (^.))
+import Data.Lens (Lens', view, (.~), (^.))
+import Data.Lens.Iso.Newtype (_Newtype)
+import Data.Lens.Record (prop)
 import Data.Meter (Meter, meterVal)
+import Data.Newtype (class Newtype)
+import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
 import Editor.Common.Lenses (_floor, _height, _id, _modeDyn, _name, _position, _roofs, _tapped, _updated)
 import Editor.HeightEditor (_min, dragArrowPos, setupHeightEditor)
+import Editor.RoofManager (RoofsData)
 import Effect.Class (liftEffect)
 import Effect.Random (randomInt)
 import Effect.Unsafe (unsafePerformEffect)
@@ -17,7 +23,7 @@ import FRP.Dynamic (Dynamic, latestEvt, sampleDyn)
 import FRP.Event (Event)
 import FRP.Event.Extra (performEvent)
 import Math.LineSeg (mkLineSeg)
-import Model.ActiveMode (ActiveMode)
+import Model.ActiveMode (ActiveMode(..))
 import Model.Polygon (Polygon, _polyVerts)
 import Model.SmartHouse.House (House, HouseNode, HouseOp(..), _roofTapped, _trees, _wallTapped, flipRoof, updateHeight)
 import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo)
@@ -40,6 +46,28 @@ data HouseRenderMode = EditHouseMode
                      | Render2DMode
 derive instance eqHouseRenderMode :: Eq HouseRenderMode
 
+
+newtype HouseEditorConf = HouseEditorConf {
+    modeDyn   :: Dynamic ActiveMode,
+    house     :: House,
+    roofsData :: Event RoofsData
+    }
+
+derive instance newtypeHouseEditorConf :: Newtype HouseEditorConf _
+instance defaultHouseEditorConf :: Default HouseEditorConf where
+    def = HouseEditorConf {
+        modeDyn   : pure Inactive,
+        house     : def,
+        roofsData : empty
+        }
+
+_house :: forall t a r. Newtype t { house :: a | r } => Lens' t a
+_house = _Newtype <<< prop (SProxy :: SProxy "house")
+
+_roofsData :: forall t a r. Newtype t { roofsData :: a | r } => Lens' t a
+_roofsData = _Newtype <<< prop (SProxy :: SProxy "roofsData")
+
+
 editHouse :: Dynamic ActiveMode -> House -> Node HouseTextureInfo HouseNode
 editHouse actDyn house = do
     let h = house ^. _height
@@ -53,8 +81,8 @@ editHouse actDyn house = do
         roofEvtsDyn <- node (def # _position .~ pDyn) $ dynamic $ traverse (renderRoof actDyn) <<< view _roofs <$> houseDyn
 
         let flipEvt = latestAnyEvtWith (view _flipped) roofEvtsDyn
-        -- height editor arrow position
-        let hPos2D = dragArrowPos $ house ^. _floor <<< _polyVerts
+            -- height editor arrow position
+            hPos2D = dragArrowPos $ house ^. _floor <<< _polyVerts
             hPos   = mkVec3 (vecX hPos2D) (vecY hPos2D) (meterVal h)
 
         -- setup height editor and get the delta event
