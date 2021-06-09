@@ -15,6 +15,7 @@ import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
 import Editor.Common.Lenses (_floor, _height, _id, _modeDyn, _name, _position, _roofs, _tapped, _updated)
 import Editor.HeightEditor (_min, dragArrowPos, setupHeightEditor)
+import Editor.HouseEditor (ArrayEditParam)
 import Editor.RoofManager (RoofsData)
 import Effect.Class (liftEffect)
 import Effect.Random (randomInt)
@@ -48,17 +49,20 @@ derive instance eqHouseRenderMode :: Eq HouseRenderMode
 
 
 newtype HouseEditorConf = HouseEditorConf {
-    modeDyn   :: Dynamic ActiveMode,
-    house     :: House,
-    roofsData :: Event RoofsData
+    modeDyn        :: Dynamic ActiveMode,
+    house          :: House,
+    
+    roofsData      :: Event RoofsData,
+    arrayEditParam :: ArrayEditParam
     }
 
 derive instance newtypeHouseEditorConf :: Newtype HouseEditorConf _
 instance defaultHouseEditorConf :: Default HouseEditorConf where
     def = HouseEditorConf {
-        modeDyn   : pure Inactive,
-        house     : def,
-        roofsData : empty
+        modeDyn        : pure Inactive,
+        house          : def,
+        roofsData      : empty,
+        arrayEditParam : def
         }
 
 _house :: forall t a r. Newtype t { house :: a | r } => Lens' t a
@@ -67,11 +71,17 @@ _house = _Newtype <<< prop (SProxy :: SProxy "house")
 _roofsData :: forall t a r. Newtype t { roofsData :: a | r } => Lens' t a
 _roofsData = _Newtype <<< prop (SProxy :: SProxy "roofsData")
 
+_arrayEditParam :: forall t a r. Newtype t { arrayEditParam :: a | r } => Lens' t a
+_arrayEditParam = _Newtype <<< prop (SProxy :: SProxy "arrayEditParam")
 
-editHouse :: Dynamic ActiveMode -> House -> Node HouseTextureInfo HouseNode
-editHouse actDyn house = do
-    let h = house ^. _height
-        floor = house ^. _floor
+
+editHouse :: HouseEditorConf -> Node HouseTextureInfo HouseNode
+editHouse conf = do
+    let house  = conf ^. _house
+        actDyn = conf ^. _modeDyn
+        
+        h      = house ^. _height
+        floor  = house ^. _floor
     fixNodeDWith house \houseDyn -> do
         let hDyn = view _height <$> houseDyn
             pDyn = mkVec3 0.0 0.0 <<< meterVal <$> hDyn

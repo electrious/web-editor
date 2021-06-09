@@ -46,7 +46,7 @@ import Rendering.DynamicNode (eventNode)
 import Rendering.Node (Node, fixNodeDWith, fixNodeEWith, getEnv, getParent, localEnv, mkNodeEnv, node, runNode, tapMouseMesh)
 import Rendering.TextureLoader (textureFromUrl)
 import SmartHouse.BuilderMode (BuilderMode(..))
-import SmartHouse.HouseEditor (HouseRenderMode(..), editHouse, renderHouse)
+import SmartHouse.HouseEditor (HouseRenderMode(..), _house, editHouse, renderHouse)
 import SmartHouse.HouseTracer (TracerMode(..), _stopTracing, _tracedPolygon, _tracerMode, traceHouse)
 import SmartHouse.UI (_savingStepDyn, houseBuilderUI)
 import Specular.Dom.Widget (runMainWidgetInNode)
@@ -187,7 +187,8 @@ renderHouseDict actHouseDyn modeDyn houses = traverse render houses
           getMode h Nothing Building                     = Inactive
           
           render h = if houseRenderMode == EditHouseMode
-                     then editHouse (getMode h <$> actHouseDyn <*> modeDyn) h
+                     then editHouse $ def # _modeDyn .~ (getMode h <$> actHouseDyn <*> modeDyn)
+                                          # _house   .~ h
                      else renderHouse h
 
 
