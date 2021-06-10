@@ -6,7 +6,11 @@ exports.exportObject = object => _ => {
 
 	var indexVertex = 0;
 	var indexVertexUvs = 0;
-	var indexNormals = 0;
+        var indexNormals = 0;
+    
+        var inverseMatrixWorld = new THREE.Matrix4();
+        inverseMatrixWorld.getInverse(object.matrixWorld.clone());
+    
       	
 	var mtlFileName = 'scene'; // maybe this value can be passed as parameter
 	output += 'mtllib ' + mtlFileName +  '.mtl\n';
@@ -27,9 +31,9 @@ exports.exportObject = object => _ => {
 		var vertices = geometry.vertices;
                 
 		for ( var i = 0, l = vertices.length; i < l; i ++ ) {
-                    
-		    var vertex = vertices[ i ].clone();
-		    vertex.applyMatrix4( mesh.matrixWorld );
+
+                    // convert vertex to the roof 'object' coordinate system
+                    var vertex = object.worldToLocal(mesh.localToWorld(vertices[i].clone()));
 
 		    output += 'v ' + vertex.x + ' ' + vertex.y + ' ' + vertex.z + '\n';
 
@@ -65,8 +69,12 @@ exports.exportObject = object => _ => {
 
 		// normals
 
+                // get model matrix from mesh to object
+                var matrixToObject = new THREE.Matrix4();
+                matrixToObject.multiplyMatrices(mesh.matrixWorld, inverseMatrixWorld);
+                
 		var normalMatrixWorld = new THREE.Matrix3();
-		normalMatrixWorld.getNormalMatrix( mesh.matrixWorld );
+		normalMatrixWorld.getNormalMatrix( matrixToObject );
 
 		for ( var i = 0, l = faces.length; i < l; i ++ ) {
 
@@ -171,8 +179,8 @@ exports.exportObject = object => _ => {
 	    mtlOutput += 'Ke 0.0000 0.0000 0.0000\n';
             
 	    if (mat.map && mat.map instanceof THREE.Texture) {
-		mtlOutput += 'map_Ka ./scene.png\n';
-		mtlOutput += 'map_Kd ./scene.png\n';
+		mtlOutput += 'map_Ka ./scene.jpg\n';
+		mtlOutput += 'map_Kd ./scene.jpg\n';
 	    }
             
 	}
