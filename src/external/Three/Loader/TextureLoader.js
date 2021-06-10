@@ -37,8 +37,8 @@ exports.textureImage = t => cb => _ => {
     ctx.drawImage(img, 0, 0);
 
     canvas.toBlob(blob => {
-        cb(new File([blob], "scene.png"))();
-    });
+        cb(new File([blob], "scene.jpg"))();
+    }, "image/jpeg");
 }
 
 // texture wrapping mode

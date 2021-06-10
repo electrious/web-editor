@@ -171,8 +171,8 @@ exports.exportObject = object => _ => {
 	    mtlOutput += 'Ke 0.0000 0.0000 0.0000\n';
             
 	    if (mat.map && mat.map instanceof THREE.Texture) {
-		mtlOutput += 'map_Ka ./scene.png\n';
-		mtlOutput += 'map_Kd ./scene.png\n';
+		mtlOutput += 'map_Ka ./scene.jpg\n';
+		mtlOutput += 'map_Kd ./scene.jpg\n';
 	    }
             
 	}
