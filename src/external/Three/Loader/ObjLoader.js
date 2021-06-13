@@ -1,12 +1,12 @@
-const OBJLoader2 = require('three/examples/jsm/loaders/OBJLoader2')
+const OBJLoader = require('three/examples/jsm/loaders/OBJLoader')
 const MTLLoader = require('three/examples/jsm/loaders/MTLLoader')
 
 exports.makeMTLLoader = _ => {
     return new MTLLoader.MTLLoader()
 }
 
-exports.makeOBJLoader2 = _ => {
-    return new OBJLoader2.OBJLoader2()
+exports.makeOBJLoader = _ => {
+    return new OBJLoader.OBJLoader()
 }
 
 exports.setPath = path => loader => _ => {
@@ -24,3 +24,7 @@ exports.loadOBJ = _ => loader => name => cb => _ => {
 exports.parseOBJ = c => loader => {
     return loader.parse(c)
 }
+
+exports.setMaterials = matCreator => loader => _ => {
+    loader.setMaterials(matCreator);
+};
