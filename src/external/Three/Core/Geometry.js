@@ -41,6 +41,10 @@ exports.setUVsNeedUpdate = _ => u => geo => _ => {
     geo.uvsNeedUpdate = u
 }
 
+exports.computeVertexNormals = _ => geo => _ => {
+    geo.computeVertexNormals();
+};
+
 exports.mkBoxGeometry = width => height => depth => _ => {
     return new three.BoxGeometry(width, height, depth)
 }

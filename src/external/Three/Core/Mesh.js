@@ -21,6 +21,10 @@ exports.setBufferGeometry = _ => geo => mesh => _ => {
     mesh.geometry = geo
 }
 
+exports.material = mesh => {
+    return mesh.material;
+}
+
 exports.setMaterial = _ => mat => mesh => _ => [
     mesh.material = mat
 ]
