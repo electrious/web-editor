@@ -29,7 +29,7 @@ derive instance newtypeTappableMesh :: Newtype TappableMesh _
 instance isObject3DTappableMesh :: IsObject3D TappableMesh where
     toObject3D = toObject3D <<< view _mesh
 
-tapEvtOn :: Mesh -> Event SceneTapEvent
+tapEvtOn :: forall o. IsObject3D o => o -> Event SceneTapEvent
 tapEvtOn m = makeEvent \k -> do
                 makeTappable m k
                 pure (stopTappable m)
@@ -133,7 +133,7 @@ derive instance newtypeTapMouseMesh :: Newtype TapMouseMesh _
 instance toObject3DTapMouseMesh :: IsObject3D TapMouseMesh where
     toObject3D = toObject3D <<< view _mesh
 
-mouseEvtOn :: Mesh -> Event SceneMouseMoveEvent
+mouseEvtOn :: forall o. IsObject3D o => o -> Event SceneMouseMoveEvent
 mouseEvtOn m = makeEvent \k -> do
     makeMouseMove m k
     pure $ stopMouseMove m
