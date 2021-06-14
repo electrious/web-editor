@@ -18,7 +18,7 @@ import Renderring.MaterialLoader (blackMaterial)
 import Three.Core.Geometry (Geometry)
 import Three.Core.Mesh (Mesh, geometry, mkMesh)
 import Three.Core.Object3D (Object3D, add, mkObject3D, setCastShadow, setName, setPosition, setRotation, setScale)
-import Three.Loader.ObjLoader (makeOBJLoader2, parseOBJ)
+import Three.Loader.ObjLoader (makeOBJLoader, parseOBJ)
 import Three.Math.Euler (mkEuler)
 import Three.Math.Vector (mkVec3)
 import Unsafe.Coerce (unsafeCoerce)
@@ -51,6 +51,6 @@ instance renderableChassis :: Renderable e ChassisRenderable Mesh where
 
 chassisGeo :: String -> Geometry
 chassisGeo = memoize \_ -> unsafePerformEffect do
-    loader <- makeOBJLoader2
+    loader <- makeOBJLoader
     let obj = parseOBJ bxChassisObjData loader
     pure $ geometry $ unsafeCoerce obj

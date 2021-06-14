@@ -3,7 +3,7 @@ module Editor.House where
 import Prelude hiding (add)
 
 import Algorithm.MeshFlatten (VertexItem, buildRTree)
-import Custom.Mesh (TapMouseMesh, mkTapMouseMesh)
+import Custom.Mesh (TapMouseMesh(..), mouseEvtOn, tapEvtOn)
 import Data.Array (range)
 import Data.Compactable (compact)
 import Data.Foldable (find, traverse_)
@@ -15,11 +15,11 @@ import Editor.Common.Lenses (_mesh)
 import Effect (Effect)
 import FRP.Event (Event, makeEvent)
 import RBush.RBush (RBush)
-import Three.Core.Geometry (class IsGeometry, BufferGeometry, Geometry, count, getAttribute, getX, getY, getZ)
-import Three.Core.Material (class IsMaterial, MaterialCreator, MeshBasicMaterial, getMaterial, preload, setTransparent)
-import Three.Core.Mesh (Mesh, bufferGeometry, geometry, isMesh)
-import Three.Core.Object3D (class IsObject3D, Object3D, add, children, remove, setCastShadow, setName, setReceiveShadow)
-import Three.Loader.ObjLoader (loadMTL, loadOBJ, makeMTLLoader, makeOBJLoader2, setPath)
+import Three.Core.Geometry (BufferGeometry, Geometry, computeVertexNormals, count, getAttribute, getX, getY, getZ)
+import Three.Core.Material (preload, setTransparent)
+import Three.Core.Mesh (Mesh, bufferGeometry, geometry, isMesh, material)
+import Three.Core.Object3D (Object3D, children, setCastShadow, setName, setReceiveShadow)
+import Three.Loader.ObjLoader (loadMTL, loadOBJ, makeMTLLoader, makeOBJLoader, setMaterials, setPath)
 import Three.Math.Vector (Vector3, mkVec3)
 
 
@@ -30,54 +30,48 @@ type HouseMesh = TapMouseMesh
 
 -- | create new HouseMesh, which is a mesh composed with the tap and mouse
 -- events from the mesh.
-mkHouseMesh :: forall geo mat. IsGeometry geo => IsMaterial mat => geo -> mat -> Effect HouseMesh
-mkHouseMesh geo mat = do
-    mesh <- mkTapMouseMesh geo mat
+mkHouseMesh :: Mesh -> Effect HouseMesh
+mkHouseMesh m = do
+    let mesh = TapMouseMesh {
+            mesh      : m,
+            tapped    : tapEvtOn m,
+            mouseMove : mouseEvtOn m
+            }
     setName "house-mesh" mesh
     pure mesh
 
 
--- | apply the material creator's material to the mesh, which is a child of
--- the loaded Object3D
-applyMaterialCreator :: forall a. IsObject3D a => MaterialCreator -> a -> Effect (Maybe HouseMesh)
-applyMaterialCreator matCreator obj = do
-    let mat :: MeshBasicMaterial
-        mat = getMaterial "scene" matCreator
-    setTransparent false mat
-
-    let oldMesh = find isMesh (children obj)
-        upd old = do
-            remove old obj
-            let geo :: Geometry
-                geo = geometry old
-            newMesh <- mkHouseMesh geo mat
-            add newMesh obj
-            pure newMesh
-    traverse upd oldMesh
+getHouseMesh :: Object3D -> Effect (Maybe HouseMesh)
+getHouseMesh obj = traverse mkHouseMesh $ find isMesh (children obj)
 
 
 -- | load the house mesh of the specified lead
 loadHouseModel :: String -> Int -> Effect (Event HouseMeshData)
 loadHouseModel serverUrl leadId = do
-    objLoader <- makeOBJLoader2
+    objLoader <- makeOBJLoader
     mtlLoader <- makeMTLLoader
 
     let path = meshPath serverUrl leadId
 
-    let setupShadow :: Object3D -> Effect Unit
-        setupShadow o = do
+        setupMeshProp :: Mesh -> Effect Unit
+        setupMeshProp o = do
             setCastShadow true o
             setReceiveShadow true o
+            setTransparent false $ material o
+            computeVertexNormals $ (geometry o :: Geometry)
 
     pure $ compact $ makeEvent \k -> do
         setPath path mtlLoader
         loadMTL mtlLoader "scene.mtl" \materials -> do
             preload materials
+
+            -- set the OBJloader to use the right materials
+            setMaterials materials objLoader
             
             loadOBJ objLoader (path <> "scene.obj") \obj -> do
                 setName "house-mesh-wrapper" obj
-                traverse_ setupShadow (children obj)
-                houseMesh <- applyMaterialCreator materials obj
+                traverse_ setupMeshProp (children obj)
+                houseMesh <- getHouseMesh obj
                 meshData <- traverse (getHouseMeshData obj) houseMesh
                 k meshData
         pure (pure unit)

@@ -33,6 +33,8 @@ foreign import setElementsNeedUpdate :: forall geo. IsGeometry geo => Boolean ->
 foreign import setUVs :: forall geo. IsGeometry geo => Array (Array Vector2) -> geo -> Effect Unit
 foreign import setUVsNeedUpdate :: forall geo. IsGeometry geo => Boolean -> geo -> Effect Unit
 
+foreign import computeVertexNormals :: forall geo. IsGeometry geo => geo -> Effect Unit
+
 foreign import data BoxGeometry :: Type
 foreign import mkBoxGeometry :: Number -> Number -> Number -> Effect BoxGeometry
 instance isGeometryBoxGeometry :: IsGeometry BoxGeometry
