@@ -20,31 +20,31 @@ import Data.UUID (UUID)
 import Editor.ArrayBuilder (runArrayBuilder)
 import Editor.Common.Lenses (_alignment, _floor, _height, _houseId, _id, _modeDyn, _name, _orientation, _panelType, _panels, _position, _roof, _roofs, _tapped, _updated)
 import Editor.HeightEditor (_min, dragArrowPos, setupHeightEditor)
-import Editor.HouseEditor (ArrayEditParam(..), HouseConfig(..), _heatmap, runHouseEditor)
+import Editor.HouseEditor (ArrayEditParam, HouseConfig, _heatmap, runHouseEditor)
 import Editor.PanelLayer (_initPanels, _mainOrientation, _roofActive)
 import Editor.PanelNode (PanelOpacity(..))
 import Editor.Rendering.PanelRendering (_opacity)
-import Editor.RoofManager (RoofsData(..), _racks, calcMainOrientation, getActivated)
-import Editor.RoofNode (RoofNode(..), RoofNodeConfig(..), createRoofNode)
+import Editor.RoofManager (RoofsData, _racks, calcMainOrientation, getActivated)
+import Editor.RoofNode (RoofNode, RoofNodeConfig, createRoofNode)
 import Effect.Class (liftEffect)
 import Effect.Random (randomInt)
 import Effect.Unsafe (unsafePerformEffect)
-import FRP.Dynamic (Dynamic(..), latestEvt, sampleDyn, step)
+import FRP.Dynamic (Dynamic, latestEvt, sampleDyn, step)
 import FRP.Event (Event)
 import FRP.Event.Extra (delay, performEvent)
 import Math.LineSeg (mkLineSeg)
 import Model.ActiveMode (ActiveMode(..), fromBoolean)
 import Model.Polygon (Polygon, _polyVerts)
-import Model.Racking.OldRackingSystem (OldRoofRackingData(..), guessRackingType)
+import Model.Racking.OldRackingSystem (OldRoofRackingData, guessRackingType)
 import Model.Racking.RackingType (RackingType(..))
 import Model.Roof.Panel (Alignment(..), Orientation(..), PanelsDict, panelsDict)
-import Model.Roof.RoofPlate (RoofPlate(..), _roofIntId)
+import Model.Roof.RoofPlate (RoofPlate, _roofIntId)
 import Model.SmartHouse.House (House, HouseNode, HouseOp(..), _roofTapped, _trees, _wallTapped, flipRoof, updateHeight)
 import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo)
 import Model.SmartHouse.Roof (_flipped, renderRoof)
 import Model.UUID (idLens)
 import Rendering.DynamicNode (dynamic)
-import Rendering.Node (Node(..), fixNodeDWith, getEnv, node, tapMesh)
+import Rendering.Node (Node, fixNodeDWith, getEnv, localEnv, node, tapMesh)
 import SmartHouse.Algorithm.Edge (_line)
 import SmartHouse.Algorithm.LAV (_edges)
 import SmartHouse.HouseTracer (renderLine, renderLineWith)
@@ -96,8 +96,8 @@ data HouseEditorMode = EditingHouse
 derive instance eqwHouseEditorMode :: Eq HouseEditorMode
 
 
-editHouse :: HouseEditorConf -> Node HouseTextureInfo HouseNode
-editHouse conf = do
+editHouse :: HouseConfig -> HouseEditorConf -> Node HouseTextureInfo HouseNode
+editHouse houseCfg conf = do
     let house  = conf ^. _house
         actDyn = conf ^. _modeDyn
         
@@ -141,7 +141,7 @@ editHouse conf = do
         -- render all roof nodes if available
             roofsDyn = step Nothing $ Just <$> conf ^. _roofsData
 
-        renderRoofs roofsDyn
+        void $ localEnv (const houseCfg) $ renderRoofs (conf ^. _arrayEditParam) roofsDyn
         
         pure { input: newHouseEvt, output: hn }
 
