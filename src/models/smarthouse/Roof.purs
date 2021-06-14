@@ -114,8 +114,8 @@ derive instance newtypeRoofEvents :: Newtype RoofEvents _
 _flipped :: forall t a r. Newtype t { flipped :: a | r } => Lens' t a
 _flipped = _Newtype <<< prop (SProxy :: SProxy "flipped")
 
-renderRoof :: Dynamic ActiveMode -> Roof -> Node HouseTextureInfo RoofEvents
-renderRoof actDyn roof = do
+renderRoof :: Dynamic Boolean -> Dynamic ActiveMode -> Roof -> Node HouseTextureInfo RoofEvents
+renderRoof enableDyn actDyn roof = do
     let poly  = roof ^. _polygon
         gable = canBeGable roof
     -- render the roof outline as white line
@@ -126,8 +126,9 @@ renderRoof actDyn roof = do
          then renderGableRoof poly
          else renderSlopeRoof poly
     let tapEvt      = multicast $ m ^. _tapped
-        actTapEvt   = gateDyn (isActive <$> actDyn) tapEvt
-        inactTapEvt = gateDyn (not <<< isActive <$> actDyn) tapEvt
+
+        actTapEvt   = gateDyn ((&&) <$> enableDyn <*> (isActive <$> actDyn)) tapEvt
+        inactTapEvt = gateDyn ((&&) <$> enableDyn <*> (not <<< isActive <$> actDyn)) tapEvt
         
     pure $ RoofEvents {
         tapped  : const (roof ^. idLens) <$> inactTapEvt,
