@@ -10,10 +10,12 @@ import API.Roofplate (loadRoofplates)
 import API.SmartHouse (SavingStep(..), createManual, isFinished, repeatCheckUntilReady, savedHouseId, uploadMeshFiles)
 import Control.Alt ((<|>))
 import Control.Alternative (empty)
+import Control.Monad.Except (runExcept)
 import Custom.Mesh (TapMouseMesh)
 import Data.Array (fromFoldable)
 import Data.Compactable (compact)
 import Data.Default (class Default, def)
+import Data.Either (Either(..))
 import Data.Filterable (filter)
 import Data.Foldable (class Foldable)
 import Data.Generic.Rep (class Generic)
@@ -30,10 +32,11 @@ import Data.Traversable (traverse)
 import Data.Tuple (fst)
 import Data.UUID (UUID)
 import Data.UUIDMap (UUIDMap)
-import Editor.Common.Lenses (_apiConfig, _deleted, _height, _houseId, _leadId, _modeDyn, _mouseMove, _name, _panelType, _panels, _parent, _tapped, _textureInfo, _updated, _width)
+import Editor.Common.Lenses (_apiConfig, _deleted, _height, _houseId, _leadId, _modeDyn, _mouseMove, _name, _panelType, _panels, _parent, _roofRackings, _roofs, _tapped, _textureInfo, _updated, _width)
 import Editor.Editor (Editor, _sizeDyn, setMode)
 import Editor.EditorMode as EditorMode
-import Editor.HouseEditor (HouseConfig, _dataServer, _heatmapTexture, _roofplates, _rotBtnTexture)
+import Editor.HouseEditor (ArrayEditParam, HouseConfig, _dataServer, _heatmapTexture, _rotBtnTexture)
+import Editor.RoofManager (RoofsData, _racks)
 import Editor.SceneEvent (size)
 import Effect (Effect)
 import Effect.Class (liftEffect)
@@ -52,7 +55,7 @@ import Rendering.DynamicNode (eventNode)
 import Rendering.Node (Node, fixNodeDWith, fixNodeE, fixNodeEWith, getEnv, getParent, localEnv, mkNodeEnv, node, runNode, tapMouseMesh)
 import Rendering.TextureLoader (textureFromUrl)
 import SmartHouse.BuilderMode (BuilderMode(..))
-import SmartHouse.HouseEditor (HouseRenderMode(..), _house, editHouse, renderHouse)
+import SmartHouse.HouseEditor (HouseRenderMode(..), _arrayEditParam, _house, _roofsData, editHouse, renderHouse)
 import SmartHouse.HouseTracer (TracerMode(..), _stopTracing, _tracedPolygon, _tracerMode, traceHouse)
 import SmartHouse.UI (_savingStepDyn, houseBuilderUI)
 import Specular.Dom.Widget (runMainWidgetInNode)
@@ -201,16 +204,18 @@ getActivated :: forall f. Foldable f => Functor f => f HouseNode -> Event UUID
 getActivated = foldEvtWith f
     where f n = const (n ^. idLens) <$> houseTapped n
 
-renderHouseDict :: Dynamic (Maybe UUID) -> Dynamic BuilderMode -> HouseDict -> HouseConfig -> Node HouseTextureInfo (UUIDMap HouseNode)
-renderHouseDict actHouseDyn modeDyn houses houseCfg = traverse render houses
+renderHouseDict :: Dynamic (Maybe UUID) -> Dynamic BuilderMode -> HouseConfig -> ArrayEditParam -> Event RoofsData -> HouseDict -> Node HouseTextureInfo (UUIDMap HouseNode)
+renderHouseDict actHouseDyn modeDyn houseCfg arrParam roofsDatEvt houses = traverse render houses
     where getMode _ _ Showing                            = Inactive
           getMode h (Just i) Building | h ^. idLens == i = Active
                                       | otherwise        = Inactive
           getMode h Nothing Building                     = Inactive
           
           render h = if houseRenderMode == EditHouseMode
-                     then editHouse houseCfg $ def # _modeDyn .~ (getMode h <$> actHouseDyn <*> modeDyn)
-                                                   # _house   .~ h
+                     then editHouse houseCfg $ def # _modeDyn        .~ (getMode h <$> actHouseDyn <*> modeDyn)
+                                                   # _house          .~ h
+                                                   # _roofsData      .~ roofsDatEvt
+                                                   # _arrayEditParam .~ arrParam
                      else renderHouse h
 
 
@@ -248,12 +253,21 @@ createHouseBuilder evts = node (def # _name .~ "house-builder") $ do
     pure $ compactHouseBuilt evt
 
 
+houseCfgFromBuilderCfg :: HouseBuilderConfig -> HouseConfig
+houseCfgFromBuilderCfg cfg = def # _dataServer     .~ (cfg ^. _dataServer)
+                                 # _modeDyn        .~ pure EditorMode.RoofEditing
+                                 # _textureInfo    .~ (cfg ^. _textureInfo)
+                                 # _rotBtnTexture  .~ (cfg ^. _rotBtnTexture)
+                                 # _heatmapTexture .~ (cfg ^. _heatmapTexture)
+                                 # _panelType      .~ (cfg ^. _panelType)
+                                 # _apiConfig      .~ (cfg ^. _apiConfig)
+
 builderForHouse :: BuilderInputEvts -> HouseTextureInfo -> Node HouseBuilderConfig HouseBuilt
 builderForHouse evts tInfo =
     fixNodeEWith def \hdEvt ->
         fixNodeDWith Nothing \actHouseDyn ->
             fixNodeDWith Building \modeDyn ->
-                fixNodeE \houseCfgEvt -> do
+                fixNodeE \roofsDatEvt -> do
                     pNode <- getParent
                     cfg   <- getEnv
                     
@@ -262,7 +276,11 @@ builderForHouse evts tInfo =
 
                     -- render all houses
                     let houseToRenderEvt = compact $ view _housesToRender <$> hdEvt
-                    nodesEvt <- localEnv (const tInfo) $ eventNode (renderHouseDict actHouseDyn modeDyn <$> houseToRenderEvt <*> houseCfgEvt)
+                        houseCfg = houseCfgFromBuilderCfg cfg
+
+                        arrParam = def
+                        
+                    nodesEvt <- localEnv (const tInfo) $ eventNode (renderHouseDict actHouseDyn modeDyn houseCfg arrParam roofsDatEvt <$> houseToRenderEvt)
 
                     let deactEvt    = multicast $ const Nothing <$> helper ^. _tapped
                         actEvt      = keepLatest $ getActivated <$> nodesEvt
@@ -294,8 +312,8 @@ builderForHouse evts tInfo =
                         finishSavingEvt = multicast $ filter isFinished stepEvt
                         newHouseIdEvt = compact $ savedHouseId <$> finishSavingEvt
                             
-                        newHouseCfgEvt = keepLatest $ performEvent $ loadRoofAndPanels cfg <$> newHouseIdEvt
-
+                        newRoofsDatEvt = keepLatest $ performEvent $ loadRoofAndPanels cfg <$> newHouseIdEvt
+                    
                         modeEvt = (const Showing <$> exportEvt) <|> 
                                   (const Building <$> finishSavingEvt)
                     
@@ -303,7 +321,7 @@ builderForHouse evts tInfo =
                                   # _tracerMode  .~ (traceRes ^. _tracerMode)
                                   # _saveStepEvt .~ stepEvt
 
-                    pure { input: newHouseCfgEvt, output : { input: modeEvt, output: { input: actHouseEvt, output : { input: newHdEvt, output : res } } } }
+                    pure { input: newRoofsDatEvt, output : { input: modeEvt, output: { input: actHouseEvt, output : { input: newHdEvt, output : res } } } }
 
 
 runAPIEvent :: forall a. APIConfig -> Event (API (Event a)) -> Event a
@@ -329,26 +347,23 @@ saveMeshes cfg imgEvt mFilesEvt houseEvt =
 
 
 -- load roof plates and panels data after saving mesh is finished
-loadRoofAndPanels :: HouseBuilderConfig -> Int -> Effect (Event HouseConfig)
+loadRoofAndPanels :: HouseBuilderConfig -> Int -> Effect (Event RoofsData)
 loadRoofAndPanels conf houseId = do
     let apiCfg = conf ^. _apiConfig
     roofsEvt  <- runAPI (loadRoofplates houseId) apiCfg
     panelsEvt <- runAPI (loadPanels houseId) apiCfg
     racksEvt  <- runAPI (loadRacking houseId) apiCfg
 
-    let mkHouseCfg rs ps rack = def # _leadId         .~ (conf ^. _leadId)
-                                    # _houseId        .~ houseId
-                                    # _roofplates     .~ rs
-                                    # _panels         .~ ps
-                                    # _dataServer     .~ (conf ^. _dataServer)
-                                    # _modeDyn        .~ pure EditorMode.ArrayEditing
-                                    # _textureInfo    .~ (conf ^. _textureInfo)
-                                    # _rotBtnTexture  .~ (conf ^. _rotBtnTexture)
-                                    # _heatmapTexture .~ (conf ^. _heatmapTexture)
-                                    # _panelType      .~ (conf ^. _panelType)
-                                    # _apiConfig      .~ apiCfg
+    let mkRoofsDat rs ps racks = def # _houseId .~ houseId
+                                     # _roofs   .~ rs
+                                     # _panels  .~ ps
+                                     # _racks   .~ extrRoofRack racks
 
-    pure $ mkHouseCfg <$> roofsEvt <*> panelsEvt <*> racksEvt
+        extrRoofRack res = case runExcept res of
+            Left _ -> M.empty
+            Right v -> v ^. _roofRackings
+
+    pure $ mkRoofsDat <$> roofsEvt <*> panelsEvt <*> racksEvt
 
 -- | external API to build a 3D house for 2D lead
 buildHouse :: Editor -> HouseBuilderConfig -> Effect HouseBuilt

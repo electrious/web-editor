@@ -24,7 +24,7 @@ import Data.Symbol (SProxy(..))
 import Data.Time.Duration (Milliseconds(..))
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import Data.UUID (UUID)
+import Data.UUID (UUID, emptyUUID)
 import Data.UUIDMap (UUIDMap)
 import Data.UUIDMap as UM
 import Editor.ArrayBuilder (runArrayBuilder)
@@ -244,17 +244,19 @@ mergeArrEvt f arr = g <$> debounce (Milliseconds 50.0) (mergeArray (f <$> arr))
 
 -- roofs data loaded after HouseBuilder finish building the 3D house and load data back.
 newtype RoofsData = RoofsData {
-    roofs  :: Array RoofPlate,
-    panels :: Array Panel,
-    racks  :: Map Int OldRoofRackingData
+    houseId :: Int,
+    roofs   :: Array RoofPlate,
+    panels  :: Array Panel,
+    racks   :: Map Int OldRoofRackingData
 }
 
 derive instance newtypeRoofsData :: Newtype RoofsData _
 instance defaultRoofsData :: Default RoofsData where
     def = RoofsData {
-        roofs  : [],
-        panels : [],
-        racks  : M.empty
+        houseId : 0,
+        roofs   : [],
+        panels  : [],
+        racks   : M.empty
         }
 
 

@@ -180,8 +180,6 @@ renderRoofs param rdDyn = dynamic $ renderRd <$> rdDyn
           renderRd (Just rd) =
               fixNodeDWith Landscape \mainOrientDyn ->
                   fixNodeDWith Nothing \activeRoof -> do
-                      houseId <- view _houseId <$> getEnv
-
                       let psDict = panelsDict $ rd ^. _panels
                           roofs  = rd ^. _roofs
                           racks  = rd ^. _racks
@@ -190,7 +188,7 @@ renderRoofs param rdDyn = dynamic $ renderRd <$> rdDyn
                           alignDyn   = step Grid      $ param ^. _alignment
                           opacityDyn = step Opaque    $ param ^. _opacity
                   
-                          cfg = def # _houseId         .~ houseId
+                          cfg = def # _houseId         .~ (rd ^. _houseId)
                                     # _mainOrientation .~ mainOrientDyn
                                     # _orientation     .~ orientDyn
                                     # _alignment       .~ alignDyn
