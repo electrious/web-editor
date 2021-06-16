@@ -252,7 +252,7 @@ createHouseBuilder evts = node (def # _name .~ "house-builder") $ do
 
 houseCfgFromBuilderCfg :: HouseBuilderConfig -> HouseConfig
 houseCfgFromBuilderCfg cfg = def # _dataServer     .~ (cfg ^. _dataServer)
-                                 # _modeDyn        .~ pure EditorMode.RoofEditing
+                                 # _modeDyn        .~ pure EditorMode.ArrayEditing
                                  # _textureInfo    .~ (cfg ^. _textureInfo)
                                  # _rotBtnTexture  .~ (cfg ^. _rotBtnTexture)
                                  # _heatmapTexture .~ (cfg ^. _heatmapTexture)
