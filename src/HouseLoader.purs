@@ -28,7 +28,7 @@ import Editor.HouseEditor (ArrayEditParam, HouseConfig, HouseEditor, _dataServer
 import Editor.PanelLayer (_serverUpdated)
 import Editor.PanelNode (PanelOpacity(..))
 import Editor.Rendering.PanelRendering (_opacity)
-import Editor.RoofManager (_editedRoofs, createRoofManager)
+import Editor.RoofManager (_arrayEvents, _editedRoofs, _racks, createRoofManager)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (step)
@@ -164,7 +164,9 @@ loadHouse editor param = do
                             Right v -> v ^. _roofRackings
     
         buildRoofMgr hmd roofsDat panelsDat roofRackData = do
-            mgr <- createRoofManager param hmd roofsDat panelsDat roofRackData
+            mgr <- createRoofManager param hmd $ def # _roofs  .~ roofsDat
+                                                     # _panels .~ panelsDat
+                                                     # _racks  .~ roofRackData
             liftEffect do
                 add (hmd ^. _wrapper) editor
                 add (mgr ^. _wrapper) editor
@@ -183,7 +185,7 @@ loadHouse editor param = do
         screenshot    : performEvent $ getScreenshot     <$> delay (cfg ^. _screenshotDelay) loadedEvt,
         roofUpdate    : keepLatest $ view _editedRoofs   <$> mgrEvt,
 
-        alignment     : keepLatest $ view _alignment     <$> mgrEvt,
-        orientation   : keepLatest $ view _orientation   <$> mgrEvt,
-        serverUpdated : keepLatest $ view _serverUpdated <$> mgrEvt
+        alignment     : keepLatest $ view (_arrayEvents <<< _alignment) <$> mgrEvt,
+        orientation   : keepLatest $ view (_arrayEvents <<< _orientation) <$> mgrEvt,
+        serverUpdated : keepLatest $ view (_arrayEvents <<< _serverUpdated) <$> mgrEvt
     }

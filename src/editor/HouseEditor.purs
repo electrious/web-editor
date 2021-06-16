@@ -78,7 +78,7 @@ instance defaultHouseConfig :: Default HouseConfig where
 _roofplates :: forall t a r. Newtype t { roofplates :: a | r } => Lens' t a
 _roofplates = _Newtype <<< prop (SProxy :: SProxy "roofplates")
 
-_dataServer :: Lens' HouseConfig String
+_dataServer :: forall t a r. Newtype t { dataServer :: a | r } => Lens' t a
 _dataServer = _Newtype <<< prop (SProxy :: SProxy "dataServer")
 
 _rotBtnTexture :: forall t a r. Newtype t { rotBtnTexture :: a | r } => Lens' t a

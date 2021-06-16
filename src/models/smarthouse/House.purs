@@ -5,7 +5,7 @@ import Prelude
 import Control.Alt ((<|>))
 import Control.Alternative (empty)
 import Data.Array as Arr
-import Data.Default (class Default)
+import Data.Default (class Default, def)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Lens (Lens', (.~), (^.))
@@ -23,11 +23,12 @@ import Data.UUID (UUID, emptyUUID, genUUID)
 import Data.UUIDMap (UUIDMap)
 import Data.UUIDMap as UM
 import Editor.Common.Lenses (_floor, _height, _id, _roofs, _slope)
+import Editor.RoofManager (ArrayEvents)
 import Effect (Effect)
 import FRP.Event (Event)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
-import Math.Angle (Angle)
+import Math.Angle (Angle, degree)
 import Model.Polygon (Polygon, _polyVerts, counterClockPoly)
 import Model.Roof.RoofPlate (Point, vec2Point)
 import Model.SmartHouse.Roof (JSRoof, Roof, exportRoof)
@@ -51,6 +52,16 @@ newtype House = House {
 
 derive instance newtypeHouse :: Newtype House _
 derive instance genericHouse :: Generic House _
+instance defaultHouse :: Default House where
+    def = House {
+        id     : emptyUUID,
+        floor  : def,
+        height : meter 0.0,
+        slope  : degree 20.0,
+        trees  : M.empty,
+        edges  : empty,
+        roofs  : empty
+        }
 instance eqHouse :: Eq House where
     eq h1 h2 = h1 ^. _id == h2 ^. _id
 instance showHouse :: Show House where
@@ -139,11 +150,13 @@ instance showHouseOp :: Show HouseOp where
 
 
 newtype HouseNode = HouseNode {
-    id         :: UUID,
-    roofTapped :: Event UUID,
-    wallTapped :: Event Unit,
-    updated    :: Event HouseOp,
-    deleted    :: Event HouseOp
+    id          :: UUID,
+    roofTapped  :: Event UUID,
+    wallTapped  :: Event Unit,
+    updated     :: Event HouseOp,
+    deleted     :: Event HouseOp,
+
+    arrayEvents :: ArrayEvents
     }
 
 derive instance newtypeHouseNode :: Newtype HouseNode _
@@ -151,11 +164,13 @@ instance hasUUIDHouseNode :: HasUUID HouseNode where
     idLens = _id
 instance defaultHouseNode :: Default HouseNode where
     def = HouseNode {
-        id         : emptyUUID,
-        roofTapped : empty,
-        wallTapped : empty,
-        updated    : empty,
-        deleted    : empty
+        id          : emptyUUID,
+        roofTapped  : empty,
+        wallTapped  : empty,
+        updated     : empty,
+        deleted     : empty,
+
+        arrayEvents : def
         }
 
 _roofTapped :: forall t a r. Newtype t { roofTapped :: a | r } => Lens' t a

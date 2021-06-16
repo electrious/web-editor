@@ -87,8 +87,13 @@ doTest roofDat panelDat = do
                           --void $ subscribe (house ^. _screenshot) logShow
 
                         else do
-                            let builderCfg = def # _leadId    .~ 359617   --318872
-                                                 # _apiConfig .~ apiCfg
+                            let builderCfg = def # _leadId         .~ 359617   --318872
+                                                 # _apiConfig      .~ apiCfg
+                                                 # _dataServer     .~ serverUrl
+                                                 # _textureInfo    .~ textures
+                                                 # _rotBtnTexture  .~ rotateButtonPNG
+                                                 # _heatmapTexture .~ heatmapGradientPNG
+                                                 # _panelType      .~ panelType
                             r <- buildHouse editor builderCfg
 
                             let readyEvt = const unit <$> filter identity (r ^. _hasHouse)

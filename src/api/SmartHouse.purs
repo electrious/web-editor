@@ -10,6 +10,7 @@ import Data.Generic.Rep (class Generic)
 import Data.Lens (Lens', view, (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
+import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import FRP.Event (Event, keepLatest)
@@ -27,7 +28,7 @@ data SavingStep = NotSaving
                 | UploadingFiles
                 | CreatingHouse
                 | WaitingForReady
-                | Finished
+                | Finished Int
 
 derive instance genericSavingStep :: Generic SavingStep _
 derive instance eqSavingStep :: Eq SavingStep
@@ -36,12 +37,21 @@ instance showSavingStep :: Show SavingStep where
     show UploadingFiles  = "Uploading mesh files for the new house..."
     show CreatingHouse   = "Elli is analyzing the new house data..."
     show WaitingForReady = "Elli is analyzing the new house data..."
-    show Finished        = "Finished creating the new house"
+    show (Finished _)    = "Finished creating the new house"
 
 stepMode :: SavingStep -> ActiveMode
-stepMode NotSaving = Inactive
-stepMode Finished  = Inactive
-stepMode _         = Active
+stepMode NotSaving    = Inactive
+stepMode (Finished _) = Inactive
+stepMode _            = Active
+
+isFinished :: SavingStep -> Boolean
+isFinished (Finished _) = true
+isFinished _            = false
+
+savedHouseId :: SavingStep -> Maybe Int
+savedHouseId (Finished h) = Just h
+savedHouseId _            = Nothing
+
 
 newtype UploadReq = UploadReq {
     obj     :: File,

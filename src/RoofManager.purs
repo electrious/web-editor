@@ -5,17 +5,21 @@ import Prelude hiding (add,degree)
 import Algorithm.MeshFlatten (flattenRoofPlates)
 import Algorithm.PointInPolygon (underPolygons)
 import Control.Alt ((<|>))
+import Control.Alternative (empty)
 import Control.Monad.Reader (ask)
 import Data.Array as Array
 import Data.Compactable (compact)
-import Data.Default (def)
+import Data.Default (class Default, def)
 import Data.Foldable (class Foldable, foldl, sequence_, traverse_)
+import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Show (genericShow)
 import Data.Lens (Lens', view, (^.), (%~), (.~))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (List(..), concat, toUnfoldable)
 import Data.List as List
 import Data.Map (Map, delete, insert, lookup, values)
+import Data.Map as M
 import Data.Maybe (Maybe(..), fromMaybe, isNothing)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
@@ -26,7 +30,7 @@ import Data.UUID (UUID)
 import Data.UUIDMap (UUIDMap)
 import Data.UUIDMap as UM
 import Editor.ArrayBuilder (runArrayBuilder)
-import Editor.Common.Lenses (_alignment, _deleted, _disposable, _face, _geometry, _houseId, _id, _mesh, _modeDyn, _mouseMove, _orientation, _panelType, _point, _position, _roof, _roofId, _roofs, _tapped, _updated, _verticeTree, _wrapper)
+import Editor.Common.Lenses (_alignment, _deleted, _disposable, _face, _geometry, _houseId, _id, _mesh, _modeDyn, _mouseMove, _orientation, _panelType, _panels, _point, _position, _roof, _roofId, _roofs, _tapped, _updated, _verticeTree, _wrapper)
 import Editor.Disposable (class Disposable, dispose)
 import Editor.EditorMode (EditorMode(..))
 import Editor.House (HouseMeshData)
@@ -53,13 +57,25 @@ import Three.Core.Object3D (class IsObject3D, Object3D, add, mkObject3D, remove,
 import Three.Math.Vector (Vector3, mkVec3, toVec2, (<.>))
 import Util (foldEvtWith)
 
-newtype RoofManager = RoofManager {
-    wrapper       :: Object3D,
-    editedRoofs   :: Event (Array RoofEdited),
+newtype ArrayEvents = ArrayEvents {
     alignment     :: Event (Maybe Alignment),
     orientation   :: Event (Maybe Orientation),
-    serverUpdated :: Event Unit,
-    disposable    :: Effect Unit
+    serverUpdated :: Event Unit
+    }
+
+derive instance newtypeArrayEvents :: Newtype ArrayEvents _
+instance defaultArrayEvents :: Default ArrayEvents where
+    def = ArrayEvents {
+        alignment     : empty,
+        orientation   : empty,
+        serverUpdated : empty
+        }
+
+newtype RoofManager = RoofManager {
+    wrapper     :: Object3D,
+    editedRoofs :: Event (Array RoofEdited),
+    arrayEvents :: ArrayEvents,
+    disposable  :: Effect Unit
 }
 
 derive instance newtypeRoofManager :: Newtype RoofManager _
@@ -69,6 +85,9 @@ instance disposableRoofManager :: Disposable RoofManager where
 
 _editedRoofs :: Lens' RoofManager (Event (Array RoofEdited))
 _editedRoofs = _Newtype <<< prop (SProxy :: SProxy "editedRoofs")
+
+_arrayEvents :: forall t a r. Newtype t { arrayEvents :: a | r } => Lens' t a
+_arrayEvents = _Newtype <<< prop (SProxy :: SProxy "arrayEvents")
 
 type RoofDict = UUIDMap RoofPlate
 
@@ -224,9 +243,34 @@ mergeArrEvt :: forall a b. (a -> Event (Maybe b)) -> Array a -> Event (Maybe b)
 mergeArrEvt f arr = g <$> debounce (Milliseconds 50.0) (mergeArray (f <$> arr))
     where g = foldl (<|>) Nothing
 
+
+-- roofs data loaded after HouseBuilder finish building the 3D house and load data back.
+newtype RoofsData = RoofsData {
+    houseId :: Int,
+    roofs   :: Array RoofPlate,
+    panels  :: Array Panel,
+    racks   :: Map Int OldRoofRackingData
+}
+
+derive instance newtypeRoofsData :: Newtype RoofsData _
+derive instance genericRoofsData :: Generic RoofsData _
+instance showRoofsData :: Show RoofsData where
+    show = genericShow
+instance defaultRoofsData :: Default RoofsData where
+    def = RoofsData {
+        houseId : 0,
+        roofs   : [],
+        panels  : [],
+        racks   : M.empty
+        }
+
+
+_racks :: forall t a r. Newtype t { racks :: a | r } => Lens' t a
+_racks = _Newtype <<< prop (SProxy :: SProxy "racks")
+
 -- | create RoofManager for an array of roofs
-createRoofManager :: ArrayEditParam -> HouseMeshData -> Array RoofPlate -> Array Panel -> Map Int OldRoofRackingData -> HouseEditor RoofManager
-createRoofManager param meshData roofs panels racks = do
+createRoofManager :: ArrayEditParam -> HouseMeshData -> RoofsData -> HouseEditor RoofManager
+createRoofManager param meshData rsDat = do
     wrapper <- liftEffect createWrapper
 
     -- create an event stream for the current active id
@@ -236,12 +280,12 @@ createRoofManager param meshData roofs panels racks = do
     let activeRoofDyn = step Nothing activeRoof
 
         -- get the default roof plates as a dict
-        defRoofDict = UM.fromFoldable roofs
-        psDict      = panelsDict panels
+        defRoofDict = UM.fromFoldable $ rsDat ^. _roofs
+        psDict      = panelsDict $ rsDat ^. _panels
     canEditRoofDyn <- isRoofEditing
 
     -- render roofs dynamically
-    Tuple renderedNodes d <- renderRoofs wrapper param activeRoof roofsData psDict racks
+    Tuple renderedNodes d <- renderRoofs wrapper param activeRoof roofsData psDict $ rsDat ^. _racks
 
     let deleteRoofOp  = multicast  $ keepLatest $ getRoofDelete <$> renderedNodes
         updateRoofOp  = keepLatest $ getRoofUpdate              <$> renderedNodes
@@ -280,11 +324,15 @@ createRoofManager param meshData roofs panels racks = do
 
     let getRoofEdited = map toRoofEdited <<< UM.toUnfoldable
 
+        arrEvts = ArrayEvents {
+            alignment     : map (view _value) <$> alignEvt,
+            orientation   : map (view _value) <$> orientEvt,
+            serverUpdated : serverUpdEvt
+            }
+
     pure $ RoofManager {
-        wrapper       : wrapper,
-        editedRoofs   : multicast $ debounce (Milliseconds 1000.0) $ getRoofEdited <$> newRoofs,
-        alignment     : map (view _value) <$> alignEvt,
-        orientation   : map (view _value) <$> orientEvt,
-        serverUpdated : serverUpdEvt,
-        disposable    : sequence_ [d, d1, d2, dispose adderDisp]
+        wrapper     : wrapper,
+        editedRoofs : multicast $ debounce (Milliseconds 1000.0) $ getRoofEdited <$> newRoofs,
+        arrayEvents : arrEvts,
+        disposable  : sequence_ [d, d1, d2, dispose adderDisp]
     }
