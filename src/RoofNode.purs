@@ -7,7 +7,7 @@ import Control.Alt ((<|>))
 import Control.Monad.Reader (ask)
 import Control.Plus (empty)
 import Custom.Mesh (TappableMesh)
-import Data.Array (head, init, snoc)
+import Data.Array (head, init, last, snoc)
 import Data.Default (class Default, def)
 import Data.Generic.Rep (class Generic)
 import Data.Lens (Lens', view, (.~), (^.))
@@ -202,10 +202,14 @@ setupRoofNode obj content roof = do
 -- NOTE: the last point will be dropped here because it's the same with the
 -- first one
 getBorderPolygon :: forall a. IsObject3D a => a -> RoofPlate -> Effect (Polygon Vector2)
-getBorderPolygon obj roof = map newPolygon $ traverse toLocal $ fromMaybe [] (init $ roof ^. _borderPoints)
+getBorderPolygon obj roof = map newPolygon $ traverse toLocal $ delRedundant $ roof ^. _borderPoints
     where toLocal p = do
               np <- worldToLocal p obj
               pure $ mkVec2 (vecX np) (vecY np)
+
+          delRedundant vs = if head vs == last vs
+                            then fromMaybe vs $ init vs
+                            else vs
 
 -- convert all unifiedPoints to local coordinate and create ShadePoint values from them
 getShadePoints :: forall a. IsObject3D a => a -> RoofPlate -> Effect (Array ShadePoint)
