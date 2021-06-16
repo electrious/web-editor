@@ -11,6 +11,8 @@ import Data.Array as Array
 import Data.Compactable (compact)
 import Data.Default (class Default, def)
 import Data.Foldable (class Foldable, foldl, sequence_, traverse_)
+import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Show (genericShow)
 import Data.Lens (Lens', view, (^.), (%~), (.~))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
@@ -24,7 +26,7 @@ import Data.Symbol (SProxy(..))
 import Data.Time.Duration (Milliseconds(..))
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import Data.UUID (UUID, emptyUUID)
+import Data.UUID (UUID)
 import Data.UUIDMap (UUIDMap)
 import Data.UUIDMap as UM
 import Editor.ArrayBuilder (runArrayBuilder)
@@ -251,6 +253,9 @@ newtype RoofsData = RoofsData {
 }
 
 derive instance newtypeRoofsData :: Newtype RoofsData _
+derive instance genericRoofsData :: Generic RoofsData _
+instance showRoofsData :: Show RoofsData where
+    show = genericShow
 instance defaultRoofsData :: Default RoofsData where
     def = RoofsData {
         houseId : 0,

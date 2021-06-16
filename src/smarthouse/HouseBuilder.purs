@@ -5,17 +5,14 @@ import Prelude hiding (degree)
 import API (API, APIConfig, runAPI)
 import API.Image (ImageResp, _link, _pixelPerMeter, getImageMeta)
 import API.Panel (loadPanels)
-import API.Racking (loadRacking)
 import API.Roofplate (loadRoofplates)
 import API.SmartHouse (SavingStep(..), createManual, isFinished, repeatCheckUntilReady, savedHouseId, uploadMeshFiles)
 import Control.Alt ((<|>))
 import Control.Alternative (empty)
-import Control.Monad.Except (runExcept)
 import Custom.Mesh (TapMouseMesh)
 import Data.Array (fromFoldable)
 import Data.Compactable (compact)
 import Data.Default (class Default, def)
-import Data.Either (Either(..))
 import Data.Filterable (filter)
 import Data.Foldable (class Foldable)
 import Data.Generic.Rep (class Generic)
@@ -32,11 +29,11 @@ import Data.Traversable (traverse)
 import Data.Tuple (fst)
 import Data.UUID (UUID)
 import Data.UUIDMap (UUIDMap)
-import Editor.Common.Lenses (_apiConfig, _deleted, _height, _houseId, _leadId, _modeDyn, _mouseMove, _name, _panelType, _panels, _parent, _roofRackings, _roofs, _tapped, _textureInfo, _updated, _width)
+import Editor.Common.Lenses (_apiConfig, _deleted, _height, _houseId, _leadId, _modeDyn, _mouseMove, _name, _panelType, _panels, _parent, _roofs, _tapped, _textureInfo, _updated, _width)
 import Editor.Editor (Editor, _sizeDyn, setMode)
 import Editor.EditorMode as EditorMode
 import Editor.HouseEditor (ArrayEditParam, HouseConfig, _dataServer, _heatmapTexture, _rotBtnTexture)
-import Editor.RoofManager (RoofsData, _racks)
+import Editor.RoofManager (RoofsData)
 import Editor.SceneEvent (size)
 import Effect (Effect)
 import Effect.Class (liftEffect)
@@ -352,18 +349,12 @@ loadRoofAndPanels conf houseId = do
     let apiCfg = conf ^. _apiConfig
     roofsEvt  <- runAPI (loadRoofplates houseId) apiCfg
     panelsEvt <- runAPI (loadPanels houseId) apiCfg
-    racksEvt  <- runAPI (loadRacking houseId) apiCfg
 
-    let mkRoofsDat rs ps racks = def # _houseId .~ houseId
-                                     # _roofs   .~ rs
-                                     # _panels  .~ ps
-                                     # _racks   .~ extrRoofRack racks
+    let mkRoofsDat rs ps = def # _houseId .~ houseId
+                               # _roofs   .~ rs
+                               # _panels  .~ ps
 
-        extrRoofRack res = case runExcept res of
-            Left _ -> M.empty
-            Right v -> v ^. _roofRackings
-
-    pure $ mkRoofsDat <$> roofsEvt <*> panelsEvt <*> racksEvt
+    pure $ multicast $ mkRoofsDat <$> roofsEvt <*> panelsEvt
 
 -- | external API to build a 3D house for 2D lead
 buildHouse :: Editor -> HouseBuilderConfig -> Effect HouseBuilt

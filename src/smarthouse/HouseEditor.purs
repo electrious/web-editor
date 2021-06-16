@@ -1,8 +1,9 @@
 module SmartHouse.HouseEditor where
 
-import Prelude
+import Prelude hiding (add)
 
 import Control.Alt ((<|>))
+import Control.Monad.RWS (tell)
 import Control.Plus (empty)
 import Data.Default (class Default, def)
 import Data.Foldable (traverse_)
@@ -19,13 +20,14 @@ import Data.Traversable (traverse)
 import Data.UUID (UUID)
 import Editor.ArrayBuilder (runArrayBuilder)
 import Editor.Common.Lenses (_alignment, _floor, _height, _houseId, _id, _modeDyn, _name, _orientation, _panelType, _panels, _position, _roof, _roofs, _tapped, _updated)
+import Editor.Disposable (Disposee(..))
 import Editor.HeightEditor (_min, dragArrowPos, setupHeightEditor)
 import Editor.HouseEditor (ArrayEditParam, HouseConfig, _heatmap, runHouseEditor)
 import Editor.PanelLayer (_initPanels, _mainOrientation, _roofActive)
 import Editor.PanelNode (PanelOpacity(..))
 import Editor.Rendering.PanelRendering (_opacity)
 import Editor.RoofManager (RoofsData, _racks, calcMainOrientation, getActivated)
-import Editor.RoofNode (RoofNode, RoofNodeConfig, createRoofNode)
+import Editor.RoofNode (RoofNode, RoofNodeConfig, RoofNodeMode(..), createRoofNode)
 import Effect.Class (liftEffect)
 import Effect.Random (randomInt)
 import Effect.Unsafe (unsafePerformEffect)
@@ -44,14 +46,16 @@ import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo)
 import Model.SmartHouse.Roof (_flipped, renderRoof)
 import Model.UUID (idLens)
 import Rendering.DynamicNode (dynamic)
-import Rendering.Node (Node, fixNodeDWith, getEnv, localEnv, node, tapMesh)
+import Rendering.Node (Node, fixNodeDWith, getEnv, getParent, localEnv, node, tapMesh)
 import SmartHouse.Algorithm.Edge (_line)
 import SmartHouse.Algorithm.LAV (_edges)
 import SmartHouse.HouseTracer (renderLine, renderLineWith)
 import Smarthouse.Algorithm.Subtree (_sinks, _source)
 import Three.Core.Geometry (_bevelEnabled, _depth, mkExtrudeGeometry, mkShape)
 import Three.Core.Material (MeshPhongMaterial, mkLineBasicMaterial, mkMeshPhongMaterial)
+import Three.Core.Object3D (add, remove)
 import Three.Math.Vector (Vector3, mkVec3, toVec2, vecX, vecY)
+import UI.RoofEditorUI (_mode)
 import Util (latestAnyEvtWith)
 
 
@@ -138,7 +142,7 @@ editHouse houseCfg conf = do
                      # _wallTapped .~ wallTap
                      # _updated    .~ (HouseOpUpdate <$> newHouseEvt)
 
-        -- render all roof nodes if available
+            -- render all roof nodes if available
             roofsDyn = step Nothing $ Just <$> conf ^. _roofsData
 
         void $ localEnv (const houseCfg) $ renderRoofs (conf ^. _arrayEditParam) roofsDyn
@@ -188,7 +192,8 @@ renderRoofs param rdDyn = dynamic $ renderRd <$> rdDyn
                           alignDyn   = step Grid      $ param ^. _alignment
                           opacityDyn = step Opaque    $ param ^. _opacity
                   
-                          cfg = def # _houseId         .~ (rd ^. _houseId)
+                          cfg = def # _mode            .~ RoofInBuilder
+                                    # _houseId         .~ (rd ^. _houseId)
                                     # _mainOrientation .~ mainOrientDyn
                                     # _orientation     .~ orientDyn
                                     # _alignment       .~ alignDyn
@@ -217,4 +222,13 @@ mkRoofNode activeRoof panelsDict racks cfg roof = do
                                                # _roofActive .~ roofActive
                                                # _initPanels .~ delay 100 (pure ps)
                                                
-    liftEffect $ runHouseEditor (runArrayBuilder rackTypeDyn roofNodeBuilder) hCfg
+    n <- liftEffect $ runHouseEditor (runArrayBuilder rackTypeDyn roofNodeBuilder) hCfg
+
+    -- add the new node object to the current Node context's parent element
+    -- and setup the dispose action
+    parent <- getParent
+    liftEffect $ add n parent
+
+    tell $ Disposee $ remove n parent
+
+    pure n
