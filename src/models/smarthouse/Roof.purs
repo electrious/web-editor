@@ -2,9 +2,11 @@ module Model.SmartHouse.Roof where
 
 import Prelude
 
+import Control.Alternative (empty)
 import Custom.Mesh (TappableMesh)
 import Data.Compactable (compact)
-import Data.Default (def)
+import Data.Default (class Default, def)
+import Data.Enum (fromEnum)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Lens (Lens', (.~), (^.))
@@ -12,7 +14,7 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (List(..), (:))
 import Data.Map as M
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), maybe)
 import Data.Meter (Meter, meterVal)
 import Data.Newtype (class Newtype)
 import Data.Set (Set)
@@ -32,16 +34,16 @@ import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Model.ActiveMode (ActiveMode, isActive)
 import Model.Polygon (Polygon, _polyVerts, polyOutline)
-import Model.Roof.RoofPlate (Point, vec2Point)
+import Model.Roof.RoofPlate (Point, _shade, vec2Point)
 import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo, _size, _texture)
 import Model.UUID (class HasUUID, idLens)
 import Rendering.Node (Node, getEnv, tapMesh)
 import SmartHouse.HouseTracer (renderLine)
 import SmartHouse.PolyGeometry (mkPolyGeometry, mkPolyGeometryWithUV)
+import SmartHouse.ShadeOption (ShadeOption)
 import Smarthouse.Algorithm.Subtree (Subtree, _isGable)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial, mkMeshBasicMaterialWithTexture)
 import Three.Math.Vector (Vector3, mkVec3, vecX, vecY, vecZ)
-
 
 data RoofState = SlopeRoof
                | Gable
@@ -51,13 +53,17 @@ derive instance eqRoofState :: Eq RoofState
 newtype Roof = Roof {
     id       :: UUID,
     polygon  :: Polygon Vector3,
-    subtrees :: UUIDMap Subtree
+    subtrees :: UUIDMap Subtree,
+
+    shade    :: Maybe ShadeOption
     }
 
 derive instance newtypeRoof :: Newtype Roof _
 derive instance genericRoof :: Generic Roof _
 instance showRoof :: Show Roof where
     show = genericShow
+instance eqRoof :: Eq Roof where
+    eq r1 r2 = r1 ^. idLens == r2 ^. idLens
 instance hasUUIDRoof :: HasUUID Roof where
     idLens = _id
 
@@ -67,7 +73,7 @@ _subtrees = _Newtype <<< prop (SProxy :: SProxy "subtrees")
 createRoofFrom :: Polygon Vector3 -> Set Subtree -> Effect Roof
 createRoofFrom p ts = do
     i <- genUUID
-    pure $ Roof { id : i, polygon : p, subtrees : UM.fromSet ts }
+    pure $ Roof { id : i, polygon : p, subtrees : UM.fromSet ts, shade : Nothing }
 
 -- check if a roof can be gable
 canBeGable :: Roof -> Boolean
@@ -84,8 +90,13 @@ subtreeIndex r = case M.values $ r ^. _subtrees of
     (t:Nil) -> Just $ t ^. idLens
     _       -> Nothing
 
+
+updateShadeOption :: Roof -> ShadeOption -> Roof
+updateShadeOption r o = r # _shade .~ Just o
+
+
 exportRoof :: Meter -> Roof -> JSRoof
-exportRoof h r = JSRoof { id: r ^. idLens, polygon: mkP <$> r ^. _polygon <<< _polyVerts }
+exportRoof h r = JSRoof { id: r ^. idLens, polygon: mkP <$> r ^. _polygon <<< _polyVerts, shade : maybe 0 fromEnum (r ^. _shade) }
     where hv = meterVal h
           mkP v = vec2Point $ mkVec3 (vecX v) (vecY v) (vecZ v + hv)
 
@@ -93,7 +104,8 @@ exportRoof h r = JSRoof { id: r ^. idLens, polygon: mkP <$> r ^. _polygon <<< _p
 -- The Roof data structure saved to server
 newtype JSRoof = JSRoof {
     id      :: UUID,
-    polygon :: Array Point
+    polygon :: Array Point,
+    shade   :: Int
     }
 
 derive instance genericJSRoof :: Generic JSRoof _
@@ -105,11 +117,16 @@ instance decodeJSRoof :: Decode JSRoof where
     decode = genericDecode (defaultOptions { unwrapSingleConstructors = true })
 
 newtype RoofEvents = RoofEvents {
-    tapped  :: Event UUID,
+    tapped  :: Event Roof,
     flipped :: Event UUID   -- event to flip the roof state, the Int is index of the subtree
     }
 
 derive instance newtypeRoofEvents :: Newtype RoofEvents _
+instance defaultRoofEvents :: Default RoofEvents where
+    def = RoofEvents {
+        tapped  : empty,
+        flipped : empty
+        }
 
 _flipped :: forall t a r. Newtype t { flipped :: a | r } => Lens' t a
 _flipped = _Newtype <<< prop (SProxy :: SProxy "flipped")
@@ -130,10 +147,8 @@ renderRoof enableDyn actDyn roof = do
         actTapEvt   = gateDyn ((&&) <$> enableDyn <*> (isActive <$> actDyn)) tapEvt
         inactTapEvt = gateDyn ((&&) <$> enableDyn <*> (not <<< isActive <$> actDyn)) tapEvt
         
-    pure $ RoofEvents {
-        tapped  : const (roof ^. idLens) <$> inactTapEvt,
-        flipped : compact $ const (subtreeIndex roof) <$> actTapEvt
-        }
+    pure $ def # _tapped  .~ multicast (const roof <$> inactTapEvt)
+               # _flipped .~ multicast (compact $ const (subtreeIndex roof) <$> actTapEvt)
 
 
 -- NOTE: MeshPhongMaterial doesn't work here in mobile Safari, though it works for the walls.

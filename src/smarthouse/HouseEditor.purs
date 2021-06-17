@@ -5,6 +5,7 @@ import Prelude hiding (add)
 import Control.Alt ((<|>))
 import Control.Monad.RWS (tell)
 import Control.Plus (empty)
+import Data.Compactable (compact)
 import Data.Default (class Default, def)
 import Data.Foldable (traverse_)
 import Data.Lens (Lens', view, (.~), (^.))
@@ -16,7 +17,7 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Meter (Meter, meterVal)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Data.Traversable (traverse)
+import Data.Traversable (class Traversable, traverse)
 import Data.UUID (UUID)
 import Editor.ArrayBuilder (runArrayBuilder)
 import Editor.Common.Lenses (_alignment, _floor, _height, _houseId, _id, _modeDyn, _name, _orientation, _panelType, _panels, _position, _roof, _roofs, _tapped, _updated)
@@ -31,9 +32,9 @@ import Editor.RoofNode (RoofNode, RoofNodeConfig, RoofNodeMode(..), createRoofNo
 import Effect.Class (liftEffect)
 import Effect.Random (randomInt)
 import Effect.Unsafe (unsafePerformEffect)
-import FRP.Dynamic (Dynamic, latestEvt, sampleDyn, step)
+import FRP.Dynamic (Dynamic, dynEvent, latestEvt, sampleDyn, step)
 import FRP.Event (Event)
-import FRP.Event.Extra (delay, performEvent)
+import FRP.Event.Extra (delay, distinct, multicast, performEvent)
 import Math.LineSeg (mkLineSeg)
 import Model.ActiveMode (ActiveMode(..), fromBoolean)
 import Model.Polygon (Polygon, _polyVerts)
@@ -41,9 +42,9 @@ import Model.Racking.OldRackingSystem (OldRoofRackingData, guessRackingType)
 import Model.Racking.RackingType (RackingType(..))
 import Model.Roof.Panel (Alignment(..), Orientation(..), PanelsDict, panelsDict)
 import Model.Roof.RoofPlate (RoofPlate, _roofIntId)
-import Model.SmartHouse.House (House, HouseNode, HouseOp(..), _roofTapped, _trees, _wallTapped, flipRoof, updateHeight)
+import Model.SmartHouse.House (House, HouseNode, HouseOp(..), _activeRoof, _roofTapped, _trees, _wallTapped, flipRoof, updateHeight)
 import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo)
-import Model.SmartHouse.Roof (_flipped, renderRoof)
+import Model.SmartHouse.Roof (Roof, RoofEvents, _flipped, renderRoof)
 import Model.UUID (idLens)
 import Rendering.DynamicNode (dynamic)
 import Rendering.Node (Node, fixNodeDWith, getEnv, getParent, localEnv, node, tapMesh)
@@ -113,41 +114,47 @@ editHouse houseCfg conf = do
 
         houseEditDyn = (==) EditingHouse <$> modeDyn
         
-    fixNodeDWith house \houseDyn -> do
-        let hDyn = view _height <$> houseDyn
-            pDyn = mkVec3 0.0 0.0 <<< meterVal <$> hDyn
-        -- render walls
-        wallTap <- latestEvt <$> dynamic (renderWalls floor <$> hDyn)
-        -- render roofs
-        roofEvtsDyn <- node (def # _position .~ pDyn) $
-                           dynamic $ traverse (renderRoof houseEditDyn actDyn) <<< view _roofs <$> houseDyn
+    fixNodeDWith house \houseDyn ->
+        fixNodeDWith Nothing \activeRoofDyn -> do
+            let hDyn = view _height <$> houseDyn
+                pDyn = mkVec3 0.0 0.0 <<< meterVal <$> hDyn
+            -- render walls
+            wallTap <- latestEvt <$> dynamic (renderWalls floor <$> hDyn)
+            -- render roofs
+            roofEvtsDyn <- node (def # _position .~ pDyn) $ dynamic $ renderBuilderRoofs houseEditDyn actDyn activeRoofDyn <<< view _roofs <$> houseDyn
 
-        let flipEvt = latestAnyEvtWith (view _flipped) roofEvtsDyn
-            -- height editor arrow position
-            hPos2D = dragArrowPos $ house ^. _floor <<< _polyVerts
-            hPos   = mkVec3 (vecX hPos2D) (vecY hPos2D) (meterVal h)
+            let flipEvt = latestAnyEvtWith (view _flipped) roofEvtsDyn
+                -- height editor arrow position
+                hPos2D = dragArrowPos $ house ^. _floor <<< _polyVerts
+                hPos   = mkVec3 (vecX hPos2D) (vecY hPos2D) (meterVal h)
 
-        -- setup height editor and get the delta event
-        -- enable height editor only in EditingHouse mode and actDyn is active
-        deltaEvt <- setupHeightEditor $ def # _modeDyn  .~ ((&&) <$> actDyn <*> (fromBoolean <$> houseEditDyn))
-                                            # _position .~ pure hPos
-                                            # _min      .~ (- meterVal h)
+            -- setup height editor and get the delta event
+            -- enable height editor only in EditingHouse mode and actDyn is active
+            deltaEvt <- setupHeightEditor $ def # _modeDyn  .~ ((&&) <$> actDyn <*> (fromBoolean <$> houseEditDyn))
+                                                # _position .~ pure hPos
+                                                # _min      .~ (- meterVal h)
     
-        let hEvt = (+) h <$> deltaEvt  -- new height
-            newHouseEvt1 = sampleDyn houseDyn $ updateHeight <$> hEvt
-            newHouseEvt2 = performEvent $ sampleDyn houseDyn $ flipRoof <$> flipEvt
-            newHouseEvt  = newHouseEvt1 <|> newHouseEvt2
-            hn = def # _id         .~ (house ^. idLens)
-                     # _roofTapped .~ latestAnyEvtWith (view _tapped) roofEvtsDyn
-                     # _wallTapped .~ wallTap
-                     # _updated    .~ (HouseOpUpdate <$> newHouseEvt)
+            let hEvt = (+) h <$> deltaEvt  -- new height
+                newHouseEvt1 = sampleDyn houseDyn $ updateHeight <$> hEvt
+                newHouseEvt2 = performEvent $ sampleDyn houseDyn $ flipRoof <$> flipEvt
+                newHouseEvt  = newHouseEvt1 <|> newHouseEvt2
 
-            -- render all roof nodes if available
-            roofsDyn = step Nothing $ Just <$> conf ^. _roofsData
+                roofTappedEvt = latestAnyEvtWith (view _tapped) roofEvtsDyn
 
-        void $ localEnv (const houseCfg) $ renderRoofs (conf ^. _arrayEditParam) roofsDyn
-        
-        pure { input: newHouseEvt, output: hn }
+                actRoofEvt = Just <$> roofTappedEvt
+                
+                hn = def # _id         .~ (house ^. idLens)
+                         # _roofTapped .~ (view idLens <$> roofTappedEvt)
+                         # _wallTapped .~ wallTap
+                         # _updated    .~ (HouseOpUpdate <$> newHouseEvt)
+                         # _activeRoof .~ multicast (distinct $ compact $ dynEvent activeRoofDyn)
+
+                -- render all roof nodes if available
+                roofsDyn = step Nothing $ Just <$> conf ^. _roofsData
+
+            void $ localEnv (const houseCfg) $ renderRoofEditor (conf ^. _arrayEditParam) roofsDyn
+            
+            pure { input : actRoofEvt, output : { input: newHouseEvt, output: hn } }
 
 
 wallMat :: MeshPhongMaterial
@@ -161,6 +168,13 @@ renderWalls poly height = do
     m <- tapMesh (def # _name .~ "walls") geo wallMat
     pure $ const unit <$> m ^. _tapped
 
+
+renderBuilderRoofs :: forall f. Traversable f => Dynamic Boolean -> Dynamic ActiveMode -> Dynamic (Maybe Roof) -> f Roof -> Node HouseTextureInfo (f RoofEvents)
+renderBuilderRoofs houseEditDyn houseActDyn actRoofDyn = traverse render
+    where render r = do
+              let isActDyn = (fromBoolean <<< (==) (Just r)) <$> actRoofDyn
+              renderRoof houseEditDyn ((&&) <$> houseActDyn <*> isActDyn) r
+              
 
 -- render the house as 2D wireframe
 renderHouse :: House -> Node HouseTextureInfo HouseNode
@@ -178,8 +192,8 @@ renderHouse house = do
 
 
 -- render roofNode on top of the house, which are used to edit arrays
-renderRoofs :: ArrayEditParam -> Dynamic (Maybe RoofsData) -> Node HouseConfig (Dynamic (Array RoofNode))
-renderRoofs param rdDyn = dynamic $ renderRd <$> rdDyn
+renderRoofEditor :: ArrayEditParam -> Dynamic (Maybe RoofsData) -> Node HouseConfig (Dynamic (Array RoofNode))
+renderRoofEditor param rdDyn = dynamic $ renderRd <$> rdDyn
     where renderRd Nothing   = pure []
           renderRd (Just rd) =
               fixNodeDWith Landscape \mainOrientDyn ->

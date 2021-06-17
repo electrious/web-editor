@@ -155,6 +155,7 @@ newtype HouseNode = HouseNode {
     wallTapped  :: Event Unit,
     updated     :: Event HouseOp,
     deleted     :: Event HouseOp,
+    activeRoof  :: Event Roof,
 
     arrayEvents :: ArrayEvents
     }
@@ -169,6 +170,7 @@ instance defaultHouseNode :: Default HouseNode where
         wallTapped  : empty,
         updated     : empty,
         deleted     : empty,
+        activeRoof  : empty,
 
         arrayEvents : def
         }
@@ -178,6 +180,9 @@ _roofTapped = _Newtype <<< prop (SProxy :: SProxy "roofTapped")
 
 _wallTapped :: forall t a r. Newtype t { wallTapped :: a | r } => Lens' t a
 _wallTapped = _Newtype <<< prop (SProxy :: SProxy "wallTapped")
+
+_activeRoof :: forall t a r. Newtype t { activeRoof :: a | r } => Lens' t a
+_activeRoof = _Newtype <<< prop (SProxy :: SProxy "activeRoof")
 
 houseTapped :: HouseNode -> Event UUID
 houseTapped h = (const i <$> h ^. _roofTapped) <|> (const i <$> h ^. _wallTapped)
