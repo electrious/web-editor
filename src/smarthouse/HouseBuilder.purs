@@ -37,11 +37,11 @@ import Editor.RoofManager (RoofsData)
 import Editor.SceneEvent (size)
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import FRP.Dynamic (Dynamic, step)
+import FRP.Dynamic (Dynamic, gateDyn, step)
 import FRP.Event (Event, create, keepLatest, sampleOn, sampleOn_, subscribe)
 import FRP.Event.Extra (delay, multicast, performEvent)
 import Math.Angle (degree)
-import Model.ActiveMode (ActiveMode(..), fromBoolean)
+import Model.ActiveMode (ActiveMode(..), fromBoolean, isActive)
 import Model.Hardware.PanelTextureInfo (PanelTextureInfo)
 import Model.Hardware.PanelType (PanelType(..))
 import Model.SmartHouse.House (House, HouseNode, HouseOp(..), JSHouses(..), _activeRoof, createHouseFrom, exportHouse, houseTapped)
@@ -208,18 +208,21 @@ getActivated :: forall f. Foldable f => Functor f => f HouseNode -> Event UUID
 getActivated = foldEvtWith f
     where f n = const (n ^. idLens) <$> houseTapped n
 
-renderHouseDict :: Dynamic (Maybe UUID) -> Dynamic BuilderMode -> HouseConfig -> ArrayEditParam -> Event RoofsData -> HouseDict -> Node HouseTextureInfo (UUIDMap HouseNode)
-renderHouseDict actHouseDyn modeDyn houseCfg arrParam roofsDatEvt houses = traverse render houses
+renderHouseDict :: Dynamic (Maybe UUID) -> Dynamic BuilderMode -> HouseConfig -> ArrayEditParam -> Event ShadeOption -> Event RoofsData -> HouseDict -> Node HouseTextureInfo (UUIDMap HouseNode)
+renderHouseDict actHouseDyn modeDyn houseCfg arrParam shadeEvt roofsDatEvt houses = traverse render houses
     where getMode _ _ Showing                            = Inactive
           getMode h (Just i) Building | h ^. idLens == i = Active
                                       | otherwise        = Inactive
           getMode h Nothing Building                     = Inactive
           
           render h = if houseRenderMode == EditHouseMode
-                     then editHouse houseCfg $ def # _modeDyn        .~ (getMode h <$> actHouseDyn <*> modeDyn)
-                                                   # _house          .~ h
-                                                   # _roofsData      .~ roofsDatEvt
-                                                   # _arrayEditParam .~ arrParam
+                     then do
+                         let md = getMode h <$> actHouseDyn <*> modeDyn
+                         editHouse houseCfg $ def # _modeDyn        .~ md
+                                                  # _house          .~ h
+                                                  # _shadeSelected  .~ gateDyn (isActive <$> md) shadeEvt
+                                                  # _roofsData      .~ roofsDatEvt
+                                                  # _arrayEditParam .~ arrParam
                      else renderHouse h
 
 
@@ -284,9 +287,10 @@ builderForHouse evts tInfo =
                     let houseToRenderEvt = compact $ view _housesToRender <$> hdEvt
                         houseCfg = houseCfgFromBuilderCfg cfg
 
+                        shadeEvt = evts ^. _shadeSelected
                         arrParam = def
                         
-                    nodesEvt <- localEnv (const tInfo) $ eventNode (renderHouseDict actHouseDyn modeDyn houseCfg arrParam roofsDatEvt <$> houseToRenderEvt)
+                    nodesEvt <- localEnv (const tInfo) $ eventNode (renderHouseDict actHouseDyn modeDyn houseCfg arrParam shadeEvt roofsDatEvt <$> houseToRenderEvt)
 
                     let deactEvt    = multicast $ const Nothing <$> helper ^. _tapped
                         actEvt      = keepLatest $ getActivated <$> nodesEvt
@@ -297,6 +301,8 @@ builderForHouse evts tInfo =
                     traceRes <- traceHouse $ def # _modeDyn     .~ (tracerMode <$> actHouseDyn <*> modeDyn)
                                                  # _mouseMove   .~ helper ^. _mouseMove
                                                  # _stopTracing .~ (evts ^. _stopTracing)
+
+                    -- create house from the traced polygon
                     let houseEvt = performEvent $ createHouseFrom (degree 30.0) <$> (traceRes ^. _tracedPolygon)
                         addHouseEvt = HouseOpCreate <$> houseEvt
                         updHouseEvt = keepLatest (getHouseUpd <$> nodesEvt)

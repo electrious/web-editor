@@ -8,7 +8,7 @@ import Data.Array as Arr
 import Data.Default (class Default, def)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Lens (Lens', (.~), (^.))
+import Data.Lens (Lens', (%~), (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (List, fromFoldable)
@@ -31,11 +31,12 @@ import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Math.Angle (Angle, degree)
 import Model.Polygon (Polygon, _polyVerts, counterClockPoly)
 import Model.Roof.RoofPlate (Point, vec2Point)
-import Model.SmartHouse.Roof (JSRoof, Roof, exportRoof)
+import Model.SmartHouse.Roof (JSRoof, Roof, exportRoof, updateShadeOption)
 import Model.UUID (class HasUUID, idLens)
 import SmartHouse.Algorithm.Edge (Edge)
 import SmartHouse.Algorithm.LAV (_edges)
 import SmartHouse.Algorithm.Skeleton (skeletonize)
+import SmartHouse.ShadeOption (ShadeOption)
 import Smarthouse.Algorithm.Roofs (generateRoofs)
 import Smarthouse.Algorithm.Subtree (Subtree, flipSubtree)
 import Three.Math.Vector (Vector3)
@@ -103,6 +104,15 @@ flipRoof i h = do
     roofs <- generateRoofs (h ^. _slope) (S.fromFoldable nts) (h ^. _edges)
     pure $ h # _roofs .~ roofs
              # _trees .~ nts
+
+
+updateActiveRoofShade :: ShadeOption -> Maybe Roof -> House -> House
+updateActiveRoofShade s Nothing   h = h
+updateActiveRoofShade s (Just ar) h = h # _roofs %~ map (f ar)
+    where f actR r = if actR == r
+                     then updateShadeOption r s
+                     else r
+
 
 exportHouse :: House -> JSHouse
 exportHouse h = JSHouse { id: h ^. idLens, floor: floor, height: meterVal $ h ^. _height, roofs: roofs }
