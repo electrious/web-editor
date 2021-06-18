@@ -7,12 +7,13 @@ import Data.Foldable (class Foldable)
 import Data.String (joinWith)
 import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
+import Foreign.Object (empty)
 import Foreign.Object as O
 import Specular.Dom.Browser (Attrs, (:=))
-import Specular.Dom.Element (Prop, attrs, onClick_, text)
+import Specular.Dom.Element (Prop, attrs, attrsD, onClick_, text)
 import Specular.Dom.Element.Class (el, el_)
 import Specular.Dom.Widget (RWidget)
-import Specular.FRP (Event, newEvent)
+import Specular.FRP (Dynamic, Event, newEvent)
 
 -- | helper function to create a div element
 div :: forall r a. Array Prop -> RWidget r a -> RWidget r a
@@ -60,3 +61,9 @@ mkStyle ps = "style" := joinWith "; " (fromFoldable $ f <$> ps)
 mkAttrs :: forall f. Functor f => Foldable f => f Style -> Attrs
 mkAttrs = O.fromFoldable <<< map f
     where f (Style k v) = Tuple k v
+
+-- setup a Prop to change an element to disabled dynamically
+disable :: Dynamic Boolean -> Prop
+disable = attrsD <<< map f
+    where f true  = "disabled" := ""
+          f false = empty

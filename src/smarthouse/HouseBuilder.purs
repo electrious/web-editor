@@ -29,7 +29,7 @@ import Data.Traversable (traverse)
 import Data.Tuple (fst)
 import Data.UUID (UUID)
 import Data.UUIDMap (UUIDMap)
-import Editor.Common.Lenses (_apiConfig, _deleted, _height, _houseId, _leadId, _modeDyn, _mouseMove, _name, _panelType, _panels, _parent, _roofs, _tapped, _textureInfo, _updated, _width)
+import Editor.Common.Lenses (_apiConfig, _buttons, _deleted, _height, _houseId, _leadId, _modeDyn, _mouseMove, _name, _panelType, _panels, _parent, _roofs, _shadeSelected, _tapped, _textureInfo, _updated, _width)
 import Editor.Editor (Editor, _sizeDyn, setMode)
 import Editor.EditorMode as EditorMode
 import Editor.HouseEditor (ArrayEditParam, HouseConfig, _dataServer, _heatmapTexture, _rotBtnTexture)
@@ -44,8 +44,9 @@ import Math.Angle (degree)
 import Model.ActiveMode (ActiveMode(..), fromBoolean)
 import Model.Hardware.PanelTextureInfo (PanelTextureInfo)
 import Model.Hardware.PanelType (PanelType(..))
-import Model.SmartHouse.House (House, HouseNode, HouseOp(..), JSHouses(..), createHouseFrom, exportHouse, houseTapped)
+import Model.SmartHouse.House (House, HouseNode, HouseOp(..), JSHouses(..), _activeRoof, createHouseFrom, exportHouse, houseTapped)
 import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo, _imageFile, _size, _texture, mkHouseTextureInfo)
+import Model.SmartHouse.Roof (Roof)
 import Model.UUID (idLens)
 import OBJExporter (MeshFiles, exportObject)
 import Rendering.DynamicNode (eventNode)
@@ -54,7 +55,8 @@ import Rendering.TextureLoader (textureFromUrl)
 import SmartHouse.BuilderMode (BuilderMode(..))
 import SmartHouse.HouseEditor (HouseRenderMode(..), _arrayEditParam, _house, _roofsData, editHouse, renderHouse)
 import SmartHouse.HouseTracer (TracerMode(..), _stopTracing, _tracedPolygon, _tracerMode, traceHouse)
-import SmartHouse.UI (_savingStepDyn, houseBuilderUI)
+import SmartHouse.ShadeOption (ShadeOption)
+import SmartHouse.UI (_activeRoofDyn, _savingStepDyn, houseBuilderUI)
 import Specular.Dom.Widget (runMainWidgetInNode)
 import Three.Core.Geometry (mkPlaneGeometry)
 import Three.Core.Material (mkMeshBasicMaterialWithTexture)
@@ -100,7 +102,8 @@ newtype HouseBuilt = HouseBuilt {
     hasHouse    :: Event Boolean,
     tracerMode  :: Event TracerMode,
     saveStepEvt :: Event SavingStep,
-    editorOp    :: Event EditorUIOp
+    editorOp    :: Event EditorUIOp,
+    activeRoof  :: Event Roof
     }
 
 derive instance newtypeHouseBuilt :: Newtype HouseBuilt _
@@ -109,7 +112,8 @@ instance defaultHouseBuilt :: Default HouseBuilt where
         hasHouse    : empty,
         tracerMode  : empty,
         saveStepEvt : empty,
-        editorOp    : empty
+        editorOp    : empty,
+        activeRoof  : empty
         }
 
 _hasHouse :: forall t a r. Newtype t { hasHouse :: a | r } => Lens' t a
@@ -196,6 +200,9 @@ getHouseUpd = foldEvtWith (view _updated)
 getHouseDel :: forall f. Foldable f => Functor f => f HouseNode -> Event HouseOp
 getHouseDel = foldEvtWith (view _deleted)
 
+getActiveRoof :: forall f. Foldable f => Functor f => f HouseNode -> Event Roof
+getActiveRoof = foldEvtWith (view _activeRoof)
+
 -- get the activated house from a list of house nodes
 getActivated :: forall f. Foldable f => Functor f => f HouseNode -> Event UUID
 getActivated = foldEvtWith f
@@ -221,15 +228,17 @@ tracerMode _ Showing  = Inactive
 tracerMode h Building = fromBoolean $ isNothing h
 
 newtype BuilderInputEvts = BuilderInputEvts {
-    export      :: Event Unit,
-    stopTracing :: Event Unit
+    export        :: Event Unit,
+    stopTracing   :: Event Unit,
+    shadeSelected :: Event ShadeOption
     }
 
 derive instance newtypeBuilderInputEvts :: Newtype BuilderInputEvts _
 instance defaultBuilderInputEvts :: Default BuilderInputEvts where
     def = BuilderInputEvts {
-        export      : empty,
-        stopTracing : empty
+        export        : empty,
+        stopTracing   : empty,
+        shadeSelected : empty
         }
 
 _export :: forall t a r. Newtype t { export :: a | r } => Lens' t a
@@ -281,6 +290,7 @@ builderForHouse evts tInfo =
 
                     let deactEvt    = multicast $ const Nothing <$> helper ^. _tapped
                         actEvt      = keepLatest $ getActivated <$> nodesEvt
+                        actRoofEvt  = keepLatest $ getActiveRoof <$> nodesEvt
                         actHouseEvt = (Just <$> actEvt) <|> deactEvt
 
                     -- trace new house
@@ -317,6 +327,7 @@ builderForHouse evts tInfo =
                         res = def # _hasHouse    .~ (hasHouse <$> hdEvt)
                                   # _tracerMode  .~ (traceRes ^. _tracerMode)
                                   # _saveStepEvt .~ stepEvt
+                                  # _activeRoof  .~ actRoofEvt
 
                     pure { input: newRoofsDatEvt, output : { input: modeEvt, output: { input: actHouseEvt, output : { input: newHdEvt, output : res } } } }
 
@@ -363,9 +374,11 @@ buildHouse editor cfg = do
     
     { event: expEvt, push: toExp } <- create
     { event: stopTracingEvt, push: toStopTracing } <- create
+    { event: shadeEvt, push: selectShade } <- create
 
-    let inputEvts = def # _export      .~ expEvt
-                        # _stopTracing .~ stopTracingEvt
+    let inputEvts = def # _export        .~ expEvt
+                        # _stopTracing   .~ stopTracingEvt
+                        # _shadeSelected .~ shadeEvt
 
     res <- fst <$> runNode (createHouseBuilder inputEvts) (mkNodeEnv editor cfg)
     let parentEl = unsafeCoerce $ editor ^. _parent
@@ -373,9 +386,12 @@ buildHouse editor cfg = do
                        # _showSaveDyn   .~ step false (res ^. _hasHouse)
                        # _showResetDyn  .~ step false ((==) Tracing <$> (res ^. _tracerMode))
                        # _savingStepDyn .~ step NotSaving (res ^. _saveStepEvt)
+                       # _activeRoofDyn .~ step Nothing (Just <$> res ^. _activeRoof)
+                   
     uiEvts <- runMainWidgetInNode parentEl $ houseBuilderUI conf
 
-    void $ subscribe (const unit <$> uiEvts ^. _save) toExp
-    void $ subscribe (const unit <$> uiEvts ^. _reset) toStopTracing
+    void $ subscribe (const unit <$> uiEvts ^. _buttons <<< _save) toExp
+    void $ subscribe (const unit <$> uiEvts ^. _buttons <<< _reset) toStopTracing
+    void $ subscribe (uiEvts ^. _shadeSelected) selectShade
 
-    pure $ res # _editorOp .~ (const Close <$> uiEvts ^. _close)
+    pure $ res # _editorOp .~ (const Close <$> uiEvts ^. _buttons <<< _close)

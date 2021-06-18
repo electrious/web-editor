@@ -292,3 +292,15 @@ _enabled = _Newtype <<< prop (SProxy :: SProxy "enabled")
 
 _floor :: forall t a r. Newtype t { floor :: a | r } => Lens' t a
 _floor = _Newtype <<< prop (SProxy :: SProxy "floor")
+
+_buttons :: forall t a r. Newtype t { buttons :: a | r } => Lens' t a
+_buttons = _Newtype <<< prop (SProxy :: SProxy "buttons")
+
+_shadeSelected :: forall t a r. Newtype t { shadeSelected :: a | r } => Lens' t a
+_shadeSelected = _Newtype <<< prop (SProxy :: SProxy "shadeSelected")
+
+_shade :: forall t a r. Newtype t { shade :: a | r } => Lens' t a
+_shade = _Newtype <<< prop (SProxy :: SProxy "shade")
+
+_rating :: forall t a r. Newtype t { rating :: a | r } => Lens' t a
+_rating = _Newtype <<< prop (SProxy :: SProxy "rating")

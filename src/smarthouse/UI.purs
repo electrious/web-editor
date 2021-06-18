@@ -3,17 +3,23 @@ module SmartHouse.UI where
 import Prelude hiding (div)
 
 import API.SmartHouse (SavingStep(..), stepMode)
+import Control.Plus (empty)
 import Data.Default (class Default, def)
-import Data.Lens (Lens', (.~), (^.))
+import Data.Lens (Lens', view, (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
+import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Editor.Common.Lenses (_height, _width)
+import Editor.Common.Lenses (_buttons, _height, _shade, _shadeSelected, _width)
 import Editor.Editor (_sizeDyn)
 import Editor.SceneEvent (Size, size)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic)
+import FRP.Event (Event)
+import Model.SmartHouse.Roof (Roof)
+import SmartHouse.ShadeOption (ShadeOption)
+import SmartHouse.ShadeOptionUI (shadeSelector)
 import Specular.Dom.Element (attrsD, class_, classes, dynText, el)
 import Specular.Dom.Widget (Widget)
 import Specular.FRP as S
@@ -26,7 +32,8 @@ newtype BuilderUIConf = BuilderUIConf {
     sizeDyn       :: Dynamic Size,
     showSaveDyn   :: Dynamic Boolean,
     showResetDyn  :: Dynamic Boolean,
-    savingStepDyn :: Dynamic SavingStep
+    savingStepDyn :: Dynamic SavingStep,
+    activeRoofDyn :: Dynamic (Maybe Roof)
     }
 
 derive instance newtypeBuilderUIConf :: Newtype BuilderUIConf _
@@ -35,11 +42,28 @@ instance defaultBuilderUIConf :: Default BuilderUIConf where
         sizeDyn       : pure (size 10 10),
         showSaveDyn   : pure false,
         showResetDyn  : pure false,
-        savingStepDyn : pure NotSaving
+        savingStepDyn : pure NotSaving,
+        activeRoofDyn : pure Nothing
         }
 
 _savingStepDyn :: forall t a r. Newtype t { savingStepDyn :: a | r } => Lens' t a
 _savingStepDyn = _Newtype <<< prop (SProxy :: SProxy "savingStepDyn")
+
+_activeRoofDyn :: forall t a r. Newtype t { activeRoofDyn :: a | r } => Lens' t a
+_activeRoofDyn = _Newtype <<< prop (SProxy :: SProxy "activeRoofDyn")
+
+
+newtype BuilderUIEvents = BuilderUIEvents {
+    buttons       :: ButtonsPane,
+    shadeSelected :: Event ShadeOption
+    }
+
+derive instance newtypeBuilderUIEvents :: Newtype BuilderUIEvents _
+instance defaultBuilderUIEvents :: Default BuilderUIEvents where
+    def = BuilderUIEvents {
+        buttons       : def,
+        shadeSelected : empty
+        }
 
 
 savingStepDialog :: S.Dynamic SavingStep -> Widget Unit
@@ -50,7 +74,7 @@ savingStepDialog stepDyn = do
             div [class_ "uk-modal-body"] $ dynText $ show <$> stepDyn
 
 -- | build the house editor UI widget system
-houseBuilderUI :: BuilderUIConf -> Widget ButtonsPane
+houseBuilderUI :: BuilderUIConf -> Widget BuilderUIEvents
 houseBuilderUI cfg = do
     let style s = mkStyle [ "position"       :~ "absolute",
                             "width"          :~ (show (s ^. _width) <> "px"),
@@ -59,7 +83,7 @@ houseBuilderUI cfg = do
                             "top"            :~ "0",
                             "pointer-events" :~ "none" ]
     sizeD <- liftEffect $ toUIDyn $ cfg ^. _sizeDyn
-    div [attrsD $ style <$> sizeD, class_ "uk-inline"] do
+    btns <- div [attrsD $ style <$> sizeD, class_ "uk-inline"] do
         showD <- liftEffect $ toUIDyn $ cfg ^. _showSaveDyn
         showR <- liftEffect $ toUIDyn $ cfg ^. _showResetDyn
         stepD <- liftEffect $ toUIDyn $ cfg ^. _savingStepDyn
@@ -69,3 +93,8 @@ houseBuilderUI cfg = do
         buttons $ def # _showSaveDyn  .~ showD
                       # _showCloseDyn .~ pure true
                       # _showResetDyn .~ showR
+
+    shadeEvt <- shadeSelector $ join <<< map (view _shade) <$> cfg ^. _activeRoofDyn
+
+    pure $ def # _buttons       .~ btns
+               # _shadeSelected .~ shadeEvt

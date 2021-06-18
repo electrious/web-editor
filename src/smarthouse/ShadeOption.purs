@@ -7,7 +7,6 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Bounded (genericBottom, genericTop)
 import Data.Generic.Rep.Enum (genericCardinality, genericFromEnum, genericPred, genericSucc, genericToEnum)
 import Data.Generic.Rep.Ord (genericCompare)
-import Data.Generic.Rep.Show (genericShow)
 import Data.Show (class Show)
 
 data ShadeOption = NoShade
@@ -19,7 +18,10 @@ derive instance eqShadeOption :: Eq ShadeOption
 derive instance genericShadeOption :: Generic ShadeOption _
 
 instance showShadeOption :: Show ShadeOption where
-    show = genericShow
+    show NoShade       = "No Shade"
+    show LightShade    = "Light Shade"
+    show ModerateShade = "Moderate Shade"
+    show HeavyShade    = "Heavy Shade"
 
 instance ordShadeOption :: Ord ShadeOption where
     compare = genericCompare

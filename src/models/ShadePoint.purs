@@ -7,8 +7,8 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Editor.Common.Lenses (_x, _y, _z)
-import Model.Roof.RoofPlate (UnifiedPoint, _rating)
+import Editor.Common.Lenses (_rating, _x, _y, _z)
+import Model.Roof.RoofPlate (UnifiedPoint)
 import Three.Math.Vector (Vector3, mkVec3)
 
 newtype ShadePoint = ShadePoint {

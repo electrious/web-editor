@@ -134,11 +134,6 @@ instance encodeUnifiedPoint :: Encode UnifiedPoint where
 instance decodeUnifiedPoint :: Decode UnifiedPoint where
     decode = genericDecode (defaultOptions { unwrapSingleConstructors = true })
 
-_shade :: forall t a r. Newtype t { shade :: a | r } => Lens' t a
-_shade = _Newtype <<< prop (SProxy :: SProxy "shade")
-
-_rating :: forall t a r. Newtype t { rating :: a | r } => Lens' t a
-_rating = _Newtype <<< prop (SProxy :: SProxy "rating")
 
 -- | external JSRoofPlate model used in JS code. The data received from user and
 -- updates sent back to user should be in this format
