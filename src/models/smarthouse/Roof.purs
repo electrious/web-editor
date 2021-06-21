@@ -14,7 +14,7 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (List(..), (:))
 import Data.Map as M
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (Maybe(..))
 import Data.Meter (Meter, meterVal)
 import Data.Newtype (class Newtype)
 import Data.Set (Set)
@@ -40,7 +40,7 @@ import Model.UUID (class HasUUID, idLens)
 import Rendering.Node (Node, getEnv, tapMesh)
 import SmartHouse.HouseTracer (renderLine)
 import SmartHouse.PolyGeometry (mkPolyGeometry, mkPolyGeometryWithUV)
-import SmartHouse.ShadeOption (ShadeOption)
+import SmartHouse.ShadeOption (ShadeOption(..))
 import Smarthouse.Algorithm.Subtree (Subtree, _isGable)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial, mkMeshBasicMaterialWithTexture)
 import Three.Math.Vector (Vector3, mkVec3, vecX, vecY, vecZ)
@@ -55,7 +55,7 @@ newtype Roof = Roof {
     polygon  :: Polygon Vector3,
     subtrees :: UUIDMap Subtree,
 
-    shade    :: Maybe ShadeOption
+    shade    :: ShadeOption
     }
 
 derive instance newtypeRoof :: Newtype Roof _
@@ -73,7 +73,7 @@ _subtrees = _Newtype <<< prop (SProxy :: SProxy "subtrees")
 createRoofFrom :: Polygon Vector3 -> Set Subtree -> Effect Roof
 createRoofFrom p ts = do
     i <- genUUID
-    pure $ Roof { id : i, polygon : p, subtrees : UM.fromSet ts, shade : Nothing }
+    pure $ Roof { id : i, polygon : p, subtrees : UM.fromSet ts, shade : NoShade }
 
 -- check if a roof can be gable
 canBeGable :: Roof -> Boolean
@@ -92,11 +92,11 @@ subtreeIndex r = case M.values $ r ^. _subtrees of
 
 
 updateShadeOption :: Roof -> ShadeOption -> Roof
-updateShadeOption r o = r # _shade .~ Just o
+updateShadeOption r o = r # _shade .~ o
 
 
 exportRoof :: Meter -> Roof -> JSRoof
-exportRoof h r = JSRoof { id: r ^. idLens, polygon: mkP <$> r ^. _polygon <<< _polyVerts, shade : maybe 0 fromEnum (r ^. _shade) }
+exportRoof h r = JSRoof { id: r ^. idLens, polygon: mkP <$> r ^. _polygon <<< _polyVerts, shade : fromEnum (r ^. _shade) }
     where hv = meterVal h
           mkP v = vec2Point $ mkVec3 (vecX v) (vecY v) (vecZ v + hv)
 

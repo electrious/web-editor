@@ -94,7 +94,7 @@ houseBuilderUI cfg = do
                               # _showCloseDyn .~ pure true
                               # _showResetDyn .~ showR
 
-        shadeEvt <- shadeSelector $ join <<< map (view _shade) <$> cfg ^. _activeRoofDyn
+        shadeEvt <- shadeSelector $ map (view _shade) <$> cfg ^. _activeRoofDyn
 
         pure $ def # _buttons       .~ btns
                    # _shadeSelected .~ shadeEvt

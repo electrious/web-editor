@@ -5,15 +5,14 @@ import Prelude hiding (div)
 import Data.Maybe (Maybe, fromMaybe, isJust)
 import Data.Traversable (class Traversable, traverse)
 import Effect.Class (liftEffect)
-import FRP.Dynamic (Dynamic, debugDyn, gateDyn)
+import FRP.Dynamic (Dynamic, gateDyn)
 import FRP.Event (Event)
 import FRP.Event.Extra (anyEvt)
-import Foreign.Object (singleton)
 import Model.ActiveMode (ActiveMode(..), fromBoolean, isActive)
 import SmartHouse.ShadeOption (ShadeOption(..))
 import Specular.Dom.Browser (Attrs, (:=))
 import Specular.Dom.Builder.Class (text)
-import Specular.Dom.Element (attrD, attrs, attrsD, class_, classes)
+import Specular.Dom.Element (attrsD, class_, classes)
 import Specular.Dom.Widget (Widget)
 import Specular.Dom.Widgets.Button (buttonOnClick)
 import Specular.FRP (weaken)
@@ -58,7 +57,7 @@ selectorStyle d = mkStyle [
 
 shadeSelector :: Dynamic (Maybe ShadeOption) -> Widget (Event ShadeOption)
 shadeSelector shadeDyn = do
-    styleD <- liftEffect $ toUIDyn $ selectorStyle <<< isJust <$> debugDyn shadeDyn
+    styleD <- liftEffect $ toUIDyn $ selectorStyle <<< isJust <$> shadeDyn
     div [classes ["uk-flex", "uk-flex-column"],
          attrsD styleD] do
         div [class_ "uk-text-bold"] $ text "Select Shading:"

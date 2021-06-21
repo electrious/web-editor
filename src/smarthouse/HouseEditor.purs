@@ -34,7 +34,7 @@ import Effect.Random (randomInt)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, dynEvent, latestEvt, sampleDyn, step)
 import FRP.Event (Event)
-import FRP.Event.Extra (delay, distinct, multicast, performEvent)
+import FRP.Event.Extra (delay, multicast, performEvent)
 import Math.LineSeg (mkLineSeg)
 import Model.ActiveMode (ActiveMode(..), fromBoolean)
 import Model.Polygon (Polygon, _polyVerts)
@@ -156,7 +156,7 @@ editHouse houseCfg conf = do
                          # _roofTapped .~ roofTappedEvt
                          # _wallTapped .~ wallTap
                          # _updated    .~ (HouseOpUpdate <$> newHouseEvt)
-                         # _activeRoof .~ multicast (distinct $ compact $ dynEvent activeRoofDyn)
+                         # _activeRoof .~ multicast (compact $ dynEvent activeRoofDyn)
 
                 -- render all roof nodes if available
                 roofsDyn = step Nothing $ Just <$> conf ^. _roofsData

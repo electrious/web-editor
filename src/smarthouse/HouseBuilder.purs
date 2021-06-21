@@ -127,6 +127,7 @@ compactHouseBuilt e = def # _hasHouse    .~ keepLatest (view _hasHouse    <$> e)
                           # _tracerMode  .~ keepLatest (view _tracerMode  <$> e)
                           # _saveStepEvt .~ keepLatest (view _saveStepEvt <$> e)
                           # _editorOp    .~ keepLatest (view _editorOp    <$> e)
+                          # _activeRoof  .~ keepLatest (view _activeRoof  <$> e)
 
 
 loadHouseTexture :: ImageResp -> Event HouseTextureInfo
