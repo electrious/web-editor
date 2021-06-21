@@ -1,6 +1,6 @@
 module Model.SmartHouse.House where
 
-import Prelude
+import Prelude hiding (degree)
 
 import Control.Alt ((<|>))
 import Control.Alternative (empty)
@@ -48,7 +48,7 @@ newtype House = House {
     slope  :: Angle,
     trees  :: UUIDMap Subtree,
     edges  :: List Edge,
-    roofs  :: List Roof
+    roofs  :: UUIDMap Roof
     }
 
 derive instance newtypeHouse :: Newtype House _
@@ -61,7 +61,7 @@ instance defaultHouse :: Default House where
         slope  : degree 20.0,
         trees  : M.empty,
         edges  : empty,
-        roofs  : empty
+        roofs  : M.empty
         }
 instance eqHouse :: Eq House where
     eq h1 h2 = h1 ^. _id == h2 ^. _id
@@ -86,12 +86,16 @@ createHouseFrom slope poly = do
         slope  : slope,
         trees  : UM.fromFoldable trees,
         edges  : edges,
-        roofs  : roofs
+        roofs  : UM.fromFoldable roofs
         }
 
 
 updateHeight :: Meter -> House -> House
 updateHeight height h = h # _height .~ height
+
+getRoof :: Maybe UUID -> House -> Maybe Roof
+getRoof Nothing _  = Nothing
+getRoof (Just i) h = M.lookup i $ h ^. _roofs
 
 -- flip a roof to/from gable
 flipRoof :: UUID -> House -> Effect House
@@ -102,17 +106,14 @@ flipRoof i h = do
         nts = M.update (Just <<< flip flipSubtree vs) i ts
     -- generate new roofs
     roofs <- generateRoofs (h ^. _slope) (S.fromFoldable nts) (h ^. _edges)
-    pure $ h # _roofs .~ roofs
+    pure $ h # _roofs .~ UM.fromFoldable roofs
              # _trees .~ nts
 
 
-updateActiveRoofShade :: ShadeOption -> Maybe Roof -> House -> House
+updateActiveRoofShade :: ShadeOption -> Maybe UUID -> House -> House
 updateActiveRoofShade s Nothing   h = h
-updateActiveRoofShade s (Just ar) h = h # _roofs %~ map (f ar)
-    where f actR r = if actR == r
-                     then updateShadeOption r s
-                     else r
-
+updateActiveRoofShade s (Just ai) h = h # _roofs %~ M.update f ai
+    where f r = Just $ updateShadeOption r s
 
 exportHouse :: House -> JSHouse
 exportHouse h = JSHouse { id: h ^. idLens, floor: floor, height: meterVal $ h ^. _height, roofs: roofs }

@@ -117,7 +117,7 @@ instance decodeJSRoof :: Decode JSRoof where
     decode = genericDecode (defaultOptions { unwrapSingleConstructors = true })
 
 newtype RoofEvents = RoofEvents {
-    tapped  :: Event Roof,
+    tapped  :: Event UUID,
     flipped :: Event UUID   -- event to flip the roof state, the Int is index of the subtree
     }
 
@@ -147,7 +147,7 @@ renderRoof enableDyn actDyn roof = do
         actTapEvt   = gateDyn ((&&) <$> enableDyn <*> (isActive <$> actDyn)) tapEvt
         inactTapEvt = gateDyn ((&&) <$> enableDyn <*> (not <<< isActive <$> actDyn)) tapEvt
         
-    pure $ def # _tapped  .~ multicast (const roof <$> inactTapEvt)
+    pure $ def # _tapped  .~ multicast (const (roof ^. idLens) <$> inactTapEvt)
                # _flipped .~ multicast (compact $ const (subtreeIndex roof) <$> actTapEvt)
 
 

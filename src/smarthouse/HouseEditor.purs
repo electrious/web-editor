@@ -42,7 +42,7 @@ import Model.Racking.OldRackingSystem (OldRoofRackingData, guessRackingType)
 import Model.Racking.RackingType (RackingType(..))
 import Model.Roof.Panel (Alignment(..), Orientation(..), PanelsDict, panelsDict)
 import Model.Roof.RoofPlate (RoofPlate, _roofIntId)
-import Model.SmartHouse.House (House, HouseNode, HouseOp(..), _activeRoof, _roofTapped, _trees, _wallTapped, flipRoof, updateActiveRoofShade, updateHeight)
+import Model.SmartHouse.House (House, HouseNode, HouseOp(..), _activeRoof, _roofTapped, _trees, _wallTapped, flipRoof, getRoof, updateActiveRoofShade, updateHeight)
 import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo)
 import Model.SmartHouse.Roof (Roof, RoofEvents, _flipped, renderRoof)
 import Model.UUID (idLens)
@@ -120,13 +120,13 @@ editHouse houseCfg conf = do
         houseEditDyn = (==) EditingHouse <$> modeDyn
         
     fixNodeDWith house \houseDyn ->
-        fixNodeDWith Nothing \activeRoofDyn -> do
+        fixNodeDWith Nothing \actRoofIdDyn -> do
             let hDyn = view _height <$> houseDyn
                 pDyn = mkVec3 0.0 0.0 <<< meterVal <$> hDyn
             -- render walls
             wallTap <- latestEvt <$> dynamic (renderWalls floor <$> hDyn)
             -- render roofs
-            roofEvtsDyn <- node (def # _position .~ pDyn) $ dynamic $ renderBuilderRoofs houseEditDyn actDyn activeRoofDyn <<< view _roofs <$> houseDyn
+            roofEvtsDyn <- node (def # _position .~ pDyn) $ dynamic $ renderBuilderRoofs houseEditDyn actDyn actRoofIdDyn <<< view _roofs <$> houseDyn
 
             let flipEvt = latestAnyEvtWith (view _flipped) roofEvtsDyn
                 -- height editor arrow position
@@ -142,16 +142,18 @@ editHouse houseCfg conf = do
             let hEvt = (+) h <$> deltaEvt  -- new height
                 newHouseEvt1 = sampleDyn houseDyn $ updateHeight <$> hEvt
                 newHouseEvt2 = performEvent $ sampleDyn houseDyn $ flipRoof <$> flipEvt
-                newHouseEvt3 = sampleDyn houseDyn $ sampleDyn activeRoofDyn $ updateActiveRoofShade <$> conf ^. _shadeSelected
+                newHouseEvt3 = sampleDyn houseDyn $ sampleDyn actRoofIdDyn $ updateActiveRoofShade <$> conf ^. _shadeSelected
                 
                 newHouseEvt  = multicast $ newHouseEvt1 <|> newHouseEvt2 <|> newHouseEvt3
 
                 roofTappedEvt = latestAnyEvtWith (view _tapped) roofEvtsDyn
 
                 actRoofEvt = Just <$> roofTappedEvt
+
+                activeRoofDyn = getRoof <$> actRoofIdDyn <*> houseDyn
                 
                 hn = def # _id         .~ (house ^. idLens)
-                         # _roofTapped .~ (view idLens <$> roofTappedEvt)
+                         # _roofTapped .~ roofTappedEvt
                          # _wallTapped .~ wallTap
                          # _updated    .~ (HouseOpUpdate <$> newHouseEvt)
                          # _activeRoof .~ multicast (distinct $ compact $ dynEvent activeRoofDyn)
@@ -176,10 +178,10 @@ renderWalls poly height = do
     pure $ const unit <$> m ^. _tapped
 
 
-renderBuilderRoofs :: forall f. Traversable f => Dynamic Boolean -> Dynamic ActiveMode -> Dynamic (Maybe Roof) -> f Roof -> Node HouseTextureInfo (f RoofEvents)
+renderBuilderRoofs :: forall f. Traversable f => Dynamic Boolean -> Dynamic ActiveMode -> Dynamic (Maybe UUID) -> f Roof -> Node HouseTextureInfo (f RoofEvents)
 renderBuilderRoofs houseEditDyn houseActDyn actRoofDyn = traverse render
     where render r = do
-              let isActDyn = (fromBoolean <<< (==) (Just r)) <$> actRoofDyn
+              let isActDyn = (fromBoolean <<< (==) (Just $ r ^. idLens)) <$> actRoofDyn
               renderRoof houseEditDyn ((&&) <$> houseActDyn <*> isActDyn) r
               
 
