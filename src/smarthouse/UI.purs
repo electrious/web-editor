@@ -83,18 +83,18 @@ houseBuilderUI cfg = do
                             "top"            :~ "0",
                             "pointer-events" :~ "none" ]
     sizeD <- liftEffect $ toUIDyn $ cfg ^. _sizeDyn
-    btns <- div [attrsD $ style <$> sizeD, class_ "uk-inline"] do
+    div [attrsD $ style <$> sizeD, class_ "uk-inline"] do
         showD <- liftEffect $ toUIDyn $ cfg ^. _showSaveDyn
         showR <- liftEffect $ toUIDyn $ cfg ^. _showResetDyn
         stepD <- liftEffect $ toUIDyn $ cfg ^. _savingStepDyn
         
         savingStepDialog stepD
         
-        buttons $ def # _showSaveDyn  .~ showD
-                      # _showCloseDyn .~ pure true
-                      # _showResetDyn .~ showR
+        btns <- buttons $ def # _showSaveDyn  .~ showD
+                              # _showCloseDyn .~ pure true
+                              # _showResetDyn .~ showR
 
-    shadeEvt <- shadeSelector $ join <<< map (view _shade) <$> cfg ^. _activeRoofDyn
+        shadeEvt <- shadeSelector $ join <<< map (view _shade) <$> cfg ^. _activeRoofDyn
 
-    pure $ def # _buttons       .~ btns
-               # _shadeSelected .~ shadeEvt
+        pure $ def # _buttons       .~ btns
+                   # _shadeSelected .~ shadeEvt
