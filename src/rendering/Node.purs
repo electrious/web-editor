@@ -124,7 +124,7 @@ _visible = _Newtype <<< prop (SProxy :: SProxy "visible")
 _renderOrder :: forall t a r. Newtype t { renderOrder :: a | r } => Lens' t a
 _renderOrder = _Newtype <<< prop (SProxy :: SProxy "renderOrder")
 
-setupProps :: forall o. IsObject3D o => Props -> o -> Effect Disposee
+setupProps :: forall o. IsObject3D o => Props -> o -> Effect (Effect Unit)
 setupProps prop o = do
     setName          (prop ^. _name) o
     setCastShadow    (prop ^. _castShadow) o
@@ -137,7 +137,7 @@ setupProps prop o = do
     d4 <- subscribeDyn (prop ^. _visible) (flip setVisible o)
     d5 <- subscribeDyn (prop ^. _target) (traverse (flip lookAt o))
     
-    pure $ Disposee $ d1 *> d2 *> d3 *> d4 *> d5
+    pure $ d1 *> d2 *> d3 *> d4 *> d5
 
 -- internal helper function to create node functions with node maker function
 mkNode :: forall e m. IsObject3D m => Props -> Effect m -> Node e m
@@ -150,7 +150,7 @@ mkNode prop func = do
     d <- liftEffect $ setupProps prop m
 
     -- remove the object from parent if node is disposed
-    tell $ d <> Disposee (remove m parent)
+    tell $ Disposee $ d *> remove m parent
     pure m
 
 
