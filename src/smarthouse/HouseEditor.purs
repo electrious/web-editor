@@ -5,7 +5,6 @@ import Prelude hiding (add)
 import Control.Alt ((<|>))
 import Control.Monad.RWS (tell)
 import Control.Plus (empty)
-import Data.Compactable (compact)
 import Data.Default (class Default, def)
 import Data.Foldable (traverse_)
 import Data.Lens (Lens', view, (.~), (^.))
@@ -129,7 +128,8 @@ editHouse houseCfg conf = do
             -- calculate the active roof id based on house's activeness and active roof id
             let f Active   i = i
                 f Inactive _ = Nothing
-                
+
+                -- id of active roof, taking into account of the house activeness
                 actRoofDyn = f <$> actDyn <*> actRoofIdDyn
                 
             -- render roofs
@@ -163,22 +163,20 @@ editHouse houseCfg conf = do
 
                 roofTappedEvt = latestAnyEvtWith (view _tapped) roofEvtsDyn
 
-                actRoofEvt = Just <$> roofTappedEvt
-
-                activeRoofDyn = getRoof <$> actRoofIdDyn <*> houseDyn
+                activeRoofDyn = getRoof <$> actRoofDyn <*> houseDyn
                 
                 hn = def # _id         .~ (house ^. idLens)
                          # _roofTapped .~ gateDyn (not <<< isActive <$> actDyn) roofTappedEvt
                          # _wallTapped .~ wallTap
                          # _updated    .~ (HouseOpUpdate <$> newHouseEvt)
-                         # _activeRoof .~ multicast (compact $ dynEvent activeRoofDyn)
+                         # _activeRoof .~ dynEvent activeRoofDyn
 
                 -- render all roof nodes if available
                 roofsDyn = step Nothing $ Just <$> conf ^. _roofsData
 
             void $ localEnv (const houseCfg) $ renderRoofEditor (conf ^. _arrayEditParam) roofsDyn
             
-            pure { input : actRoofEvt, output : { input: newHouseEvt, output: hn } }
+            pure { input : Just <$> roofTappedEvt, output : { input: newHouseEvt, output: hn } }
 
 
 wallMat :: MeshPhongMaterial

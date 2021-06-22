@@ -103,7 +103,7 @@ newtype HouseBuilt = HouseBuilt {
     tracerMode  :: Event TracerMode,
     saveStepEvt :: Event SavingStep,
     editorOp    :: Event EditorUIOp,
-    activeRoof  :: Event Roof
+    activeRoof  :: Event (Maybe Roof)
     }
 
 derive instance newtypeHouseBuilt :: Newtype HouseBuilt _
@@ -201,7 +201,7 @@ getHouseUpd = foldEvtWith (view _updated)
 getHouseDel :: forall f. Foldable f => Functor f => f HouseNode -> Event HouseOp
 getHouseDel = foldEvtWith (view _deleted)
 
-getActiveRoof :: forall f. Foldable f => Functor f => f HouseNode -> Event Roof
+getActiveRoof :: forall f. Foldable f => Functor f => f HouseNode -> Event (Maybe Roof)
 getActiveRoof = foldEvtWith (view _activeRoof)
 
 -- get the activated house from a list of house nodes
@@ -393,7 +393,7 @@ buildHouse editor cfg = do
                        # _showSaveDyn   .~ step false (res ^. _hasHouse)
                        # _showResetDyn  .~ step false ((==) Tracing <$> (res ^. _tracerMode))
                        # _savingStepDyn .~ step NotSaving (res ^. _saveStepEvt)
-                       # _activeRoofDyn .~ step Nothing (Just <$> res ^. _activeRoof)
+                       # _activeRoofDyn .~ step Nothing (res ^. _activeRoof)
                    
     uiEvts <- runMainWidgetInNode parentEl $ houseBuilderUI conf
 

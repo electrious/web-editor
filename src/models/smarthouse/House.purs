@@ -166,7 +166,7 @@ newtype HouseNode = HouseNode {
     wallTapped  :: Event Unit,
     updated     :: Event HouseOp,
     deleted     :: Event HouseOp,
-    activeRoof  :: Event Roof,
+    activeRoof  :: Event (Maybe Roof),
 
     arrayEvents :: ArrayEvents
     }
