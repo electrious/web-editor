@@ -15,9 +15,9 @@ import Editor.Common.Lenses (_mesh)
 import Effect (Effect)
 import FRP.Event (Event, makeEvent)
 import RBush.RBush (RBush)
-import Three.Core.Geometry (BufferGeometry, Geometry, computeVertexNormals, count, getAttribute, getX, getY, getZ)
+import Three.Core.Geometry (BufferGeometry, computeVertexNormals, count, getAttribute, getX, getY, getZ)
 import Three.Core.Material (preload, setTransparent)
-import Three.Core.Mesh (Mesh, bufferGeometry, geometry, isMesh, material)
+import Three.Core.Mesh (Mesh, geometry, isMesh, material)
 import Three.Core.Object3D (Object3D, children, setCastShadow, setName, setReceiveShadow)
 import Three.Loader.ObjLoader (loadMTL, loadOBJ, makeMTLLoader, makeOBJLoader, setMaterials, setPath)
 import Three.Math.Vector (Vector3, mkVec3)
@@ -58,7 +58,7 @@ loadHouseModel serverUrl leadId = do
             setCastShadow true o
             setReceiveShadow true o
             setTransparent false $ material o
-            computeVertexNormals $ (geometry o :: Geometry)
+            computeVertexNormals $ (geometry o :: BufferGeometry)
 
     pure $ compact $ makeEvent \k -> do
         setPath path mtlLoader
@@ -96,7 +96,7 @@ type GeometryInfo = {
 
 -- | get the vertex position and normal vector arrays of a BufferGeometry
 getGeometryInfo :: Mesh -> GeometryInfo
-getGeometryInfo mesh = let g = bufferGeometry mesh
+getGeometryInfo mesh = let g = geometry mesh
                            posAttr = getAttribute "position" g
                            normAttr = getAttribute "normal" g
 

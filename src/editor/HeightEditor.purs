@@ -17,7 +17,7 @@ import FRP.Event (Event)
 import Math (pi)
 import Model.ActiveMode (ActiveMode(..), isActive)
 import Rendering.Node (Node, _visible, node)
-import Three.Core.Geometry (Geometry)
+import Three.Core.Geometry (BufferGeometry)
 import Three.Core.Material (MeshBasicMaterial)
 import Three.Math.Euler (mkEuler)
 import Three.Math.Vector (class Vector, Vector3, mkVec3, vecX, vecY, vecZ)
@@ -82,7 +82,7 @@ dragArrow conf = do
                   # _deltaTransform .~ Just transF
                   # _rotation       .~ mkEuler (pi / 2.0) 0.0 0.0
     node (def # _position .~ posDyn
-              # _visible  .~ actDyn) $ createDraggableObject (cfg :: DragObjCfg Geometry)
+              # _visible  .~ actDyn) $ createDraggableObject (cfg :: DragObjCfg BufferGeometry)
 
 
 -- | setup drag arrow to edit the house height

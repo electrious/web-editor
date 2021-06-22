@@ -13,11 +13,7 @@ exports.geometry = _ => mesh => {
     return mesh.geometry
 }
 
-exports.bufferGeometry = _ => mesh => {
-    return mesh.geometry
-}
-
-exports.setBufferGeometry = _ => geo => mesh => _ => {
+exports.setGeometry = _ => geo => mesh => _ => {
     mesh.geometry = geo
 }
 

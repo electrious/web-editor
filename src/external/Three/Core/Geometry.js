@@ -1,44 +1,24 @@
 const three = require('three')
 const lines = require('three/examples/jsm/lines/LineGeometry')
 
+exports.mkBufferGeometry = _ => {
+    return new three.BufferGeometry();
+}
+
+exports.setAttribute = _ => name => attr => geo => _ => {
+    geo.setAttribute(name, attr);
+}
+
+exports.getAttribute = _ => name => geo => {
+    return geo.getAttribute(name);
+}
+
+exports.setIndex = _ => idx => geo => _ => {
+    geo.setIndex(idx);
+}
+
 exports.clone = _ => g => _ => {
     return g.clone()
-}
-
-exports.mkGeometry = _ => {
-    return new three.Geometry()
-}
-
-exports.vertices = _ => geo => {
-    return geo.vertices
-}
-
-exports.setVertices = _ => vs => geo => _ => {
-    geo.vertices = vs
-}
-
-exports.setVerticesNeedUpdate = _ => u => geo => _ => {
-    geo.verticesNeedUpdate = u
-}
-
-exports.faces = _ => geo => {
-    return geo.faces
-}
-
-exports.setFaces = _ => fs => geo => _ => {
-    geo.faces = fs
-}
-
-exports.setElementsNeedUpdate = _ => u => geo => _ => {
-    geo.elementsNeedUpdate = u
-}
-
-exports.setUVs = _ => uvs => geo => _ => {
-    geo.faceVertexUvs = [uvs]
-}
-
-exports.setUVsNeedUpdate = _ => u => geo => _ => {
-    geo.uvsNeedUpdate = u
 }
 
 exports.computeVertexNormals = _ => geo => _ => {
@@ -85,12 +65,13 @@ exports.mkLineGeometry = ps => _ => {
     return geo
 }
 
-exports.isBufferAttribute = attr => {
-    return attr instanceof three.BufferAttribute
+
+exports.mkBufferAttribute = _ => arr => s => _ => {
+    return new three.BufferAttribute(arr, s);
 }
 
-exports.getAttribute = _ => name => geo => {
-    return geo.getAttribute(name)
+exports.isBufferAttribute = attr => {
+    return attr instanceof three.BufferAttribute
 }
 
 exports.setXYZ = idx => x => y => z => attr => _ => {

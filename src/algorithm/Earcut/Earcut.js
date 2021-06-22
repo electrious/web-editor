@@ -1,14 +1,9 @@
-const earcut = require('earcut')
-const three = require('three')
+const earcut = require('earcut');
 
 exports.earcut = vs => {
-    const idxs = earcut(vs, null, 3)
-    let faces = []
-
-    let l = idxs.length
-    for(var i = 0; i < l; i += 3) {
-        faces.push(new three.Face3(idxs[i], idxs[i + 1], idxs[i + 2]))
+    if (vs.length > 3) {
+        return new Uint16Array(earcut(vs, null, 3));
+    } else {
+        return new Uint16Array([]);
     }
-
-    return faces
-}
+};

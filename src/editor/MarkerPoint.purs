@@ -23,7 +23,7 @@ import FRP.Event.Extra (performEvent)
 import Model.ActiveMode (ActiveMode(..), isActive)
 import Rendering.Node (_visible, getParent, tapMesh)
 import Rendering.NodeRenderable (class NodeRenderable)
-import Three.Core.Geometry (CircleGeometry, Geometry, mkCircleGeometry)
+import Three.Core.Geometry (BufferGeometry, CircleGeometry, mkCircleGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial)
 import Three.Math.Vector (class Vector, getVector, updateVector)
 import UI.DraggableObject (DragObjCfg, createDraggableObject, incZ)
@@ -82,7 +82,7 @@ instance nodeRenderableVertMarkerPoint :: Vector v => NodeRenderable e (VertMark
                       # _enabled  .~ enabled
                       # _position .~ (getVector $ m ^. _position)
             mod = m ^. _modifier <<< _modifierFunc
-        dragObj <- createDraggableObject (cfg :: DragObjCfg Geometry)
+        dragObj <- createDraggableObject (cfg :: DragObjCfg BufferGeometry)
         let posEvt   = performEvent $ (mod <<< updateVector (m ^. _position)) <$> dragObj ^. _position
             dragging = dragObj ^. _isDragging
         pure $ VertMarker {
