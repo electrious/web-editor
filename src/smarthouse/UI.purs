@@ -5,21 +5,21 @@ import Prelude hiding (div)
 import API.SmartHouse (SavingStep(..), stepMode)
 import Control.Plus (empty)
 import Data.Default (class Default, def)
-import Data.Lens (Lens', view, (.~), (^.))
+import Data.Lens (Lens', (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Editor.Common.Lenses (_buttons, _height, _shade, _shadeSelected, _width)
+import Editor.Common.Lenses (_buttons, _height, _shadeSelected, _width)
 import Editor.Editor (_sizeDyn)
 import Editor.SceneEvent (Size, size)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic)
 import FRP.Event (Event)
 import Model.SmartHouse.Roof (Roof)
+import SmartHouse.ActiveRoofUI (_deleteHouse, activeRoofUI)
 import SmartHouse.ShadeOption (ShadeOption)
-import SmartHouse.ShadeOptionUI (shadeSelector)
 import Specular.Dom.Element (attrsD, class_, classes, dynText, el)
 import Specular.Dom.Widget (Widget)
 import Specular.FRP as S
@@ -55,16 +55,17 @@ _activeRoofDyn = _Newtype <<< prop (SProxy :: SProxy "activeRoofDyn")
 
 newtype BuilderUIEvents = BuilderUIEvents {
     buttons       :: ButtonsPane,
-    shadeSelected :: Event ShadeOption
+    shadeSelected :: Event ShadeOption,
+    deleteHouse   :: Event Unit
     }
 
 derive instance newtypeBuilderUIEvents :: Newtype BuilderUIEvents _
 instance defaultBuilderUIEvents :: Default BuilderUIEvents where
     def = BuilderUIEvents {
         buttons       : def,
-        shadeSelected : empty
+        shadeSelected : empty,
+        deleteHouse   : empty
         }
-
 
 savingStepDialog :: S.Dynamic SavingStep -> Widget Unit
 savingStepDialog stepDyn = do
@@ -94,7 +95,8 @@ houseBuilderUI cfg = do
                               # _showCloseDyn .~ pure true
                               # _showResetDyn .~ showR
 
-        shadeEvt <- shadeSelector $ map (view _shade) <$> cfg ^. _activeRoofDyn
+        roofUIEvt <- activeRoofUI $ cfg ^. _activeRoofDyn
 
         pure $ def # _buttons       .~ btns
-                   # _shadeSelected .~ shadeEvt
+                   # _shadeSelected .~ (roofUIEvt ^. _shadeSelected)
+                   # _deleteHouse   .~ (roofUIEvt ^. _deleteHouse)

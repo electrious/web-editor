@@ -37,7 +37,7 @@ import Editor.RoofManager (RoofsData)
 import Editor.SceneEvent (size)
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import FRP.Dynamic (Dynamic, gateDyn, step)
+import FRP.Dynamic (Dynamic, gateDyn, sampleDyn, step)
 import FRP.Event (Event, create, keepLatest, sampleOn, sampleOn_, subscribe)
 import FRP.Event.Extra (delay, multicast, performEvent)
 import Math.Angle (degree)
@@ -52,6 +52,7 @@ import OBJExporter (MeshFiles, exportObject)
 import Rendering.DynamicNode (eventNode)
 import Rendering.Node (Node, fixNodeDWith, fixNodeE, fixNodeEWith, getEnv, getParent, localEnv, mkNodeEnv, node, runNode, tapMouseMesh)
 import Rendering.TextureLoader (textureFromUrl)
+import SmartHouse.ActiveRoofUI (_deleteHouse)
 import SmartHouse.BuilderMode (BuilderMode(..))
 import SmartHouse.HouseEditor (HouseRenderMode(..), _arrayEditParam, _house, _roofsData, editHouse, renderHouse)
 import SmartHouse.HouseTracer (TracerMode(..), _stopTracing, _tracedPolygon, _tracerMode, traceHouse)
@@ -234,7 +235,8 @@ tracerMode h Building = fromBoolean $ isNothing h
 newtype BuilderInputEvts = BuilderInputEvts {
     export        :: Event Unit,
     stopTracing   :: Event Unit,
-    shadeSelected :: Event ShadeOption
+    shadeSelected :: Event ShadeOption,
+    deleteHouse   :: Event Unit
     }
 
 derive instance newtypeBuilderInputEvts :: Newtype BuilderInputEvts _
@@ -242,7 +244,8 @@ instance defaultBuilderInputEvts :: Default BuilderInputEvts where
     def = BuilderInputEvts {
         export        : empty,
         stopTracing   : empty,
-        shadeSelected : empty
+        shadeSelected : empty,
+        deleteHouse   : empty
         }
 
 _export :: forall t a r. Newtype t { export :: a | r } => Lens' t a
@@ -308,7 +311,12 @@ builderForHouse evts tInfo =
                         addHouseEvt = HouseOpCreate <$> houseEvt
                         updHouseEvt = keepLatest (getHouseUpd <$> nodesEvt)
 
-                        opEvt = addHouseEvt <|> updHouseEvt
+                        mkDelOp _ (Just h) = Just $ HouseOpDelete h
+                        mkDelOp _ Nothing  = Nothing
+                        
+                        delHouseEvt = multicast $ compact $ sampleDyn actHouseDyn $ mkDelOp <$> evts ^. _deleteHouse
+
+                        opEvt = addHouseEvt <|> updHouseEvt <|> delHouseEvt
 
                         -- update HouseDictData by applying the house operations
                         newHdEvt = multicast $ sampleOn hdEvt $ applyHouseOp <$> opEvt
@@ -334,7 +342,7 @@ builderForHouse evts tInfo =
                         res = def # _hasHouse    .~ (hasHouse <$> hdEvt)
                                   # _tracerMode  .~ (traceRes ^. _tracerMode)
                                   # _saveStepEvt .~ stepEvt
-                                  # _activeRoof  .~ actRoofEvt
+                                  # _activeRoof  .~ (actRoofEvt <|> const Nothing <$> delHouseEvt)
 
                     pure { input: newRoofsDatEvt, output : { input: modeEvt, output: { input: actHouseEvt, output : { input: newHdEvt, output : res } } } }
 
@@ -382,10 +390,12 @@ buildHouse editor cfg = do
     { event: expEvt, push: toExp } <- create
     { event: stopTracingEvt, push: toStopTracing } <- create
     { event: shadeEvt, push: selectShade } <- create
+    { event: delHouseEvt, push: delHouse } <- create
 
     let inputEvts = def # _export        .~ expEvt
                         # _stopTracing   .~ stopTracingEvt
                         # _shadeSelected .~ shadeEvt
+                        # _deleteHouse   .~ delHouseEvt
 
     res <- fst <$> runNode (createHouseBuilder inputEvts) (mkNodeEnv editor cfg)
     let parentEl = unsafeCoerce $ editor ^. _parent
@@ -400,5 +410,6 @@ buildHouse editor cfg = do
     void $ subscribe (const unit <$> uiEvts ^. _buttons <<< _save) toExp
     void $ subscribe (const unit <$> uiEvts ^. _buttons <<< _reset) toStopTracing
     void $ subscribe (uiEvts ^. _shadeSelected) selectShade
+    void $ subscribe (uiEvts ^. _deleteHouse) delHouse
 
     pure $ res # _editorOp .~ (const Close <$> uiEvts ^. _buttons <<< _close)
