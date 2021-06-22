@@ -32,11 +32,11 @@ import Editor.RoofNode (RoofNode, RoofNodeConfig, RoofNodeMode(..), createRoofNo
 import Effect.Class (liftEffect)
 import Effect.Random (randomInt)
 import Effect.Unsafe (unsafePerformEffect)
-import FRP.Dynamic (Dynamic, dynEvent, latestEvt, sampleDyn, step)
+import FRP.Dynamic (Dynamic, dynEvent, gateDyn, latestEvt, sampleDyn, step)
 import FRP.Event (Event)
 import FRP.Event.Extra (delay, multicast, performEvent)
 import Math.LineSeg (mkLineSeg)
-import Model.ActiveMode (ActiveMode(..), fromBoolean)
+import Model.ActiveMode (ActiveMode(..), fromBoolean, isActive)
 import Model.Polygon (Polygon, _polyVerts)
 import Model.Racking.OldRackingSystem (OldRoofRackingData, guessRackingType)
 import Model.Racking.RackingType (RackingType(..))
@@ -44,9 +44,9 @@ import Model.Roof.Panel (Alignment(..), Orientation(..), PanelsDict, panelsDict)
 import Model.Roof.RoofPlate (RoofPlate, _roofIntId)
 import Model.SmartHouse.House (House, HouseNode, HouseOp(..), _activeRoof, _roofTapped, _trees, _wallTapped, flipRoof, getRoof, updateActiveRoofShade, updateHeight)
 import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo)
-import Model.SmartHouse.Roof (Roof, RoofEvents, _flipped, renderRoof)
+import Model.SmartHouse.Roof (Roof, RoofEvents, _flipped, renderRoof, renderRoofOutlines)
 import Model.UUID (idLens)
-import Rendering.DynamicNode (dynamic)
+import Rendering.DynamicNode (dynamic, dynamic_)
 import Rendering.Node (Node, fixNodeDWith, getEnv, getParent, localEnv, node, tapMesh)
 import SmartHouse.Algorithm.Edge (_line)
 import SmartHouse.Algorithm.LAV (_edges)
@@ -125,8 +125,23 @@ editHouse houseCfg conf = do
                 pDyn = mkVec3 0.0 0.0 <<< meterVal <$> hDyn
             -- render walls
             wallTap <- latestEvt <$> dynamic (renderWalls floor <$> hDyn)
+
+            -- calculate the active roof id based on house's activeness and active roof id
+            let f Active   i = i
+                f Inactive _ = Nothing
+                
+                actRoofDyn = f <$> actDyn <*> actRoofIdDyn
+                
             -- render roofs
-            roofEvtsDyn <- node (def # _position .~ pDyn) $ dynamic $ renderBuilderRoofs houseEditDyn actDyn actRoofIdDyn <<< view _roofs <$> houseDyn
+            roofEvtsDyn <- node (def # _position .~ pDyn
+                                     # _name     .~ "roofs") do
+                let roofsDyn = view _roofs <$> houseDyn
+                -- render roof outlines dynamically
+                dynamic_ $ renderRoofOutlines <$> actRoofDyn <*> roofsDyn
+
+                -- render roofs dynamically
+                dynamic $ renderBuilderRoofs houseEditDyn actRoofDyn <$> roofsDyn
+
 
             let flipEvt = latestAnyEvtWith (view _flipped) roofEvtsDyn
                 -- height editor arrow position
@@ -153,7 +168,7 @@ editHouse houseCfg conf = do
                 activeRoofDyn = getRoof <$> actRoofIdDyn <*> houseDyn
                 
                 hn = def # _id         .~ (house ^. idLens)
-                         # _roofTapped .~ roofTappedEvt
+                         # _roofTapped .~ gateDyn (not <<< isActive <$> actDyn) roofTappedEvt
                          # _wallTapped .~ wallTap
                          # _updated    .~ (HouseOpUpdate <$> newHouseEvt)
                          # _activeRoof .~ multicast (compact $ dynEvent activeRoofDyn)
@@ -178,12 +193,8 @@ renderWalls poly height = do
     pure $ const unit <$> m ^. _tapped
 
 
-renderBuilderRoofs :: forall f. Traversable f => Dynamic Boolean -> Dynamic ActiveMode -> Dynamic (Maybe UUID) -> f Roof -> Node HouseTextureInfo (f RoofEvents)
-renderBuilderRoofs houseEditDyn houseActDyn actRoofDyn = traverse render
-    where render r = do
-              let isActDyn = (fromBoolean <<< (==) (Just $ r ^. idLens)) <$> actRoofDyn
-              renderRoof houseEditDyn ((&&) <$> houseActDyn <*> isActDyn) r
-              
+renderBuilderRoofs :: forall f. Traversable f => Dynamic Boolean -> Dynamic (Maybe UUID) -> f Roof -> Node HouseTextureInfo (f RoofEvents)
+renderBuilderRoofs houseEditDyn actRoofDyn = traverse (renderRoof houseEditDyn actRoofDyn)
 
 -- render the house as 2D wireframe
 renderHouse :: House -> Node HouseTextureInfo HouseNode

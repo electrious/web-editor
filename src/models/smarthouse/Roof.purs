@@ -19,7 +19,7 @@ import Data.Meter (Meter, meterVal)
 import Data.Newtype (class Newtype)
 import Data.Set (Set)
 import Data.Symbol (SProxy(..))
-import Data.Traversable (traverse_)
+import Data.Traversable (class Traversable, traverse_)
 import Data.UUID (UUID, genUUID)
 import Data.UUIDMap (UUIDMap)
 import Data.UUIDMap as UM
@@ -32,12 +32,11 @@ import FRP.Event (Event)
 import FRP.Event.Extra (multicast)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
-import Model.ActiveMode (ActiveMode(..), isActive)
+import Model.ActiveMode (ActiveMode(..), fromBoolean, isActive)
 import Model.Polygon (Polygon, _polyVerts, polyOutline)
 import Model.Roof.RoofPlate (Point, vec2Point)
 import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo, _size, _texture)
 import Model.UUID (class HasUUID, idLens)
-import Rendering.DynamicNode (dynamic_)
 import Rendering.Node (Node, getEnv, tapMesh)
 import SmartHouse.HouseTracer (lineMat, renderLineWith)
 import SmartHouse.PolyGeometry (mkPolyGeometry, mkPolyGeometryWithUV)
@@ -140,14 +139,23 @@ getRoofLineMat :: ActiveMode -> LineBasicMaterial
 getRoofLineMat Active   = actLineMat
 getRoofLineMat Inactive = lineMat
 
-renderRoof :: Dynamic Boolean -> Dynamic ActiveMode -> Roof -> Node HouseTextureInfo RoofEvents
-renderRoof enableDyn actDyn roof = do
+getRoofActive :: Roof -> Maybe UUID -> ActiveMode
+getRoofActive r (Just i) = fromBoolean $ i == r ^. idLens
+getRoofActive _ Nothing  = Inactive
+
+renderRoofOutline :: forall e. Maybe UUID -> Roof -> Node e Unit
+renderRoofOutline actId r = render $ getRoofLineMat $ getRoofActive r actId
+    where render m = traverse_ (flip renderLineWith m) (polyOutline $ r ^. _polygon)
+
+renderRoofOutlines :: forall e f. Traversable f => Maybe UUID -> f Roof -> Node e Unit
+renderRoofOutlines actId = traverse_ (renderRoofOutline actId)
+
+renderRoof :: Dynamic Boolean -> Dynamic (Maybe UUID) -> Roof -> Node HouseTextureInfo RoofEvents
+renderRoof enableDyn actIdDyn roof = do
     let poly  = roof ^. _polygon
         gable = canBeGable roof
 
-        render m = traverse_ (flip renderLineWith m) (polyOutline poly)
-    -- render the roof outline as white line
-    dynamic_ $ render <<< getRoofLineMat <$> actDyn
+        actDyn = getRoofActive roof <$> actIdDyn
 
     -- render the roof polygon
     m <- if roofState roof == Gable
