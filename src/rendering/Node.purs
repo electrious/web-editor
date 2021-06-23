@@ -17,6 +17,7 @@ import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Editor.Common.Lenses (_name, _parent, _position, _rotation, _scale)
 import Editor.Disposable (Disposee(..))
+import Editor.SceneEvent (setRaycastable)
 import Effect (Effect)
 import Effect.Class (class MonadEffect, liftEffect)
 import FRP.Dynamic (Dynamic, step, subscribeDyn)
@@ -136,8 +137,9 @@ setupProps prop o = do
     d3 <- subscribeDyn (prop ^. _scale) (flip setScale o)
     d4 <- subscribeDyn (prop ^. _visible) (flip setVisible o)
     d5 <- subscribeDyn (prop ^. _target) (traverse (flip lookAt o))
+    d6 <- subscribeDyn (prop ^. _visible) (setRaycastable o)
     
-    pure $ d1 *> d2 *> d3 *> d4 *> d5
+    pure $ d1 *> d2 *> d3 *> d4 *> d5 *> d6
 
 -- internal helper function to create node functions with node maker function
 mkNode :: forall e m. IsObject3D m => Props -> Effect m -> Node e m

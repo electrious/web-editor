@@ -168,3 +168,12 @@ userData = toObject3D >>> jsUserData
 -- | set a custom user Data string
 setUserData :: forall a. IsObject3D a => String -> a -> Effect Unit
 setUserData d o = jsSetUserData d (toObject3D o)
+
+foreign import jsEnableLayer :: Int -> Object3D -> Effect Unit
+foreign import jsDisableLayer :: Int -> Object3D -> Effect Unit
+
+enableLayer :: forall o. IsObject3D o => Int -> o -> Effect Unit
+enableLayer l o = jsEnableLayer l (toObject3D o)
+
+disableLayer :: forall o. IsObject3D o => Int -> o -> Effect Unit
+disableLayer l o = jsDisableLayer l (toObject3D o)

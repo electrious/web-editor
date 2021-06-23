@@ -27,7 +27,7 @@ import FRP.Event (Event, subscribe)
 import FRP.Event.Extra (debounce, multicast, performEvent)
 import Three.Core.Camera (class IsCamera)
 import Three.Core.Face3 (Face3)
-import Three.Core.Object3D (class IsObject3D, Object3D, toObject3D)
+import Three.Core.Object3D (class IsObject3D, Object3D, disableLayer, enableLayer, toObject3D)
 import Three.Core.Raycaster (Intersection, distance, face, intersectObject, mkRaycaster, object, point, setFromCamera)
 import Three.Math.Vector (Vector2, Vector3, mkVec2, mkVec3)
 
@@ -186,6 +186,19 @@ processDragObjects e objs = traverse doDrag target *> pure (f target)
             }
           f (Just _) = Nothing
           f Nothing  = Just e
+
+
+-- enable raycasting on a object by enabling the default layer 0
+enableRaycasting :: forall o. IsObject3D o => o -> Effect Unit
+enableRaycasting = enableLayer 0
+
+disableRaycasting :: forall o. IsObject3D o => o -> Effect Unit
+disableRaycasting = disableLayer 0
+
+setRaycastable :: forall o. IsObject3D o => o -> Boolean -> Effect Unit
+setRaycastable o true  = enableRaycasting o
+setRaycastable o false = disableRaycasting o
+
 
 newtype RaycastSetup = RaycastSetup {
     dragEvent  :: Event DragEvent,
