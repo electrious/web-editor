@@ -1,5 +1,6 @@
 module Three.Core.TypedArray where
 
+import Three.Core.Face3 (Face3)
 import Three.Math.Vector (Vector2, Vector3)
 
 class TypedArray a
@@ -13,3 +14,4 @@ instance typedArrayFloat32Array :: TypedArray Float32Array
 
 foreign import vector3Array :: Array Vector3 -> Float32Array
 foreign import vector2Array :: Array Vector2 -> Float32Array
+foreign import face3Array :: Array Face3 -> Uint16Array

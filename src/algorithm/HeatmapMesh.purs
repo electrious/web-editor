@@ -22,7 +22,8 @@ import Editor.Common.Lenses (_index, _position, _x, _y)
 import Effect (Effect)
 import Model.ShadePoint (ShadePoint, _intensity, mkShadePoint)
 import Three.Core.Face3 (Face3, indexA, indexB, indexC, mkFace3)
-import Three.Core.Geometry (Geometry, mkGeometry, setElementsNeedUpdate, setFaces, setUVs, setUVsNeedUpdate, setVertices, setVerticesNeedUpdate)
+import Three.Core.Geometry (BufferGeometry, mkBufferAttribute, mkBufferGeometry, setAttribute, setIndex)
+import Three.Core.TypedArray (face3Array, vector2Array, vector3Array)
 import Three.Math.Vector (Vector2, Vector3, mkVec2, mkVec3, vecX, vecY, (<->))
 import Three.Math.Vector as Vec
 
@@ -94,7 +95,7 @@ heatmapUVs = map (\sp -> let x = clamp 0.0 1.0 (sp ^. _intensity * 0.8 + 0.2)
 
 -- create new geometry for heatmap based on polygon and triangles from roofnode
 -- and shade points data
-createNewGeometry :: Array Vector3 -> Array Face3 -> Array ShadePoint -> Effect Geometry
+createNewGeometry :: Array Vector3 -> Array Face3 -> Array ShadePoint -> Effect BufferGeometry
 createNewGeometry polygon faces shadePs = do
     let polyShadePs  = shadePointsForVerts shadePs polygon
         ivs          = indexedVertices polygon
@@ -119,21 +120,22 @@ createNewGeometry polygon faces shadePs = do
                          v3 = triVertex3 tri
                      in mkFace3 (getIndex v1) (getIndex v2) (getIndex v3)
     newFaces <- traverse mkFace newTris
-        
+    
     -- calculate faceVertexUV correctly based on face and uvs
     let uvs = heatmapUVs shades
-        mkFaceUVs f = compact [uvs !! indexA f, uvs !! indexB f, uvs !! indexC f]
-        faceUVs = mkFaceUVs <$> newFaces
 
-    geo <- mkGeometry
-    
-    setVertices meshVerts geo
-    setVerticesNeedUpdate true geo
+    geo <- mkBufferGeometry
 
-    setFaces newFaces geo
-    setElementsNeedUpdate true geo
+    -- position
+    posAttr <- mkBufferAttribute (vector3Array meshVerts) 3
+    setAttribute "position" posAttr geo
 
-    setUVs faceUVs geo
-    setUVsNeedUpdate true geo
+    -- faces
+    fsAttr <- mkBufferAttribute (face3Array newFaces) 1
+    setIndex fsAttr geo
+
+    -- uv
+    uvAttr <- mkBufferAttribute (vector2Array uvs) 2
+    setAttribute "uv" uvAttr geo
 
     pure geo

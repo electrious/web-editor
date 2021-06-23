@@ -27,3 +27,18 @@ exports.vector2Array = vs => {
 
     return arr;
 }
+
+exports.face3Array = fs => {
+    let arr = new Uint16Array(fs.length * 3);
+
+    for (var i = 0; i < fs.length; i++) {
+        let f = fs[i];
+        let j = 3 * i;
+
+        arr[j] = f.a;
+        arr[j + 1] = f.b;
+        arr[j + 2] = f.c;
+    }
+
+    return arr;
+};

@@ -17,6 +17,41 @@ exports.setIndex = _ => idx => geo => _ => {
     geo.setIndex(idx);
 }
 
+
+exports.vertices = _ => geo => {
+    let attr = geo.getAttribute("position");
+    let arr = attr.array;
+
+    let al = arr.length / 3;
+    
+    let vs = new Array(al);
+
+    for (var i = 0; i < al; i++) {
+        let j = i * 3;
+        vs[i] = new three.Vector3(arr[j], arr[j + 1], arr[j + 2]);
+    }
+
+    return vs;
+};
+
+exports.faces = _ => geo => {
+    var attr = geo.getIndex();
+    let arr = attr.array;
+    let al = arr.length / 3;
+    let fs = new Array(al);
+
+    for (var i = 0; i < al; i++) {
+        let j = i * 3;
+        fs[i] = {
+            a: arr[j],
+            b: arr[j + 1],
+            c: arr[j + 2]
+        };
+    }
+
+    return fs;
+};
+
 exports.clone = _ => g => _ => {
     return g.clone()
 }

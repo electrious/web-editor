@@ -9,6 +9,7 @@ import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Effect (Effect)
+import Three.Core.Face3 (Face3)
 import Three.Core.TypedArray (class TypedArray)
 import Three.Math.Vector (Vector2, Vector3)
 
@@ -125,3 +126,7 @@ foreign import count :: BufferAttribute -> Int
 foreign import getX :: Int -> BufferAttribute -> Number
 foreign import getY :: Int -> BufferAttribute -> Number
 foreign import getZ :: Int -> BufferAttribute -> Number
+
+
+foreign import vertices :: forall geo. IsGeometry geo => geo -> Array Vector3
+foreign import faces :: forall geo. IsGeometry geo => geo -> Array Face3
