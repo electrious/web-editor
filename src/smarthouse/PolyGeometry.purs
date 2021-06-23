@@ -18,10 +18,13 @@ import Three.Math.Vector (class Vector, getVector, mkVec2, vecX, vecY)
 type PolyGeometry = BufferGeometry
 
 
-mkPolyGeometry :: forall v. Vector v => Polygon v -> Effect PolyGeometry
-mkPolyGeometry poly = do
+mkPolyGeometry :: forall v. Vector v => Polygon v -> v -> Effect PolyGeometry
+mkPolyGeometry poly norm = do
     let vs = getVector <$> (poly ^. _polyVerts)
         indices = triangulatePoly poly
+
+        nv = getVector norm
+        ns = const nv <$> vs
 
         mkUV v = mkVec2 0.0 0.0
         uvs = mkUV <$> vs
@@ -30,6 +33,9 @@ mkPolyGeometry poly = do
 
     posAttr <- mkBufferAttribute (vector3Array vs) 3
     setAttribute "position" posAttr geo
+
+    normAttr <- mkBufferAttribute (vector3Array ns) 3
+    setAttribute "normal" normAttr geo
 
     idxAttr <- mkBufferAttribute indices 1
     setIndex idxAttr geo

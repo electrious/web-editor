@@ -23,7 +23,7 @@ import Data.Traversable (class Traversable, traverse_)
 import Data.UUID (UUID, genUUID)
 import Data.UUIDMap (UUIDMap)
 import Data.UUIDMap as UM
-import Editor.Common.Lenses (_id, _name, _polygon, _shade, _tapped)
+import Editor.Common.Lenses (_id, _name, _normal, _polygon, _shade, _tapped)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
@@ -42,7 +42,7 @@ import SmartHouse.HouseTracer (lineMat, renderLineWith)
 import SmartHouse.PolyGeometry (mkPolyGeometry, mkPolyGeometryWithUV)
 import SmartHouse.ShadeOption (ShadeOption(..))
 import Smarthouse.Algorithm.Subtree (Subtree, _isGable)
-import Three.Core.Material (LineBasicMaterial, MeshBasicMaterial, mkLineBasicMaterial, mkMeshBasicMaterial, mkMeshBasicMaterialWithTexture)
+import Three.Core.Material (LineBasicMaterial, MeshPhongMaterial, mkLineBasicMaterial, mkMeshBasicMaterialWithTexture, mkMeshPhongMaterial)
 import Three.Math.Vector (Vector3, mkVec3, vecX, vecY, vecZ)
 
 data RoofState = SlopeRoof
@@ -55,7 +55,9 @@ newtype Roof = Roof {
     polygon  :: Polygon Vector3,
     subtrees :: UUIDMap Subtree,
 
-    shade    :: ShadeOption
+    shade    :: ShadeOption,
+
+    normal   :: Vector3
     }
 
 derive instance newtypeRoof :: Newtype Roof _
@@ -70,10 +72,10 @@ instance hasUUIDRoof :: HasUUID Roof where
 _subtrees :: forall t a r. Newtype t { subtrees :: a | r } => Lens' t a
 _subtrees = _Newtype <<< prop (SProxy :: SProxy "subtrees")
 
-createRoofFrom :: Polygon Vector3 -> Set Subtree -> Effect Roof
-createRoofFrom p ts = do
+createRoofFrom :: Polygon Vector3 -> Set Subtree -> Vector3 -> Effect Roof
+createRoofFrom p ts n = do
     i <- genUUID
-    pure $ Roof { id : i, polygon : p, subtrees : UM.fromSet ts, shade : NoShade }
+    pure $ Roof { id : i, polygon : p, subtrees : UM.fromSet ts, shade : NoShade, normal : n }
 
 -- check if a roof can be gable
 canBeGable :: Roof -> Boolean
@@ -159,7 +161,7 @@ renderRoof enableDyn actIdDyn roof = do
 
     -- render the roof polygon
     m <- if roofState roof == Gable
-         then renderGableRoof poly
+         then renderGableRoof poly (roof ^. _normal)
          else renderSlopeRoof poly
     let tapEvt      = multicast $ m ^. _tapped
 
@@ -170,13 +172,12 @@ renderRoof enableDyn actIdDyn roof = do
                # _flipped .~ multicast (compact $ const (subtreeIndex roof) <$> actTapEvt)
 
 
--- NOTE: MeshPhongMaterial doesn't work here in mobile Safari, though it works for the walls.
-gableMat :: MeshBasicMaterial
-gableMat = unsafePerformEffect $ mkMeshBasicMaterial 0x999999
+gableMat :: MeshPhongMaterial
+gableMat = unsafePerformEffect $ mkMeshPhongMaterial 0x999999
 
-renderGableRoof :: forall e. Polygon Vector3 -> Node e TappableMesh
-renderGableRoof poly = do
-    geo <- liftEffect $ mkPolyGeometry poly
+renderGableRoof :: forall e. Polygon Vector3 -> Vector3 -> Node e TappableMesh
+renderGableRoof poly norm = do
+    geo <- liftEffect $ mkPolyGeometry poly norm
     tapMesh (def # _name .~ "roof") geo gableMat
 
 renderSlopeRoof :: Polygon Vector3 -> Node HouseTextureInfo TappableMesh
