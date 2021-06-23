@@ -23,6 +23,9 @@ mkPolyGeometry poly = do
     let vs = getVector <$> (poly ^. _polyVerts)
         indices = triangulatePoly poly
 
+        mkUV v = mkVec2 0.0 0.0
+        uvs = mkUV <$> vs
+
     geo <- mkBufferGeometry
 
     posAttr <- mkBufferAttribute (vector3Array vs) 3
@@ -30,6 +33,9 @@ mkPolyGeometry poly = do
 
     idxAttr <- mkBufferAttribute indices 1
     setIndex idxAttr geo
+
+    uvAttr <- mkBufferAttribute (vector2Array uvs) 2
+    setAttribute "uv" uvAttr geo
     
     pure geo
 
