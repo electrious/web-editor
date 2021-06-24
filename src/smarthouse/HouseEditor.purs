@@ -49,6 +49,7 @@ import Rendering.DynamicNode (dynamic, dynamic_)
 import Rendering.Node (Node, fixNodeDWith, getEnv, getParent, localEnv, node, tapMesh)
 import SmartHouse.Algorithm.Edge (_line)
 import SmartHouse.Algorithm.LAV (_edges)
+import SmartHouse.BuilderMode (BuilderMode(..))
 import SmartHouse.HouseTracer (renderLine, renderLineWith)
 import SmartHouse.ShadeOption (ShadeOption)
 import Smarthouse.Algorithm.Subtree (_sinks, _source)
@@ -68,6 +69,7 @@ derive instance eqHouseRenderMode :: Eq HouseRenderMode
 
 newtype HouseEditorConf = HouseEditorConf {
     modeDyn        :: Dynamic ActiveMode,
+    builderModeDyn :: Dynamic BuilderMode,
     house          :: House,
 
     shadeSelected  :: Event ShadeOption,
@@ -80,12 +82,16 @@ derive instance newtypeHouseEditorConf :: Newtype HouseEditorConf _
 instance defaultHouseEditorConf :: Default HouseEditorConf where
     def = HouseEditorConf {
         modeDyn        : pure Inactive,
+        builderModeDyn : pure Building,
         house          : def,
         shadeSelected  : empty,
         
         roofsData      : empty,
         arrayEditParam : def
         }
+
+_builderModeDyn :: forall t a r. Newtype t { builderModeDyn :: a | r } => Lens' t a
+_builderModeDyn = _Newtype <<< prop (SProxy :: SProxy "builderModeDyn")
 
 _house :: forall t a r. Newtype t { house :: a | r } => Lens' t a
 _house = _Newtype <<< prop (SProxy :: SProxy "house")
@@ -137,7 +143,7 @@ editHouse houseCfg conf = do
                                      # _name     .~ "roofs") do
                 let roofsDyn = view _roofs <$> houseDyn
                 -- render roof outlines dynamically
-                dynamic_ $ renderRoofOutlines <$> actRoofDyn <*> roofsDyn
+                dynamic_ $ renderRoofOutlines <$> (conf ^. _builderModeDyn) <*> actRoofDyn <*> roofsDyn
 
                 -- render roofs dynamically
                 dynamic $ renderBuilderRoofs houseEditDyn actRoofDyn <$> roofsDyn

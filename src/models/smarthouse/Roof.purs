@@ -38,6 +38,7 @@ import Model.Roof.RoofPlate (Point, vec2Point)
 import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo, _size, _texture)
 import Model.UUID (class HasUUID, idLens)
 import Rendering.Node (Node, getEnv, tapMesh)
+import SmartHouse.BuilderMode (BuilderMode(..))
 import SmartHouse.HouseTracer (lineMat, renderLineWith)
 import SmartHouse.PolyGeometry (mkPolyGeometry, mkPolyGeometryWithUV)
 import SmartHouse.ShadeOption (ShadeOption(..))
@@ -149,8 +150,9 @@ renderRoofOutline :: forall e. Maybe UUID -> Roof -> Node e Unit
 renderRoofOutline actId r = render $ getRoofLineMat $ getRoofActive r actId
     where render m = traverse_ (flip renderLineWith m) (polyOutline $ r ^. _polygon)
 
-renderRoofOutlines :: forall e f. Traversable f => Maybe UUID -> f Roof -> Node e Unit
-renderRoofOutlines actId = traverse_ (renderRoofOutline actId)
+renderRoofOutlines :: forall e f. Traversable f => BuilderMode -> Maybe UUID -> f Roof -> Node e Unit
+renderRoofOutlines Building actId = traverse_ (renderRoofOutline actId)
+renderRoofOutlines Showing    _   = const (pure unit)
 
 renderRoof :: Dynamic Boolean -> Dynamic (Maybe UUID) -> Roof -> Node HouseTextureInfo RoofEvents
 renderRoof enableDyn actIdDyn roof = do
