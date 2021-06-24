@@ -247,7 +247,7 @@ renderPanels cfg content = do
 
     -- add panel layer dynamically only in array editing mode
     d <- liftEffect $ subscribeDyn modeDyn \m -> do
-             if m == ArrayEditing
+             if m == ArrayEditing || m == Showing
                  then add l content
                  else remove l content
     pure $ Tuple l d
