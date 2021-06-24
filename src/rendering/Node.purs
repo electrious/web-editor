@@ -7,7 +7,7 @@ import Control.Monad.Reader (class MonadAsk, class MonadReader, ReaderT, ask, lo
 import Control.Monad.Writer (class MonadTell, class MonadWriter, WriterT, runWriterT)
 import Custom.Mesh (DraggableMesh, TapDragMesh, TapMouseMesh, TappableMesh, mkDraggableMesh, mkTapDragMesh, mkTapMouseMesh, mkTappableMesh)
 import Data.Default (class Default, def)
-import Data.Lens (Lens', set, view, (^.))
+import Data.Lens (Lens', set, view, (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..))
@@ -92,7 +92,8 @@ newtype Props = Props {
     rotation      :: Dynamic Euler,
     scale         :: Dynamic Vector3,
     target        :: Dynamic (Maybe Vector3),
-    visible       :: Dynamic Boolean
+    visible       :: Dynamic Boolean,
+    raycastable   :: Dynamic Boolean
     }
 
 derive instance newtypeProps :: Newtype Props _
@@ -107,7 +108,8 @@ instance defaultProps :: Default Props where
         rotation      : pure def,
         scale         : pure (mkVec3 1.0 1.0 1.0),
         target        : pure Nothing,
-        visible       : pure true
+        visible       : pure true,
+        raycastable   : pure true
         }
 
 _castShadow :: forall t a r. Newtype t { castShadow :: a | r } => Lens' t a
@@ -122,6 +124,9 @@ _target = _Newtype <<< prop (SProxy :: SProxy "target")
 _visible :: forall t a r. Newtype t { visible :: a | r } => Lens' t a
 _visible = _Newtype <<< prop (SProxy :: SProxy "visible")
 
+_raycastable :: forall t a r. Newtype t { raycastable :: a | r } => Lens' t a
+_raycastable = _Newtype <<< prop (SProxy :: SProxy "raycastable")
+
 _renderOrder :: forall t a r. Newtype t { renderOrder :: a | r } => Lens' t a
 _renderOrder = _Newtype <<< prop (SProxy :: SProxy "renderOrder")
 
@@ -132,12 +137,17 @@ setupProps prop o = do
     setReceiveShadow (prop ^. _receiveShadow) o
     setRenderOrder   (prop ^. _renderOrder) o
 
+    
     d1 <- subscribeDyn (prop ^. _position) (flip setPosition o)
     d2 <- subscribeDyn (prop ^. _rotation) (flip setRotation o)
     d3 <- subscribeDyn (prop ^. _scale) (flip setScale o)
-    d4 <- subscribeDyn (prop ^. _visible) (flip setVisible o)
-    d5 <- subscribeDyn (prop ^. _target) (traverse (flip lookAt o))
-    d6 <- subscribeDyn (prop ^. _visible) (setRaycastable o)
+    d4 <- subscribeDyn (prop ^. _target) (traverse (flip lookAt o))
+
+    let visible = prop ^. _visible
+        castD   = prop ^. _raycastable
+
+    d5 <- subscribeDyn visible (flip setVisible o)
+    d6 <- subscribeDyn ((&&) <$> castD <*> visible) (setRaycastable o)
     
     pure $ d1 *> d2 *> d3 *> d4 *> d5 *> d6
 
@@ -171,10 +181,10 @@ mesh :: forall geo mat e. IsGeometry geo => IsMaterial mat => Props -> geo -> ma
 mesh prop geo mat = mkNode prop $ mkMesh geo mat
 
 line :: forall e mat. IsLineMaterial mat => Props -> Array Vector3 -> mat -> Node e Line
-line prop vs mat = mkNode prop $ mkLineGeometry vs >>= flip mkLine mat
+line prop vs mat = mkNode (prop # _raycastable .~ pure false) $ mkLineGeometry vs >>= flip mkLine mat
 
 dashLine :: forall e mat. IsLineMaterial mat => Props -> Array Vector3 -> mat -> Node e Line
-dashLine prop vs mat = mkNode prop do
+dashLine prop vs mat = mkNode (prop # _raycastable .~ pure false) do
     geo <- mkLineGeometry vs
     l <- mkLine geo mat
     computeLineDistances l

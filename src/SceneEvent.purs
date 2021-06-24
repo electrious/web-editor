@@ -190,10 +190,12 @@ processDragObjects e objs = traverse doDrag target *> pure (f target)
 
 -- enable raycasting on a object by enabling the default layer 0
 enableRaycasting :: forall o. IsObject3D o => o -> Effect Unit
-enableRaycasting = enableLayer 0
+enableRaycasting = enableLayer 0 *> disableLayer 1
 
+-- disable raycasting by disable layer 0 and enable layer 1, so it can still be
+-- visible to the camera, which is working on both layer 0 and 1.
 disableRaycasting :: forall o. IsObject3D o => o -> Effect Unit
-disableRaycasting = disableLayer 0
+disableRaycasting = disableLayer 0 *> enableLayer 1
 
 setRaycastable :: forall o. IsObject3D o => o -> Boolean -> Effect Unit
 setRaycastable o true  = enableRaycasting o
