@@ -19,7 +19,7 @@ import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, gateDyn, step)
 import FRP.Event (Event, gate)
 import FRP.Event.Extra (foldWithDef, multicast, performEvent)
-import Rendering.Node (Node, Props, _renderOrder, _visible, dragMesh, fixNodeE, getParent, node, tapDragMesh)
+import Rendering.Node (Node, Props, _raycastable, _renderOrder, _visible, dragMesh, fixNodeE, getParent, node, tapDragMesh)
 import Three.Core.Geometry (class IsGeometry, CircleGeometry, mkCircleGeometry)
 import Three.Core.Material (MeshBasicMaterial, doubleSide, mkMeshBasicMaterial, setOpacity, setSide, setTransparent)
 import Three.Core.Object3D (localToParent, parentToLocal, worldToLocal)
@@ -144,10 +144,11 @@ createDraggableObject cfg =
                                    ) (cfg ^. _customGeo) (cfg ^. _customMat)
 
                 -- create the invisible circle
-                let vis2Dyn = step false isDraggingEvt
+                let castable = step false isDraggingEvt
                 invCircle <- invisibleCircle (def # _name        .~ "invisible-circle"
                                                   # _position    .~ posDyn
-                                                  # _visible     .~ vis2Dyn
+                                                  # _visible     .~ pure false
+                                                  # _raycastable .~ castable
                                                   # _renderOrder .~ 10
                                              )
 

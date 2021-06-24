@@ -142,12 +142,8 @@ setupProps prop o = do
     d2 <- subscribeDyn (prop ^. _rotation) (flip setRotation o)
     d3 <- subscribeDyn (prop ^. _scale) (flip setScale o)
     d4 <- subscribeDyn (prop ^. _target) (traverse (flip lookAt o))
-
-    let visible = prop ^. _visible
-        castD   = prop ^. _raycastable
-
-    d5 <- subscribeDyn visible (flip setVisible o)
-    d6 <- subscribeDyn ((&&) <$> castD <*> visible) (setRaycastable o)
+    d5 <- subscribeDyn (prop ^. _visible) (flip setVisible o)
+    d6 <- subscribeDyn (prop ^. _raycastable) (setRaycastable o)
     
     pure $ d1 *> d2 *> d3 *> d4 *> d5 *> d6
 
