@@ -15,7 +15,7 @@ import Editor.Common.Lenses (_name, _position, _tapped)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, performDynamic, sampleDyn_)
 import FRP.Event (Event)
-import Rendering.Node (Node, _target, _visible, getParent, tapMesh)
+import Rendering.Node (Node, _raycastable, _target, _visible, getParent, tapMesh)
 import Three.Core.Geometry (CircleGeometry, mkCircleGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial)
 import Three.Core.Object3D (localToWorld)
@@ -57,11 +57,14 @@ createAdderMarker pDyn = do
 
         posDyn    = calcPos <$> pDyn
         targetDyn = performDynamic $ traverse calcTarget <$> pDyn
+
+        visDyn = isJust <$> pDyn
         
-    m <- tapMesh (def # _name     .~ "adder-marker"
-                      # _position .~ posDyn
-                      # _target   .~ targetDyn
-                      # _visible  .~ (isJust <$> pDyn)
+    m <- tapMesh (def # _name        .~ "adder-marker"
+                      # _position    .~ posDyn
+                      # _target      .~ targetDyn
+                      # _visible     .~ visDyn
+                      # _raycastable .~ visDyn
                  ) adderMarkerGeo adderMarkerMat
     pure $ compact $ sampleDyn_ pDyn $ m ^. _tapped
 

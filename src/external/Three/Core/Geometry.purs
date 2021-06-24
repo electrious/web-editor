@@ -10,28 +10,22 @@ import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Effect (Effect)
 import Three.Core.Face3 (Face3)
+import Three.Core.TypedArray (class TypedArray)
 import Three.Math.Vector (Vector2, Vector3)
 
 class IsGeometry geo
-class IsGeometry geo <= IsBufferGeometry geo
+
+foreign import data BufferGeometry :: Type
+instance isGeometryBufferGeometry :: IsGeometry BufferGeometry
+
+foreign import mkBufferGeometry :: Effect BufferGeometry
+
+foreign import setAttribute :: forall geo. IsGeometry geo => String -> BufferAttribute -> geo -> Effect Unit
+foreign import getAttribute :: forall geo. IsGeometry geo => String -> geo -> BufferAttribute
+foreign import setIndex :: forall geo. IsGeometry geo => BufferAttribute -> geo -> Effect Unit
+
 
 foreign import clone :: forall geo. IsGeometry geo => geo -> Effect geo
-
-foreign import data Geometry :: Type
-instance isGeometryGeometry :: IsGeometry Geometry
-
-foreign import mkGeometry :: Effect Geometry
-
-foreign import vertices :: forall geo. IsGeometry geo => geo -> Array Vector3
-foreign import setVertices :: forall geo. IsGeometry geo => Array Vector3 -> geo -> Effect Unit
-foreign import setVerticesNeedUpdate :: forall geo. IsGeometry geo => Boolean -> geo -> Effect Unit
-
-foreign import faces :: forall geo. IsGeometry geo => geo -> Array Face3
-foreign import setFaces :: forall geo. IsGeometry geo => Array Face3 -> geo -> Effect Unit
-foreign import setElementsNeedUpdate :: forall geo. IsGeometry geo => Boolean -> geo -> Effect Unit
-
-foreign import setUVs :: forall geo. IsGeometry geo => Array (Array Vector2) -> geo -> Effect Unit
-foreign import setUVsNeedUpdate :: forall geo. IsGeometry geo => Boolean -> geo -> Effect Unit
 
 foreign import computeVertexNormals :: forall geo. IsGeometry geo => geo -> Effect Unit
 
@@ -118,13 +112,10 @@ foreign import mkExtrudeGeometry :: Shape -> ExtrudeSettings -> Effect ExtrudeGe
 foreign import data LineGeometry :: Type
 foreign import mkLineGeometry :: Array Vector3 -> Effect LineGeometry
 
-foreign import data BufferGeometry :: Type
 foreign import data BufferAttribute :: Type
 
-instance isGeometryBufferGeometry :: IsGeometry BufferGeometry
-instance isBufferGeometryBufferGeometry :: IsBufferGeometry BufferGeometry
+foreign import mkBufferAttribute :: forall a. TypedArray a => a -> Int -> Effect BufferAttribute
 
-foreign import getAttribute :: forall geo. IsBufferGeometry geo => String -> geo -> BufferAttribute
 foreign import isBufferAttribute :: BufferAttribute -> Boolean
 
 foreign import setXYZ :: Int -> Number -> Number -> Number -> BufferAttribute -> Effect Unit
@@ -135,3 +126,7 @@ foreign import count :: BufferAttribute -> Int
 foreign import getX :: Int -> BufferAttribute -> Number
 foreign import getY :: Int -> BufferAttribute -> Number
 foreign import getZ :: Int -> BufferAttribute -> Number
+
+
+foreign import vertices :: forall geo. IsGeometry geo => geo -> Array Vector3
+foreign import faces :: forall geo. IsGeometry geo => geo -> Array Face3

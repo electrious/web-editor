@@ -1,44 +1,59 @@
 const three = require('three')
 const lines = require('three/examples/jsm/lines/LineGeometry')
 
-exports.clone = _ => g => _ => {
-    return g.clone()
+exports.mkBufferGeometry = _ => {
+    return new three.BufferGeometry();
 }
 
-exports.mkGeometry = _ => {
-    return new three.Geometry()
+exports.setAttribute = _ => name => attr => geo => _ => {
+    geo.setAttribute(name, attr);
 }
+
+exports.getAttribute = _ => name => geo => {
+    return geo.getAttribute(name);
+}
+
+exports.setIndex = _ => idx => geo => _ => {
+    geo.setIndex(idx);
+}
+
 
 exports.vertices = _ => geo => {
-    return geo.vertices
-}
+    let attr = geo.getAttribute("position");
+    let arr = attr.array;
 
-exports.setVertices = _ => vs => geo => _ => {
-    geo.vertices = vs
-}
+    let al = arr.length / 3;
+    
+    let vs = new Array(al);
 
-exports.setVerticesNeedUpdate = _ => u => geo => _ => {
-    geo.verticesNeedUpdate = u
-}
+    for (var i = 0; i < al; i++) {
+        let j = i * 3;
+        vs[i] = new three.Vector3(arr[j], arr[j + 1], arr[j + 2]);
+    }
+
+    return vs;
+};
 
 exports.faces = _ => geo => {
-    return geo.faces
-}
+    var attr = geo.getIndex();
+    let arr = attr.array;
+    let al = arr.length / 3;
+    let fs = new Array(al);
 
-exports.setFaces = _ => fs => geo => _ => {
-    geo.faces = fs
-}
+    for (var i = 0; i < al; i++) {
+        let j = i * 3;
+        fs[i] = {
+            a: arr[j],
+            b: arr[j + 1],
+            c: arr[j + 2]
+        };
+    }
 
-exports.setElementsNeedUpdate = _ => u => geo => _ => {
-    geo.elementsNeedUpdate = u
-}
+    return fs;
+};
 
-exports.setUVs = _ => uvs => geo => _ => {
-    geo.faceVertexUvs = [uvs]
-}
-
-exports.setUVsNeedUpdate = _ => u => geo => _ => {
-    geo.uvsNeedUpdate = u
+exports.clone = _ => g => _ => {
+    return g.clone()
 }
 
 exports.computeVertexNormals = _ => geo => _ => {
@@ -85,12 +100,13 @@ exports.mkLineGeometry = ps => _ => {
     return geo
 }
 
-exports.isBufferAttribute = attr => {
-    return attr instanceof three.BufferAttribute
+
+exports.mkBufferAttribute = _ => arr => s => _ => {
+    return new three.BufferAttribute(arr, s);
 }
 
-exports.getAttribute = _ => name => geo => {
-    return geo.getAttribute(name)
+exports.isBufferAttribute = attr => {
+    return attr instanceof three.BufferAttribute
 }
 
 exports.setXYZ = idx => x => y => z => attr => _ => {

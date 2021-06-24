@@ -18,8 +18,8 @@ import Math.Angle (degreeVal)
 import Model.Polygon (Polygon, polygonBBox, toPolygon)
 import Model.Roof.RoofPlate (RoofPlate)
 import RBush.RBush (BBox, RBush, load, mkRBush, search)
-import Three.Core.Geometry (class IsBufferGeometry, clone, getAttribute, isBufferAttribute, setNeedsUpdate, setXYZ)
-import Three.Core.Mesh (Mesh, setBufferGeometry)
+import Three.Core.Geometry (class IsGeometry, clone, getAttribute, isBufferAttribute, setNeedsUpdate, setXYZ)
+import Three.Core.Mesh (Mesh, setGeometry)
 import Three.Math.Vector (Vector2, Vector3, addScaled, angleBetween, mkVec2, vecX, vecY, vecZ, (<->), (<.>))
 
 
@@ -99,7 +99,7 @@ newtype FlattenedVertex = FlattenedVertex {
 derive instance newtypeFlattendVertex :: Newtype FlattenedVertex _
 
 -- | apply the flattened vertices to the BufferGeometry and return a new one
-applyFlattenedVertex :: forall geo. IsBufferGeometry geo => geo -> Array FlattenedVertex -> Effect geo
+applyFlattenedVertex :: forall geo. IsGeometry geo => geo -> Array FlattenedVertex -> Effect geo
 applyFlattenedVertex geo fvs = do
     newGeo <- clone geo
     let attr = getAttribute "position" newGeo
@@ -141,8 +141,8 @@ flattenRoofplate tree roof = flattenF <$> filter f candidates
 
 
 -- | flatten all roofplates
-flattenRoofPlates :: forall geo. IsBufferGeometry geo => geo -> RBush VertexItem -> Mesh -> Array RoofPlate -> Effect Unit
+flattenRoofPlates :: forall geo. IsGeometry geo => geo -> RBush VertexItem -> Mesh -> Array RoofPlate -> Effect Unit
 flattenRoofPlates geo tree house roofs = do
     let fvs = concatMap (flattenRoofplate tree) roofs
     newGeo <- applyFlattenedVertex geo fvs
-    setBufferGeometry newGeo house
+    setGeometry newGeo house

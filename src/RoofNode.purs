@@ -229,7 +229,7 @@ getNewRoof obj roof polyEvt = do
     let toParent v = applyMatrix (matrix obj) (mkVec3 (vecX v) (vecY v) 0.0)
     pure $ (RoofOpUpdate <<< flip updateRoofPlate roof <<< map toParent <<< view _polyVerts) <$> polyEvt
 
-renderPanels :: forall a. IsObject3D a => RoofNodeConfig -> a -> ArrayBuilder PanelLayer
+renderPanels :: forall a. IsObject3D a => RoofNodeConfig -> a -> ArrayBuilder (Tuple PanelLayer (Effect Unit))
 renderPanels cfg content = do
     l <- createPanelLayer (PanelLayerConfig {
                                 houseId         : cfg ^. _houseId,
@@ -242,8 +242,15 @@ renderPanels cfg content = do
                                 initPanels      : cfg ^. _initPanels,
                                 opacity         : cfg ^. _opacity
                             })
-    liftEffect $ add l content
-    pure l
+
+    modeDyn <- view _editorMode <$> ask
+
+    -- add panel layer dynamically only in array editing mode
+    d <- liftEffect $ subscribeDyn modeDyn \m -> do
+             if m == ArrayEditing
+                 then add l content
+                 else remove l content
+    pure $ Tuple l d
 
 evtInMaybe :: forall a b. (a -> Event b) -> Maybe a -> Event b
 evtInMaybe _ Nothing  = empty
@@ -279,7 +286,7 @@ createRoofNode cfg = do
     hmMat   <- view _heatmapMaterial <$> liftRenderingM ask
 
     -- render panels
-    panelLayer <- renderPanels cfg content
+    Tuple panelLayer d00 <- renderPanels cfg content
     
     let mode = cfg ^. _mode
         -- get the panel tap event on inactive roofs
@@ -338,7 +345,7 @@ createRoofNode cfg = do
             updated       : multicast newRoof,
             tapped        : multicast $ const roof <$> (roofTapEvt <|> roofTapOnPanelEvt),
             roofObject    : obj,
-            disposable    : sequence_ [dispose d0, d1, d2],
+            disposable    : sequence_ [d00, dispose d0, d1, d2],
             currentPanels : panelLayer ^. _currentPanels,
             serverUpdated : panelLayer ^. _serverUpdated,
             alignment     : map (map (view _alignment)) <$> roofSpecActArrEvt,

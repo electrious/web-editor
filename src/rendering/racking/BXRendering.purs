@@ -15,7 +15,7 @@ import Model.Racking.BX.Chassis (Chassis)
 import Rendering.Racking.BXChassisObj (bxChassisObjData)
 import Rendering.Renderable (class Renderable, render)
 import Renderring.MaterialLoader (blackMaterial)
-import Three.Core.Geometry (Geometry)
+import Three.Core.Geometry (BufferGeometry)
 import Three.Core.Mesh (Mesh, geometry, mkMesh)
 import Three.Core.Object3D (Object3D, add, mkObject3D, setCastShadow, setName, setPosition, setRotation, setScale)
 import Three.Loader.ObjLoader (makeOBJLoader, parseOBJ)
@@ -49,7 +49,7 @@ instance renderableChassis :: Renderable e ChassisRenderable Mesh where
         pure m
 
 
-chassisGeo :: String -> Geometry
+chassisGeo :: String -> BufferGeometry
 chassisGeo = memoize \_ -> unsafePerformEffect do
     loader <- makeOBJLoader
     let obj = parseOBJ bxChassisObjData loader

@@ -26,7 +26,7 @@ import FRP.Event.Extra (multicast)
 import Model.ActiveMode (ActiveMode(..), fromBoolean, isActive)
 import Model.Polygon (Polygon, _polyVerts, addVertexAt, delVertexAt, polyCenter, polyMidPoints, updateVertAt)
 import Rendering.DynamicNode (renderDynamic)
-import Rendering.Node (Node, _visible, fixNodeDWith, tapMesh)
+import Rendering.Node (Node, _raycastable, _visible, fixNodeDWith, tapMesh)
 import Three.Core.Geometry (CircleGeometry, mkCircleGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial)
 import Three.Math.Vector (class Vector, getVector, incX)
@@ -57,20 +57,26 @@ polyDelGeo = unsafePerformEffect (mkCircleGeometry 0.6 32)
 
 -- | create the polygon delete marker button
 mkPolyDelMarker :: forall e v. Vector v => Dynamic v -> Dynamic ActiveMode -> Node e TappableMesh
-mkPolyDelMarker posDyn actDyn = tapMesh (def # _name     .~ "delete-marker"
-                                             # _position .~ (getVector <$> posDyn)
-                                             # _visible  .~ (isActive <$> actDyn)
-                                        ) polyDelGeo polyDelMat
+mkPolyDelMarker posDyn actDyn = do
+    let act = isActive <$> actDyn
+    tapMesh (def # _name     .~ "delete-marker"
+                 # _position .~ (getVector <$> posDyn)
+                 # _visible  .~ act
+                 # _raycastable .~ act
+            ) polyDelGeo polyDelMat
 
 polyFinMat :: MeshBasicMaterial
 polyFinMat = unsafePerformEffect $ mkMeshBasicMaterial 0x22ff22
 
 -- | create a finish marker button
 mkPolyFinMarker :: forall e v. Vector v => Dynamic v -> Dynamic ActiveMode -> Node e TappableMesh
-mkPolyFinMarker posDyn actDyn = tapMesh (def # _name     .~ "finish-marker"
-                                             # _position .~ (getVector <$> posDyn)
-                                             # _visible  .~ (isActive <$> actDyn)
-                                        ) polyDelGeo polyFinMat
+mkPolyFinMarker posDyn actDyn = do
+    let act = isActive <$> actDyn
+    tapMesh (def # _name     .~ "finish-marker"
+                 # _position .~ (getVector <$> posDyn)
+                 # _visible  .~ act
+                 # _raycastable .~ act
+            ) polyDelGeo polyFinMat
 
 -- | given a list of vertices position, calculate all middle points
 midMarkerPoints :: forall v f. Vector v => Functor f => Dynamic ActiveMode -> f (Tuple Int v) -> f (MidMarkerPoint Int v)

@@ -16,7 +16,7 @@ import Data.Traversable (traverse)
 import Data.UUID (UUID)
 import Data.UUIDMap (UUIDMap)
 import Data.UUIDMap as UM
-import Editor.Common.Lenses (_height, _id)
+import Editor.Common.Lenses (_height, _id, _normal)
 import Effect (Effect)
 import Math.Angle (Angle, degreeVal, tan)
 import Math.LineSeg (LineSeg, _start, direction)
@@ -105,7 +105,7 @@ roofForEdge :: Angle -> RoofData -> Effect Roof
 roofForEdge slope rd = do
     let sorted = sortedNodes (rd ^. _edge) slope $ S.toUnfoldable $ rd ^. _subtrees
         nodes  = sorted <> rd ^. _edgeNodes
-    createRoofFrom (newPolygon nodes) (rd ^. _subtrees)
+    createRoofFrom (newPolygon nodes) (rd ^. _subtrees) (rd ^. _edge <<< _normal)
 
 
 procMerge :: Angle -> UUIDMap RoofData -> Subtree -> UUIDMap RoofData

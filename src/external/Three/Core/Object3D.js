@@ -135,3 +135,11 @@ exports.jsUserData = o => {
 exports.jsSetUserData = d => o => _ => {
     o.userData = d
 }
+
+exports.jsEnableLayer = l => o => _ => {
+    o.layers.enable(l);
+}
+
+exports.jsDisableLayer = l => o => _ => {
+    o.layers.disable(l);
+}

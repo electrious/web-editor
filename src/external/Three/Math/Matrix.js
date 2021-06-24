@@ -2,5 +2,5 @@ const three = require('three')
 
 exports.invert = m => {
     var n = new three.Matrix4()
-    return n.getInverse(m)
+    return n.copy(m).invert();
 }

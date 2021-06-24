@@ -36,7 +36,7 @@
     "google-protobuf": "^3.12.2",
     "rbush": "^3.0.1",
     "shamos-hoey": "^1.1.0",
-    "three": "^0.110.0",
+    "three": "^0.129.0",
     "uuid": "^8.3.1",
     "webpb": "https://github.com/electrious/webpb"
   }

@@ -21,9 +21,9 @@ import FRP.Dynamic (Dynamic, dynEvent, gateDyn)
 import FRP.Event (Event, sampleOn_)
 import FRP.Event.Extra (performEvent)
 import Model.ActiveMode (ActiveMode(..), isActive)
-import Rendering.Node (_visible, getParent, tapMesh)
+import Rendering.Node (_raycastable, _visible, getParent, tapMesh)
 import Rendering.NodeRenderable (class NodeRenderable)
-import Three.Core.Geometry (CircleGeometry, Geometry, mkCircleGeometry)
+import Three.Core.Geometry (BufferGeometry, CircleGeometry, mkCircleGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial)
 import Three.Math.Vector (class Vector, getVector, updateVector)
 import UI.DraggableObject (DragObjCfg, createDraggableObject, incZ)
@@ -82,7 +82,7 @@ instance nodeRenderableVertMarkerPoint :: Vector v => NodeRenderable e (VertMark
                       # _enabled  .~ enabled
                       # _position .~ (getVector $ m ^. _position)
             mod = m ^. _modifier <<< _modifierFunc
-        dragObj <- createDraggableObject (cfg :: DragObjCfg Geometry)
+        dragObj <- createDraggableObject (cfg :: DragObjCfg BufferGeometry)
         let posEvt   = performEvent $ (mod <<< updateVector (m ^. _position)) <$> dragObj ^. _position
             dragging = dragObj ^. _isDragging
         pure $ VertMarker {
@@ -137,9 +137,11 @@ midGeometry = unsafePerformEffect (mkCircleGeometry 0.3 32)
 instance nodeRenderableMidMarkerPoint :: Vector v => NodeRenderable e (MidMarkerPoint i v) (MidMarker i v) where
     render p = do
         parent <- getParent
+        let actDyn = isActive <$> p ^. _active
         m <- tapMesh (def # _name     .~ "mid-marker"
                           # _position .~ pure (incZ $ getVector $ p ^. _position)
-                          # _visible  .~ (isActive <$> p ^. _active)
+                          # _visible  .~ actDyn
+                          # _raycastable .~ actDyn
                      ) midGeometry midMaterial
         
         pure $ MidMarker { tapped : const p <$> gateDyn (p ^. _enabled) (m ^. _tapped) }

@@ -16,7 +16,7 @@ import Math.LineSeg (LineSeg, mkLineSeg)
 import Model.UUID (class HasUUID, idLens)
 import SmartHouse.Algorithm.Ray (Ray)
 import SmartHouse.Algorithm.VertInfo (VertInfo, _bisector)
-import Three.Math.Vector (Vector3)
+import Three.Math.Vector (Vector3, mkVec3, normal, vecX, vecY)
 
 newtype Edge = Edge {
     id            :: UUID,
@@ -24,7 +24,9 @@ newtype Edge = Edge {
     leftVertex    :: Vector3,
     rightVertex   :: Vector3,
     leftBisector  :: Ray,
-    rightBisector :: Ray
+    rightBisector :: Ray,
+
+    normal        :: Vector3  -- outward normal vector for an edge
     }
 
 derive instance newtypeEdge :: Newtype Edge _
@@ -58,11 +60,17 @@ edge lv rv = do
     i <- genUUID
     let lp = lv ^. _position
         rp = rv ^. _position
+
+        dx = vecX rp - vecX lp
+        dy = vecY rp - vecY lp
+
+        n = normal $ mkVec3 dy (-dx) 0.0
     pure $ Edge {
         id            : i,
         line          : mkLineSeg lp rp,
         leftVertex    : lp,
         rightVertex   : rp,
         leftBisector  : lv ^. _bisector,
-        rightBisector : rv ^. _bisector
+        rightBisector : rv ^. _bisector,
+        normal        : n
         }

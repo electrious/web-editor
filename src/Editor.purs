@@ -28,7 +28,7 @@ import Three.Controls.OrbitControls (OrbitControls, enableDamping, enableZoom, i
 import Three.Controls.OrbitControls as OrbitControls
 import Three.Core.Camera (class IsCamera, PerspectiveCamera, mkPerspectiveCamera, setAspect, updateProjectionMatrix)
 import Three.Core.Light (mkAmbientLight, mkDirectionalLight)
-import Three.Core.Object3D (class IsObject3D, Object3D, add, hasParent, lookAt, mkObject3D, parent, position, rotateOnWorldAxis, rotateZ, setDefaultUp, setName, setPosition, setRotation, translateX, translateY, worldToLocal)
+import Three.Core.Object3D (class IsObject3D, Object3D, add, enableLayer, hasParent, lookAt, mkObject3D, parent, position, rotateOnWorldAxis, rotateZ, setDefaultUp, setName, setPosition, setRotation, translateX, translateY, worldToLocal)
 import Three.Core.Scene (disposeScene, mkScene)
 import Three.Core.WebGLRenderer (domElement, mkWebGLRenderer, render, setSize)
 import Three.Math.Euler (mkEuler)
@@ -152,6 +152,9 @@ createEditor elem cfg = do
 
     scene    <- mkScene
     camera   <- mkPerspectiveCamera 45.0 (800.0 / 600.0) 0.1 1000.0
+    -- let camera work in both the default layer 0 and layer 1
+    enableLayer 1 camera
+    
     renderer <- mkWebGLRenderer
 
     -- function to update camera and renderer when resized

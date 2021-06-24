@@ -38,7 +38,7 @@ import Editor.PanelNode (PanelOpacity)
 import Editor.PanelOperation (ArrayOperation(..), PanelOperation(..))
 import Editor.Rendering.ButtonsRenderer (ButtonOperation(..), ButtonsRenderer, _plusDragged, _plusTapped, _rotTapped, mkButtonsRenderer)
 import Editor.Rendering.PanelRendering (PanelRenderer, PanelRendererConfig(..), _opacity, _operations, createPanelRenderer)
-import Editor.SceneEvent (isDrag, isDragEnd, isDragStart)
+import Editor.SceneEvent (disableRaycasting, isDrag, isDragEnd, isDragStart, setRaycastable)
 import Editor.UI.DragInfo (DragInfo, mkDragInfo)
 import Effect (Effect)
 import Effect.Class (liftEffect)
@@ -394,7 +394,7 @@ setupPanelDragging layer helper canDragArray = do
         dragEvt = gateDyn isDragging $ filter isDrag dEvt
 
     -- only enable the helper when user is actually dragging a panel
-    d <- subscribeDyn isDragging (flip setVisible helper)
+    d <- subscribeDyn isDragging (setRaycastable helper)
 
     let nLayer = layer # _arrayDragging .~ isDragging
                        # _disposable    %~ ((<*) d)
@@ -420,7 +420,7 @@ setupPlusBtnDragging layer helper canDragPlus = do
         dragEvt = gateDyn isDragging $ filter isDrag dEvt
     
     -- only enable the helper when user is actually dragging a panel
-    d <- subscribeDyn isDragging (flip setVisible helper)
+    d <- subscribeDyn isDragging (setRaycastable helper)
 
     let nLayer = layer # _plusDragging .~ isDragging
                        # _disposable   %~ ((<*) d)
@@ -810,5 +810,7 @@ mkDragHelper = do
     setCastShadow false m
     setRenderOrder 30 m
     setVisible false m
+
+    disableRaycasting m
 
     pure m

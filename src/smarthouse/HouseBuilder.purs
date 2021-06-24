@@ -54,7 +54,7 @@ import Rendering.Node (Node, fixNodeDWith, fixNodeE, fixNodeEWith, getEnv, getPa
 import Rendering.TextureLoader (textureFromUrl)
 import SmartHouse.ActiveRoofUI (_deleteHouse)
 import SmartHouse.BuilderMode (BuilderMode(..))
-import SmartHouse.HouseEditor (HouseRenderMode(..), _arrayEditParam, _house, _roofsData, editHouse, renderHouse)
+import SmartHouse.HouseEditor (HouseRenderMode(..), _arrayEditParam, _builderModeDyn, _house, _roofsData, editHouse, renderHouse)
 import SmartHouse.HouseTracer (TracerMode(..), _stopTracing, _tracedPolygon, _tracerMode, traceHouse)
 import SmartHouse.ShadeOption (ShadeOption)
 import SmartHouse.UI (_activeRoofDyn, _savingStepDyn, houseBuilderUI)
@@ -221,6 +221,7 @@ renderHouseDict actHouseDyn modeDyn houseCfg arrParam shadeEvt roofsDatEvt house
                      then do
                          let md = getMode h <$> actHouseDyn <*> modeDyn
                          editHouse houseCfg $ def # _modeDyn        .~ md
+                                                  # _builderModeDyn .~ modeDyn
                                                   # _house          .~ h
                                                   # _shadeSelected  .~ gateDyn (isActive <$> md) shadeEvt
                                                   # _roofsData      .~ roofsDatEvt
