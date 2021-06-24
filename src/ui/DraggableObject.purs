@@ -141,6 +141,7 @@ createDraggableObject cfg =
                 mesh <- visibleObj (def # _name     .~ "visible-obj"
                                         # _position .~ posDyn
                                         # _visible  .~ cfg ^. _isActive
+                                        # _raycastable .~ cfg ^. _isActive
                                    ) (cfg ^. _customGeo) (cfg ^. _customMat)
 
                 -- create the invisible circle
