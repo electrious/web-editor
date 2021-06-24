@@ -11,9 +11,7 @@ exports.exportObject = object => _ => {
         var inverseMatrixWorld = new THREE.Matrix4();
         inverseMatrixWorld.getInverse(object.matrixWorld.clone());
     
-      	
-	var mtlFileName = 'scene'; // maybe this value can be passed as parameter
-	output += 'mtllib ' + mtlFileName +  '.mtl\n';
+	output += 'mtllib scene.mtl\n';
 
 	var parseMesh = function ( mesh ) {
 
@@ -24,93 +22,86 @@ exports.exportObject = object => _ => {
 	    var geometry = mesh.geometry;
 	    var material = mesh.material;
             
-	    if ( geometry instanceof THREE.Geometry ) {
-
+            if (geometry instanceof THREE.BufferGeometry) {
+                // name of the mesh object
 		output += 'o ' + mesh.name + '\n';
-                
-		var vertices = geometry.vertices;
-                
-		for ( var i = 0, l = vertices.length; i < l; i ++ ) {
 
-                    // convert vertex to the roof 'object' coordinate system
-                    var vertex = object.worldToLocal(mesh.localToWorld(vertices[i].clone()));
+                var vertices = geometry.getAttribute('position');
+		var normals = geometry.getAttribute('normal');
+		var uvs = geometry.getAttribute('uv');
+		var indices = geometry.getIndex();
 
-		    output += 'v ' + vertex.x + ' ' + vertex.y + ' ' + vertex.z + '\n';
+                var vertex = new THREE.Vector3();
+		var normal = new THREE.Vector3();
+		var uv = new THREE.Vector2();
 
-		    nbVertex ++;
 
-		}
+                var i,
+		    j,
+		    l,
+		    m,
+                    v,
+		    face = [];
 
-		// uvs
+                // vertices
+                if (vertices !== undefined) {
+                    for (i = 0, l = vertices.count; i < l; i++) {
+                        vertex.x = vertices.getX(i);
+                        vertex.y = vertices.getY(i);
+                        vertex.z = vertices.getZ(i);
 
-		var faces = geometry.faces;
-		var faceVertexUvs = geometry.faceVertexUvs[ 0 ];
-		var hasVertexUvs = faces.length === faceVertexUvs.length;
+                        v = object.worldToLocal(mesh.localToWorld(vertex));
 
-		if ( hasVertexUvs ) {
+                        output += 'v ' + v.x + ' ' + v.y + ' ' + v.z + '\n';
 
-		    for ( var i = 0, l = faceVertexUvs.length; i < l; i ++ ) {
+                        nbVertex++;
+                    }
+                }
 
-			var vertexUvs = faceVertexUvs[ i ];
+                // uvs
 
-			for ( var j = 0, jl = vertexUvs.length; j < jl; j ++ ) {
-                            
-			    var uv = vertexUvs[ j ];
-                            
-			    output += 'vt ' + uv.x + ' ' + uv.y + '\n';
-                            
-			    nbVertexUvs ++;
+		if (uvs !== undefined) {
+                    
+		    for (i = 0, l = uvs.count; i < l; i++, nbVertexUvs++) {
 
-			}
+			uv.x = uvs.getX(i);
+			uv.y = uvs.getY(i);
+
+			// transform the uv to export format
+			output += 'vt ' + uv.x + ' ' + uv.y + '\n';
                         
 		    }
-                    
+
 		}
 
 		// normals
 
-                // get model matrix from mesh to object
-                var matrixToObject = new THREE.Matrix4();
-                matrixToObject.multiplyMatrices(mesh.matrixWorld, inverseMatrixWorld);
+		if (normals !== undefined) {
+
+                    // get model matrix from mesh to object
+                    var matrixToObject = new THREE.Matrix4();
+                    matrixToObject.multiplyMatrices(mesh.matrixWorld, inverseMatrixWorld);
                 
-		var normalMatrixWorld = new THREE.Matrix3();
-		normalMatrixWorld.getNormalMatrix( matrixToObject );
+		    var normalMatrixWorld = new THREE.Matrix3();
+		    normalMatrixWorld.getNormalMatrix( matrixToObject );
+                    
+		    for (i = 0, l = normals.count; i < l; i++, nbNormals++) {
 
-		for ( var i = 0, l = faces.length; i < l; i ++ ) {
+			normal.x = normals.getX(i);
+			normal.y = normals.getY(i);
+			normal.z = normals.getZ(i);
 
-		    var face = faces[ i ];
-		    var vertexNormals = face.vertexNormals;
+			// transfrom the normal to world space
+			normal.applyMatrix3(normalMatrixWorld);
 
-		    if ( vertexNormals.length === 3 ) {
-
-			for ( var j = 0, jl = vertexNormals.length; j < jl; j ++ ) {
-
-			    var normal = vertexNormals[ j ].clone();
-			    normal.applyMatrix3( normalMatrixWorld );
-
-			    output += 'vn ' + normal.x + ' ' + normal.y + ' ' + normal.z + '\n';
-
-			    nbNormals ++;
-
-			}
-
-		    } else {
-
-			var normal = face.normal.clone();
-			normal.applyMatrix3( normalMatrixWorld );
-
-			for ( var j = 0; j < 3; j ++ ) {
-
-			    output += 'vn ' + normal.x + ' ' + normal.y + ' ' + normal.z + '\n';
-
-			    nbNormals ++;
-
-			}
+			// transform the normal to export format
+			output += 'vn ' + normal.x + ' ' + normal.y + ' ' + normal.z + '\n';
 
 		    }
 
 		}
-                
+
+
 		// material
                 
 		if (material.name !== '')
@@ -120,24 +111,43 @@ exports.exportObject = object => _ => {
                 
 		materials[material.id] = material;
 
-		// faces
+                // faces
+                
+		if (indices !== null) {
 
+		    for (i = 0, l = indices.count; i < l; i += 3) {
 
-		for ( var i = 0, j = 1, l = faces.length; i < l; i ++, j += 3 ) {
+			for (m = 0; m < 3; m++) {
+                            
+			    j = indices.getX(i + m) + 1;
 
-		    var face = faces[ i ];
+			    face[m] = (indexVertex + j) + '/' + (uvs ? (indexVertexUvs + j) : '') + '/' + (indexNormals + j);
 
-		    output += 'f ';
-		    output += ( indexVertex + face.a + 1 ) + '/' + ( hasVertexUvs ? ( indexVertexUvs + j     ) : '' ) + '/' + ( indexNormals + j     ) + ' ';
-		    output += ( indexVertex + face.b + 1 ) + '/' + ( hasVertexUvs ? ( indexVertexUvs + j + 1 ) : '' ) + '/' + ( indexNormals + j + 1 ) + ' ';
-		    output += ( indexVertex + face.c + 1 ) + '/' + ( hasVertexUvs ? ( indexVertexUvs + j + 2 ) : '' ) + '/' + ( indexNormals + j + 2 ) + '\n';
+			}
+
+			// transform the face to export format
+			output += 'f ' + face.join(' ') + "\n";
+
+		    }
+
+		} else {
+
+		    for (i = 0, l = vertices.count; i < l; i += 3) {
+
+			for (m = 0; m < 3; m++) {
+
+			    j = i + m + 1;
+                            
+			    face[m] = (indexVertex + j) + '/' + (uvs ? (indexVertexUvs + j) : '') + '/' + (indexNormals + j);
+
+			}
+
+			// transform the face to export format
+			output += 'f ' + face.join(' ') + "\n";
+
+		    }
 
 		}
-
-	    } else {
-
-		console.warn( 'THREE.OBJExporter.parseMesh(): geometry type unsupported', mesh );
-		// TODO: Support only BufferGeometry and use use setFromObject()
 
 	    }
 
