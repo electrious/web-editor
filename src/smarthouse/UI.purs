@@ -24,7 +24,7 @@ import Specular.Dom.Element (attrsD, class_, classes, dynText, el)
 import Specular.Dom.Widget (Widget)
 import Specular.FRP as S
 import UI.Bridge (toUIDyn)
-import UI.ButtonPane (ButtonsPane, _showCloseDyn, _showResetDyn, _showSaveDyn, buttons)
+import UI.ButtonPane (ButtonsPane, _showCloseDyn, _showResetDyn, _showSaveDyn, _showUndoDyn, buttons)
 import UI.ConfirmDialog (dialogAttr)
 import UI.Utils (div, mkStyle, (:~))
 
@@ -94,6 +94,7 @@ houseBuilderUI cfg = do
         btns <- buttons $ def # _showSaveDyn  .~ showD
                               # _showCloseDyn .~ pure true
                               # _showResetDyn .~ showR
+                              # _showUndoDyn  .~ showR
 
         roofUIEvt <- activeRoofUI $ cfg ^. _activeRoofDyn
 

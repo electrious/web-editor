@@ -15,7 +15,7 @@ import Data.Lens (Lens', view, (%~), (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (List(..), head, (:))
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (Maybe(..), fromMaybe, isJust)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple(..), fst)
@@ -41,6 +41,7 @@ import Three.Math.Vector (Vector3, addScaled, dist, mkVec3, toVec2, toVec3)
 newtype HouseTracerConf = HouseTracerConf {
     modeDyn     :: Dynamic ActiveMode,
     mouseMove   :: Event SceneMouseMoveEvent,
+    undoTracing :: Event Unit,
     stopTracing :: Event Unit
     }
 
@@ -49,8 +50,12 @@ instance defaultHouseTracerConf :: Default HouseTracerConf where
     def = HouseTracerConf {
         modeDyn     : pure Active,
         mouseMove   : empty,
+        undoTracing : empty,
         stopTracing : empty
         }
+
+_undoTracing :: forall t a r. Newtype t { undoTracing :: a | r } => Lens' t a
+_undoTracing = _Newtype <<< prop (SProxy :: SProxy "undoTracing")
 
 _stopTracing :: forall t a r. Newtype t { stopTracing :: a | r } => Lens' t a
 _stopTracing = _Newtype <<< prop (SProxy :: SProxy "stopTracing")
@@ -70,14 +75,16 @@ fromBoolean false = Tracing
 -- result data type of the house tracer
 newtype TracerResult = TracerResult {
     tracedPolygon :: Event (Polygon Vector3),
-    tracerMode    :: Event TracerMode
+    tracerMode    :: Event TracerMode,
+    canUndo       :: Event Boolean
     }
 
 derive instance newtypeTracerResult :: Newtype TracerResult _
 instance defaultTracerResult :: Default TracerResult where
     def = TracerResult {
         tracedPolygon : empty,
-        tracerMode    : empty
+        tracerMode    : empty,
+        canUndo       : empty
         }
 
 _tracedPolygon :: forall t a r. Newtype t { tracedPolygon :: a | r } => Lens' t a
@@ -85,6 +92,9 @@ _tracedPolygon = _Newtype <<< prop (SProxy :: SProxy "tracedPolygon")
 
 _tracerMode :: forall t a r. Newtype t { tracerMode :: a | r } => Lens' t a
 _tracerMode = _Newtype <<< prop (SProxy :: SProxy "tracerMode")
+
+_canUndo :: forall t a r. Newtype t { canUndo :: a | r } => Lens' t a
+_canUndo = _Newtype <<< prop (SProxy :: SProxy "canUndo")
 
 -- internal state data
 newtype TracerState = TracerState {
@@ -119,6 +129,17 @@ addNewVert v s = case s ^. _firstVert of
     Nothing -> s # _tracedVerts %~ Cons v
                  # _firstVert   .~ Just v
                  # _tracerMode  .~ Tracing
+
+
+canUndo :: TracerState -> Boolean
+canUndo = isJust <<< head <<< view _tracedVerts
+
+undo :: TracerState -> TracerState
+undo s = case s ^. _tracedVerts of
+    Nil     -> s
+    (v:Nil) -> def
+    (v:ls)  -> s # _tracedVerts .~ ls
+
 
 resetTracer :: Unit -> TracerState -> TracerState
 resetTracer _ _ = def
@@ -350,6 +371,7 @@ traceHouse conf = node (def # _name    .~ "house-tracer"
         newVertEvt <- vertAdder conf stDyn
 
         let newStEvt = multicast $ sampleDyn stDyn $ (addNewVert <$> newVertEvt) <|>
+                                                     (const undo <$> conf ^. _undoTracing) <|>
                                                      (resetTracer <$> conf ^. _stopTracing)
 
             modeEvt = multicast $ view _tracerMode <$> stEvt
@@ -367,5 +389,6 @@ traceHouse conf = node (def # _name    .~ "house-tracer"
 
             res = def # _tracedPolygon .~ polyEvt
                       # _tracerMode    .~ modeEvt
+                      # _canUndo       .~ (canUndo <$> stEvt)
 
         pure { input: multicast (newStAfterFinishEvt <|> newStEvt), output: res }

@@ -55,14 +55,14 @@ import Rendering.TextureLoader (textureFromUrl)
 import SmartHouse.ActiveRoofUI (_deleteHouse)
 import SmartHouse.BuilderMode (BuilderMode(..))
 import SmartHouse.HouseEditor (HouseRenderMode(..), _arrayEditParam, _builderModeDyn, _house, _roofsData, editHouse, renderHouse)
-import SmartHouse.HouseTracer (TracerMode(..), _stopTracing, _tracedPolygon, _tracerMode, traceHouse)
+import SmartHouse.HouseTracer (TracerMode(..), _stopTracing, _tracedPolygon, _tracerMode, _undoTracing, traceHouse)
 import SmartHouse.ShadeOption (ShadeOption)
 import SmartHouse.UI (_activeRoofDyn, _savingStepDyn, houseBuilderUI)
 import Specular.Dom.Widget (runMainWidgetInNode)
 import Three.Core.Geometry (mkPlaneGeometry)
 import Three.Core.Material (mkMeshBasicMaterialWithTexture)
 import Three.Loader.TextureLoader (clampToEdgeWrapping, repeatWrapping, setRepeat, setWrapS, setWrapT, textureHeight, textureImageEvt, textureWidth)
-import UI.ButtonPane (_close, _reset, _save, _showResetDyn, _showSaveDyn)
+import UI.ButtonPane (_close, _reset, _save, _showResetDyn, _showSaveDyn, _undo)
 import UI.EditorUIOp (EditorUIOp(..))
 import UI.RoofEditorUI (_editorOp)
 import Unsafe.Coerce (unsafeCoerce)
@@ -235,6 +235,7 @@ tracerMode h Building = fromBoolean $ isNothing h
 
 newtype BuilderInputEvts = BuilderInputEvts {
     export        :: Event Unit,
+    undoTracing   :: Event Unit,
     stopTracing   :: Event Unit,
     shadeSelected :: Event ShadeOption,
     deleteHouse   :: Event Unit
@@ -244,6 +245,7 @@ derive instance newtypeBuilderInputEvts :: Newtype BuilderInputEvts _
 instance defaultBuilderInputEvts :: Default BuilderInputEvts where
     def = BuilderInputEvts {
         export        : empty,
+        undoTracing   : empty,
         stopTracing   : empty,
         shadeSelected : empty,
         deleteHouse   : empty
@@ -305,6 +307,7 @@ builderForHouse evts tInfo =
                     -- trace new house
                     traceRes <- traceHouse $ def # _modeDyn     .~ (tracerMode <$> actHouseDyn <*> modeDyn)
                                                  # _mouseMove   .~ helper ^. _mouseMove
+                                                 # _undoTracing .~ (evts ^. _undoTracing)
                                                  # _stopTracing .~ (evts ^. _stopTracing)
 
                     -- create house from the traced polygon
@@ -389,11 +392,13 @@ buildHouse editor cfg = do
     setMode editor EditorMode.HouseBuilding
     
     { event: expEvt, push: toExp } <- create
+    { event: undoTracingEvt, push: toUndoTracing } <- create
     { event: stopTracingEvt, push: toStopTracing } <- create
     { event: shadeEvt, push: selectShade } <- create
     { event: delHouseEvt, push: delHouse } <- create
 
     let inputEvts = def # _export        .~ expEvt
+                        # _undoTracing   .~ undoTracingEvt
                         # _stopTracing   .~ stopTracingEvt
                         # _shadeSelected .~ shadeEvt
                         # _deleteHouse   .~ delHouseEvt
@@ -410,6 +415,7 @@ buildHouse editor cfg = do
 
     void $ subscribe (const unit <$> uiEvts ^. _buttons <<< _save) toExp
     void $ subscribe (const unit <$> uiEvts ^. _buttons <<< _reset) toStopTracing
+    void $ subscribe (const unit <$> uiEvts ^. _buttons <<< _undo) toUndoTracing
     void $ subscribe (uiEvts ^. _shadeSelected) selectShade
     void $ subscribe (uiEvts ^. _deleteHouse) delHouse
 
