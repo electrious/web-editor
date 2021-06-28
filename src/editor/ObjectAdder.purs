@@ -48,12 +48,10 @@ adderMarkerGeo :: CircleGeometry
 adderMarkerGeo = unsafePerformEffect (mkCircleGeometry 1.0 32)
 
 -- the default blue circle marker
-blueMarker :: forall e. Dynamic Boolean -> Dynamic Vector3 -> Dynamic (Maybe Vector3) -> Node e Unit
-blueMarker visDyn posDyn targetDyn = void $ mesh (def # _name     .~ "blue-marker"
-                                                      # _visible  .~ visDyn
-                                                      # _position .~ posDyn
-                                                      # _target   .~ targetDyn
-                                                 ) adderMarkerGeo adderMarkerMat
+blueMarker :: forall e. Dynamic Boolean -> Node e Unit
+blueMarker visDyn = void $ mesh (def # _name    .~ "blue-marker"
+                                     # _visible .~ visDyn
+                                ) adderMarkerGeo adderMarkerMat
 
 
 whiteGeo :: BoxGeometry
@@ -81,16 +79,14 @@ blackOnWhiteLine rot = node (def # _name     .~ "cross-line"
                 ) blackGeo blackMat
 
 
-crossMarker :: forall e. Dynamic Boolean -> Dynamic Vector3 -> Dynamic (Maybe Vector3) -> Node e Unit
-crossMarker visDyn posDyn targetDyn  = node (def # _name     .~ "cross-marker"
-                                                 # _position .~ posDyn
-                                                 # _target   .~ targetDyn
-                                                 # _visible  .~ visDyn) do
+crossMarker :: forall e. Dynamic Boolean -> Node e Unit
+crossMarker visDyn = node (def # _name    .~ "cross-marker"
+                               # _visible .~ visDyn) do
     blackOnWhiteLine def
     blackOnWhiteLine (mkEuler 0.0 0.0 (pi / 2.0))
 
 
-createAdderMarker :: forall e v. Vector v => Dynamic (Maybe (CandidatePoint v)) -> (Dynamic Boolean -> Dynamic Vector3 -> Dynamic (Maybe Vector3) -> Node e Unit) -> Node e (Event (CandidatePoint v))
+createAdderMarker :: forall e v. Vector v => Dynamic (Maybe (CandidatePoint v)) -> (Dynamic Boolean -> Node e Unit) -> Node e (Event (CandidatePoint v))
 createAdderMarker pDyn marker = do
     parent <- getParent
 
@@ -108,14 +104,15 @@ createAdderMarker pDyn marker = do
 
         visDyn = isJust <$> pDyn
         
-    m <- tapMesh (def # _name        .~ "adder-marker"
-                      # _position    .~ posDyn
-                      # _target      .~ targetDyn
-                      # _visible     .~ pure false
-                      # _raycastable .~ visDyn
-                 ) adderMarkerGeo adderMarkerMat
-    -- the visible marker
-    marker visDyn posDyn targetDyn
+    m <- node (def # _name     .~ "adder-marker"
+                   # _position .~ posDyn
+                   # _target   .~ targetDyn
+              ) do
+        -- the visible marker
+        marker visDyn
+        tapMesh (def # _visible .~ pure false
+                     # _raycastable .~ visDyn
+                ) adderMarkerGeo adderMarkerMat
     
     pure $ compact $ sampleDyn_ pDyn $ m ^. _tapped
 
