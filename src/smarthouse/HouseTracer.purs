@@ -20,7 +20,7 @@ import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple(..), fst)
 import Editor.Common.Lenses (_face, _modeDyn, _mouseMove, _name, _parent, _point, _position)
-import Editor.ObjectAdder (createObjectAdder, mkCandidatePoint)
+import Editor.ObjectAdder (AdderType(..), createObjectAdder, mkCandidatePoint)
 import Editor.SceneEvent (SceneMouseMoveEvent)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, sampleDyn, step)
@@ -353,8 +353,8 @@ vertAdder conf stDyn = do
 
     -- render the object adder
     let opt = def # _name .~ "vert-adder"
-                  # _position .~ pure (mkVec3 0.0 0.0 0.2)
-    addedPntEvt <- node opt $ createObjectAdder newCandPDyn (isActive <$> conf ^. _modeDyn)
+                  # _position .~ pure (mkVec3 0.0 0.0 0.005)
+    addedPntEvt <- node opt $ createObjectAdder CrossAdder newCandPDyn (isActive <$> conf ^. _modeDyn)
     
     pure $ view _position <$> addedPntEvt
 
