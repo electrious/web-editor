@@ -353,7 +353,7 @@ vertAdder conf stDyn = do
 
     -- render the object adder
     let opt = def # _name .~ "vert-adder"
-                  # _position .~ pure (mkVec3 0.0 0.0 0.005)
+                  # _position .~ pure (mkVec3 0.0 0.0 0.01)
     addedPntEvt <- node opt $ createObjectAdder CrossAdder newCandPDyn (isActive <$> conf ^. _modeDyn)
     
     pure $ view _position <$> addedPntEvt
