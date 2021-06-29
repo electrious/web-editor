@@ -129,4 +129,4 @@ instance renderableStopper :: Renderable e StopperRenderable Mesh where
         pure m
 
 stopperCy :: CylinderGeometry
-stopperCy = unsafePerformEffect $ mkCylinderGeometry 0.02 0.036
+stopperCy = unsafePerformEffect $ mkCylinderGeometry 0.02 0.02 0.036 8

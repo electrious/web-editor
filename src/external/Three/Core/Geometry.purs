@@ -38,7 +38,7 @@ foreign import mkCircleGeometry :: Number -> Int -> Effect CircleGeometry
 instance isGeometryCircleGeometry :: IsGeometry CircleGeometry
 
 foreign import data CylinderGeometry :: Type
-foreign import mkCylinderGeometry :: Number -> Number -> Effect CylinderGeometry
+foreign import mkCylinderGeometry :: Number -> Number -> Number -> Int -> Effect CylinderGeometry
 instance isGeometryCylinderGeometry :: IsGeometry CylinderGeometry
 
 foreign import data ShapeGeometry :: Type

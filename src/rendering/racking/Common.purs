@@ -19,10 +19,10 @@ import Three.Math.Euler (mkEuler)
 import Three.Math.Vector (mkVec3)
 
 clampBodyCy :: CylinderGeometry
-clampBodyCy = unsafePerformEffect $ mkCylinderGeometry 0.005 0.06
+clampBodyCy = unsafePerformEffect $ mkCylinderGeometry 0.005 0.005 0.06 8
 
 clampHeadCy :: CylinderGeometry
-clampHeadCy = unsafePerformEffect $ mkCylinderGeometry 0.015 0.006
+clampHeadCy = unsafePerformEffect $ mkCylinderGeometry 0.015 0.015 0.006 8
 
 buildClamp :: Effect Object3D
 buildClamp = do
