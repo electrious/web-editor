@@ -78,7 +78,7 @@ dragArrow conf = do
         
         cfg = def # _isActive       .~ actDyn
                   # _customMat      .~ mat
-                  # _validator      .~ validator
+                  # _validator      .~ pure validator
                   # _deltaTransform .~ Just transF
                   # _rotation       .~ mkEuler (pi / 2.0) 0.0 0.0
     node (def # _position .~ posDyn
