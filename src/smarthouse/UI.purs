@@ -11,7 +11,7 @@ import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Editor.Common.Lenses (_buttons, _height, _shadeSelected, _width)
+import Editor.Common.Lenses (_buttons, _height, _roof, _shadeSelected, _width)
 import Editor.Editor (_sizeDyn)
 import Editor.SceneEvent (Size, size)
 import Effect.Class (liftEffect)
@@ -26,6 +26,7 @@ import Specular.FRP as S
 import UI.Bridge (toUIDyn)
 import UI.ButtonPane (ButtonsPane, _showCloseDyn, _showResetDyn, _showSaveDyn, _showUndoDyn, buttons)
 import UI.ConfirmDialog (dialogAttr)
+import UI.EditPane (editPane)
 import UI.Utils (div, mkStyle, (:~))
 
 newtype BuilderUIConf = BuilderUIConf {
@@ -96,8 +97,8 @@ houseBuilderUI cfg = do
                               # _showResetDyn .~ showR
                               # _showUndoDyn  .~ showR
 
-        roofUIEvt <- activeRoofUI $ cfg ^. _activeRoofDyn
+        editEvts <- editPane $ cfg ^. _activeRoofDyn
 
         pure $ def # _buttons       .~ btns
-                   # _shadeSelected .~ (roofUIEvt ^. _shadeSelected)
-                   # _deleteHouse   .~ (roofUIEvt ^. _deleteHouse)
+                   # _shadeSelected .~ (editEvts ^. _roof <<< _shadeSelected)
+                   # _deleteHouse   .~ (editEvts ^. _roof <<< _deleteHouse)

@@ -45,15 +45,7 @@ _deleteHouse = _Newtype <<< prop (SProxy :: SProxy "deleteHouse")
 
 activeRoofUIStyle :: Boolean -> Attrs
 activeRoofUIStyle d = mkStyle [
-    "position"       :~ "absolute",
-    "background"     :~ "white",
-    "width"          :~ "220px",
-    "top"            :~ "80px",
-    "right"          :~ "20px",
-    "padding"        :~ "5px",
-    "z-index"        :~ "10",
-    "pointer-events" :~ "auto",
-    "display"        :~ if d then "flex" else "none"
+    "display" :~ if d then "flex" else "none"
     ]
 
 
@@ -68,7 +60,7 @@ delButton =
 activeRoofUI :: Dynamic (Maybe Roof) -> Widget ActiveRoofUI
 activeRoofUI actRoofDyn = do
     styleD <- liftEffect $ toUIDyn $ activeRoofUIStyle <<< isJust <$> actRoofDyn
-    div [classes ["uk-flex", "uk-flex-column"],
+    div [classes ["uk-flex", "uk-flex-column", "uk-margin-top"],
          attrsD styleD] do
         selEvt <- shadeSelector $ map (view _shade) <$> actRoofDyn
         delEvt <- delButton
