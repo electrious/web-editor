@@ -29,7 +29,7 @@ import Data.Traversable (traverse)
 import Data.Tuple (fst)
 import Data.UUID (UUID)
 import Data.UUIDMap (UUIDMap)
-import Editor.Common.Lenses (_apiConfig, _buttons, _deleted, _height, _houseId, _leadId, _modeDyn, _mouseMove, _name, _panelType, _panels, _parent, _roofs, _shadeSelected, _tapped, _textureInfo, _updated, _width)
+import Editor.Common.Lenses (_apiConfig, _buttons, _height, _houseId, _leadId, _modeDyn, _mouseMove, _name, _panelType, _panels, _parent, _roofs, _shadeSelected, _tapped, _textureInfo, _updated, _width)
 import Editor.Editor (Editor, _sizeDyn, setMode)
 import Editor.EditorMode as EditorMode
 import Editor.HouseEditor (ArrayEditParam, HouseConfig, _dataServer, _heatmapTexture, _rotBtnTexture)
@@ -198,10 +198,6 @@ exportHouses hd = JSHouses { houses : fromFoldable $ M.values $ exportHouse <$> 
 -- get house update event from a list of house nodes
 getHouseUpd :: forall f. Foldable f => Functor f => f HouseNode -> Event HouseOp
 getHouseUpd = foldEvtWith (view _updated)
-
--- get house delete event from a list of house nodes
-getHouseDel :: forall f. Foldable f => Functor f => f HouseNode -> Event HouseOp
-getHouseDel = foldEvtWith (view _deleted)
 
 getActiveRoof :: forall f. Foldable f => Functor f => f HouseNode -> Event (Maybe Roof)
 getActiveRoof = foldEvtWith (view _activeRoof)
