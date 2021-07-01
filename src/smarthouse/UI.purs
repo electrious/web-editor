@@ -18,7 +18,7 @@ import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic)
 import FRP.Event (Event)
 import Model.SmartHouse.Roof (Roof)
-import SmartHouse.ActiveRoofUI (_deleteHouse, activeRoofUI)
+import SmartHouse.ActiveRoofUI (_deleteHouse)
 import SmartHouse.ShadeOption (ShadeOption)
 import Specular.Dom.Element (attrsD, class_, classes, dynText, el)
 import Specular.Dom.Widget (Widget)
@@ -26,7 +26,7 @@ import Specular.FRP as S
 import UI.Bridge (toUIDyn)
 import UI.ButtonPane (ButtonsPane, _showCloseDyn, _showResetDyn, _showSaveDyn, _showUndoDyn, buttons)
 import UI.ConfirmDialog (dialogAttr)
-import UI.EditPane (editPane)
+import UI.EditPane (_buildTree, editPane)
 import UI.Utils (div, mkStyle, (:~))
 
 newtype BuilderUIConf = BuilderUIConf {
@@ -57,7 +57,8 @@ _activeRoofDyn = _Newtype <<< prop (SProxy :: SProxy "activeRoofDyn")
 newtype BuilderUIEvents = BuilderUIEvents {
     buttons       :: ButtonsPane,
     shadeSelected :: Event ShadeOption,
-    deleteHouse   :: Event Unit
+    deleteHouse   :: Event Unit,
+    buildTree     :: Event Unit
     }
 
 derive instance newtypeBuilderUIEvents :: Newtype BuilderUIEvents _
@@ -65,7 +66,8 @@ instance defaultBuilderUIEvents :: Default BuilderUIEvents where
     def = BuilderUIEvents {
         buttons       : def,
         shadeSelected : empty,
-        deleteHouse   : empty
+        deleteHouse   : empty,
+        buildTree     : empty
         }
 
 savingStepDialog :: S.Dynamic SavingStep -> Widget Unit
@@ -102,3 +104,4 @@ houseBuilderUI cfg = do
         pure $ def # _buttons       .~ btns
                    # _shadeSelected .~ (editEvts ^. _roof <<< _shadeSelected)
                    # _deleteHouse   .~ (editEvts ^. _roof <<< _deleteHouse)
+                   # _buildTree     .~ (editEvts ^. _buildTree)

@@ -4,21 +4,24 @@ import Prelude
 
 import Control.Alt ((<|>))
 import Control.Alternative (empty)
+import Custom.Mesh (TappableMesh)
 import Data.Default (class Default, def)
 import Data.Lens (set, view, (.~), (^.))
 import Data.Maybe (Maybe(..))
 import Data.Meter (Meter, meter, meterVal)
 import Data.Newtype (class Newtype)
-import Editor.Common.Lenses (_height, _isActive, _name, _position, _rotation)
+import Editor.Common.Lenses (_height, _isActive, _name, _position, _rotation, _tapped, _updated)
 import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
-import FRP.Dynamic (Dynamic, distinctDyn, sampleDyn)
+import FRP.Dynamic (Dynamic, distinctDyn, latestEvt, sampleDyn)
 import FRP.Event (Event)
 import Math (pi)
 import Math.Line (_direction)
-import Model.SmartHouse.Tree (Tree, TreePart, _barrel, _canopy, _crown, _dia)
-import Rendering.DynamicNode (dynamic_)
-import Rendering.Node (Node, _renderOrder, fixNodeDWith, mesh)
+import Model.ActiveMode (ActiveMode)
+import Model.SmartHouse.Tree (Tree, TreeNode, TreeOp(..), TreePart, _barrel, _canopy, _crown, _dia)
+import Model.UUID (idLens)
+import Rendering.DynamicNode (dynamic)
+import Rendering.Node (Node, _renderOrder, fixNodeDWith, tapMesh)
 import Three.Core.Geometry (BufferGeometry, mkCylinderGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial, setOpacity)
 import Three.Math.Euler (mkEuler)
@@ -37,18 +40,21 @@ leafMat :: MeshBasicMaterial
 leafMat = unsafePerformEffect $ mkMeshBasicMaterial 0x3cb200
 
 
-buildTrunk :: forall e. Dynamic Meter -> Node e Unit
-buildTrunk = dynamic_ <<< map mkT
+getTapEvt :: TappableMesh -> Event Unit
+getTapEvt = map (const unit) <<< view _tapped
+
+buildTrunk :: forall e. Dynamic Meter -> Node e (Event Unit)
+buildTrunk = map latestEvt <<< dynamic <<< map mkT
     where mkT h = do let ht = meterVal h * 0.8
                      geo <- liftEffect $ mkCylinderGeometry 0.1 0.1 ht 20
-                     mesh (def # _name        .~ "tree-trunk"
-                               # _position    .~ pure (mkVec3 0.0 0.0 (ht / 2.0))
-                               # _renderOrder .~ 6
-                          ) geo trunkMat
+                     getTapEvt <$> tapMesh (def # _name        .~ "tree-trunk"
+                                                # _position    .~ pure (mkVec3 0.0 0.0 (ht / 2.0))
+                                                # _renderOrder .~ 6
+                                           ) geo trunkMat
 
 
-buildCrown :: forall e. Dynamic Meter -> Dynamic TreePart -> Node e Unit
-buildCrown hDyn crownDyn = dynamic_ $ mkC <$> hDyn <*> crownDyn
+buildCrown :: forall e. Dynamic Meter -> Dynamic TreePart -> Node e (Event Unit)
+buildCrown hDyn crownDyn = latestEvt <$> dynamic (mkC <$> hDyn <*> crownDyn)
     where mkC height c = do
               let th = meterVal height
                   ch = meterVal $ c ^. _height
@@ -59,15 +65,15 @@ buildCrown hDyn crownDyn = dynamic_ $ mkC <$> hDyn <*> crownDyn
                   pos = mkVec3 0.0 0.0 (ch + h / 2.0)
                   
               geo <- liftEffect $ mkCylinderGeometry 0.0 cd h 20
-              mesh (def # _name        .~ "tree-crown"
-                        # _position    .~ pure pos
-                        # _renderOrder .~ 9
-                   ) geo leafMat
+              getTapEvt <$> tapMesh (def # _name        .~ "tree-crown"
+                                         # _position    .~ pure pos
+                                         # _renderOrder .~ 9
+                                    ) geo leafMat
 
 
 -- build the tree barrel part
-buildBarrel :: forall e. Dynamic TreePart -> Dynamic TreePart -> Node e Unit
-buildBarrel crownDyn barrelDyn = dynamic_ $ mkB <$> crownDyn <*> barrelDyn
+buildBarrel :: forall e. Dynamic TreePart -> Dynamic TreePart -> Node e (Event Unit)
+buildBarrel crownDyn barrelDyn = latestEvt <$> dynamic (mkB <$> crownDyn <*> barrelDyn)
     where mkB c b = do
               let ch = meterVal $ c ^. _height
                   cd = meterVal $ c ^. _dia
@@ -79,15 +85,15 @@ buildBarrel crownDyn barrelDyn = dynamic_ $ mkB <$> crownDyn <*> barrelDyn
                   pos = mkVec3 0.0 0.0 (bh + h / 2.0)
                   
               geo <- liftEffect $ mkCylinderGeometry cd bd h 20
-              mesh (def # _name        .~ "tree-barrel"
-                        # _position    .~ pure pos
-                        # _renderOrder .~ 8
-                   ) geo leafMat
+              getTapEvt <$> tapMesh (def # _name        .~ "tree-barrel"
+                                         # _position    .~ pure pos
+                                         # _renderOrder .~ 8
+                                    ) geo leafMat
 
 
 -- build the tree canopy part
-buildCanopy :: forall e. Dynamic TreePart -> Dynamic TreePart -> Node e Unit
-buildCanopy barrelDyn canopyDyn = dynamic_ $ mkC <$> barrelDyn <*> canopyDyn
+buildCanopy :: forall e. Dynamic TreePart -> Dynamic TreePart -> Node e (Event Unit)
+buildCanopy barrelDyn canopyDyn = latestEvt <$> dynamic (mkC <$> barrelDyn <*> canopyDyn)
     where mkC b c = do
               let bh = meterVal $ b ^. _height
                   bd = meterVal $ b ^. _dia
@@ -99,10 +105,10 @@ buildCanopy barrelDyn canopyDyn = dynamic_ $ mkC <$> barrelDyn <*> canopyDyn
                   pos = mkVec3 0.0 0.0 (ch + h / 2.0)
                   
               geo <- liftEffect $ mkCylinderGeometry bd cd h 20
-              mesh (def # _name        .~ "tree-canopy"
-                        # _position    .~ pure pos
-                        # _renderOrder .~ 7
-                   ) geo leafMat
+              getTapEvt <$> tapMesh (def # _name        .~ "tree-canopy"
+                                         # _position    .~ pure pos
+                                         # _renderOrder .~ 7
+                                    ) geo leafMat
 
 
 heightBtn :: forall e. Tree -> Dynamic TreePart -> Node e (Event Meter)
@@ -148,25 +154,27 @@ canopyBtn tree barrelDyn = buildTreeDragBtn cfg
                     # _validator .~ (validF <$> barrelDyn)
 
 
-editTree :: forall e. Tree -> Node e Unit
-editTree tree = fixNodeDWith tree \treeDyn -> do
+editTree :: forall e. Tree -> Dynamic ActiveMode -> Node e TreeNode
+editTree tree actDyn = fixNodeDWith tree \treeDyn -> do
 
     let hDyn      = distinctDyn $ view _height <$> treeDyn
         crownDyn  = distinctDyn $ view _crown <$> treeDyn
         barrelDyn = distinctDyn $ view _barrel <$> treeDyn
         canopyDyn = distinctDyn $ view _canopy <$> treeDyn
 
-    buildTrunk hDyn
-    buildCrown hDyn crownDyn
-    buildBarrel crownDyn barrelDyn
-    buildCanopy barrelDyn canopyDyn
+    tapTrunkEvt  <- buildTrunk hDyn
+    tapCrownEvt  <- buildCrown hDyn crownDyn
+    tapBarrelEvt <- buildBarrel crownDyn barrelDyn
+    tapCanopyEvt <- buildCanopy barrelDyn canopyDyn
 
     hEvt       <- heightBtn tree canopyDyn
     crownEvts  <- crownBtn tree hDyn barrelDyn
     barrelEvts <- barrelBtn tree crownDyn canopyDyn
     canopyEvts <- canopyBtn tree barrelDyn
 
-    let updEvt = (set _height               <$> hEvt)                  <|>
+    let tapEvt = tapTrunkEvt <|> tapCrownEvt <|> tapBarrelEvt <|> tapCanopyEvt
+
+        updEvt = (set _height               <$> hEvt)                  <|>
                  (set (_crown  <<< _height) <$> crownEvts  ^. _height) <|>
                  (set (_crown  <<< _dia)    <$> crownEvts  ^. _dia)    <|>
                  (set (_barrel <<< _height) <$> barrelEvts ^. _height) <|>
@@ -175,8 +183,13 @@ editTree tree = fixNodeDWith tree \treeDyn -> do
                  (set (_canopy <<< _dia)    <$> canopyEvts ^. _dia)
                  
         treeEvt = sampleDyn treeDyn updEvt
+
+        opEvt = TreeOpUpdate <$> treeEvt
     
-    pure { input: treeEvt, output : unit }
+        tn = def # _tapped  .~ (const (tree ^. idLens) <$> tapEvt)
+                 # _updated .~ opEvt
+
+    pure { input: treeEvt, output : tn }
 
 
 

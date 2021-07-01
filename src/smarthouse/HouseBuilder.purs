@@ -63,6 +63,7 @@ import Three.Core.Geometry (mkPlaneGeometry)
 import Three.Core.Material (mkMeshBasicMaterialWithTexture)
 import Three.Loader.TextureLoader (clampToEdgeWrapping, repeatWrapping, setRepeat, setWrapS, setWrapT, textureHeight, textureImageEvt, textureWidth)
 import UI.ButtonPane (_close, _reset, _save, _showResetDyn, _showSaveDyn, _undo)
+import UI.EditPane (_buildTree)
 import UI.EditorUIOp (EditorUIOp(..))
 import UI.RoofEditorUI (_editorOp)
 import Unsafe.Coerce (unsafeCoerce)
@@ -238,7 +239,8 @@ newtype BuilderInputEvts = BuilderInputEvts {
     undoTracing   :: Event Unit,
     stopTracing   :: Event Unit,
     shadeSelected :: Event ShadeOption,
-    deleteHouse   :: Event Unit
+    deleteHouse   :: Event Unit,
+    buildTree     :: Event Unit
     }
 
 derive instance newtypeBuilderInputEvts :: Newtype BuilderInputEvts _
@@ -248,7 +250,8 @@ instance defaultBuilderInputEvts :: Default BuilderInputEvts where
         undoTracing   : empty,
         stopTracing   : empty,
         shadeSelected : empty,
-        deleteHouse   : empty
+        deleteHouse   : empty,
+        buildTree     : empty
         }
 
 _export :: forall t a r. Newtype t { export :: a | r } => Lens' t a
@@ -396,12 +399,14 @@ buildHouse editor cfg = do
     { event: stopTracingEvt, push: toStopTracing } <- create
     { event: shadeEvt, push: selectShade } <- create
     { event: delHouseEvt, push: delHouse } <- create
+    { event: treeEvt, push: buildTree } <- create
 
     let inputEvts = def # _export        .~ expEvt
                         # _undoTracing   .~ undoTracingEvt
                         # _stopTracing   .~ stopTracingEvt
                         # _shadeSelected .~ shadeEvt
                         # _deleteHouse   .~ delHouseEvt
+                        # _buildTree     .~ treeEvt
 
     res <- fst <$> runNode (createHouseBuilder inputEvts) (mkNodeEnv editor cfg)
     let parentEl = unsafeCoerce $ editor ^. _parent
@@ -418,5 +423,6 @@ buildHouse editor cfg = do
     void $ subscribe (const unit <$> uiEvts ^. _buttons <<< _undo) toUndoTracing
     void $ subscribe (uiEvts ^. _shadeSelected) selectShade
     void $ subscribe (uiEvts ^. _deleteHouse) delHouse
+    void $ subscribe (uiEvts ^. _buildTree) buildTree
 
     pure $ res # _editorOp .~ (const Close <$> uiEvts ^. _buttons <<< _close)

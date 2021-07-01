@@ -2,6 +2,7 @@ module Model.SmartHouse.Tree where
 
 import Prelude
 
+import Control.Plus (empty)
 import Data.Default (class Default, def)
 import Data.Lens (Lens', (.~))
 import Data.Lens.Iso.Newtype (_Newtype)
@@ -12,6 +13,7 @@ import Data.Symbol (SProxy(..))
 import Data.UUID (UUID, emptyUUID, genUUID)
 import Editor.Common.Lenses (_height, _id, _position)
 import Effect (Effect)
+import FRP.Event (Event)
 import Model.UUID (class HasUUID)
 import Three.Math.Vector (Vector3)
 
@@ -44,6 +46,7 @@ newtype Tree = Tree {
 
 
 derive instance newtypeTree :: Newtype Tree _
+derive instance eqTree :: Eq Tree
 instance hasUUIDTree :: HasUUID Tree where
     idLens = _id
 instance defaultTree :: Default Tree where
@@ -75,3 +78,25 @@ mkTree p = do
     i <- genUUID
     pure $ def # _id .~ i
                # _position .~ p
+
+
+data TreeOp = TreeOpCreate Tree
+            | TreeOpDelete UUID
+            | TreeOpUpdate Tree
+derive instance eqTreeOp :: Eq TreeOp
+
+newtype TreeNode = TreeNode {
+    id      :: UUID,
+    tapped  :: Event UUID,
+    updated :: Event TreeOp
+}
+
+derive instance newtypeTreeNode :: Newtype TreeNode _
+instance hasUUIDTreeNode :: HasUUID TreeNode where
+    idLens = _id
+instance defaultTreeNode :: Default TreeNode where
+    def = TreeNode {
+        id      : emptyUUID,
+        tapped  : empty,
+        updated : empty
+    }
