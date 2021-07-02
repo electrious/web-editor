@@ -22,11 +22,11 @@ import Model.SmartHouse.Tree (Tree, TreeNode, TreeOp(..), TreePart, _barrel, _ca
 import Model.UUID (idLens)
 import Rendering.DynamicNode (dynamic)
 import Rendering.Node (Node, _renderOrder, fixNodeDWith, tapMesh)
-import Three.Core.Geometry (BufferGeometry, mkCylinderGeometry)
+import Three.Core.Geometry (BufferGeometry, CircleGeometry, mkCircleGeometry, mkCylinderGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial, setOpacity)
 import Three.Math.Euler (mkEuler)
 import Three.Math.Vector (Vector3, mkVec3, vecX, vecY, vecZ)
-import UI.DraggableObject (DragObjCfg, _deltaTransform, _validator, createDraggableObject)
+import UI.DraggableObject (DragObjCfg, _customGeo, _deltaTransform, _validator, createDraggableObject)
 
 
 trunkMat :: MeshBasicMaterial
@@ -201,7 +201,7 @@ data DragDirection = XZ
                    | ZOnly
 
 derive instance eqDragDirection :: Eq DragDirection
-                     
+
 newtype TreeDragBtn = TreeDragBtn {
     height    :: Meter,
     dia       :: Meter,
@@ -255,15 +255,20 @@ buildTreeDragBtn actDyn cfg = do
                # _dia    .~ (meter <<< vecX <$> posEvt)
 
 
+-- big button to drag the tree around
+posBtnGeo :: CircleGeometry
+posBtnGeo = unsafePerformEffect $ mkCircleGeometry 2.0 30
+
 -- button to move the tree around
 buildTreePosBtn :: forall e. Dynamic Boolean -> Node e (Event Vector3)
 buildTreePosBtn actDyn = do
     let transF v = mkVec3 (vecX v) (vecY v) 0.0
 
-        dragCfg :: DragObjCfg BufferGeometry
+        dragCfg :: DragObjCfg CircleGeometry
         dragCfg = def # _isActive       .~ actDyn
                       # _position       .~ def
                       # _deltaTransform .~ Just transF
+                      # _customGeo      .~ Just posBtnGeo
 
     btn <- createDraggableObject dragCfg
     pure $ transF <$> btn ^. _position

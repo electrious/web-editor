@@ -4,6 +4,8 @@ import Prelude
 
 import Control.Plus (empty)
 import Data.Default (class Default, def)
+import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Show (genericShow)
 import Data.Lens (Lens', (.~))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
@@ -23,12 +25,16 @@ newtype TreePart = TreePart {
     }
 
 derive instance newtypeTreepart :: Newtype TreePart _
+derive instance genericTreePart :: Generic TreePart _
 derive instance eqTreePart :: Eq TreePart
 instance defaultTreePart :: Default TreePart where
     def = TreePart {
         height : def,
         dia    : def
         }
+instance showTreePart :: Show TreePart where
+    show = genericShow
+
 
 _dia :: forall t a r. Newtype t { dia :: a | r } => Lens' t a
 _dia = _Newtype <<< prop (SProxy :: SProxy "dia")
@@ -46,9 +52,12 @@ newtype Tree = Tree {
 
 
 derive instance newtypeTree :: Newtype Tree _
+derive instance genericTree :: Generic Tree _
 derive instance eqTree :: Eq Tree
 instance hasUUIDTree :: HasUUID Tree where
     idLens = _id
+instance showTree :: Show Tree where
+    show = genericShow
 instance defaultTree :: Default Tree where
     def = Tree {
         id       : emptyUUID,

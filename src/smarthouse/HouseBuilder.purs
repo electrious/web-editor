@@ -44,9 +44,10 @@ import Math.Angle (degree)
 import Model.ActiveMode (ActiveMode(..), fromBoolean, isActive)
 import Model.Hardware.PanelTextureInfo (PanelTextureInfo)
 import Model.Hardware.PanelType (PanelType(..))
-import Model.SmartHouse.House (House, HouseNode, HouseOp(..), JSHouses(..), _activeRoof, createHouseFrom, exportHouse, houseTapped)
+import Model.SmartHouse.House (House, HouseNode, HouseOp(..), JSHouses(..), _activeRoof, _trees, createHouseFrom, exportHouse, houseTapped)
 import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo, _imageFile, _size, _texture, mkHouseTextureInfo)
 import Model.SmartHouse.Roof (Roof)
+import Model.SmartHouse.Tree (Tree, TreeNode, TreeOp(..))
 import Model.UUID (idLens)
 import OBJExporter (MeshFiles, exportObject)
 import Rendering.DynamicNode (eventNode)
@@ -57,6 +58,7 @@ import SmartHouse.BuilderMode (BuilderMode(..))
 import SmartHouse.HouseEditor (HouseRenderMode(..), _arrayEditParam, _builderModeDyn, _house, _roofsData, editHouse, renderHouse)
 import SmartHouse.HouseTracer (TracerMode(..), _stopTracing, _tracedPolygon, _tracerMode, _undoTracing, traceHouse)
 import SmartHouse.ShadeOption (ShadeOption)
+import SmartHouse.TreeBuilder (editTree)
 import SmartHouse.UI (_activeRoofDyn, _savingStepDyn, houseBuilderUI)
 import Specular.Dom.Widget (runMainWidgetInNode)
 import Three.Core.Geometry (mkPlaneGeometry)
@@ -153,12 +155,15 @@ mkHelperPlane t = do
 
     tapMouseMesh (def # _name .~ "helper-plane") geo mat
 
--- internal data structure to manage houses
+-- internal data structure to manage houses and trees
 type HouseDict = UUIDMap House
+type TreeDict = UUIDMap Tree
 
 newtype HouseDictData = HouseDictData {
     houses         :: HouseDict,
-    housesToRender :: Maybe HouseDict
+    trees          :: TreeDict,
+    housesToRender :: Maybe HouseDict,
+    treesToRender  :: Maybe TreeDict
     }
 
 derive instance newtypeHouseDictData :: Newtype HouseDictData _
@@ -168,7 +173,9 @@ instance showHouseDictData :: Show HouseDictData where
 instance defaultHouseDictData :: Default HouseDictData where
     def = HouseDictData {
         houses         : M.empty,
-        housesToRender : Nothing
+        trees          : M.empty,
+        housesToRender : Nothing,
+        treesToRender  : Nothing
         }
 
 _houses :: forall t a r. Newtype t { houses :: a | r } => Lens' t a
@@ -177,19 +184,35 @@ _houses = _Newtype <<< prop (SProxy :: SProxy "houses")
 _housesToRender :: forall t a r. Newtype t { housesToRender :: a | r } => Lens' t a
 _housesToRender = _Newtype <<< prop (SProxy :: SProxy "housesToRender")
 
+_treesToRender :: forall t a r. Newtype t { treesToRender :: a | r } => Lens' t a
+_treesToRender = _Newtype <<< prop (SProxy :: SProxy "treesToRender")
+
+
 hasHouse :: HouseDictData -> Boolean
 hasHouse = not <<< M.isEmpty <<< view _houses
 
 -- mark all houses to be rendered
-renderAll :: HouseDictData -> HouseDictData
-renderAll s = s # _housesToRender .~ Just (s ^. _houses)
+renderAllHouses :: HouseDictData -> HouseDictData
+renderAllHouses s = s # _housesToRender .~ Just (s ^. _houses)
+
+-- mark all trees to be rendered
+renderAllTrees :: HouseDictData -> HouseDictData
+renderAllTrees s = s # _treesToRender .~ Just (s ^. _trees)
 
 -- | update the HouseDictData with house operations
 applyHouseOp :: HouseOp -> HouseDictData -> HouseDictData
-applyHouseOp (HouseOpCreate house) d = renderAll $ d # _houses %~ M.insert (house ^. idLens) house
-applyHouseOp (HouseOpDelete hid)   d = renderAll $ d # _houses %~ M.delete hid
+applyHouseOp (HouseOpCreate house) d = renderAllHouses $ d # _houses %~ M.insert (house ^. idLens) house
+applyHouseOp (HouseOpDelete hid)   d = renderAllHouses $ d # _houses %~ M.delete hid
 applyHouseOp (HouseOpUpdate house) d = d # _houses %~ M.insert (house ^. idLens) house
                                          # _housesToRender .~ Nothing
+
+
+-- | Update the HosueDictData with Tree operations
+applyTreeOp :: TreeOp -> HouseDictData -> HouseDictData
+applyTreeOp (TreeOpCreate tree) d = renderAllTrees $ d # _trees %~ M.insert (tree ^. idLens) tree
+applyTreeOp (TreeOpDelete tid)  d = renderAllTrees $ d # _trees %~ M.delete tid
+applyTreeOp (TreeOpUpdate tree) d = d # _trees %~ M.insert (tree ^. idLens) tree
+                                      # _treesToRender .~ Nothing
 
 
 exportHouses :: HouseDictData -> JSHouses
@@ -207,8 +230,12 @@ getActivated :: forall f. Foldable f => Functor f => f HouseNode -> Event UUID
 getActivated = foldEvtWith f
     where f n = const (n ^. idLens) <$> houseTapped n
 
+getTappedTree :: forall f. Foldable f => Functor f => f TreeNode -> Event UUID
+getTappedTree = foldEvtWith f
+    where f n = const (n ^. idLens) <$> n ^. _tapped
+
 renderHouseDict :: Dynamic (Maybe UUID) -> Dynamic BuilderMode -> HouseConfig -> ArrayEditParam -> Event ShadeOption -> Event RoofsData -> HouseDict -> Node HouseTextureInfo (UUIDMap HouseNode)
-renderHouseDict actHouseDyn modeDyn houseCfg arrParam shadeEvt roofsDatEvt houses = traverse render houses
+renderHouseDict actIdDyn modeDyn houseCfg arrParam shadeEvt roofsDatEvt houses = traverse render houses
     where getMode _ _ Showing                            = Inactive
           getMode h (Just i) Building | h ^. idLens == i = Active
                                       | otherwise        = Inactive
@@ -216,7 +243,7 @@ renderHouseDict actHouseDyn modeDyn houseCfg arrParam shadeEvt roofsDatEvt house
           
           render h = if houseRenderMode == EditHouseMode
                      then do
-                         let md = getMode h <$> actHouseDyn <*> modeDyn
+                         let md = getMode h <$> actIdDyn <*> modeDyn
                          editHouse houseCfg $ def # _modeDyn        .~ md
                                                   # _builderModeDyn .~ modeDyn
                                                   # _house          .~ h
@@ -224,6 +251,16 @@ renderHouseDict actHouseDyn modeDyn houseCfg arrParam shadeEvt roofsDatEvt house
                                                   # _roofsData      .~ roofsDatEvt
                                                   # _arrayEditParam .~ arrParam
                      else renderHouse h
+
+
+renderTrees :: forall e. Dynamic (Maybe UUID) -> Dynamic BuilderMode -> TreeDict -> Node e (UUIDMap TreeNode)
+renderTrees actIdDyn modeDyn trees = traverse render trees
+    where getMode _ _ Showing                            = Inactive
+          getMode t (Just i) Building | t ^. idLens == i = Active
+                                      | otherwise        = Inactive
+          getMode _ Nothing Building                     = Inactive
+          
+          render t = editTree t (getMode t <$> actIdDyn <*> modeDyn)
 
 
 tracerMode :: Maybe UUID -> BuilderMode -> ActiveMode
@@ -280,7 +317,7 @@ houseCfgFromBuilderCfg cfg = def # _dataServer     .~ (cfg ^. _dataServer)
 builderForHouse :: BuilderInputEvts -> HouseTextureInfo -> Node HouseBuilderConfig HouseBuilt
 builderForHouse evts tInfo =
     fixNodeEWith def \hdEvt ->
-        fixNodeDWith Nothing \actHouseDyn ->
+        fixNodeDWith Nothing \actIdDyn ->
             fixNodeDWith Building \modeDyn ->
                 fixNodeE \roofsDatEvt -> do
                     pNode <- getParent
@@ -291,20 +328,27 @@ builderForHouse evts tInfo =
 
                     -- render all houses
                     let houseToRenderEvt = compact $ view _housesToRender <$> hdEvt
+                        treesToRenderEvt = compact $ view _treesToRender <$> hdEvt
                         houseCfg = houseCfgFromBuilderCfg cfg
 
                         shadeEvt = evts ^. _shadeSelected
                         arrParam = def
-                        
-                    nodesEvt <- localEnv (const tInfo) $ eventNode (renderHouseDict actHouseDyn modeDyn houseCfg arrParam shadeEvt roofsDatEvt <$> houseToRenderEvt)
+                    
+                    -- render houses and trees
+                    nodesEvt <- localEnv (const tInfo) $ eventNode (renderHouseDict actIdDyn modeDyn houseCfg arrParam shadeEvt roofsDatEvt <$> houseToRenderEvt)
+                    treesEvt <- eventNode (renderTrees actIdDyn modeDyn <$> treesToRenderEvt)
 
                     let deactEvt    = multicast $ const Nothing <$> helper ^. _tapped
+
                         actEvt      = keepLatest $ getActivated <$> nodesEvt
                         actRoofEvt  = keepLatest $ getActiveRoof <$> nodesEvt
-                        actHouseEvt = (Just <$> actEvt) <|> deactEvt
 
+                        treeTapEvt = keepLatest $ getTappedTree <$> treesEvt
+
+                        newActIdEvt = (Just <$> (actEvt <|> treeTapEvt)) <|> deactEvt
+                    
                     -- trace new house
-                    traceRes <- traceHouse $ def # _modeDyn     .~ (tracerMode <$> actHouseDyn <*> modeDyn)
+                    traceRes <- traceHouse $ def # _modeDyn     .~ (tracerMode <$> actIdDyn <*> modeDyn)
                                                  # _mouseMove   .~ helper ^. _mouseMove
                                                  # _undoTracing .~ (evts ^. _undoTracing)
                                                  # _stopTracing .~ (evts ^. _stopTracing)
@@ -317,7 +361,7 @@ builderForHouse evts tInfo =
                         mkDelOp _ (Just h) = Just $ HouseOpDelete h
                         mkDelOp _ Nothing  = Nothing
                         
-                        delHouseEvt = multicast $ compact $ sampleDyn actHouseDyn $ mkDelOp <$> evts ^. _deleteHouse
+                        delHouseEvt = multicast $ compact $ sampleDyn actIdDyn $ mkDelOp <$> evts ^. _deleteHouse
 
                         opEvt = addHouseEvt <|> updHouseEvt <|> delHouseEvt
 
@@ -347,7 +391,7 @@ builderForHouse evts tInfo =
                                   # _saveStepEvt .~ stepEvt
                                   # _activeRoof  .~ (actRoofEvt <|> const Nothing <$> delHouseEvt)
 
-                    pure { input: newRoofsDatEvt, output : { input: modeEvt, output: { input: actHouseEvt, output : { input: newHdEvt, output : res } } } }
+                    pure { input: newRoofsDatEvt, output : { input: modeEvt, output: { input: newActIdEvt, output : { input: newHdEvt, output : res } } } }
 
 
 runAPIEvent :: forall a. APIConfig -> Event (API (Event a)) -> Event a
