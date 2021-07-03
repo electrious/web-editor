@@ -58,7 +58,7 @@ import SmartHouse.BuilderMode (BuilderMode(..))
 import SmartHouse.HouseEditor (HouseRenderMode(..), _arrayEditParam, _builderModeDyn, _house, _roofsData, editHouse, renderHouse)
 import SmartHouse.HouseTracer (TracerMode(..), _stopTracing, _tracedPolygon, _tracerMode, _undoTracing, traceHouse)
 import SmartHouse.ShadeOption (ShadeOption)
-import SmartHouse.TreeBuilder (editTree)
+import SmartHouse.TreeBuilder (buildTree, editTree)
 import SmartHouse.UI (_activeRoofDyn, _savingStepDyn, houseBuilderUI)
 import Specular.Dom.Widget (runMainWidgetInNode)
 import Three.Core.Geometry (mkPlaneGeometry)
@@ -202,7 +202,9 @@ renderAllTrees s = s # _treesToRender .~ Just (s ^. _trees)
 -- | update the HouseDictData with house operations
 applyHouseOp :: HouseOp -> HouseDictData -> HouseDictData
 applyHouseOp (HouseOpCreate house) d = renderAllHouses $ d # _houses %~ M.insert (house ^. idLens) house
-applyHouseOp (HouseOpDelete hid)   d = renderAllHouses $ d # _houses %~ M.delete hid
+applyHouseOp (HouseOpDelete hid)   d = if M.member hid (d ^. _houses)
+                                       then renderAllHouses $ d # _houses %~ M.delete hid
+                                       else d
 applyHouseOp (HouseOpUpdate house) d = d # _houses %~ M.insert (house ^. idLens) house
                                          # _housesToRender .~ Nothing
 
@@ -210,7 +212,9 @@ applyHouseOp (HouseOpUpdate house) d = d # _houses %~ M.insert (house ^. idLens)
 -- | Update the HosueDictData with Tree operations
 applyTreeOp :: TreeOp -> HouseDictData -> HouseDictData
 applyTreeOp (TreeOpCreate tree) d = renderAllTrees $ d # _trees %~ M.insert (tree ^. idLens) tree
-applyTreeOp (TreeOpDelete tid)  d = renderAllTrees $ d # _trees %~ M.delete tid
+applyTreeOp (TreeOpDelete tid)  d = if M.member tid (d ^. _trees)
+                                    then renderAllTrees $ d # _trees %~ M.delete tid
+                                    else d
 applyTreeOp (TreeOpUpdate tree) d = d # _trees %~ M.insert (tree ^. idLens) tree
                                       # _treesToRender .~ Nothing
 
@@ -233,6 +237,9 @@ getActivated = foldEvtWith f
 getTappedTree :: forall f. Foldable f => Functor f => f TreeNode -> Event UUID
 getTappedTree = foldEvtWith f
     where f n = const (n ^. idLens) <$> n ^. _tapped
+
+getTreeUpd :: forall f. Foldable f => Functor f => f TreeNode -> Event TreeOp
+getTreeUpd = foldEvtWith (view _updated)
 
 renderHouseDict :: Dynamic (Maybe UUID) -> Dynamic BuilderMode -> HouseConfig -> ArrayEditParam -> Event ShadeOption -> Event RoofsData -> HouseDict -> Node HouseTextureInfo (UUIDMap HouseNode)
 renderHouseDict actIdDyn modeDyn houseCfg arrParam shadeEvt roofsDatEvt houses = traverse render houses
@@ -346,12 +353,18 @@ builderForHouse evts tInfo =
                         treeTapEvt = keepLatest $ getTappedTree <$> treesEvt
 
                         newActIdEvt = (Just <$> (actEvt <|> treeTapEvt)) <|> deactEvt
-                    
+
+                        mouseEvt = multicast $ helper ^. _mouseMove
+                        delEvt   = multicast $ evts ^. _deleteHouse
+
+                        buildTreeActDyn = step Inactive $ const Active <$> evts ^. _buildTree
                     -- trace new house
                     traceRes <- traceHouse $ def # _modeDyn     .~ (tracerMode <$> actIdDyn <*> modeDyn)
-                                                 # _mouseMove   .~ helper ^. _mouseMove
+                                                 # _mouseMove   .~ mouseEvt
                                                  # _undoTracing .~ (evts ^. _undoTracing)
                                                  # _stopTracing .~ (evts ^. _stopTracing)
+
+                    newTreeEvt <- buildTree buildTreeActDyn mouseEvt
 
                     -- create house from the traced polygon
                     let houseEvt = performEvent $ createHouseFrom (degree 30.0) <$> (traceRes ^. _tracedPolygon)
@@ -361,12 +374,23 @@ builderForHouse evts tInfo =
                         mkDelOp _ (Just h) = Just $ HouseOpDelete h
                         mkDelOp _ Nothing  = Nothing
                         
-                        delHouseEvt = multicast $ compact $ sampleDyn actIdDyn $ mkDelOp <$> evts ^. _deleteHouse
+                        delHouseEvt = multicast $ compact $ sampleDyn actIdDyn $ mkDelOp <$> delEvt
 
                         opEvt = addHouseEvt <|> updHouseEvt <|> delHouseEvt
 
+                        -- tree operations
+                        mkDelTreeOp _ (Just t) = Just $ TreeOpDelete t
+                        mkDelTreeOp _ Nothing  = Nothing
+
+                        addTreeEvt = TreeOpCreate <$> newTreeEvt
+                        delTreeEvt = multicast $ compact $ sampleDyn actIdDyn $ mkDelTreeOp <$> delEvt
+                        updTreeEvt = keepLatest $ getTreeUpd <$> treesEvt
+
+                        treeOpEvt = addTreeEvt <|> updTreeEvt <|> delTreeEvt
+
                         -- update HouseDictData by applying the house operations
-                        newHdEvt = multicast $ sampleOn hdEvt $ applyHouseOp <$> opEvt
+                        newHdEvt = multicast $ sampleOn hdEvt $ (applyHouseOp <$> opEvt) <|>
+                                                                (applyTreeOp <$> treeOpEvt)
 
                         exportEvt = multicast $ evts ^. _export
                     

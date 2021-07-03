@@ -4,26 +4,32 @@ import Prelude
 
 import Control.Alt ((<|>))
 import Control.Alternative (empty)
+import Control.Monad.Reader.Class (ask)
 import Custom.Mesh (TappableMesh)
 import Data.Default (class Default, def)
 import Data.Lens (set, view, (.~), (^.))
 import Data.Maybe (Maybe(..))
 import Data.Meter (Meter, meter, meterVal)
 import Data.Newtype (class Newtype)
-import Editor.Common.Lenses (_height, _isActive, _name, _position, _rotation, _tapped, _updated)
+import Editor.Common.Lenses (_face, _height, _isActive, _name, _parent, _point, _position, _rotation, _tapped, _updated)
+import Editor.ObjectAdder (AdderType(..), createObjectAdder, mkCandidatePoint)
+import Editor.SceneEvent (SceneMouseMoveEvent)
 import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
-import FRP.Dynamic (Dynamic, distinctDyn, latestEvt, sampleDyn)
+import FRP.Dynamic (Dynamic, distinctDyn, latestEvt, sampleDyn, step)
 import FRP.Event (Event)
+import FRP.Event.Extra (performEvent)
 import Math (pi)
 import Math.Line (_direction)
 import Model.ActiveMode (ActiveMode, isActive)
-import Model.SmartHouse.Tree (Tree, TreeNode, TreeOp(..), TreePart, _barrel, _canopy, _crown, _dia)
+import Model.SmartHouse.Tree (Tree, TreeNode, TreeOp(..), TreePart, _barrel, _canopy, _crown, _dia, mkTree)
 import Model.UUID (idLens)
 import Rendering.DynamicNode (dynamic)
-import Rendering.Node (Node, _renderOrder, fixNodeDWith, tapMesh)
+import Rendering.Node (Node, _renderOrder, _visible, fixNodeDWith, node, tapMesh)
+import Three.Core.Face3 (normal)
 import Three.Core.Geometry (BufferGeometry, CircleGeometry, mkCircleGeometry, mkCylinderGeometry)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial, setOpacity)
+import Three.Core.Object3D (worldToLocal)
 import Three.Math.Euler (mkEuler)
 import Three.Math.Vector (Vector3, mkVec3, vecX, vecY, vecZ)
 import UI.DraggableObject (DragObjCfg, _customGeo, _deltaTransform, _validator, createDraggableObject)
@@ -195,6 +201,27 @@ editTree tree actDyn = fixNodeDWith tree \treeDyn -> do
 
     pure { input: treeEvt, output : tn }
 
+
+-- show a Button to let user to add a new tree
+buildTree :: forall e. Dynamic ActiveMode -> Event SceneMouseMoveEvent -> Node e (Event Tree)
+buildTree actDyn mouseEvt = node (def # _name .~ "tree-builder"
+                                      # _visible .~ (isActive <$> actDyn)) do
+    e <- ask
+    let parent = e ^. _parent
+
+        -- get a candidate point
+        getCandPoint evt = do
+            np <- worldToLocal (evt ^. _point) parent
+            pure $ Just $ mkCandidatePoint np (normal $ evt ^. _face)
+        
+        candPntDyn = step Nothing $ performEvent $ getCandPoint <$> mouseEvt
+    
+        opt = def # _name .~ "tree-adder"
+                  # _position .~ pure (mkVec3 0.0 0.0 0.01)
+
+    addedPntEvt <- node opt $ createObjectAdder DefaultAdder candPntDyn (isActive <$> actDyn)
+
+    pure $ performEvent $ mkTree <<< view _position <$> addedPntEvt
 
 
 data DragDirection = XZ
