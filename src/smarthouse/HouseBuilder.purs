@@ -270,9 +270,13 @@ renderTrees actIdDyn modeDyn trees = traverse render trees
           render t = editTree t (getMode t <$> actIdDyn <*> modeDyn)
 
 
-tracerMode :: Maybe UUID -> BuilderMode -> ActiveMode
-tracerMode _ Showing  = Inactive
-tracerMode h Building = fromBoolean $ isNothing h
+tracerMode :: Maybe UUID -> BuilderMode -> Boolean -> ActiveMode
+tracerMode _ Showing  _ = Inactive
+tracerMode h Building t = fromBoolean $ isNothing h && not t
+
+treeBuilderMode :: Maybe UUID -> BuilderMode -> Boolean -> ActiveMode
+treeBuilderMode _ Showing _  = Inactive
+treeBuilderMode h Building t = fromBoolean $ isNothing h && t
 
 newtype BuilderInputEvts = BuilderInputEvts {
     export        :: Event Unit,
@@ -357,14 +361,15 @@ builderForHouse evts tInfo =
                         mouseEvt = multicast $ helper ^. _mouseMove
                         delEvt   = multicast $ evts ^. _deleteHouse
 
-                        buildTreeActDyn = step Inactive $ const Active <$> evts ^. _buildTree
+                        buildTreeDyn = step false $ evts ^. _buildTree
+
                     -- trace new house
-                    traceRes <- traceHouse $ def # _modeDyn     .~ (tracerMode <$> actIdDyn <*> modeDyn)
+                    traceRes <- traceHouse $ def # _modeDyn     .~ (tracerMode <$> actIdDyn <*> modeDyn <*> buildTreeDyn)
                                                  # _mouseMove   .~ mouseEvt
                                                  # _undoTracing .~ (evts ^. _undoTracing)
                                                  # _stopTracing .~ (evts ^. _stopTracing)
 
-                    newTreeEvt <- buildTree buildTreeActDyn mouseEvt
+                    newTreeEvt <- buildTree (treeBuilderMode <$> actIdDyn <*> modeDyn <*> buildTreeDyn) mouseEvt
 
                     -- create house from the traced polygon
                     let houseEvt = performEvent $ createHouseFrom (degree 30.0) <$> (traceRes ^. _tracedPolygon)

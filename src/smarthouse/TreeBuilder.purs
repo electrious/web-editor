@@ -25,10 +25,10 @@ import Model.ActiveMode (ActiveMode, isActive)
 import Model.SmartHouse.Tree (Tree, TreeNode, TreeOp(..), TreePart, _barrel, _canopy, _crown, _dia, mkTree)
 import Model.UUID (idLens)
 import Rendering.DynamicNode (dynamic)
-import Rendering.Node (Node, _renderOrder, _visible, fixNodeDWith, node, tapMesh)
+import Rendering.Node (Node, _renderOrder, _visible, fixNodeDWith, mesh, node, tapMesh)
 import Three.Core.Face3 (normal)
 import Three.Core.Geometry (BufferGeometry, CircleGeometry, mkCircleGeometry, mkCylinderGeometry)
-import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial, setOpacity)
+import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial, setOpacity, setTransparent)
 import Three.Core.Object3D (worldToLocal)
 import Three.Math.Euler (mkEuler)
 import Three.Math.Vector (Vector3, mkVec3, vecX, vecY, vecZ)
@@ -43,7 +43,11 @@ trunkMat = unsafePerformEffect do
 
 
 leafMat :: MeshBasicMaterial
-leafMat = unsafePerformEffect $ mkMeshBasicMaterial 0x3cb200
+leafMat = unsafePerformEffect $ do
+    mat <- mkMeshBasicMaterial 0x3cb200
+    setTransparent true mat
+    setOpacity 0.7 mat
+    pure mat
 
 
 getTapEvt :: TappableMesh -> Event Unit
@@ -52,9 +56,10 @@ getTapEvt = map (const unit) <<< view _tapped
 buildTrunk :: forall e. Dynamic Meter -> Node e (Event Unit)
 buildTrunk = map latestEvt <<< dynamic <<< map mkT
     where mkT h = do let ht = meterVal h * 0.8
-                     geo <- liftEffect $ mkCylinderGeometry 0.1 0.1 ht 20
+                     geo <- liftEffect $ mkCylinderGeometry 0.1 0.1 ht 20 false
                      getTapEvt <$> tapMesh (def # _name        .~ "tree-trunk"
                                                 # _position    .~ pure (mkVec3 0.0 0.0 (ht / 2.0))
+                                                # _rotation    .~ pure (mkEuler (pi / 2.0) 0.0 0.0)
                                                 # _renderOrder .~ 6
                                            ) geo trunkMat
 
@@ -70,9 +75,10 @@ buildCrown hDyn crownDyn = latestEvt <$> dynamic (mkC <$> hDyn <*> crownDyn)
 
                   pos = mkVec3 0.0 0.0 (ch + h / 2.0)
                   
-              geo <- liftEffect $ mkCylinderGeometry 0.0 cd h 20
+              geo <- liftEffect $ mkCylinderGeometry 0.0 cd h 40 true
               getTapEvt <$> tapMesh (def # _name        .~ "tree-crown"
                                          # _position    .~ pure pos
+                                         # _rotation    .~ pure (mkEuler (pi / 2.0) 0.0 0.0)
                                          # _renderOrder .~ 9
                                     ) geo leafMat
 
@@ -90,9 +96,10 @@ buildBarrel crownDyn barrelDyn = latestEvt <$> dynamic (mkB <$> crownDyn <*> bar
 
                   pos = mkVec3 0.0 0.0 (bh + h / 2.0)
                   
-              geo <- liftEffect $ mkCylinderGeometry cd bd h 20
+              geo <- liftEffect $ mkCylinderGeometry cd bd h 40 true
               getTapEvt <$> tapMesh (def # _name        .~ "tree-barrel"
                                          # _position    .~ pure pos
+                                         # _rotation    .~ pure (mkEuler (pi / 2.0) 0.0 0.0)
                                          # _renderOrder .~ 8
                                     ) geo leafMat
 
@@ -109,10 +116,17 @@ buildCanopy barrelDyn canopyDyn = latestEvt <$> dynamic (mkC <$> barrelDyn <*> c
                   h = bh - ch
 
                   pos = mkVec3 0.0 0.0 (ch + h / 2.0)
-                  
-              geo <- liftEffect $ mkCylinderGeometry bd cd h 20
+                  cPos = mkVec3 0.0 0.0 ch
+              
+              -- bottom cap under the canopy
+              circGeo <- liftEffect $ mkCircleGeometry cd 40
+              void $ mesh (def # _position .~ pure cPos
+                               # _rotation .~ pure (mkEuler pi 0.0 0.0)) circGeo leafMat
+
+              geo <- liftEffect $ mkCylinderGeometry bd cd h 40 true
               getTapEvt <$> tapMesh (def # _name        .~ "tree-canopy"
                                          # _position    .~ pure pos
+                                         # _rotation    .~ pure (mkEuler (pi / 2.0) 0.0 0.0)
                                          # _renderOrder .~ 7
                                     ) geo leafMat
 
@@ -170,10 +184,14 @@ editTree tree actDyn = fixNodeDWith tree \treeDyn -> do
 
         isActDyn  = isActive <$> actDyn
 
-    tapTrunkEvt  <- buildTrunk hDyn
-    tapCrownEvt  <- buildCrown hDyn crownDyn
-    tapBarrelEvt <- buildBarrel crownDyn barrelDyn
-    tapCanopyEvt <- buildCanopy barrelDyn canopyDyn
+    tapEvt <- node (def # _name .~ "tree-body"
+                        # _position .~ (view _position <$> treeDyn)) do
+        tapTrunkEvt  <- buildTrunk hDyn
+        tapCrownEvt  <- buildCrown hDyn crownDyn
+        tapBarrelEvt <- buildBarrel crownDyn barrelDyn
+        tapCanopyEvt <- buildCanopy barrelDyn canopyDyn
+
+        pure $ tapTrunkEvt <|> tapCrownEvt <|> tapBarrelEvt <|> tapCanopyEvt
 
     hEvt       <- heightBtn isActDyn tree canopyDyn
     crownEvts  <- crownBtn isActDyn tree hDyn barrelDyn
@@ -181,9 +199,7 @@ editTree tree actDyn = fixNodeDWith tree \treeDyn -> do
     canopyEvts <- canopyBtn isActDyn tree barrelDyn
     posEvt     <- buildTreePosBtn isActDyn
 
-    let tapEvt = tapTrunkEvt <|> tapCrownEvt <|> tapBarrelEvt <|> tapCanopyEvt
-
-        updEvt = (set _height               <$> hEvt)                  <|>
+    let updEvt = (set _height               <$> hEvt)                  <|>
                  (set (_crown  <<< _height) <$> crownEvts  ^. _height) <|>
                  (set (_crown  <<< _dia)    <$> crownEvts  ^. _dia)    <|>
                  (set (_barrel <<< _height) <$> barrelEvts ^. _height) <|>

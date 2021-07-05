@@ -54,10 +54,10 @@ mountBotBox :: BoxGeometry
 mountBotBox = unsafePerformEffect $ mkBoxGeometry 0.0508 0.127 0.05
 
 mountEndCy :: CylinderGeometry
-mountEndCy = unsafePerformEffect $ mkCylinderGeometry 0.0254 0.0254 0.05 8
+mountEndCy = unsafePerformEffect $ mkCylinderGeometry 0.0254 0.0254 0.05 8 false
 
 mountHeadCy :: CylinderGeometry
-mountHeadCy = unsafePerformEffect $ mkCylinderGeometry 0.0127 0.0127 0.046 8
+mountHeadCy = unsafePerformEffect $ mkCylinderGeometry 0.0127 0.0127 0.046 8 false
 
 buildMount :: Effect Object3D
 buildMount = do

@@ -151,11 +151,11 @@ instance renderableWithSlopeQBaseMount :: RenderableWithSlope e QBaseMountRender
         pure m
 
 qbMountBaseCy :: CylinderGeometry
-qbMountBaseCy = unsafePerformEffect $ mkCylinderGeometry r r (meterVal $ inch 0.5) 8
+qbMountBaseCy = unsafePerformEffect $ mkCylinderGeometry r r (meterVal $ inch 0.5) 8 false
     where r = meterVal $ inch 3.0
 
 qbMountStickCy :: CylinderGeometry
-qbMountStickCy = unsafePerformEffect $ mkCylinderGeometry r r 1.0 8
+qbMountStickCy = unsafePerformEffect $ mkCylinderGeometry r r 1.0 8 false
     where r = meterVal $ inch 0.8
 
 
