@@ -28,18 +28,15 @@ import Rendering.DynamicNode (dynamic)
 import Rendering.Node (Node, _renderOrder, _visible, fixNodeDWith, mesh, node, tapMesh)
 import Three.Core.Face3 (normal)
 import Three.Core.Geometry (BufferGeometry, CircleGeometry, mkCircleGeometry, mkCylinderGeometry)
-import Three.Core.Material (MeshBasicMaterial, MeshPhongMaterial, mkMeshBasicMaterial, mkMeshPhongMaterial, setOpacity)
+import Three.Core.Material (MeshPhongMaterial, mkMeshPhongMaterial)
 import Three.Core.Object3D (worldToLocal)
 import Three.Math.Euler (mkEuler)
 import Three.Math.Vector (Vector3, mkVec3, vecX, vecY, vecZ)
 import UI.DraggableObject (DragObjCfg, _customGeo, _deltaTransform, _validator, createDraggableObject)
 
 
-trunkMat :: MeshBasicMaterial
-trunkMat = unsafePerformEffect do
-    mat <- mkMeshBasicMaterial 0x512e1c
-    setOpacity 0.7 mat
-    pure mat
+trunkMat :: MeshPhongMaterial
+trunkMat = unsafePerformEffect $ mkMeshPhongMaterial 0x512e1c
 
 
 leafMat :: MeshPhongMaterial
