@@ -18,7 +18,7 @@ import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, distinctDyn, latestEvt, sampleDyn, step)
 import FRP.Event (Event)
-import FRP.Event.Extra (performEvent)
+import FRP.Event.Extra (multicast, performEvent)
 import Math (pi)
 import Math.Line (_direction)
 import Model.ActiveMode (ActiveMode, isActive)
@@ -131,8 +131,8 @@ buildCanopy barrelDyn canopyDyn = latestEvt <$> dynamic (mkC <$> barrelDyn <*> c
                                     ) geo leafMat
 
 
-heightBtn :: forall e. Dynamic Boolean -> Tree -> Dynamic TreePart -> Node e (Event Meter)
-heightBtn actDyn tree canopyDyn = view _height <$> buildTreeDragBtn actDyn cfg
+heightBtn :: forall e. Dynamic Boolean -> Tree -> Dynamic TreePart -> Dynamic Vector3 -> Node e (Event Meter)
+heightBtn actDyn tree canopyDyn posDyn = node (def # _position .~ posDyn) $ view _height <$> buildTreeDragBtn actDyn cfg
     where h = tree ^. _height
           validF canopy p = let z = vecZ p
                             in z < 50.0 && z > meterVal (canopy ^. _height)
@@ -140,8 +140,8 @@ heightBtn actDyn tree canopyDyn = view _height <$> buildTreeDragBtn actDyn cfg
                     # _validator .~ (validF <$> canopyDyn)
                     # _direction .~ ZOnly
 
-crownBtn :: forall e. Dynamic Boolean -> Tree -> Dynamic Meter -> Dynamic TreePart -> Node e TreeBtnEvts
-crownBtn actDyn tree hDyn barrelDyn = buildTreeDragBtn actDyn cfg
+crownBtn :: forall e. Dynamic Boolean -> Tree -> Dynamic Meter -> Dynamic TreePart -> Dynamic Vector3 -> Node e TreeBtnEvts
+crownBtn actDyn tree hDyn barrelDyn posDyn = node (def # _position .~ posDyn) $ buildTreeDragBtn actDyn cfg
     where c = tree ^. _crown
           validF h barrel p = let x = vecX p
                                   z = vecZ p
@@ -152,8 +152,8 @@ crownBtn actDyn tree hDyn barrelDyn = buildTreeDragBtn actDyn cfg
 
 
 
-barrelBtn :: forall e. Dynamic Boolean -> Tree -> Dynamic TreePart -> Dynamic TreePart -> Node e TreeBtnEvts
-barrelBtn actDyn tree crownDyn canopyDyn = buildTreeDragBtn actDyn cfg
+barrelBtn :: forall e. Dynamic Boolean -> Tree -> Dynamic TreePart -> Dynamic TreePart -> Dynamic Vector3 -> Node e TreeBtnEvts
+barrelBtn actDyn tree crownDyn canopyDyn posDyn = node (def # _position .~ posDyn) $ buildTreeDragBtn actDyn cfg
     where b = tree ^. _barrel
           validF crown canopy p = let x = vecX p
                                       z = vecZ p
@@ -163,8 +163,8 @@ barrelBtn actDyn tree crownDyn canopyDyn = buildTreeDragBtn actDyn cfg
                     # _validator .~ (validF <$> crownDyn <*> canopyDyn)
 
 
-canopyBtn :: forall e. Dynamic Boolean -> Tree -> Dynamic TreePart -> Node e TreeBtnEvts
-canopyBtn actDyn tree barrelDyn = buildTreeDragBtn actDyn cfg
+canopyBtn :: forall e. Dynamic Boolean -> Tree -> Dynamic TreePart -> Dynamic Vector3 -> Node e TreeBtnEvts
+canopyBtn actDyn tree barrelDyn posDyn = node (def # _position .~ posDyn) $ buildTreeDragBtn actDyn cfg
     where c = tree ^. _canopy
           validF barrel p = let x = vecX p
                                 z = vecZ p
@@ -176,16 +176,16 @@ canopyBtn actDyn tree barrelDyn = buildTreeDragBtn actDyn cfg
 
 editTree :: forall e. Tree -> Dynamic ActiveMode -> Node e TreeNode
 editTree tree actDyn = fixNodeDWith tree \treeDyn -> do
-
-    let hDyn      = distinctDyn $ view _height <$> treeDyn
-        crownDyn  = distinctDyn $ view _crown  <$> treeDyn
-        barrelDyn = distinctDyn $ view _barrel <$> treeDyn
-        canopyDyn = distinctDyn $ view _canopy <$> treeDyn
+    let hDyn      = distinctDyn $ view _height   <$> treeDyn
+        posDyn    = distinctDyn $ view _position <$> treeDyn
+        crownDyn  = distinctDyn $ view _crown    <$> treeDyn
+        barrelDyn = distinctDyn $ view _barrel   <$> treeDyn
+        canopyDyn = distinctDyn $ view _canopy   <$> treeDyn
 
         isActDyn  = isActive <$> actDyn
 
-    tapEvt <- node (def # _name .~ "tree-body"
-                        # _position .~ (view _position <$> treeDyn)) do
+    tapEvt <- node (def # _name .~ "tree"
+                        # _position .~ posDyn) do
         tapTrunkEvt  <- buildTrunk hDyn
         tapCrownEvt  <- buildCrown hDyn crownDyn
         tapBarrelEvt <- buildBarrel crownDyn barrelDyn
@@ -193,11 +193,11 @@ editTree tree actDyn = fixNodeDWith tree \treeDyn -> do
 
         pure $ tapTrunkEvt <|> tapCrownEvt <|> tapBarrelEvt <|> tapCanopyEvt
 
-    hEvt       <- heightBtn isActDyn tree canopyDyn
-    crownEvts  <- crownBtn isActDyn tree hDyn barrelDyn
-    barrelEvts <- barrelBtn isActDyn tree crownDyn canopyDyn
-    canopyEvts <- canopyBtn isActDyn tree barrelDyn
-    posEvt     <- buildTreePosBtn isActDyn
+    hEvt       <- heightBtn isActDyn tree canopyDyn posDyn
+    crownEvts  <- crownBtn isActDyn tree hDyn barrelDyn posDyn
+    barrelEvts <- barrelBtn isActDyn tree crownDyn canopyDyn posDyn
+    canopyEvts <- canopyBtn isActDyn tree barrelDyn posDyn
+    posEvt     <- buildTreePosBtn isActDyn tree
 
     let updEvt = (set _height               <$> hEvt)                  <|>
                  (set (_crown  <<< _height) <$> crownEvts  ^. _height) <|>
@@ -207,13 +207,16 @@ editTree tree actDyn = fixNodeDWith tree \treeDyn -> do
                  (set (_canopy <<< _height) <$> canopyEvts ^. _height) <|>
                  (set (_canopy <<< _dia)    <$> canopyEvts ^. _dia)    <|>
                  (set _position             <$> posEvt)
-                 
+                
         treeEvt = sampleDyn treeDyn updEvt
 
         opEvt = TreeOpUpdate <$> treeEvt
-    
-        tn = def # _tapped  .~ (const (tree ^. idLens) <$> tapEvt)
-                 # _updated .~ opEvt
+
+        tid = tree ^. idLens
+
+        tn = def # idLens   .~ tid
+                # _tapped  .~ (const tid <$> tapEvt)
+                # _updated .~ opEvt
 
     pure { input: treeEvt, output : tn }
 
@@ -246,6 +249,7 @@ data DragDirection = XZ
 derive instance eqDragDirection :: Eq DragDirection
 
 newtype TreeDragBtn = TreeDragBtn {
+    position  :: Vector3,
     height    :: Meter,
     dia       :: Meter,
     validator :: Dynamic (Vector3 -> Boolean),
@@ -255,6 +259,7 @@ newtype TreeDragBtn = TreeDragBtn {
 derive instance newtypeTreeDragBtn :: Newtype TreeDragBtn _
 instance defaultTreeDragBtn :: Default TreeDragBtn where
     def = TreeDragBtn {
+        position  : def,
         height    : def,
         dia       : def,
         validator : pure (const true),
@@ -282,17 +287,16 @@ buildTreeDragBtn actDyn cfg = do
         -- make sure the arrow can only be dragged along X and Z axis
         transF v = mkVec3 (vecX v) 0.0 (vecZ v)
         transF2 v = mkVec3 0.0 0.0 (vecZ v)
-        
-        
+
         dragCfg :: DragObjCfg BufferGeometry
         dragCfg = def # _isActive       .~ actDyn
-                      # _position       .~ mkVec3 (meterVal d) 0.0 (meterVal h)
+                      # _position       .~ mkVec3 (meterVal d) (meterVal h) 0.0
                       # _rotation       .~ mkEuler (pi / 2.0) 0.0 0.0
                       # _validator      .~ (cfg ^. _validator)
                       # _deltaTransform .~ Just (if cfg ^. _direction == XZ then transF else transF2)
 
     btn <- createDraggableObject dragCfg
-    let posEvt = btn ^. _position
+    let posEvt = multicast $ btn ^. _position
         
     pure $ def # _height .~ (meter <<< vecZ <$> posEvt)
                # _dia    .~ (meter <<< vecX <$> posEvt)
@@ -303,13 +307,13 @@ posBtnGeo :: CircleGeometry
 posBtnGeo = unsafePerformEffect $ mkCircleGeometry 2.0 30
 
 -- button to move the tree around
-buildTreePosBtn :: forall e. Dynamic Boolean -> Node e (Event Vector3)
-buildTreePosBtn actDyn = do
+buildTreePosBtn :: forall e. Dynamic Boolean -> Tree -> Node e (Event Vector3)
+buildTreePosBtn actDyn tree = do
     let transF v = mkVec3 (vecX v) (vecY v) 0.0
 
         dragCfg :: DragObjCfg CircleGeometry
         dragCfg = def # _isActive       .~ actDyn
-                      # _position       .~ def
+                      # _position       .~ (tree ^. _position)
                       # _deltaTransform .~ Just transF
                       # _customGeo      .~ Just posBtnGeo
 

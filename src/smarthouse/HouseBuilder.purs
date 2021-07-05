@@ -37,7 +37,7 @@ import Editor.RoofManager (RoofsData)
 import Editor.SceneEvent (size)
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import FRP.Dynamic (Dynamic, gateDyn, sampleDyn, step)
+import FRP.Dynamic (Dynamic, debugDyn, gateDyn, sampleDyn, step)
 import FRP.Event (Event, create, keepLatest, sampleOn, sampleOn_, subscribe)
 import FRP.Event.Extra (delay, multicast, performEvent)
 import Math.Angle (degree)
@@ -267,7 +267,7 @@ renderTrees actIdDyn modeDyn trees = traverse render trees
                                       | otherwise        = Inactive
           getMode _ Nothing Building                     = Inactive
           
-          render t = editTree t (getMode t <$> actIdDyn <*> modeDyn)
+          render t = editTree t (getMode t <$> debugDyn actIdDyn <*> modeDyn)
 
 
 tracerMode :: Maybe UUID -> BuilderMode -> Boolean -> ActiveMode
