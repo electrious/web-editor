@@ -165,7 +165,6 @@ newtype HouseNode = HouseNode {
     roofTapped  :: Event UUID,
     wallTapped  :: Event Unit,
     updated     :: Event HouseOp,
-    deleted     :: Event HouseOp,
     activeRoof  :: Event (Maybe Roof),
 
     arrayEvents :: ArrayEvents
@@ -180,7 +179,6 @@ instance defaultHouseNode :: Default HouseNode where
         roofTapped  : empty,
         wallTapped  : empty,
         updated     : empty,
-        deleted     : empty,
         activeRoof  : empty,
 
         arrayEvents : def

@@ -17,8 +17,8 @@ import Editor.SceneEvent (Size, size)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic)
 import FRP.Event (Event)
-import Model.SmartHouse.Roof (Roof)
-import SmartHouse.ActiveRoofUI (_deleteHouse, activeRoofUI)
+import Models.SmartHouse.ActiveItem (ActiveItem)
+import SmartHouse.ActiveItemUI (_deleteHouse)
 import SmartHouse.ShadeOption (ShadeOption)
 import Specular.Dom.Element (attrsD, class_, classes, dynText, el)
 import Specular.Dom.Widget (Widget)
@@ -26,6 +26,7 @@ import Specular.FRP as S
 import UI.Bridge (toUIDyn)
 import UI.ButtonPane (ButtonsPane, _showCloseDyn, _showResetDyn, _showSaveDyn, _showUndoDyn, buttons)
 import UI.ConfirmDialog (dialogAttr)
+import UI.EditPane (_activeItem, _buildTree, editPane)
 import UI.Utils (div, mkStyle, (:~))
 
 newtype BuilderUIConf = BuilderUIConf {
@@ -33,7 +34,7 @@ newtype BuilderUIConf = BuilderUIConf {
     showSaveDyn   :: Dynamic Boolean,
     showResetDyn  :: Dynamic Boolean,
     savingStepDyn :: Dynamic SavingStep,
-    activeRoofDyn :: Dynamic (Maybe Roof)
+    activeItemDyn :: Dynamic (Maybe ActiveItem)
     }
 
 derive instance newtypeBuilderUIConf :: Newtype BuilderUIConf _
@@ -43,20 +44,21 @@ instance defaultBuilderUIConf :: Default BuilderUIConf where
         showSaveDyn   : pure false,
         showResetDyn  : pure false,
         savingStepDyn : pure NotSaving,
-        activeRoofDyn : pure Nothing
+        activeItemDyn : pure Nothing
         }
 
 _savingStepDyn :: forall t a r. Newtype t { savingStepDyn :: a | r } => Lens' t a
 _savingStepDyn = _Newtype <<< prop (SProxy :: SProxy "savingStepDyn")
 
-_activeRoofDyn :: forall t a r. Newtype t { activeRoofDyn :: a | r } => Lens' t a
-_activeRoofDyn = _Newtype <<< prop (SProxy :: SProxy "activeRoofDyn")
+_activeItemDyn :: forall t a r. Newtype t { activeItemDyn :: a | r } => Lens' t a
+_activeItemDyn = _Newtype <<< prop (SProxy :: SProxy "activeItemDyn")
 
 
 newtype BuilderUIEvents = BuilderUIEvents {
     buttons       :: ButtonsPane,
     shadeSelected :: Event ShadeOption,
-    deleteHouse   :: Event Unit
+    deleteHouse   :: Event Unit,
+    buildTree     :: Event Boolean
     }
 
 derive instance newtypeBuilderUIEvents :: Newtype BuilderUIEvents _
@@ -64,7 +66,8 @@ instance defaultBuilderUIEvents :: Default BuilderUIEvents where
     def = BuilderUIEvents {
         buttons       : def,
         shadeSelected : empty,
-        deleteHouse   : empty
+        deleteHouse   : empty,
+        buildTree     : empty
         }
 
 savingStepDialog :: S.Dynamic SavingStep -> Widget Unit
@@ -96,8 +99,9 @@ houseBuilderUI cfg = do
                               # _showResetDyn .~ showR
                               # _showUndoDyn  .~ showR
 
-        roofUIEvt <- activeRoofUI $ cfg ^. _activeRoofDyn
+        editEvts <- editPane $ cfg ^. _activeItemDyn
 
         pure $ def # _buttons       .~ btns
-                   # _shadeSelected .~ (roofUIEvt ^. _shadeSelected)
-                   # _deleteHouse   .~ (roofUIEvt ^. _deleteHouse)
+                   # _shadeSelected .~ (editEvts ^. _activeItem <<< _shadeSelected)
+                   # _deleteHouse   .~ (editEvts ^. _activeItem <<< _deleteHouse)
+                   # _buildTree     .~ (editEvts ^. _buildTree)

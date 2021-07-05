@@ -2,7 +2,7 @@ module SmartHouse.ShadeOptionUI where
 
 import Prelude hiding (div)
 
-import Data.Maybe (Maybe, fromMaybe)
+import Data.Maybe (Maybe, fromMaybe, isJust)
 import Data.Traversable (class Traversable, traverse)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic, gateDyn)
@@ -10,21 +10,21 @@ import FRP.Event (Event)
 import FRP.Event.Extra (anyEvt)
 import Model.ActiveMode (ActiveMode(..), fromBoolean, isActive)
 import SmartHouse.ShadeOption (ShadeOption(..))
-import Specular.Dom.Browser ((:=))
+import Specular.Dom.Browser (Attrs, (:=))
 import Specular.Dom.Builder.Class (text)
-import Specular.Dom.Element (class_, classes)
+import Specular.Dom.Element (attrsD, class_, classes)
 import Specular.Dom.Widget (Widget)
 import Specular.Dom.Widgets.Button (buttonOnClick)
 import Specular.FRP (weaken)
 import UI.Bridge (fromUIEvent, toUIDyn)
-import UI.Utils (div)
+import UI.Utils (div, mkStyle, (:~))
 
 
 -- a clickable selector option used in a selector list
 selectorOption :: forall a. Show a => a -> Dynamic ActiveMode -> Widget (Event a)
 selectorOption v actDyn = do
     let mkAtt Active   = "class" := "uk-button uk-button-primary"
-        mkAtt Inactive = "class" := "uk-button uk-button-default"
+        mkAtt Inactive = "class" := "uk-button uk-button-default uk-hide"
 
     attD <- liftEffect $ toUIDyn (mkAtt <$> actDyn)
     e <- fromUIEvent =<< buttonOnClick (weaken attD) (text $ show v)
@@ -41,9 +41,16 @@ selectList vs actDyn = div [classes ["uk-button-group", "uk-flex", "uk-flex-colu
     where f v = selectorOption v (fromBoolean <<< (==) v <$> actDyn)
 
 
+shadeSelectorStyle :: Boolean -> Attrs
+shadeSelectorStyle d = mkStyle [
+    "display" :~ if d then "flex" else "none"
+    ]
+
 shadeSelector :: Dynamic (Maybe ShadeOption) -> Widget (Event ShadeOption)
 shadeSelector shadeDyn = do
-    div [classes ["uk-flex", "uk-flex-column"]] do
+    styleD <- liftEffect $ toUIDyn $ shadeSelectorStyle <<< isJust <$> shadeDyn
+    div [classes ["uk-flex", "uk-flex-column"],
+         attrsD styleD] do
         div [class_ "uk-text-bold"] $ text "Select Shading:"
 
         let actDyn = fromMaybe NoShade <$> shadeDyn

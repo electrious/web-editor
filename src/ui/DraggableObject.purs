@@ -4,6 +4,7 @@ import Prelude hiding (add)
 
 import Control.Alt ((<|>))
 import Custom.Mesh (DraggableMesh, TapDragMesh, calcDragDelta, validateDrag)
+import Data.Compactable (compact)
 import Data.Default (class Default, def)
 import Data.Filterable (filter)
 import Data.Lens (Lens', (.~), (^.))
@@ -16,7 +17,7 @@ import Editor.Common.Lenses (_dragged, _enabled, _isActive, _name, _position, _r
 import Editor.SceneEvent (isDragEnd, isDragStart)
 import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
-import FRP.Dynamic (Dynamic, gateDyn, step)
+import FRP.Dynamic (Dynamic, gateDyn, sampleDyn, step)
 import FRP.Event (Event, gate)
 import FRP.Event.Extra (foldWithDef, multicast, performEvent)
 import Rendering.Node (Node, Props, _raycastable, _renderOrder, _visible, dragMesh, fixNodeE, getParent, node, tapDragMesh)
@@ -34,7 +35,7 @@ newtype DragObjCfg geo = DragObjCfg {
     rotation       :: Euler,
     customGeo      :: Maybe geo,
     customMat      :: Maybe MeshBasicMaterial,
-    validator      :: Vector3 -> Boolean,
+    validator      :: Dynamic (Vector3 -> Boolean),
     deltaTransform :: Maybe (Vector3 -> Vector3)
     }
 
@@ -48,7 +49,7 @@ instance defaultDragObjCfg :: Default (DragObjCfg geo) where
         rotation       : def,
         customGeo      : Nothing,
         customMat      : Nothing,
-        validator      : const true,
+        validator      : pure (const true),
         deltaTransform : Nothing
         }
 
@@ -173,8 +174,11 @@ createDraggableObject cfg =
                     zeroZ v = mkVec3 (vecX v) (vecY v) 0.0
 
                     -- validate and transform the new position with configured funtions
-                    filtF  = cfg ^. _validator
-                    newPos = multicast $ filter filtF $ performEvent $ toParent <$> foldWithDef updatePos deltaEvt position
+                    filtFDyn = cfg ^. _validator
+                    newPosE = performEvent $ toParent <$> foldWithDef updatePos deltaEvt position
+
+                    doFilter p f = if f p then Just p else Nothing
+                    newPos = multicast $ compact $ sampleDyn filtFDyn $ doFilter <$> newPosE
                     
                     dragObj = DraggableObject {
                         tapped     : const unit <$> mesh ^. _tapped,
