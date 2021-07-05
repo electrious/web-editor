@@ -28,7 +28,7 @@ import Rendering.DynamicNode (dynamic)
 import Rendering.Node (Node, _renderOrder, _visible, fixNodeDWith, mesh, node, tapMesh)
 import Three.Core.Face3 (normal)
 import Three.Core.Geometry (BufferGeometry, CircleGeometry, mkCircleGeometry, mkCylinderGeometry)
-import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial, setOpacity, setTransparent)
+import Three.Core.Material (MeshBasicMaterial, MeshPhongMaterial, mkMeshBasicMaterial, mkMeshPhongMaterial, setOpacity)
 import Three.Core.Object3D (worldToLocal)
 import Three.Math.Euler (mkEuler)
 import Three.Math.Vector (Vector3, mkVec3, vecX, vecY, vecZ)
@@ -42,12 +42,8 @@ trunkMat = unsafePerformEffect do
     pure mat
 
 
-leafMat :: MeshBasicMaterial
-leafMat = unsafePerformEffect $ do
-    mat <- mkMeshBasicMaterial 0x3cb200
-    setTransparent true mat
-    setOpacity 0.7 mat
-    pure mat
+leafMat :: MeshPhongMaterial
+leafMat = unsafePerformEffect $ mkMeshPhongMaterial 0x3cb200
 
 
 getTapEvt :: TappableMesh -> Event Unit
