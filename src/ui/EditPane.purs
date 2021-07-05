@@ -11,11 +11,10 @@ import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple(..))
-import Editor.Common.Lenses (_roof)
 import FRP.Dynamic (Dynamic)
 import FRP.Event (Event)
-import Model.SmartHouse.Roof (Roof)
-import SmartHouse.ActiveRoofUI (ActiveRoofUI, activeRoofUI)
+import Models.SmartHouse.ActiveItem (ActiveItem)
+import SmartHouse.ActiveItemUI (ActiveItemUI, activeItemUI)
 import Specular.Dom.Browser (Attrs)
 import Specular.Dom.Builder.Class (dynText)
 import Specular.Dom.Element (attrs, classes)
@@ -27,20 +26,22 @@ import UI.Bridge (fromUIEvent)
 import UI.Utils (div, mkAttrs, mkStyle, (:~))
 
 newtype EditPane = EditPane {
-    buildTree :: Event Boolean,
-    roof      :: ActiveRoofUI
+    buildTree  :: Event Boolean,
+    activeItem :: ActiveItemUI
 }
 
 derive instance newtypeEditPane :: Newtype EditPane _
 instance defaultEditPane :: Default EditPane where
     def = EditPane {
-        buildTree : empty,
-        roof      : def
+        buildTree  : empty,
+        activeItem : def
     }
 
 _buildTree :: forall t a r. Newtype t { buildTree :: a | r } => Lens' t a
 _buildTree = _Newtype <<< prop (SProxy :: SProxy "buildTree")
 
+_activeItem :: forall t a r. Newtype t { activeItem :: a | r } => Lens' t a
+_activeItem = _Newtype <<< prop (SProxy :: SProxy "activeItem")
 
 -- | button to allow user to build a new tree
 treeBtn :: Widget (S.Event Boolean)
@@ -68,12 +69,12 @@ editPaneStyle d = mkStyle [
     "display"        :~ if d then "flex" else "none"
 ]
 
-editPane :: Dynamic (Maybe Roof) -> Widget EditPane
-editPane actRoofDyn =
+editPane :: Dynamic (Maybe ActiveItem) -> Widget EditPane
+editPane actItemDyn =
     div [classes ["uk-flex", "uk-flex-column"], attrs (editPaneStyle true)] do
         treeEvt <- fromUIEvent =<< treeBtn
 
-        roofEvt <- activeRoofUI actRoofDyn
+        roofEvt <- activeItemUI actItemDyn
 
-        pure $ def # _buildTree .~ treeEvt
-                   # _roof      .~ roofEvt
+        pure $ def # _buildTree  .~ treeEvt
+                   # _activeItem .~ roofEvt

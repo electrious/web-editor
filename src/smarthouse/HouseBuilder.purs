@@ -37,7 +37,7 @@ import Editor.RoofManager (RoofsData)
 import Editor.SceneEvent (size)
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import FRP.Dynamic (Dynamic, debugDyn, gateDyn, sampleDyn, step)
+import FRP.Dynamic (Dynamic, gateDyn, sampleDyn, step)
 import FRP.Event (Event, create, keepLatest, sampleOn, sampleOn_, subscribe)
 import FRP.Event.Extra (delay, multicast, performEvent)
 import Math.Angle (degree)
@@ -49,17 +49,18 @@ import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo, _imageFile, _size, _
 import Model.SmartHouse.Roof (Roof)
 import Model.SmartHouse.Tree (Tree, TreeNode, TreeOp(..))
 import Model.UUID (idLens)
+import Models.SmartHouse.ActiveItem (ActiveItem(..))
 import OBJExporter (MeshFiles, exportObject)
 import Rendering.DynamicNode (eventNode)
 import Rendering.Node (Node, fixNodeDWith, fixNodeE, fixNodeEWith, getEnv, getParent, localEnv, mkNodeEnv, node, runNode, tapMouseMesh)
 import Rendering.TextureLoader (textureFromUrl)
-import SmartHouse.ActiveRoofUI (_deleteHouse)
+import SmartHouse.ActiveItemUI (_deleteHouse)
 import SmartHouse.BuilderMode (BuilderMode(..))
 import SmartHouse.HouseEditor (HouseRenderMode(..), _arrayEditParam, _builderModeDyn, _house, _roofsData, editHouse, renderHouse)
 import SmartHouse.HouseTracer (TracerMode(..), _stopTracing, _tracedPolygon, _tracerMode, _undoTracing, traceHouse)
 import SmartHouse.ShadeOption (ShadeOption)
 import SmartHouse.TreeBuilder (buildTree, editTree)
-import SmartHouse.UI (_activeRoofDyn, _savingStepDyn, houseBuilderUI)
+import SmartHouse.UI (_activeItemDyn, _savingStepDyn, houseBuilderUI)
 import Specular.Dom.Widget (runMainWidgetInNode)
 import Three.Core.Geometry (mkPlaneGeometry)
 import Three.Core.Material (mkMeshBasicMaterialWithTexture)
@@ -107,7 +108,7 @@ newtype HouseBuilt = HouseBuilt {
     tracerMode  :: Event TracerMode,
     saveStepEvt :: Event SavingStep,
     editorOp    :: Event EditorUIOp,
-    activeRoof  :: Event (Maybe Roof)
+    activeItem  :: Event (Maybe ActiveItem)
     }
 
 derive instance newtypeHouseBuilt :: Newtype HouseBuilt _
@@ -117,7 +118,7 @@ instance defaultHouseBuilt :: Default HouseBuilt where
         tracerMode  : empty,
         saveStepEvt : empty,
         editorOp    : empty,
-        activeRoof  : empty
+        activeItem  : empty
         }
 
 _hasHouse :: forall t a r. Newtype t { hasHouse :: a | r } => Lens' t a
@@ -126,12 +127,15 @@ _hasHouse = _Newtype <<< prop (SProxy :: SProxy "hasHouse")
 _saveStepEvt :: forall t a r. Newtype t { saveStepEvt :: a | r } => Lens' t a
 _saveStepEvt = _Newtype <<< prop (SProxy :: SProxy "saveStepEvt")
 
+_activeItem :: forall t a r. Newtype t { activeItem :: a | r } => Lens' t a
+_activeItem = _Newtype <<< prop (SProxy :: SProxy "activeItem")
+
 compactHouseBuilt :: Event HouseBuilt -> HouseBuilt
 compactHouseBuilt e = def # _hasHouse    .~ keepLatest (view _hasHouse    <$> e)
                           # _tracerMode  .~ keepLatest (view _tracerMode  <$> e)
                           # _saveStepEvt .~ keepLatest (view _saveStepEvt <$> e)
                           # _editorOp    .~ keepLatest (view _editorOp    <$> e)
-                          # _activeRoof  .~ keepLatest (view _activeRoof  <$> e)
+                          # _activeItem  .~ keepLatest (view _activeItem  <$> e)
 
 
 loadHouseTexture :: ImageResp -> Event HouseTextureInfo
@@ -238,6 +242,9 @@ getTappedTree :: forall f. Foldable f => Functor f => f TreeNode -> Event UUID
 getTappedTree = foldEvtWith f
     where f n = const (n ^. idLens) <$> n ^. _tapped
 
+getActiveTree :: UUID -> HouseDictData -> Maybe Tree
+getActiveTree tid hd = M.lookup tid (hd ^. _trees)
+
 getTreeUpd :: forall f. Foldable f => Functor f => f TreeNode -> Event TreeOp
 getTreeUpd = foldEvtWith (view _updated)
 
@@ -267,7 +274,7 @@ renderTrees actIdDyn modeDyn trees = traverse render trees
                                       | otherwise        = Inactive
           getMode _ Nothing Building                     = Inactive
           
-          render t = editTree t (getMode t <$> debugDyn actIdDyn <*> modeDyn)
+          render t = editTree t (getMode t <$> actIdDyn <*> modeDyn)
 
 
 tracerMode :: Maybe UUID -> BuilderMode -> Boolean -> ActiveMode
@@ -352,9 +359,10 @@ builderForHouse evts tInfo =
                     let deactEvt    = multicast $ const Nothing <$> helper ^. _tapped
 
                         actEvt      = keepLatest $ getActivated <$> nodesEvt
-                        actRoofEvt  = keepLatest $ getActiveRoof <$> nodesEvt
+                        actRoofEvt  = keepLatest $ map (map ActiveRoof) <<< getActiveRoof <$> nodesEvt
 
-                        treeTapEvt = keepLatest $ getTappedTree <$> treesEvt
+                        treeTapEvt = multicast $ keepLatest $ getTappedTree <$> treesEvt
+                        actTreeEvt = map ActiveTree <$> (sampleOn hdEvt $ getActiveTree <$> treeTapEvt)
 
                         newActIdEvt = (Just <$> (actEvt <|> treeTapEvt)) <|> deactEvt
 
@@ -418,7 +426,7 @@ builderForHouse evts tInfo =
                         res = def # _hasHouse    .~ (hasHouse <$> hdEvt)
                                   # _tracerMode  .~ (traceRes ^. _tracerMode)
                                   # _saveStepEvt .~ stepEvt
-                                  # _activeRoof  .~ (actRoofEvt <|> const Nothing <$> delHouseEvt)
+                                  # _activeItem  .~ (actRoofEvt <|> actTreeEvt <|> const Nothing <$> delHouseEvt)
 
                     pure { input: newRoofsDatEvt, output : { input: modeEvt, output: { input: newActIdEvt, output : { input: newHdEvt, output : res } } } }
 
@@ -483,7 +491,7 @@ buildHouse editor cfg = do
                        # _showSaveDyn   .~ step false (res ^. _hasHouse)
                        # _showResetDyn  .~ step false ((==) Tracing <$> (res ^. _tracerMode))
                        # _savingStepDyn .~ step NotSaving (res ^. _saveStepEvt)
-                       # _activeRoofDyn .~ step Nothing (res ^. _activeRoof)
+                       # _activeItemDyn .~ step Nothing (res ^. _activeItem)
                    
     uiEvts <- runMainWidgetInNode parentEl $ houseBuilderUI conf
 
