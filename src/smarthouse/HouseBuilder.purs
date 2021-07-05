@@ -204,7 +204,7 @@ applyHouseOp :: HouseOp -> HouseDictData -> HouseDictData
 applyHouseOp (HouseOpCreate house) d = renderAllHouses $ d # _houses %~ M.insert (house ^. idLens) house
 applyHouseOp (HouseOpDelete hid)   d = if M.member hid (d ^. _houses)
                                        then renderAllHouses $ d # _houses %~ M.delete hid
-                                       else d
+                                       else d # _housesToRender .~ Nothing
 applyHouseOp (HouseOpUpdate house) d = d # _houses %~ M.insert (house ^. idLens) house
                                          # _housesToRender .~ Nothing
 
@@ -214,7 +214,7 @@ applyTreeOp :: TreeOp -> HouseDictData -> HouseDictData
 applyTreeOp (TreeOpCreate tree) d = renderAllTrees $ d # _trees %~ M.insert (tree ^. idLens) tree
 applyTreeOp (TreeOpDelete tid)  d = if M.member tid (d ^. _trees)
                                     then renderAllTrees $ d # _trees %~ M.delete tid
-                                    else d
+                                    else d # _treesToRender .~ Nothing
 applyTreeOp (TreeOpUpdate tree) d = d # _trees %~ M.insert (tree ^. idLens) tree
                                       # _treesToRender .~ Nothing
 
@@ -280,7 +280,7 @@ newtype BuilderInputEvts = BuilderInputEvts {
     stopTracing   :: Event Unit,
     shadeSelected :: Event ShadeOption,
     deleteHouse   :: Event Unit,
-    buildTree     :: Event Unit
+    buildTree     :: Event Boolean
     }
 
 derive instance newtypeBuilderInputEvts :: Newtype BuilderInputEvts _

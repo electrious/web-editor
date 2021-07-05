@@ -58,7 +58,7 @@ newtype BuilderUIEvents = BuilderUIEvents {
     buttons       :: ButtonsPane,
     shadeSelected :: Event ShadeOption,
     deleteHouse   :: Event Unit,
-    buildTree     :: Event Unit
+    buildTree     :: Event Boolean
     }
 
 derive instance newtypeBuilderUIEvents :: Newtype BuilderUIEvents _

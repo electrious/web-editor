@@ -10,21 +10,24 @@ import Data.Lens.Record (prop)
 import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
+import Data.Tuple (Tuple(..))
 import Editor.Common.Lenses (_roof)
 import FRP.Dynamic (Dynamic)
 import FRP.Event (Event)
 import Model.SmartHouse.Roof (Roof)
 import SmartHouse.ActiveRoofUI (ActiveRoofUI, activeRoofUI)
 import Specular.Dom.Browser (Attrs)
-import Specular.Dom.Element (attrs, classes, text)
+import Specular.Dom.Builder.Class (dynText)
+import Specular.Dom.Element (attrs, classes)
 import Specular.Dom.Widget (Widget)
 import Specular.Dom.Widgets.Button (buttonOnClick)
+import Specular.FRP (attachDynWith, fixEvent, holdDyn, weaken)
 import Specular.FRP as S
 import UI.Bridge (fromUIEvent)
 import UI.Utils (div, mkAttrs, mkStyle, (:~))
 
 newtype EditPane = EditPane {
-    buildTree :: Event Unit,
+    buildTree :: Event Boolean,
     roof      :: ActiveRoofUI
 }
 
@@ -40,8 +43,16 @@ _buildTree = _Newtype <<< prop (SProxy :: SProxy "buildTree")
 
 
 -- | button to allow user to build a new tree
-treeBtn :: Widget (S.Event Unit)
-treeBtn = buttonOnClick (pure $ mkAttrs ["class" :~ "uk-button"]) (text "Build a Tree")
+treeBtn :: Widget (S.Event Boolean)
+treeBtn = fixEvent \tapEvt -> do
+    d <- holdDyn false tapEvt
+    let label true  = "Stop Building Tree"
+        label false = "Build a Tree"
+    e <- buttonOnClick (pure $ mkAttrs ["class" :~ "uk-button"]) (dynText $ weaken $ label <$> d)
+
+    let f v _ = not v
+        nextEvt = attachDynWith f d e
+    pure $ Tuple nextEvt nextEvt
 
 -- | a section in the UI to house editing buttons
 editPaneStyle :: Boolean -> Attrs
