@@ -52,7 +52,7 @@ getTapEvt = map (const unit) <<< view _tapped
 buildTrunk :: forall e. Dynamic Meter -> Node e (Event Unit)
 buildTrunk = map latestEvt <<< dynamic <<< map mkT
     where mkT h = do let ht = meterVal h * 0.8
-                     geo <- liftEffect $ mkCylinderGeometry 0.1 0.1 ht 20 false
+                     geo <- liftEffect $ mkCylinderGeometry 0.3 0.7 ht 20 false
                      getTapEvt <$> tapMesh (def # _name        .~ "tree-trunk"
                                                 # _position    .~ pure (mkVec3 0.0 0.0 (ht / 2.0))
                                                 # _rotation    .~ pure (mkEuler (pi / 2.0) 0.0 0.0)
@@ -128,12 +128,12 @@ buildCanopy barrelDyn canopyDyn = latestEvt <$> dynamic (mkC <$> barrelDyn <*> c
 
 
 heightBtn :: forall e. Dynamic Boolean -> Tree -> Dynamic TreePart -> Dynamic Vector3 -> Node e (Event Meter)
-heightBtn actDyn tree canopyDyn posDyn = node (def # _position .~ posDyn) $ view _height <$> buildTreeDragBtn actDyn cfg
+heightBtn actDyn tree crownDyn posDyn = node (def # _position .~ posDyn) $ view _height <$> buildTreeDragBtn actDyn cfg
     where h = tree ^. _height
-          validF canopy p = let z = vecZ p
-                            in z < 50.0 && z > meterVal (canopy ^. _height)
+          validF crown p = let z = vecZ p
+                           in z < 50.0 && z > meterVal (crown ^. _height)
           cfg = def # _height    .~ h
-                    # _validator .~ (validF <$> canopyDyn)
+                    # _validator .~ (validF <$> crownDyn)
                     # _direction .~ ZOnly
 
 crownBtn :: forall e. Dynamic Boolean -> Tree -> Dynamic Meter -> Dynamic TreePart -> Dynamic Vector3 -> Node e TreeBtnEvts
@@ -189,7 +189,7 @@ editTree tree actDyn = fixNodeDWith tree \treeDyn -> do
 
         pure $ tapTrunkEvt <|> tapCrownEvt <|> tapBarrelEvt <|> tapCanopyEvt
 
-    hEvt       <- heightBtn isActDyn tree canopyDyn posDyn
+    hEvt       <- heightBtn isActDyn tree crownDyn posDyn
     crownEvts  <- crownBtn isActDyn tree hDyn barrelDyn posDyn
     barrelEvts <- barrelBtn isActDyn tree crownDyn canopyDyn posDyn
     canopyEvts <- canopyBtn isActDyn tree barrelDyn posDyn
