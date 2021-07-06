@@ -15,7 +15,7 @@ import Data.Lens.Record (prop)
 import Data.List (List(..), (:))
 import Data.Map as M
 import Data.Maybe (Maybe(..))
-import Data.Meter (Meter, meterVal)
+import Data.Meter (Meter, feetInchStr, meter, meterVal)
 import Data.Newtype (class Newtype)
 import Data.Set (Set)
 import Data.Symbol (SProxy(..))
@@ -23,7 +23,7 @@ import Data.Traversable (class Traversable, traverse_)
 import Data.UUID (UUID, genUUID)
 import Data.UUIDMap (UUIDMap)
 import Data.UUIDMap as UM
-import Editor.Common.Lenses (_id, _name, _normal, _polygon, _shade, _tapped)
+import Editor.Common.Lenses (_id, _name, _normal, _polygon, _position, _shade, _tapped)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
@@ -32,19 +32,20 @@ import FRP.Event (Event)
 import FRP.Event.Extra (multicast)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
+import Math.LineSeg (LineSeg, _end, _start, length)
 import Model.ActiveMode (ActiveMode(..), fromBoolean, isActive)
 import Model.Polygon (Polygon, _polyVerts, polyOutline)
 import Model.Roof.RoofPlate (Point, vec2Point)
 import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo, _size, _texture)
 import Model.UUID (class HasUUID, idLens)
-import Rendering.Node (Node, getEnv, tapMesh)
+import Rendering.Node (Node, _fontSize, getEnv, line, node, tapMesh, text3D)
 import SmartHouse.BuilderMode (BuilderMode(..))
 import SmartHouse.HouseTracer (lineMat, renderLineWith)
 import SmartHouse.PolyGeometry (mkPolyGeometry, mkPolyGeometryWithUV)
 import SmartHouse.ShadeOption (ShadeOption(..))
 import Smarthouse.Algorithm.Subtree (Subtree, _isGable)
 import Three.Core.Material (LineBasicMaterial, MeshPhongMaterial, mkLineBasicMaterial, mkMeshBasicMaterialWithTexture, mkMeshPhongMaterial)
-import Three.Math.Vector (Vector3, mkVec3, vecX, vecY, vecZ)
+import Three.Math.Vector (Vector3, mkVec3, vecX, vecY, vecZ, (<**>), (<+>))
 
 data RoofState = SlopeRoof
                | Gable
@@ -148,7 +149,19 @@ getRoofActive _ Nothing  = Inactive
 
 renderRoofOutline :: forall e. Maybe UUID -> Roof -> Node e Unit
 renderRoofOutline actId r = render $ getRoofLineMat $ getRoofActive r actId
-    where render m = traverse_ (flip renderLineWith m) (polyOutline $ r ^. _polygon)
+    where render m = traverse_ (flip renderLineWithLength m) (polyOutline $ r ^. _polygon)
+
+renderLineWithLength :: forall e. LineSeg Vector3 -> LineBasicMaterial -> Node e Unit
+renderLineWithLength l mat = do
+    let s = l ^. _start
+        e = l ^. _end
+        vs = [s, e]
+
+        tPos = (s <+> e) <**> 0.5
+        lStr = feetInchStr $ meter $ length l
+    void $ line (def # _name .~ "roof-line") vs mat
+    void $ node (def # _position .~ pure tPos) $ text3D (def # _fontSize .~ 1.0) lStr
+
 
 renderRoofOutlines :: forall e f. Traversable f => BuilderMode -> Maybe UUID -> f Roof -> Node e Unit
 renderRoofOutlines Building actId = traverse_ (renderRoofOutline actId)

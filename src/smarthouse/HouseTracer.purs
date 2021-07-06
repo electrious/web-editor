@@ -16,6 +16,7 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (List(..), head, (:))
 import Data.Maybe (Maybe(..), fromMaybe, isJust)
+import Data.Meter (feetInchStr, meter)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple(..), fst)
@@ -27,16 +28,16 @@ import FRP.Dynamic (Dynamic, sampleDyn, step)
 import FRP.Event (Event, withLast)
 import FRP.Event.Extra (delay, multicast, performEvent)
 import Math.Angle (degreeVal)
-import Math.LineSeg (LineSeg, _end, _start, distToLineSeg, intersection, lineVec, linesAngle, mkLineSeg, perpendicularLineSeg, projPointWithLineSeg)
+import Math.LineSeg (LineSeg, _end, _start, distToLineSeg, intersection, length, lineVec, linesAngle, mkLineSeg, perpendicularLineSeg, projPointWithLineSeg)
 import Model.ActiveMode (ActiveMode(..), isActive)
 import Model.Polygon (Polygon, newPolygon)
 import Rendering.DynamicNode (dynamic_)
-import Rendering.Node (Node, _visible, dashLine, fixNodeE, line, mesh, node)
+import Rendering.Node (Node, _fontSize, _visible, dashLine, fixNodeE, line, mesh, node, text3D)
 import Three.Core.Face3 (normal)
 import Three.Core.Geometry (CircleGeometry, mkCircleGeometry)
 import Three.Core.Material (LineBasicMaterial, LineDashedMaterial, MeshBasicMaterial, mkLineBasicMaterial, mkLineDashedMaterial, mkMeshBasicMaterial)
 import Three.Core.Object3D (worldToLocal)
-import Three.Math.Vector (Vector3, addScaled, dist, mkVec3, toVec2, toVec3)
+import Three.Math.Vector (Vector3, addScaled, dist, mkVec3, toVec2, toVec3, (<**>), (<+>))
 
 newtype HouseTracerConf = HouseTracerConf {
     modeDyn     :: Dynamic ActiveMode,
@@ -176,7 +177,14 @@ renderState st = do
     let vs = st ^. _tracedVerts
     traverse_ renderVert vs
     void $ line (def # _name .~ "polygon-line") (fromFoldable vs) lineMat
+    traverse_ renderLineLength $ allLines st
 
+
+renderLineLength :: forall e. LineSeg Vector3 -> Node e Unit
+renderLineLength l = do
+    let tPos = (l ^. _start <+> l ^. _end) <**> 0.5
+        lStr = feetInchStr $ meter $ length l
+    void $ node (def # _position .~ pure tPos) $ text3D (def # _fontSize .~ 1.0) lStr
 --------------------------------------------------------
 -- temp lines
 --------------------------------------------------------
@@ -188,12 +196,18 @@ lineMat :: LineBasicMaterial
 lineMat = unsafePerformEffect $ mkLineBasicMaterial 0xeeeeee 4.0
 
 renderLine :: forall e. LineSeg Vector3 -> Node e Unit
-renderLine l = void $ line (def # _name .~ "vert-adder-line") vs lineMat
-    where vs = [l ^. _start, l ^. _end]
+renderLine l = renderLineWith l lineMat
 
 renderLineWith :: forall e. LineSeg Vector3 -> LineBasicMaterial -> Node e Unit
-renderLineWith l mat = void $ line (def # _name .~ "vert-adder-line") vs mat
-    where vs = [l ^. _start, l ^. _end]                       
+renderLineWith l mat = do
+    let s = l ^. _start
+        e = l ^. _end
+        vs = [s, e]
+
+        tPos = (s <+> e) <**> 0.5
+        lStr = feetInchStr $ meter $ length l
+    void $ line (def # _name .~ "vert-adder-line") vs mat
+    void $ node (def # _position .~ pure tPos) $ text3D (def # _fontSize .~ 1.0) lStr
 
 renderMaybeLine :: forall e. Maybe (LineSeg Vector3) -> Node e Unit
 renderMaybeLine Nothing  = pure unit

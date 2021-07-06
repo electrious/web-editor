@@ -48,6 +48,8 @@ feetInchStr (Meter m) =
         ft   = floor feet
         i    = round $ 12.0 * (feet - toNumber ft)
         
-    in if i == 12
-       then show (ft + 1) <> "'"
-       else show ft <> "'" <> show i <> "\""
+    in if ft == 0
+       then show i <> "\""
+       else if i == 12
+            then show (ft + 1) <> "'"
+            else show ft <> "'" <> show i <> "\""
