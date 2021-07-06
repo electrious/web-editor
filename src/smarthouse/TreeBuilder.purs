@@ -139,7 +139,7 @@ heightBtn actDyn tree crownDyn posDyn = node (def # _position .~ posDyn) $
 
     where h = tree ^. _height
           validF crown p = let z = vecZ p
-                           in z < 50.0 && z > meterVal (crown ^. _height)
+                           in z < 50.0 && z > meterVal (crown ^. _height) + 0.5
         
           toT v = mkVec3 (vecX v) (vecY v) (vecZ v + 0.5)
           fromT v = mkVec3 (vecX v) (vecY v) (vecZ v - 0.5)
@@ -155,7 +155,7 @@ crownBtn actDyn tree hDyn barrelDyn posDyn = node (def # _position .~ posDyn) $ 
     where c = tree ^. _crown
           validF h barrel p = let x = vecX p
                                   z = vecZ p
-                              in x > 0.0 && x < 20.0 && z > meterVal (barrel ^. _height) && z < meterVal h
+                              in x > 0.5 && x < 20.5 && z > meterVal (barrel ^. _height) && z < meterVal h
           
           toT v = mkVec3 (vecX v + 0.5) (vecY v) (vecZ v)
           fromT v = mkVec3 (vecX v - 0.5) (vecY v) (vecZ v)
@@ -173,7 +173,7 @@ barrelBtn actDyn tree crownDyn canopyDyn posDyn = node (def # _position .~ posDy
     where b = tree ^. _barrel
           validF crown canopy p = let x = vecX p
                                       z = vecZ p
-                                  in x > 0.0 && x < 20.0 && z > meterVal (canopy ^. _height) && z < meterVal (crown ^. _height)
+                                  in x > 0.5 && x < 20.5 && z > meterVal (canopy ^. _height) && z < meterVal (crown ^. _height)
           
           toT v = mkVec3 (vecX v + 0.5) (vecY v) (vecZ v)
           fromT v = mkVec3 (vecX v - 0.5) (vecY v) (vecZ v)
@@ -190,7 +190,7 @@ canopyBtn actDyn tree barrelDyn posDyn = node (def # _position .~ posDyn) $ buil
     where c = tree ^. _canopy
           validF barrel p = let x = vecX p
                                 z = vecZ p
-                            in x > 0.0 && x < 20.0 && z > 0.0 && z < meterVal (barrel ^. _height)
+                            in x > 0.5 && x < 20.5 && z > 0.0 && z < meterVal (barrel ^. _height)
           
           toT v = mkVec3 (vecX v + 0.5) (vecY v) (vecZ v)
           fromT v = mkVec3 (vecX v - 0.5) (vecY v) (vecZ v)
