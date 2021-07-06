@@ -7,10 +7,13 @@ import Control.Alternative (empty)
 import Control.Monad.Reader.Class (ask)
 import Custom.Mesh (TappableMesh)
 import Data.Default (class Default, def)
-import Data.Lens (set, view, (.~), (^.))
+import Data.Lens (Lens', set, view, (.~), (^.))
+import Data.Lens.Iso.Newtype (_Newtype)
+import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..))
 import Data.Meter (Meter, meter, meterVal)
 import Data.Newtype (class Newtype)
+import Data.Symbol (SProxy(..))
 import Editor.Common.Lenses (_face, _height, _isActive, _name, _parent, _point, _position, _rotation, _tapped, _updated)
 import Editor.ObjectAdder (AdderType(..), createObjectAdder, mkCandidatePoint)
 import Editor.SceneEvent (SceneMouseMoveEvent)
@@ -129,9 +132,15 @@ heightBtn actDyn tree crownDyn posDyn = node (def # _position .~ posDyn) $ view 
     where h = tree ^. _height
           validF crown p = let z = vecZ p
                            in z < 50.0 && z > meterVal (crown ^. _height)
-          cfg = def # _height    .~ h
-                    # _validator .~ (validF <$> crownDyn)
-                    # _direction .~ ZOnly
+        
+          toT v = mkVec3 (vecX v) (vecY v) (vecZ v + 0.5)
+          fromT v = mkVec3 (vecX v) (vecY v) (vecZ v - 0.5)
+
+          cfg = def # _height     .~ h
+                    # _toTarget   .~ toT
+                    # _fromTarget .~ fromT
+                    # _validator  .~ (validF <$> crownDyn)
+                    # _direction  .~ ZOnly
 
 crownBtn :: forall e. Dynamic Boolean -> Tree -> Dynamic Meter -> Dynamic TreePart -> Dynamic Vector3 -> Node e TreeBtnEvts
 crownBtn actDyn tree hDyn barrelDyn posDyn = node (def # _position .~ posDyn) $ buildTreeDragBtn actDyn cfg
@@ -139,9 +148,15 @@ crownBtn actDyn tree hDyn barrelDyn posDyn = node (def # _position .~ posDyn) $ 
           validF h barrel p = let x = vecX p
                                   z = vecZ p
                               in x > 0.0 && x < 20.0 && z > meterVal (barrel ^. _height) && z < meterVal h
-          cfg = def # _height .~ (c ^. _height)
-                    # _dia    .~ (c ^. _dia)
-                    # _validator .~ (validF <$> hDyn <*> barrelDyn)
+          
+          toT v = mkVec3 (vecX v + 0.5) (vecY v) (vecZ v)
+          fromT v = mkVec3 (vecX v - 0.5) (vecY v) (vecZ v)
+
+          cfg = def # _height     .~ (c ^. _height)
+                    # _toTarget   .~ toT
+                    # _fromTarget .~ fromT
+                    # _dia        .~ (c ^. _dia)
+                    # _validator  .~ (validF <$> hDyn <*> barrelDyn)
 
 
 
@@ -151,9 +166,15 @@ barrelBtn actDyn tree crownDyn canopyDyn posDyn = node (def # _position .~ posDy
           validF crown canopy p = let x = vecX p
                                       z = vecZ p
                                   in x > 0.0 && x < 20.0 && z > meterVal (canopy ^. _height) && z < meterVal (crown ^. _height)
-          cfg = def # _height .~ (b ^. _height)
-                    # _dia    .~ (b ^. _dia)
-                    # _validator .~ (validF <$> crownDyn <*> canopyDyn)
+          
+          toT v = mkVec3 (vecX v + 0.5) (vecY v) (vecZ v)
+          fromT v = mkVec3 (vecX v - 0.5) (vecY v) (vecZ v)
+
+          cfg = def # _height     .~ (b ^. _height)
+                    # _dia        .~ (b ^. _dia)
+                    # _toTarget   .~ toT
+                    # _fromTarget .~ fromT
+                    # _validator  .~ (validF <$> crownDyn <*> canopyDyn)
 
 
 canopyBtn :: forall e. Dynamic Boolean -> Tree -> Dynamic TreePart -> Dynamic Vector3 -> Node e TreeBtnEvts
@@ -162,9 +183,15 @@ canopyBtn actDyn tree barrelDyn posDyn = node (def # _position .~ posDyn) $ buil
           validF barrel p = let x = vecX p
                                 z = vecZ p
                             in x > 0.0 && x < 20.0 && z > 0.0 && z < meterVal (barrel ^. _height)
-          cfg = def # _height .~ (c ^. _height)
-                    # _dia    .~ (c ^. _dia)
-                    # _validator .~ (validF <$> barrelDyn)
+          
+          toT v = mkVec3 (vecX v + 0.5) (vecY v) (vecZ v)
+          fromT v = mkVec3 (vecX v - 0.5) (vecY v) (vecZ v)
+
+          cfg = def # _height     .~ (c ^. _height)
+                    # _dia        .~ (c ^. _dia)
+                    # _toTarget   .~ toT
+                    # _fromTarget .~ fromT
+                    # _validator  .~ (validF <$> barrelDyn)
 
 
 editTree :: forall e. Tree -> Dynamic ActiveMode -> Node e TreeNode
@@ -242,22 +269,33 @@ data DragDirection = XZ
 derive instance eqDragDirection :: Eq DragDirection
 
 newtype TreeDragBtn = TreeDragBtn {
-    position  :: Vector3,
-    height    :: Meter,
-    dia       :: Meter,
-    validator :: Dynamic (Vector3 -> Boolean),
-    direction :: DragDirection
+    position   :: Vector3,
+    height     :: Meter,
+    dia        :: Meter,
+    toTarget   :: Vector3          -> Vector3,
+    fromTarget :: Vector3          -> Vector3,
+    validator  :: Dynamic (Vector3 -> Boolean),
+    direction  :: DragDirection
     }
 
 derive instance newtypeTreeDragBtn :: Newtype TreeDragBtn _
 instance defaultTreeDragBtn :: Default TreeDragBtn where
     def = TreeDragBtn {
-        position  : def,
-        height    : def,
-        dia       : def,
-        validator : pure (const true),
-        direction : XZ
+        position   : def,
+        height     : def,
+        dia        : def,
+        toTarget   : identity,
+        fromTarget : identity,
+        validator  : pure (const true),
+        direction  : XZ
         }
+
+
+_toTarget :: forall t a r. Newtype t { toTarget :: a | r } => Lens' t a
+_toTarget = _Newtype <<< prop (SProxy :: SProxy "toTarget")
+
+_fromTarget :: forall t a r. Newtype t { fromTarget :: a | r } => Lens' t a
+_fromTarget = _Newtype <<< prop (SProxy :: SProxy "fromTarget")
 
 
 newtype TreeBtnEvts = TreeBtnEvts {
@@ -277,19 +315,24 @@ buildTreeDragBtn actDyn cfg = do
     let h = cfg ^. _height
         d = cfg ^. _dia
 
+        toT = cfg ^. _toTarget
+        fromT = cfg ^. _fromTarget
+
         -- make sure the arrow can only be dragged along X and Z axis
         transF v = mkVec3 (vecX v) 0.0 (vecZ v)
         transF2 v = mkVec3 0.0 0.0 (vecZ v)
 
+        switchYZ v = mkVec3 (vecX v) (vecZ v) (vecY v)
+
         dragCfg :: DragObjCfg BufferGeometry
         dragCfg = def # _isActive       .~ actDyn
-                      # _position       .~ mkVec3 (meterVal d) (meterVal h) 0.0
+                      # _position       .~ switchYZ (toT (mkVec3 (meterVal d) 0.0 (meterVal h)))
                       # _rotation       .~ mkEuler (pi / 2.0) 0.0 0.0
                       # _validator      .~ (cfg ^. _validator)
                       # _deltaTransform .~ Just (if cfg ^. _direction == XZ then transF else transF2)
 
     btn <- createDraggableObject dragCfg
-    let posEvt = multicast $ btn ^. _position
+    let posEvt = multicast $ fromT <$> btn ^. _position
         
     pure $ def # _height .~ (meter <<< vecZ <$> posEvt)
                # _dia    .~ (meter <<< vecX <$> posEvt)
