@@ -15,8 +15,8 @@ import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import Editor.Common.Lenses (_name, _parent, _position, _rotation, _scale)
-import Editor.Disposable (Disposee(..))
+import Editor.Common.Lenses (_color, _name, _parent, _position, _rotation, _scale)
+import Editor.Disposable (Disposee(..), dispose)
 import Editor.SceneEvent (setRaycastable)
 import Effect (Effect)
 import Effect.Class (class MonadEffect, liftEffect)
@@ -28,6 +28,7 @@ import Three.Core.Mesh (Line, Mesh, computeLineDistances, mkLine, mkMesh)
 import Three.Core.Object3D (class IsObject3D, Object3D, add, lookAt, mkObject3D, remove, setCastShadow, setName, setPosition, setReceiveShadow, setRenderOrder, setRotation, setScale, setVisible, toObject3D)
 import Three.Math.Euler (Euler)
 import Three.Math.Vector (Vector3, mkVec3)
+import Troika.Text (Text, mkText, setColor, setFontSize, setText, setTextAlign, sync)
 
 newtype NodeEnv e = NodeEnv {
     parent :: Object3D,
@@ -197,6 +198,67 @@ tapDragMesh prop geo mat = mkNode prop $ mkTapDragMesh geo mat
 
 tapMouseMesh :: forall geo mat e. IsGeometry geo => IsMaterial mat => Props -> geo -> mat -> Node e TapMouseMesh
 tapMouseMesh prop geo mat = mkNode prop $ mkTapMouseMesh geo mat
+
+
+newtype TextProps = TextProps {
+    fontSize  :: Number,
+    color     :: Int,
+    textAlign :: String
+}
+
+derive instance newtypeTextProps :: Newtype TextProps _
+instance defaultTextProps :: Default TextProps where
+    def = TextProps {
+        fontSize  : 1.0,
+        color     : 0xffffff,
+        textAlign : "left"
+    }
+
+_fontSize :: forall t a r. Newtype t { fontSize :: a | r } => Lens' t a
+_fontSize = _Newtype <<< prop (SProxy :: SProxy "fontSize")
+
+_textAlign :: forall t a r. Newtype t { textAlign :: a | r } => Lens' t a
+_textAlign = _Newtype <<< prop (SProxy :: SProxy "textAlign")
+
+text3D :: forall e. TextProps -> String -> Node e Text
+text3D prop s = do
+    t <- liftEffect mkText
+    parent <- getParent
+
+    liftEffect do
+        add t parent
+
+        setFontSize (prop ^. _fontSize) t
+        setColor (prop ^. _color) t
+        setTextAlign (prop ^. _textAlign) t
+
+        setText s t
+        sync t
+
+    tell $ Disposee $ remove t parent *> dispose t
+
+    pure t
+
+dynText3D :: forall e. TextProps -> Dynamic String -> Node e Text
+dynText3D prop dyn = do
+    t <- liftEffect mkText
+    parent <- getParent
+
+    liftEffect do
+        add t parent
+
+        setFontSize (prop ^. _fontSize) t
+        setColor (prop ^. _color) t
+        setTextAlign (prop ^. _textAlign) t
+
+    d <- liftEffect $ subscribeDyn dyn \s -> do
+        setText s t
+        sync t
+
+
+    tell $ Disposee $ d *> remove t parent *> dispose t
+
+    pure t
 
 -- | compute fixed point in Node context
 fixNodeE :: forall e i o. (Event i -> Node e { input :: Event i, output :: o }) -> Node e o

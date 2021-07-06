@@ -307,3 +307,6 @@ _rating = _Newtype <<< prop (SProxy :: SProxy "rating")
 
 _tree :: forall t a r. Newtype t { tree :: a | r } => Lens' t a
 _tree = _Newtype <<< prop (SProxy :: SProxy "tree")
+
+_color :: forall t a r. Newtype t { color :: a | r } => Lens' t a
+_color = _Newtype <<< prop (SProxy :: SProxy "color")

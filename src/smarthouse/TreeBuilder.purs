@@ -11,7 +11,7 @@ import Data.Lens (Lens', set, view, (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..))
-import Data.Meter (Meter, meter, meterVal)
+import Data.Meter (Meter, feetInchStr, meter, meterVal)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Editor.Common.Lenses (_face, _height, _isActive, _name, _parent, _point, _position, _rotation, _tapped, _updated)
@@ -28,14 +28,14 @@ import Model.ActiveMode (ActiveMode, isActive)
 import Model.SmartHouse.Tree (Tree, TreeNode, TreeOp(..), TreePart, _barrel, _canopy, _crown, _dia, mkTree)
 import Model.UUID (idLens)
 import Rendering.DynamicNode (dynamic)
-import Rendering.Node (Node, _renderOrder, _visible, fixNodeDWith, mesh, node, tapMesh)
+import Rendering.Node (Node, _fontSize, _renderOrder, _textAlign, _visible, dynText3D, fixNodeDWith, mesh, node, tapMesh)
 import Three.Core.Face3 (normal)
 import Three.Core.Geometry (BufferGeometry, CircleGeometry, mkCircleGeometry, mkCylinderGeometry)
 import Three.Core.Material (MeshPhongMaterial, mkMeshPhongMaterial)
 import Three.Core.Object3D (worldToLocal)
 import Three.Math.Euler (mkEuler)
 import Three.Math.Vector (Vector3, mkVec3, vecX, vecY, vecZ)
-import UI.DraggableObject (DragObjCfg, _customGeo, _deltaTransform, _validator, createDraggableObject)
+import UI.DraggableObject (DragObjCfg, _customGeo, _deltaTransform, _validator, createDraggableObject, createDraggableObjectWith)
 
 
 trunkMat :: MeshPhongMaterial
@@ -128,7 +128,15 @@ buildCanopy barrelDyn canopyDyn = latestEvt <$> dynamic (mkC <$> barrelDyn <*> c
 
 
 heightBtn :: forall e. Dynamic Boolean -> Tree -> Dynamic TreePart -> Dynamic Vector3 -> Node e (Event Meter)
-heightBtn actDyn tree crownDyn posDyn = node (def # _position .~ posDyn) $ view _height <$> buildTreeDragBtn actDyn cfg
+heightBtn actDyn tree crownDyn posDyn = node (def # _position .~ posDyn) $
+    fixNodeDWith (tree ^. _height) \hDyn -> do
+        let tDyn = feetInchStr <$> hDyn
+            tProp = def # _fontSize  .~ 0.35
+                        # _textAlign .~ "center"
+            tWrpCfg = def # _position .~ pure (mkVec3 (-0.44) (0.2) 0.0)
+        hEvt <- view _height <$> buildTreeDragBtn actDyn cfg (node tWrpCfg $ void $ dynText3D tProp tDyn)
+        pure { input : hEvt, output : hEvt }
+
     where h = tree ^. _height
           validF crown p = let z = vecZ p
                            in z < 50.0 && z > meterVal (crown ^. _height)
@@ -143,7 +151,7 @@ heightBtn actDyn tree crownDyn posDyn = node (def # _position .~ posDyn) $ view 
                     # _direction  .~ ZOnly
 
 crownBtn :: forall e. Dynamic Boolean -> Tree -> Dynamic Meter -> Dynamic TreePart -> Dynamic Vector3 -> Node e TreeBtnEvts
-crownBtn actDyn tree hDyn barrelDyn posDyn = node (def # _position .~ posDyn) $ buildTreeDragBtn actDyn cfg
+crownBtn actDyn tree hDyn barrelDyn posDyn = node (def # _position .~ posDyn) $ buildTreeDragBtn actDyn cfg (pure unit)
     where c = tree ^. _crown
           validF h barrel p = let x = vecX p
                                   z = vecZ p
@@ -161,7 +169,7 @@ crownBtn actDyn tree hDyn barrelDyn posDyn = node (def # _position .~ posDyn) $ 
 
 
 barrelBtn :: forall e. Dynamic Boolean -> Tree -> Dynamic TreePart -> Dynamic TreePart -> Dynamic Vector3 -> Node e TreeBtnEvts
-barrelBtn actDyn tree crownDyn canopyDyn posDyn = node (def # _position .~ posDyn) $ buildTreeDragBtn actDyn cfg
+barrelBtn actDyn tree crownDyn canopyDyn posDyn = node (def # _position .~ posDyn) $ buildTreeDragBtn actDyn cfg (pure unit)
     where b = tree ^. _barrel
           validF crown canopy p = let x = vecX p
                                       z = vecZ p
@@ -178,7 +186,7 @@ barrelBtn actDyn tree crownDyn canopyDyn posDyn = node (def # _position .~ posDy
 
 
 canopyBtn :: forall e. Dynamic Boolean -> Tree -> Dynamic TreePart -> Dynamic Vector3 -> Node e TreeBtnEvts
-canopyBtn actDyn tree barrelDyn posDyn = node (def # _position .~ posDyn) $ buildTreeDragBtn actDyn cfg
+canopyBtn actDyn tree barrelDyn posDyn = node (def # _position .~ posDyn) $ buildTreeDragBtn actDyn cfg (pure unit)
     where c = tree ^. _canopy
           validF barrel p = let x = vecX p
                                 z = vecZ p
@@ -310,8 +318,8 @@ instance defaultTreeBtnEvts :: Default TreeBtnEvts where
         dia    : empty
         }
 
-buildTreeDragBtn :: forall e. Dynamic Boolean -> TreeDragBtn -> Node e TreeBtnEvts
-buildTreeDragBtn actDyn cfg = do
+buildTreeDragBtn :: forall e. Dynamic Boolean -> TreeDragBtn -> Node e Unit -> Node e TreeBtnEvts
+buildTreeDragBtn actDyn cfg child = do
     let h = cfg ^. _height
         d = cfg ^. _dia
 
@@ -331,7 +339,7 @@ buildTreeDragBtn actDyn cfg = do
                       # _validator      .~ (cfg ^. _validator)
                       # _deltaTransform .~ Just (if cfg ^. _direction == XZ then transF else transF2)
 
-    btn <- createDraggableObject dragCfg
+    btn <- createDraggableObjectWith dragCfg child
     let posEvt = multicast $ fromT <$> btn ^. _position
         
     pure $ def # _height .~ (meter <<< vecZ <$> posEvt)

@@ -3,6 +3,7 @@ module Data.Meter where
 import Prelude
 
 import Data.Default (class Default)
+import Data.Int (floor, round, toNumber)
 import Data.Newtype (class Newtype)
 import Foreign.Generic (class Decode, class Encode, decode, encode)
 
@@ -39,3 +40,14 @@ inch i = meter $ i * 0.0254
 
 feetInch :: Number -> Number -> Meter
 feetInch f i = meter $ f * 0.3048 + i * 0.0254
+
+
+feetInchStr :: Meter -> String
+feetInchStr (Meter m) =
+    let feet = m * 3.28084
+        ft   = floor feet
+        i    = round $ 12.0 * (feet - toNumber ft)
+        
+    in if i == 12
+       then show (ft + 1) <> "'"
+       else show ft <> "'" <> show i <> "\""

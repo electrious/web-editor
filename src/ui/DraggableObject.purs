@@ -118,10 +118,12 @@ incZ p = mkVec3 (vecX p) (vecY p) (vecZ p + 0.1)
 decZ :: Vector3 -> Vector3
 decZ p = mkVec3 (vecX p) (vecY p) (vecZ p - 0.1)
 
+createDraggableObject :: forall e geo. IsGeometry geo => DragObjCfg geo -> Node e DraggableObject
+createDraggableObject cfg = createDraggableObjectWith cfg (pure unit)
 
 -- | create a draggable object
-createDraggableObject :: forall e geo. IsGeometry geo => DragObjCfg geo -> Node e DraggableObject
-createDraggableObject cfg =
+createDraggableObjectWith :: forall e geo. IsGeometry geo => DragObjCfg geo -> Node e Unit -> Node e DraggableObject
+createDraggableObjectWith cfg child =
     node (def # _name     .~ "drag-object"
               # _rotation .~ pure (cfg ^. _rotation)
          ) $
@@ -145,6 +147,10 @@ createDraggableObject cfg =
                                         # _raycastable .~ cfg ^. _isActive
                                    ) (cfg ^. _customGeo) (cfg ^. _customMat)
 
+                node (def # _name .~ "drag-content"
+                          # _position .~ posDyn
+                          # _visible  .~ cfg ^. _isActive) child
+                
                 -- create the invisible circle
                 let castable = step false isDraggingEvt
                 invCircle <- invisibleCircle (def # _name        .~ "invisible-circle"
