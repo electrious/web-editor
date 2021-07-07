@@ -109,9 +109,9 @@ verticesFromTo vs ve lav = go (Just vs) Nil
           go Nothing ls = ls
 
 
-unifyVerts :: Vertex -> Vertex -> Vector3 -> LAV -> Effect (Tuple LAV Vertex)
-unifyVerts va vb point lav = do
-    nv <- vertexFrom (lav ^. idLens) point (va ^. _leftEdge) (vb ^. _rightEdge) (Just $ vb ^. _bisector <<< _direction) (Just $ va ^. _bisector <<< _direction)
+unifyVerts :: Vertex -> Vertex -> Vector3 -> Number -> LAV -> Effect (Tuple LAV Vertex)
+unifyVerts va vb point h lav = do
+    nv <- vertexFrom (lav ^. idLens) point h (va ^. _leftEdge) (vb ^. _rightEdge) (Just $ vb ^. _bisector <<< _direction) (Just $ va ^. _bisector <<< _direction)
 
     let idxA = vertIndex va lav
         idxB = vertIndex vb lav
@@ -133,9 +133,9 @@ unifyVerts va vb point lav = do
     pure $ Tuple newLav nv
 
 
-unifyThreeVerts :: Vertex -> Vertex -> Vertex -> Vector3 -> LAV -> Effect (Tuple LAV (Maybe Vertex))
-unifyThreeVerts va vb vc point lav = do
-    nv <- vertexFrom (lav ^. idLens) point (va ^. _leftEdge) (vc ^. _rightEdge) (Just $ vc ^. _bisector <<< _direction) (Just $ va ^. _bisector <<< _direction)
+unifyThreeVerts :: Vertex -> Vertex -> Vertex -> Vector3 -> Number -> LAV -> Effect (Tuple LAV (Maybe Vertex))
+unifyThreeVerts va vb vc point h lav = do
+    nv <- vertexFrom (lav ^. idLens) point h (va ^. _leftEdge) (vc ^. _rightEdge) (Just $ vc ^. _bisector <<< _direction) (Just $ va ^. _bisector <<< _direction)
 
     let idxA = vertIndex va lav
         idxB = vertIndex vb lav
@@ -212,7 +212,7 @@ normalizeContour = newPolygon <<< map g <<< filter f <<< polyWindows
 
 slavFromPolygon :: forall v. Eq v => Vector v => Polygon v -> Effect SLAVState
 slavFromPolygon poly = do
-    let mkVi (Triple prev p next) = vertInfoFrom p (mkLineSeg prev p) (mkLineSeg p next) Nothing Nothing
+    let mkVi (Triple prev p next) = vertInfoFrom p 0.0 (mkLineSeg prev p) (mkLineSeg p next) Nothing Nothing
         vis = mkVi <$> polyWindows (getVector <$> normalizeContour poly)
         ns  = fromMaybe vis $ Arr.snoc <$> Arr.tail vis <*> Arr.head vis
 

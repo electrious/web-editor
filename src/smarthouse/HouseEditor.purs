@@ -17,6 +17,7 @@ import Data.Meter (Meter, meterVal)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (class Traversable, traverse)
+import Data.Tuple (fst)
 import Data.UUID (UUID)
 import Editor.ArrayBuilder (runArrayBuilder)
 import Editor.Common.Lenses (_alignment, _floor, _height, _houseId, _id, _modeDyn, _name, _orientation, _panelType, _panels, _position, _roof, _roofs, _shadeSelected, _tapped, _updated)
@@ -43,7 +44,7 @@ import Model.Roof.Panel (Alignment(..), Orientation(..), PanelsDict, panelsDict)
 import Model.Roof.RoofPlate (RoofPlate, _roofIntId)
 import Model.SmartHouse.House (House, HouseNode, HouseOp(..), _activeRoof, _roofTapped, _trees, _wallTapped, flipRoof, getRoof, updateActiveRoofShade, updateHeight)
 import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo)
-import Model.SmartHouse.Roof (Roof, RoofEvents, _flipped, renderRoof, renderRoofOutlines)
+import Model.SmartHouse.Roof (Roof, RoofEvents, _flipped, renderRoof)
 import Model.UUID (idLens)
 import Rendering.DynamicNode (dynamic, dynamic_)
 import Rendering.Line (renderLine, renderLineWith)
@@ -52,7 +53,7 @@ import SmartHouse.Algorithm.Edge (_line)
 import SmartHouse.Algorithm.LAV (_edges)
 import SmartHouse.BuilderMode (BuilderMode(..))
 import SmartHouse.ShadeOption (ShadeOption)
-import Smarthouse.Algorithm.Subtree (_sinks, _source)
+import Smarthouse.Algorithm.Subtree (Subtree, _sinks, _source, treeLines)
 import Three.Core.Geometry (_bevelEnabled, _depth, mkExtrudeGeometry, mkShape)
 import Three.Core.Material (MeshPhongMaterial, mkLineBasicMaterial, mkMeshPhongMaterial)
 import Three.Core.Object3D (add, remove)
@@ -143,7 +144,8 @@ editHouse houseCfg conf = do
                                      # _name     .~ "roofs") do
                 let roofsDyn = view _roofs <$> houseDyn
                 -- render roof outlines dynamically
-                dynamic_ $ renderRoofOutlines <$> (conf ^. _builderModeDyn) <*> actRoofDyn <*> roofsDyn
+                --dynamic_ $ renderRoofOutlines <$> (conf ^. _builderModeDyn) <*> actRoofDyn <*> roofsDyn
+                dynamic_ $ traverse_ renderSubtree <<< view _trees <$> houseDyn
 
                 -- render roofs dynamically
                 dynamic $ renderBuilderRoofs houseEditDyn actRoofDyn <$> roofsDyn
@@ -196,6 +198,9 @@ renderWalls poly height = do
     m <- tapMesh (def # _name .~ "walls") geo wallMat
     pure $ const unit <$> m ^. _tapped
 
+-- render all subtree lines with length text
+renderSubtree :: forall e. Subtree -> Node e Unit
+renderSubtree t = traverse_ renderLine $ treeLines t
 
 renderBuilderRoofs :: forall f. Traversable f => Dynamic Boolean -> Dynamic (Maybe UUID) -> f Roof -> Node HouseTextureInfo (f RoofEvents)
 renderBuilderRoofs houseEditDyn actRoofDyn = traverse (renderRoof houseEditDyn actRoofDyn)
@@ -205,7 +210,7 @@ renderHouse :: House -> Node HouseTextureInfo HouseNode
 renderHouse house = do
     traverse_ renderLine $ view _line <$> house ^. _edges
 
-    let mkLines t = mkLineSeg (t ^. _source) <$> t ^. _sinks
+    let mkLines t = mkLineSeg (t ^. _source) <<< fst <$> t ^. _sinks
         renderTree t = do
             c <- liftEffect $ randomInt 0 0xffffff
             mat <- liftEffect $ mkLineBasicMaterial c 4.0

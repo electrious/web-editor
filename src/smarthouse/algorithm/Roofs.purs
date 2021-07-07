@@ -26,7 +26,7 @@ import Model.SmartHouse.Roof (Roof, _subtrees, createRoofFrom)
 import Model.UUID (class HasUUID, idLens)
 import SmartHouse.Algorithm.Edge (Edge, _leftVertex, _line, _rightVertex)
 import SmartHouse.Algorithm.LAV (_edges)
-import Smarthouse.Algorithm.Subtree (Subtree, SubtreeType(..), _source, _subtreeType, mergedEdge, normalSubtree)
+import Smarthouse.Algorithm.Subtree (Subtree, SubtreeType(..), _sinks, _source, _subtreeType, mergedEdge, normalSubtree)
 import Three.Math.Vector (Vector3, mkVec3, vecX, vecY, (<->), (<.>))
 
 
@@ -97,7 +97,9 @@ setZ z v = mkVec3 (vecX v) (vecY v) z
 -- project a subtree node source's Z to 3D value based on slope and distance to corresponding edge
 projNodeTo3D :: Angle -> Subtree -> Subtree
 projNodeTo3D slope t = t # _source %~ setZ (t ^. _height * s)
+                         # _sinks  %~ map f
     where s = scaleFactor slope
+          f (Tuple p h) = Tuple (setZ (h * s) p) h
 
 sortedNodes :: Edge -> Angle -> List Subtree -> List Subtree
 sortedNodes e slope ts =

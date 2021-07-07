@@ -17,6 +17,7 @@ import Three.Math.Vector (class Vector, Vector3, normal, length, vecX, vecY, (<*
 -- intermediete data structure for constructing initial vertices and edges
 newtype VertInfo = VertInfo {
     position :: Vector3,
+    height   :: Number,
     isReflex :: Boolean,
     bisector :: Ray,
     usable   :: Boolean
@@ -37,8 +38,8 @@ _cross :: forall v. Vector v => v -> v -> Number
 _cross v1 v2 = vecX v1 * vecY v2 - vecX v2 * vecY v1
 
 
-vertInfoFrom :: Vector3 -> LineSeg Vector3 -> LineSeg Vector3 -> Maybe Vector3 -> Maybe Vector3 -> VertInfo
-vertInfoFrom p leftEdge rightEdge vecL vecR =
+vertInfoFrom :: Vector3 -> Number -> LineSeg Vector3 -> LineSeg Vector3 -> Maybe Vector3 -> Maybe Vector3 -> VertInfo
+vertInfoFrom p h leftEdge rightEdge vecL vecR =
     let leftVec  = direction leftEdge <**> (-1.0)
         rightVec = direction rightEdge
         lv       = fromMaybe leftVec $ normal <$> vecL
@@ -47,6 +48,7 @@ vertInfoFrom p leftEdge rightEdge vecL vecR =
         Tuple dir usable = checkLength $ (leftVec <+> rightVec) <**> (if isReflex then -1.0 else 1.0)
     in VertInfo {
         position : p,
+        height   : h,
         isReflex : isReflex,
         bisector : ray p dir,
         usable   : usable
