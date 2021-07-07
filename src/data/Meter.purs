@@ -52,4 +52,6 @@ feetInchStr (Meter m) =
        then show i <> "\""
        else if i == 12
             then show (ft + 1) <> "'"
-            else show ft <> "'" <> show i <> "\""
+            else if i == 0
+                 then show ft <> "'"
+                 else show ft <> "'" <> show i <> "\""

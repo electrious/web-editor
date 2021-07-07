@@ -5,7 +5,6 @@ import Prelude
 import Control.Alt ((<|>))
 import Control.Alternative (empty)
 import Control.Monad.Reader (ask)
-import Data.Array (fromFoldable)
 import Data.Default (class Default, def)
 import Data.Filterable (filter)
 import Data.Foldable (class Foldable, foldl, traverse_)
@@ -16,7 +15,6 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (List(..), head, (:))
 import Data.Maybe (Maybe(..), fromMaybe, isJust)
-import Data.Meter (feetInchStr, meter)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple(..), fst)
@@ -28,16 +26,17 @@ import FRP.Dynamic (Dynamic, sampleDyn, step)
 import FRP.Event (Event, withLast)
 import FRP.Event.Extra (delay, multicast, performEvent)
 import Math.Angle (degreeVal)
-import Math.LineSeg (LineSeg, _end, _start, distToLineSeg, intersection, length, lineVec, linesAngle, mkLineSeg, perpendicularLineSeg, projPointWithLineSeg)
+import Math.LineSeg (LineSeg, _end, _start, distToLineSeg, intersection, lineSegsFromPolyVerts, lineVec, linesAngle, mkLineSeg, perpendicularLineSeg, projPointWithLineSeg)
 import Model.ActiveMode (ActiveMode(..), isActive)
 import Model.Polygon (Polygon, newPolygon)
 import Rendering.DynamicNode (dynamic_)
-import Rendering.Node (Node, _fontSize, _visible, dashLine, fixNodeE, line, mesh, node, text3D)
+import Rendering.Line (renderLine, renderPolyLine)
+import Rendering.Node (Node, _visible, dashLine, fixNodeE, mesh, node)
 import Three.Core.Face3 (normal)
 import Three.Core.Geometry (CircleGeometry, mkCircleGeometry)
-import Three.Core.Material (LineBasicMaterial, LineDashedMaterial, MeshBasicMaterial, mkLineBasicMaterial, mkLineDashedMaterial, mkMeshBasicMaterial)
+import Three.Core.Material (LineDashedMaterial, MeshBasicMaterial, mkLineDashedMaterial, mkMeshBasicMaterial)
 import Three.Core.Object3D (worldToLocal)
-import Three.Math.Vector (Vector3, addScaled, dist, mkVec3, toVec2, toVec3, vecX, vecY, vecZ, (<**>), (<+>))
+import Three.Math.Vector (Vector3, addScaled, dist, mkVec3, toVec2, toVec3)
 
 newtype HouseTracerConf = HouseTracerConf {
     modeDyn     :: Dynamic ActiveMode,
@@ -154,9 +153,7 @@ lastLine st = f $ st ^. _tracedVerts
           f _         = Nothing
 
 allLines :: TracerState -> List (LineSeg Vector3)
-allLines st = fst $ foldl f (Tuple Nil Nothing) $ st ^. _tracedVerts
-    where f (Tuple r Nothing) v = Tuple r (Just v)
-          f (Tuple r (Just lv)) v = Tuple (mkLineSeg v lv : r) (Just v)
+allLines st = lineSegsFromPolyVerts $ st ^. _tracedVerts
 
 --------------------------------------------------------
 -- render the tracer state
@@ -176,41 +173,14 @@ renderState :: forall e. TracerState -> Node e Unit
 renderState st = do
     let vs = st ^. _tracedVerts
     traverse_ renderVert vs
-    void $ line (def # _name .~ "polygon-line") (fromFoldable vs) lineMat
-    traverse_ renderLineLength $ allLines st
+    renderPolyLine vs
 
-
-renderLineLength :: forall e. LineSeg Vector3 -> Node e Unit
-renderLineLength l = do
-    let tPos = moveUp 0.1 $ (l ^. _start <+> l ^. _end) <**> 0.5
-        lStr = feetInchStr $ meter $ length l
-    void $ node (def # _position .~ pure tPos) $ text3D (def # _fontSize .~ 1.0) lStr
 --------------------------------------------------------
 -- temp lines
 --------------------------------------------------------
 
 tempLineTo :: Maybe Vector3 -> TracerState -> Maybe (LineSeg Vector3)
 tempLineTo t s = mkLineSeg <$> t <*> lastVert s
-
-lineMat :: LineBasicMaterial
-lineMat = unsafePerformEffect $ mkLineBasicMaterial 0xeeeeee 4.0
-
-renderLine :: forall e. LineSeg Vector3 -> Node e Unit
-renderLine l = renderLineWith l lineMat
-
-moveUp :: Number -> Vector3 -> Vector3
-moveUp dh v = mkVec3 (vecX v) (vecY v) (vecZ v + dh)
-
-renderLineWith :: forall e. LineSeg Vector3 -> LineBasicMaterial -> Node e Unit
-renderLineWith l mat = do
-    let s = l ^. _start
-        e = l ^. _end
-        vs = [s, e]
-
-        tPos = moveUp 0.1 $ (s <+> e) <**> 0.5
-        lStr = feetInchStr $ meter $ length l
-    void $ line (def # _name .~ "vert-adder-line") vs mat
-    void $ node (def # _position .~ pure tPos) $ text3D (def # _fontSize .~ 1.0) lStr
 
 renderMaybeLine :: forall e. Maybe (LineSeg Vector3) -> Node e Unit
 renderMaybeLine Nothing  = pure unit

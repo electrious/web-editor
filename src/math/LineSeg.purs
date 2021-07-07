@@ -8,10 +8,11 @@ import Data.Generic.Rep.Show (genericShow)
 import Data.Lens (Lens', (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
+import Data.List (List(..), (:))
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Data.Tuple (Tuple(..))
+import Data.Tuple (Tuple(..), fst)
 import Math.Angle (Angle)
 import Math.Utils (lineIntersection)
 import Three.Math.Vector (class Vector, Vector2, Vector3, addScaled, angleBetween, cross, mkVec3, normal, toVec2, toVec3, (<**>), (<+>), (<->), (<.>))
@@ -79,6 +80,12 @@ projPointWithLineSeg sp p l = sp <+> (lv <**> s)
           sv  = p <-> sp
           s   = (lv <.> sv) / V.length lv
 
+
+-- all line segs for a list of poly line vertices (not polygon edges)
+lineSegsFromPolyVerts :: forall f v. Foldable f => f v -> List (LineSeg v)
+lineSegsFromPolyVerts = fst <<< foldl f (Tuple Nil Nothing)
+    where f (Tuple r Nothing) v = Tuple r (Just v)
+          f (Tuple r (Just lv)) v = Tuple (mkLineSeg v lv : r) (Just v)
 
 -- perpendicular line of the specified line l, crossing start point of l, in 2D
 perpendicularLineSeg :: LineSeg Vector2 -> LineSeg Vector2
