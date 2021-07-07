@@ -37,7 +37,7 @@ import Three.Core.Face3 (normal)
 import Three.Core.Geometry (CircleGeometry, mkCircleGeometry)
 import Three.Core.Material (LineBasicMaterial, LineDashedMaterial, MeshBasicMaterial, mkLineBasicMaterial, mkLineDashedMaterial, mkMeshBasicMaterial)
 import Three.Core.Object3D (worldToLocal)
-import Three.Math.Vector (Vector3, addScaled, dist, mkVec3, toVec2, toVec3, (<**>), (<+>))
+import Three.Math.Vector (Vector3, addScaled, dist, mkVec3, toVec2, toVec3, vecX, vecY, vecZ, (<**>), (<+>))
 
 newtype HouseTracerConf = HouseTracerConf {
     modeDyn     :: Dynamic ActiveMode,
@@ -182,7 +182,7 @@ renderState st = do
 
 renderLineLength :: forall e. LineSeg Vector3 -> Node e Unit
 renderLineLength l = do
-    let tPos = (l ^. _start <+> l ^. _end) <**> 0.5
+    let tPos = moveUp 0.1 $ (l ^. _start <+> l ^. _end) <**> 0.5
         lStr = feetInchStr $ meter $ length l
     void $ node (def # _position .~ pure tPos) $ text3D (def # _fontSize .~ 1.0) lStr
 --------------------------------------------------------
@@ -198,13 +198,16 @@ lineMat = unsafePerformEffect $ mkLineBasicMaterial 0xeeeeee 4.0
 renderLine :: forall e. LineSeg Vector3 -> Node e Unit
 renderLine l = renderLineWith l lineMat
 
+moveUp :: Number -> Vector3 -> Vector3
+moveUp dh v = mkVec3 (vecX v) (vecY v) (vecZ v + dh)
+
 renderLineWith :: forall e. LineSeg Vector3 -> LineBasicMaterial -> Node e Unit
 renderLineWith l mat = do
     let s = l ^. _start
         e = l ^. _end
         vs = [s, e]
 
-        tPos = (s <+> e) <**> 0.5
+        tPos = moveUp 0.1 $ (s <+> e) <**> 0.5
         lStr = feetInchStr $ meter $ length l
     void $ line (def # _name .~ "vert-adder-line") vs mat
     void $ node (def # _position .~ pure tPos) $ text3D (def # _fontSize .~ 1.0) lStr
