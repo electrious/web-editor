@@ -3,7 +3,7 @@ module Editor.ObjectAdder where
 import Prelude
 
 import Data.Compactable (compact)
-import Data.Default (def)
+import Data.Default (class Default, def)
 import Data.Lens (Lens', (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
@@ -86,8 +86,8 @@ crossMarker visDyn = node (def # _name    .~ "cross-marker"
     blackOnWhiteLine (mkEuler 0.0 0.0 (pi / 2.0))
 
 
-createAdderMarker :: forall e v. Vector v => Dynamic (Maybe (CandidatePoint v)) -> (Dynamic Boolean -> Node e Unit) -> Node e (Event (CandidatePoint v))
-createAdderMarker pDyn marker = do
+createAdderMarker :: forall e v. Vector v => Boolean -> Dynamic (Maybe (CandidatePoint v)) -> (Dynamic Boolean -> Node e Unit) -> Node e (Event (CandidatePoint v))
+createAdderMarker updTarget pDyn marker = do
     parent <- getParent
 
     let posV p = getVector $ p ^. _position
@@ -103,11 +103,14 @@ createAdderMarker pDyn marker = do
         targetDyn = performDynamic $ traverse calcTarget <$> pDyn
 
         visDyn = isJust <$> pDyn
-        
-    m <- node (def # _name     .~ "adder-marker"
+
+        prop = def # _name     .~ "adder-marker"
                    # _position .~ posDyn
-                   # _target   .~ targetDyn
-              ) do
+        
+        nProp = if updTarget
+                then prop # _target   .~ targetDyn
+                else prop 
+    m <- node nProp do
         -- the visible marker
         marker visDyn
         tapMesh (def # _visible .~ pure false
@@ -118,10 +121,13 @@ createAdderMarker pDyn marker = do
 
 -- | create a object adder
 createObjectAdder :: forall e v. Vector v => AdderType -> Dynamic (Maybe (CandidatePoint v)) -> Dynamic Boolean -> Node e (Event (CandidatePoint v))
-createObjectAdder t point canShow = createAdderMarker (pointCanShow <$> canShow <*> point) (marker t)
+createObjectAdder t point canShow = createAdderMarker (updTarget t) (pointCanShow <$> canShow <*> point) (marker t)
     where -- update candidate point with canShow status
           pointCanShow true p  = p
           pointCanShow false _ = Nothing
+
+          updTarget DefaultAdder = true
+          updTarget CrossAdder   = false
 
           marker DefaultAdder = blueMarker
           marker CrossAdder   = crossMarker
