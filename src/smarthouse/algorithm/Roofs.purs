@@ -3,7 +3,7 @@ module Smarthouse.Algorithm.Roofs where
 import Prelude
 
 import Data.Array (foldl)
-import Data.Lens (Lens', view, (^.))
+import Data.Lens (Lens', view, (%~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (List(..), elem, singleton, sortBy, (:))
@@ -13,6 +13,7 @@ import Data.Set (Set)
 import Data.Set as S
 import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
+import Data.Tuple (Tuple(..), fst, snd)
 import Data.UUID (UUID)
 import Data.UUIDMap (UUIDMap)
 import Data.UUIDMap as UM
@@ -26,7 +27,7 @@ import Model.UUID (class HasUUID, idLens)
 import SmartHouse.Algorithm.Edge (Edge, _leftVertex, _line, _rightVertex)
 import SmartHouse.Algorithm.LAV (_edges)
 import Smarthouse.Algorithm.Subtree (Subtree, SubtreeType(..), _source, _subtreeType, mergedEdge, normalSubtree)
-import Three.Math.Vector (Vector3, mkVec3, (<**>), (<+>), (<->), (<.>))
+import Three.Math.Vector (Vector3, mkVec3, vecX, vecY, (<->), (<.>))
 
 
 scaleFactor :: Angle -> Number
@@ -86,26 +87,31 @@ mergeRoofDataWith slope t lr rr =
     in RoofData {
         id        : lr ^. idLens,
         subtrees  : S.union (lr ^. _subtrees) (rr ^. _subtrees),
-        edgeNodes : lns <> singleton (projNodeTo3D slope t) <> rns,
+        edgeNodes : lns <> singleton (view _source $ projNodeTo3D slope t) <> rns,
         edge      : lr ^. _edge
         }
 
-projNodeTo3D :: Angle -> Subtree -> Vector3
-projNodeTo3D slope t = t ^. _source <+> (upVec <**> (t ^. _height * s))
+setZ :: Number -> Vector3 -> Vector3
+setZ z v = mkVec3 (vecX v) (vecY v) z
+
+-- project a subtree node source's Z to 3D value based on slope and distance to corresponding edge
+projNodeTo3D :: Angle -> Subtree -> Subtree
+projNodeTo3D slope t = t # _source %~ setZ (t ^. _height * s)
     where s = scaleFactor slope
 
-sortedNodes :: Edge -> Angle -> List Subtree -> List Vector3
+sortedNodes :: Edge -> Angle -> List Subtree -> List Subtree
 sortedNodes e slope ts =
     let edge    = e ^. _line
-        g t1 t2 = comparing (flip distanceAlong edge) t2 t1
+        g t1 t2 = comparing (flip distanceAlong edge <<< view _source) t2 t1
     in sortBy g $ projNodeTo3D slope <$> ts
 
 -- find polygon for an edge
-roofForEdge :: Angle -> RoofData -> Effect Roof
+roofForEdge :: Angle -> RoofData -> Effect (Tuple Roof (List Subtree))
 roofForEdge slope rd = do
     let sorted = sortedNodes (rd ^. _edge) slope $ S.toUnfoldable $ rd ^. _subtrees
-        nodes  = sorted <> rd ^. _edgeNodes
-    createRoofFrom (newPolygon nodes) (rd ^. _subtrees) (rd ^. _edge <<< _normal)
+        nodes  = (view _source <$> sorted) <> rd ^. _edgeNodes
+    roof <- createRoofFrom (newPolygon nodes) (rd ^. _subtrees) (rd ^. _edge <<< _normal)
+    pure $ Tuple roof sorted
 
 
 procMerge :: Angle -> UUIDMap RoofData -> Subtree -> UUIDMap RoofData
@@ -121,8 +127,8 @@ procMerge slope m t = case t ^. _subtreeType of
 
         in M.update (const newrd) li $ M.update (const newrd) ri m
         
-    
-generateRoofs :: Angle -> Set Subtree -> List Edge -> Effect (List Roof)
+-- generate a list of Roofs and update Subtree node to 3D
+generateRoofs :: Angle -> Set Subtree -> List Edge -> Effect (Tuple (List Roof) (UUIDMap Subtree))
 generateRoofs slope ts edges = do
     let -- MergedNode subtrees
         mts = S.filter (not <<< normalSubtree) ts
@@ -134,5 +140,7 @@ generateRoofs slope ts edges = do
 
         newRds = S.toUnfoldable $ S.fromFoldable $ M.values newRDM
 
-    traverse (roofForEdge slope) newRds
-    
+    res <- traverse (roofForEdge slope) newRds
+    let roofs = fst <$> res
+        trees = UM.fromFoldable $ join $ snd <$> res
+    pure $ Tuple roofs trees

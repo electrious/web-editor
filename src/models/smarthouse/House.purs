@@ -77,14 +77,14 @@ createHouseFrom :: Angle -> Polygon Vector3 -> Effect House
 createHouseFrom slope poly = do
     i <- genUUID
     Tuple trees edges <- skeletonize $ counterClockPoly poly
-    roofs <- generateRoofs slope (S.fromFoldable trees) edges
+    Tuple roofs newTs <- generateRoofs slope (S.fromFoldable trees) edges
     
     pure $ House {
         id     : i,
         floor  : poly,
         height : meter 3.5,   -- default height
         slope  : slope,
-        trees  : UM.fromFoldable trees,
+        trees  : newTs,
         edges  : edges,
         roofs  : UM.fromFoldable roofs
         }
@@ -105,9 +105,10 @@ flipRoof i h = do
         -- flip the subtree at idx
         nts = M.update (Just <<< flip flipSubtree vs) i ts
     -- generate new roofs
-    roofs <- generateRoofs (h ^. _slope) (S.fromFoldable nts) (h ^. _edges)
+    Tuple roofs newTs <- generateRoofs (h ^. _slope) (S.fromFoldable nts) (h ^. _edges)
+
     pure $ h # _roofs .~ UM.fromFoldable roofs
-             # _trees .~ nts
+             # _trees .~ newTs
 
 
 updateActiveRoofShade :: ShadeOption -> Maybe UUID -> House -> House
