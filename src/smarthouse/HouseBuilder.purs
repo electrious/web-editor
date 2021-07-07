@@ -426,7 +426,10 @@ builderForHouse evts tInfo =
                         res = def # _hasHouse    .~ (hasHouse <$> hdEvt)
                                   # _tracerMode  .~ (traceRes ^. _tracerMode)
                                   # _saveStepEvt .~ stepEvt
-                                  # _activeItem  .~ (actRoofEvt <|> actTreeEvt <|> const Nothing <$> delHouseEvt)
+                                  # _activeItem  .~ (actRoofEvt <|>
+                                                     actTreeEvt <|>
+                                                     const Nothing <$> delHouseEvt <|>
+                                                     const Nothing <$> deactEvt)
 
                     pure { input: newRoofsDatEvt, output : { input: modeEvt, output: { input: newActIdEvt, output : { input: newHdEvt, output : res } } } }
 

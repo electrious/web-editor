@@ -3,7 +3,7 @@ module Editor.ObjectAdder where
 import Prelude
 
 import Data.Compactable (compact)
-import Data.Default (class Default, def)
+import Data.Default (def)
 import Data.Lens (Lens', (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
