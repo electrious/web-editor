@@ -42,7 +42,7 @@ import Model.Racking.OldRackingSystem (OldRoofRackingData, guessRackingType)
 import Model.Racking.RackingType (RackingType(..))
 import Model.Roof.Panel (Alignment(..), Orientation(..), PanelsDict, panelsDict)
 import Model.Roof.RoofPlate (RoofPlate, _roofIntId)
-import Model.SmartHouse.House (House, HouseNode, HouseOp(..), _activeRoof, _roofTapped, _trees, _wallTapped, flipRoof, getRoof, updateActiveRoofShade, updateHeight)
+import Model.SmartHouse.House (House, HouseNode, HouseOp(..), _activeRoof, _roofTapped, _trees, _wallTapped, flipRoof, getRoof, getVertNode, updateActiveRoofShade, updateHeight)
 import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo)
 import Model.SmartHouse.Roof (Roof, RoofEvents, _flipped, renderActRoofOutline, renderRoof)
 import Model.UUID (idLens)
@@ -150,7 +150,7 @@ editHouse houseCfg conf = do
                 node (def # _name .~ "roof-lines"
                           # _position .~ pure (mkVec3 0.0 0.0 0.02)) do
                     -- render ridge lines
-                    dynamic_ $ traverse_ renderSubtree <<< view _trees <$> houseDyn
+                    dynamic_ $ renderSubtrees <$> houseDyn
                     -- render edge lines
                     dynamic_ $ traverse_ renderLine <<< map (view _line) <<< view _edges <$> houseDyn
                     -- render roof outlines dynamically
@@ -208,8 +208,12 @@ renderWalls poly height = do
     pure $ const unit <$> m ^. _tapped
 
 -- render all subtree lines with length text
-renderSubtree :: forall e. Subtree -> Node e Unit
-renderSubtree t = traverse_ renderLine $ treeLines t
+renderSubtrees :: forall e. House -> Node e Unit
+renderSubtrees h = traverse_ (renderSubtree h) (h ^. _trees)
+
+renderSubtree :: forall e. House -> Subtree -> Node e Unit
+renderSubtree h t = traverse_ renderLine ls
+    where ls = map (view _position <<< flip getVertNode h) <$> treeLines t
 
 renderBuilderRoofs :: forall f. Traversable f => Dynamic Boolean -> Dynamic (Maybe UUID) -> f Roof -> Node HouseTextureInfo (f RoofEvents)
 renderBuilderRoofs houseEditDyn actRoofDyn = traverse (renderRoof houseEditDyn actRoofDyn)

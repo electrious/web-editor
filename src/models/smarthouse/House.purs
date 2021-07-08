@@ -13,7 +13,7 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (List, fromFoldable)
 import Data.Map as M
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Meter (Meter, meter, meterVal)
 import Data.Newtype (class Newtype)
 import Data.Set as S
@@ -34,34 +34,37 @@ import Model.Roof.RoofPlate (Point, vec2Point)
 import Model.SmartHouse.Roof (JSRoof, Roof, exportRoof, updateShadeOption)
 import Model.UUID (class HasUUID, idLens)
 import SmartHouse.Algorithm.Edge (Edge)
-import SmartHouse.Algorithm.LAV (_edges)
+import SmartHouse.Algorithm.LAV (_edges, _vertices)
 import SmartHouse.Algorithm.Skeleton (skeletonize)
+import SmartHouse.Algorithm.VertNode (VertNode)
 import SmartHouse.ShadeOption (ShadeOption)
 import Smarthouse.Algorithm.Roofs (generateRoofs)
 import Smarthouse.Algorithm.Subtree (Subtree, flipSubtree)
 import Three.Math.Vector (Vector3)
 
 newtype House = House {
-    id     :: UUID,
-    floor  :: Polygon Vector3,
-    height :: Meter,
-    slope  :: Angle,
-    trees  :: UUIDMap Subtree,
-    edges  :: List Edge,
-    roofs  :: UUIDMap Roof
+    id       :: UUID,
+    floor    :: Polygon Vector3,
+    height   :: Meter,
+    slope    :: Angle,
+    trees    :: UUIDMap Subtree,
+    vertices :: UUIDMap VertNode,
+    edges    :: List Edge,
+    roofs    :: UUIDMap Roof
     }
 
 derive instance newtypeHouse :: Newtype House _
 derive instance genericHouse :: Generic House _
 instance defaultHouse :: Default House where
     def = House {
-        id     : emptyUUID,
-        floor  : def,
-        height : meter 0.0,
-        slope  : degree 20.0,
-        trees  : M.empty,
-        edges  : empty,
-        roofs  : M.empty
+        id       : emptyUUID,
+        floor    : def,
+        height   : meter 0.0,
+        slope    : degree 20.0,
+        trees    : M.empty,
+        vertices : M.empty,
+        edges    : empty,
+        roofs    : M.empty
         }
 instance eqHouse :: Eq House where
     eq h1 h2 = h1 ^. _id == h2 ^. _id
@@ -77,16 +80,17 @@ createHouseFrom :: Angle -> Polygon Vector3 -> Effect House
 createHouseFrom slope poly = do
     i <- genUUID
     Tuple trees edges <- skeletonize $ counterClockPoly poly
-    Tuple roofs newTs <- generateRoofs slope (S.fromFoldable trees) edges
+    Tuple roofs nodes <- generateRoofs slope (S.fromFoldable trees) edges
     
     pure $ House {
-        id     : i,
-        floor  : poly,
-        height : meter 3.5,   -- default height
-        slope  : slope,
-        trees  : newTs,
-        edges  : edges,
-        roofs  : UM.fromFoldable roofs
+        id       : i,
+        floor    : poly,
+        height   : meter 3.5,   -- default height
+        slope    : slope,
+        trees    : UM.fromFoldable trees,
+        vertices : nodes,
+        edges    : edges,
+        roofs    : UM.fromFoldable roofs
         }
 
 
@@ -97,6 +101,11 @@ getRoof :: Maybe UUID -> House -> Maybe Roof
 getRoof Nothing _  = Nothing
 getRoof (Just i) h = M.lookup i $ h ^. _roofs
 
+-- load up to date VertNode
+getVertNode :: VertNode -> House -> VertNode
+getVertNode v h = fromMaybe v $ M.lookup (v ^. idLens) (h ^. _vertices)
+
+
 -- flip a roof to/from gable
 flipRoof :: UUID -> House -> Effect House
 flipRoof i h = do
@@ -105,10 +114,11 @@ flipRoof i h = do
         -- flip the subtree at idx
         nts = M.update (Just <<< flip flipSubtree vs) i ts
     -- generate new roofs
-    Tuple roofs newTs <- generateRoofs (h ^. _slope) (S.fromFoldable nts) (h ^. _edges)
+    Tuple roofs nodes <- generateRoofs (h ^. _slope) (S.fromFoldable nts) (h ^. _edges)
 
     pure $ h # _roofs .~ UM.fromFoldable roofs
-             # _trees .~ newTs
+             # _trees .~ nts
+             # _vertices .~ nodes
 
 
 updateActiveRoofShade :: ShadeOption -> Maybe UUID -> House -> House

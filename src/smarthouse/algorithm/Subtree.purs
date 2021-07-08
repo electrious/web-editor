@@ -97,9 +97,9 @@ mergedEdge e t = case t ^. _subtreeType of
     NormalNode -> false
     MergedNode le re -> e == le || e == re
 
-treeLines :: Subtree -> List (LineSeg Vector3)
-treeLines t = mkLineSeg s <<< view _position <$> t ^. _sinks
-    where s = t ^. _source <<< _position
+treeLines :: Subtree -> List (LineSeg VertNode)
+treeLines t = mkLineSeg s <$> t ^. _sinks
+    where s = t ^. _source
 
 gableSubtree :: Subtree -> List Vector3 -> Subtree
 gableSubtree t vs = mkT $ foldl f (Tuple 0 Nil) (view _position <$> t ^. _sinks)
