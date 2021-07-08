@@ -31,6 +31,9 @@ lineMat = unsafePerformEffect $ mkLineBasicMaterial 0xeeeeee 4.0
 renderLine :: forall e. LineSeg Vector3 -> Node e Unit
 renderLine l = renderLineWith l lineMat
 
+renderLineOnlyWith :: forall e. LineSeg Vector3 -> LineBasicMaterial -> Node e Unit
+renderLineOnlyWith l = void <<< line (def # _name .~ "line") [l^. _start, l ^. _end]
+
 renderLineWith :: forall e. LineSeg Vector3 -> LineBasicMaterial -> Node e Unit
 renderLineWith l mat = do
     let vs = [l ^. _start, l ^. _end]
@@ -49,9 +52,9 @@ renderLineLength l = do
         lv = lineVec l
 
         rPos = if vecY lv < 0.0
-               then moveLeft 3.0 tPos
+               then moveLeft 1.5 tPos
                else if vecX lv < 0.0
-                    then moveAway 2.0 tPos
+                    then moveAway 1.5 tPos
                     else tPos
 
         lStr = feetInchStr $ meter $ length l

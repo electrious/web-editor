@@ -19,7 +19,7 @@ import Data.Meter (Meter, meterVal)
 import Data.Newtype (class Newtype)
 import Data.Set (Set)
 import Data.Symbol (SProxy(..))
-import Data.Traversable (class Traversable, traverse_)
+import Data.Traversable (traverse_)
 import Data.UUID (UUID, genUUID)
 import Data.UUIDMap (UUIDMap)
 import Data.UUIDMap as UM
@@ -37,7 +37,7 @@ import Model.Polygon (Polygon, _polyVerts, polyOutline)
 import Model.Roof.RoofPlate (Point, vec2Point)
 import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo, _size, _texture)
 import Model.UUID (class HasUUID, idLens)
-import Rendering.Line (lineMat, renderLineWith)
+import Rendering.Line (renderLineOnlyWith)
 import Rendering.Node (Node, getEnv, tapMesh)
 import SmartHouse.BuilderMode (BuilderMode(..))
 import SmartHouse.PolyGeometry (mkPolyGeometry, mkPolyGeometryWithUV)
@@ -138,22 +138,17 @@ _flipped = _Newtype <<< prop (SProxy :: SProxy "flipped")
 actLineMat :: LineBasicMaterial
 actLineMat = unsafePerformEffect $ mkLineBasicMaterial 0xeeee00 4.0
 
-getRoofLineMat :: ActiveMode -> LineBasicMaterial
-getRoofLineMat Active   = actLineMat
-getRoofLineMat Inactive = lineMat
-
 getRoofActive :: Roof -> Maybe UUID -> ActiveMode
 getRoofActive r (Just i) = fromBoolean $ i == r ^. idLens
 getRoofActive _ Nothing  = Inactive
 
-renderRoofOutline :: forall e. Maybe UUID -> Roof -> Node e Unit
-renderRoofOutline actId r = render $ getRoofLineMat $ getRoofActive r actId
-    where render m = traverse_ (flip renderLineWith m) (polyOutline $ r ^. _polygon)
+renderRoofOutline :: forall e. Roof -> Node e Unit
+renderRoofOutline r = traverse_ (flip renderLineOnlyWith actLineMat) (polyOutline $ r ^. _polygon)
 
-
-renderRoofOutlines :: forall e f. Traversable f => BuilderMode -> Maybe UUID -> f Roof -> Node e Unit
-renderRoofOutlines Building actId = traverse_ (renderRoofOutline actId)
-renderRoofOutlines Showing    _   = const (pure unit)
+renderActRoofOutline :: forall e. BuilderMode -> Maybe Roof -> Node e Unit
+renderActRoofOutline Building (Just r) = renderRoofOutline r
+renderActRoofOutline _ Nothing         = pure unit
+renderActRoofOutline Showing    _      = pure unit
 
 renderRoof :: Dynamic Boolean -> Dynamic (Maybe UUID) -> Roof -> Node HouseTextureInfo RoofEvents
 renderRoof enableDyn actIdDyn roof = do

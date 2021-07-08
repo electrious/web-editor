@@ -12,6 +12,7 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (List(..))
 import Data.Map (Map, lookup)
+import Data.Map as M
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Meter (Meter, meterVal)
 import Data.Newtype (class Newtype)
@@ -43,7 +44,7 @@ import Model.Roof.Panel (Alignment(..), Orientation(..), PanelsDict, panelsDict)
 import Model.Roof.RoofPlate (RoofPlate, _roofIntId)
 import Model.SmartHouse.House (House, HouseNode, HouseOp(..), _activeRoof, _roofTapped, _trees, _wallTapped, flipRoof, getRoof, updateActiveRoofShade, updateHeight)
 import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo)
-import Model.SmartHouse.Roof (Roof, RoofEvents, _flipped, renderRoof)
+import Model.SmartHouse.Roof (Roof, RoofEvents, _flipped, renderActRoofOutline, renderRoof)
 import Model.UUID (idLens)
 import Rendering.DynamicNode (dynamic, dynamic_)
 import Rendering.Line (renderLine, renderLineWith)
@@ -135,16 +136,25 @@ editHouse houseCfg conf = do
             let f Active   i = i
                 f Inactive _ = Nothing
 
+                g (Just i) m = M.lookup i m
+                g Nothing _  = Nothing
+
                 -- id of active roof, taking into account of the house activeness
                 actRoofDyn = f <$> actDyn <*> actRoofIdDyn
-                
+
             -- render roofs
             roofEvtsDyn <- node (def # _position .~ pDyn
                                      # _name     .~ "roofs") do
                 let roofsDyn = view _roofs <$> houseDyn
-                -- render roof outlines dynamically
-                --dynamic_ $ renderRoofOutlines <$> (conf ^. _builderModeDyn) <*> actRoofDyn <*> roofsDyn
-                dynamic_ $ traverse_ renderSubtree <<< view _trees <$> houseDyn
+                    actRDyn = g <$> actRoofDyn <*> roofsDyn
+                node (def # _name .~ "roof-lines"
+                          # _position .~ pure (mkVec3 0.0 0.0 0.02)) do
+                    -- render ridge lines
+                    dynamic_ $ traverse_ renderSubtree <<< view _trees <$> houseDyn
+                    -- render edge lines
+                    dynamic_ $ traverse_ renderLine <<< map (view _line) <<< view _edges <$> houseDyn
+                    -- render roof outlines dynamically
+                    dynamic_ $ renderActRoofOutline <$> (conf ^. _builderModeDyn) <*> actRDyn
 
                 -- render roofs dynamically
                 dynamic $ renderBuilderRoofs houseEditDyn actRoofDyn <$> roofsDyn
