@@ -17,7 +17,7 @@ import Data.Tuple (Tuple(..), fst, snd)
 import Data.UUID (UUID)
 import Data.UUIDMap (UUIDMap)
 import Data.UUIDMap as UM
-import Editor.Common.Lenses (_height, _id, _normal)
+import Editor.Common.Lenses (_height, _id, _normal, _position)
 import Effect (Effect)
 import Math.Angle (Angle, degreeVal, tan)
 import Math.LineSeg (LineSeg, _start, direction)
@@ -87,7 +87,7 @@ mergeRoofDataWith slope t lr rr =
     in RoofData {
         id        : lr ^. idLens,
         subtrees  : S.union (lr ^. _subtrees) (rr ^. _subtrees),
-        edgeNodes : lns <> singleton (view _source $ projNodeTo3D slope t) <> rns,
+        edgeNodes : lns <> singleton (view (_source <<< _position) $ projNodeTo3D slope t) <> rns,
         edge      : lr ^. _edge
         }
 
@@ -96,22 +96,22 @@ setZ z v = mkVec3 (vecX v) (vecY v) z
 
 -- project a subtree node source's Z to 3D value based on slope and distance to corresponding edge
 projNodeTo3D :: Angle -> Subtree -> Subtree
-projNodeTo3D slope t = t # _source %~ setZ (t ^. _height * s)
+projNodeTo3D slope t = t # _source %~ f
                          # _sinks  %~ map f
     where s = scaleFactor slope
-          f (Tuple p h) = Tuple (setZ (h * s) p) h
+          f v = v # _position %~ setZ (v ^. _height * s)
 
 sortedNodes :: Edge -> Angle -> List Subtree -> List Subtree
 sortedNodes e slope ts =
     let edge    = e ^. _line
-        g t1 t2 = comparing (flip distanceAlong edge <<< view _source) t2 t1
+        g t1 t2 = comparing (flip distanceAlong edge <<< view (_source <<< _position)) t2 t1
     in sortBy g $ projNodeTo3D slope <$> ts
 
 -- find polygon for an edge
 roofForEdge :: Angle -> RoofData -> Effect (Tuple Roof (List Subtree))
 roofForEdge slope rd = do
     let sorted = sortedNodes (rd ^. _edge) slope $ S.toUnfoldable $ rd ^. _subtrees
-        nodes  = (view _source <$> sorted) <> rd ^. _edgeNodes
+        nodes  = (view (_source <<< _position) <$> sorted) <> rd ^. _edgeNodes
     roof <- createRoofFrom (newPolygon nodes) (rd ^. _subtrees) (rd ^. _edge <<< _normal)
     pure $ Tuple roof sorted
 

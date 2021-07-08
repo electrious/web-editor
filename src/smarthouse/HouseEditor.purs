@@ -17,7 +17,6 @@ import Data.Meter (Meter, meterVal)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (class Traversable, traverse)
-import Data.Tuple (fst)
 import Data.UUID (UUID)
 import Editor.ArrayBuilder (runArrayBuilder)
 import Editor.Common.Lenses (_alignment, _floor, _height, _houseId, _id, _modeDyn, _name, _orientation, _panelType, _panels, _position, _roof, _roofs, _shadeSelected, _tapped, _updated)
@@ -210,7 +209,7 @@ renderHouse :: House -> Node HouseTextureInfo HouseNode
 renderHouse house = do
     traverse_ renderLine $ view _line <$> house ^. _edges
 
-    let mkLines t = mkLineSeg (t ^. _source) <<< fst <$> t ^. _sinks
+    let mkLines t = mkLineSeg (t ^. _source <<< _position) <<< view _position <$> t ^. _sinks
         renderTree t = do
             c <- liftEffect $ randomInt 0 0xffffff
             mat <- liftEffect $ mkLineBasicMaterial c 4.0

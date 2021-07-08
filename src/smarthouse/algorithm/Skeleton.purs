@@ -34,7 +34,8 @@ import SmartHouse.Algorithm.Event (EdgeE, EdgesE, PointEvent(..), SplitE, _inter
 import SmartHouse.Algorithm.LAV (LAV, SLAV, _edges, _lavs, _vertices, addLav, delLav, emptySLAV, eventValid, getLav, invalidateVertex, lavFromVertices, length, nextVertex, prevVertex, runSLAV, unifyThreeVerts, unifyVerts, updateLav, verticesFromTo)
 import SmartHouse.Algorithm.Ray (ray)
 import SmartHouse.Algorithm.VertInfo (_bisector, _cross, _isReflex)
-import SmartHouse.Algorithm.Vertex (Vertex, _lavId, _leftEdge, _rightEdge, vertToSink, vertexFrom)
+import SmartHouse.Algorithm.VertNode (VertNode, mkVertNode, vertNodeFromVertex)
+import SmartHouse.Algorithm.Vertex (Vertex, _lavId, _leftEdge, _rightEdge, vertexFrom)
 import SmartHouse.HouseTracer (almostParallel)
 import Smarthouse.Algorithm.Subtree (Subtree, SubtreeType(..), subtree)
 import Three.Math.Vector (class Vector, Vector3, dist, normal, (<**>), (<+>), (<->), (<.>))
@@ -167,14 +168,17 @@ handleEdgeEvent' :: EdgeE -> LAV -> SLAV (Tuple Subtree (List PointEvent))
 handleEdgeEvent' e lav =
     if isTriangle e lav
         then do let vs = lav ^. _vertices
-                    sinks = fromFoldable $ vertToSink <$> vs
+                    sinks = fromFoldable $ vertNodeFromVertex <$> vs
                     edges = Set.fromFoldable $ Arr.concatMap (\v -> [v ^. _leftEdge, v ^. _rightEdge]) vs
+                    
+                -- this new Vertex is only used in the final subtree. only position and height is used.
+                newV <- liftEffect $ mkVertNode (e ^. _intersection) (e ^. _distance)
 
                 -- delete this LAV and invalidate all vertices in it
                 delLav (lav ^. idLens)
                 traverse_ invalidateVertex vs
 
-                t <- liftEffect $ subtree NormalNode (e ^. _intersection) (e ^. _distance) sinks (Set.toUnfoldable edges)
+                t <- liftEffect $ subtree NormalNode newV sinks (Set.toUnfoldable edges)
                 
                 pure $ Tuple t Nil
         else do let va = e ^. _vertexA
@@ -183,14 +187,14 @@ handleEdgeEvent' e lav =
                 invalidateVertex va
                 invalidateVertex vb
 
-                let sinks = fromFoldable [vertToSink va, vertToSink vb]
+                let sinks = fromFoldable [vertNodeFromVertex va, vertNodeFromVertex vb]
                     edges = Set.fromFoldable [va ^. _leftEdge, va ^. _rightEdge, vb ^. _leftEdge, vb ^. _rightEdge]
                 newEvt <- nextEvent newLav newV
                 let evts = fromFoldable $ compact [newEvt]
 
                 updateLav newLav (Just newV)
 
-                t <- liftEffect $ subtree NormalNode (e ^. _intersection) (e ^. _distance) sinks (Set.toUnfoldable edges)
+                t <- liftEffect $ subtree NormalNode (vertNodeFromVertex newV) sinks (Set.toUnfoldable edges)
                 pure $ Tuple t evts
 
 
@@ -201,37 +205,40 @@ handleEdgesEvent' :: EdgesE -> LAV -> SLAV (Tuple Subtree (List PointEvent))
 handleEdgesEvent' e lav =
     if isRectangle e lav
         then do let vs = lav ^. _vertices
-                    sinks = fromFoldable $ vertToSink <$> vs
+                    sinks = fromFoldable $ vertNodeFromVertex <$> vs
                     edges = Set.fromFoldable $ Arr.concatMap (\v -> [v ^. _leftEdge, v ^. _rightEdge]) vs
+
+                -- this new Vertex is only used in the final subtree. only position and height is used.
+                newV <- liftEffect $ mkVertNode (e ^. _intersection) (e ^. _distance)
 
                 -- delete this LAV and invalidate all vertices in it
                 delLav (lav ^. idLens)
                 traverse_ invalidateVertex vs
 
-                t <- liftEffect $ subtree NormalNode (e ^. _intersection) (e ^. _distance) sinks (Set.toUnfoldable edges)
+                t <- liftEffect $ subtree NormalNode newV sinks (Set.toUnfoldable edges)
                 pure $ Tuple t Nil
         else do let va = e ^. _vertexA
                     vb = e ^. _vertexB
                     vc = e ^. _vertexC
-                Tuple newLav newV <- liftEffect $ unifyThreeVerts va vb vc (e ^. _intersection) (e ^. _distance) lav
+                Triple newLav newV canHaveNewEvts <- liftEffect $ unifyThreeVerts va vb vc (e ^. _intersection) (e ^. _distance) lav
                 invalidateVertex va
                 invalidateVertex vb
                 invalidateVertex vc
 
-                let sinks = fromFoldable [vertToSink va, vertToSink vb, vertToSink vc]
+                let sinks = fromFoldable $ vertNodeFromVertex <$> [va, vb, vc]
                     edges = Set.fromFoldable [va ^. _leftEdge, va ^. _rightEdge,
                                               vb ^. _leftEdge, vb ^. _rightEdge,
                                               vc ^. _leftEdge, vc ^. _rightEdge]
                     nodeT = MergedNode (va ^. _leftEdge) (vc ^. _rightEdge)
-                evts <- case newV of
-                    Just nv -> do
-                        newEvt <- nextEvent newLav nv
-                        pure $ fromFoldable $ compact [newEvt]
-                    Nothing -> pure Nil
+                evts <- if canHaveNewEvts
+                        then do
+                            newEvt <- nextEvent newLav newV
+                            pure $ fromFoldable $ compact [newEvt]
+                        else pure Nil
 
-                updateLav newLav newV
+                updateLav newLav (Just newV)
 
-                t <- liftEffect $ subtree nodeT (e ^. _intersection) (e ^. _distance) sinks (Set.toUnfoldable edges)
+                t <- liftEffect $ subtree nodeT (vertNodeFromVertex newV) sinks (Set.toUnfoldable edges)
                 pure $ Tuple t evts
 
 
@@ -243,12 +250,12 @@ handleSplitEvent' e (Tuple x y) = do
     let lavId  = e ^. _vertex <<< _lavId
         intPos = e ^. _intersection
         h      = e ^. _distance
-    v1 <- liftEffect $ vertexFrom lavId intPos h (e ^. _vertex <<< _leftEdge) (e ^. _oppositeEdge) Nothing Nothing
-    v2 <- liftEffect $ vertexFrom lavId intPos h (e ^. _oppositeEdge) (e ^. _vertex <<< _rightEdge) Nothing Nothing
+        v      = e ^. _vertex
+    v1 <- liftEffect $ vertexFrom lavId intPos h (v ^. _leftEdge) (e ^. _oppositeEdge) Nothing Nothing
+    v2 <- liftEffect $ vertexFrom lavId intPos h (e ^. _oppositeEdge) (v ^. _rightEdge) Nothing Nothing
 
     lav <- getLav lavId
-    let v = e ^. _vertex
-        edges = Set.fromFoldable [v ^. _leftEdge, v ^. _rightEdge]
+    let edges = Set.fromFoldable [v ^. _leftEdge, v ^. _rightEdge]
     
         eNext = lav >>= nextVertex v
         ePrev = lav >>= prevVertex v
@@ -278,12 +285,12 @@ handleSplitEvent' e (Tuple x y) = do
 
     invalidateVertex v
 
-    t <- liftEffect $ subtree NormalNode intPos (e ^. _distance) (Cons (vertToSink v) sinks) (Set.toUnfoldable $ edges <> es)
+    t <- liftEffect $ subtree NormalNode (vertNodeFromVertex v1) (Cons (vertNodeFromVertex v) sinks) (Set.toUnfoldable $ edges <> es)
     
     pure $ Tuple t evts
 
 
-processNewLAV :: LAV -> List Vertex -> SLAV (Triple (List PointEvent) (List (Tuple Vector3 Number)) (Set.Set Edge))
+processNewLAV :: LAV -> List Vertex -> SLAV (Triple (List PointEvent) (List VertNode) (Set.Set Edge))
 processNewLAV lav nvs = if length lav > 2
                         then do addLav lav nvs
                                 evts <- traverse (nextEvent lav) nvs
@@ -291,10 +298,10 @@ processNewLAV lav nvs = if length lav > 2
                         else -- only 2 vertices in this LAV, collapse it
                             do let vs = lav ^. _vertices
                                    v  = vs !! 1
-                                   sink = vertToSink <$> v
+                                   sink = v
                                    edges = Set.fromFoldable $ compact $ [view _leftEdge <$> v, view _rightEdge <$> v]
                                traverse_ invalidateVertex vs
-                               pure $ Triple Nil (compact $ singleton sink) edges
+                               pure $ Triple Nil (vertNodeFromVertex <$> compact (singleton sink)) edges
 
 
 findXY :: SplitE -> SLAV (Maybe (Tuple Vertex Vertex))

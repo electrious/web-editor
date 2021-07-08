@@ -5,21 +5,22 @@ import Prelude
 import Data.Array (foldl)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Lens (Lens', view, (.~), (^.))
+import Data.Lens (Lens', set, view, (%~), (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (List(..), elem, (:))
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
-import Data.Tuple (Tuple(..), fst)
+import Data.Tuple (Tuple(..))
 import Data.UUID (UUID, genUUID)
-import Editor.Common.Lenses (_height, _id)
+import Editor.Common.Lenses (_id, _position)
 import Effect (Effect)
 import Math.LineSeg (LineSeg, mkLineSeg)
 import Model.UUID (class HasUUID, idLens)
 import SmartHouse.Algorithm.Edge (Edge)
 import SmartHouse.Algorithm.LAV (_edges)
+import SmartHouse.Algorithm.VertNode (VertNode)
 import Three.Math.Vector (Vector3, (<**>), (<+>))
 
 data SubtreeType = NormalNode
@@ -35,9 +36,8 @@ instance showSubtreeType :: Show SubtreeType where
 
 newtype Subtree = Subtree {
     id              :: UUID,
-    source          :: Vector3,
-    height          :: Number,
-    sinks           :: List (Tuple Vector3 Number), -- sink position with min height to an edge
+    source          :: VertNode,
+    sinks           :: List VertNode,
     edges           :: List Edge,
     subtreeType     :: SubtreeType,
     isGable         :: Boolean,         -- if this subtree node is gable
@@ -53,7 +53,6 @@ instance hasUUIDSubtree :: HasUUID Subtree where
     idLens = _id
 instance showSubtree :: Show Subtree where
     show t = "Subtree { source: "      <> show (t ^. _source) <>
-                     ", height: "      <> show (t ^. _height) <>
                      ", sinks: "       <> show (t ^. _sinks) <>
                      ", edges: "       <> show (t ^. _edges) <>
                      ", subtreeType: " <> show (t ^. _subtreeType) <>
@@ -76,13 +75,12 @@ _originalSubtree :: forall t a r. Newtype t { originalSubtree :: a | r } => Lens
 _originalSubtree = _Newtype <<< prop (SProxy :: SProxy "originalSubtree")
 
 
-subtree :: SubtreeType -> Vector3 -> Number -> List (Tuple Vector3 Number) -> List Edge -> Effect Subtree
-subtree t source h ss es = do
+subtree :: SubtreeType -> VertNode -> List VertNode -> List Edge -> Effect Subtree
+subtree t source ss es = do
     i <- genUUID
     pure $ Subtree {
         id              : i,
         source          : source,
-        height          : h,
         sinks           : ss,
         edges           : es,
         subtreeType     : t,
@@ -100,18 +98,19 @@ mergedEdge e t = case t ^. _subtreeType of
     MergedNode le re -> e == le || e == re
 
 treeLines :: Subtree -> List (LineSeg Vector3)
-treeLines t = mkLineSeg s <<< fst <$> t ^. _sinks
-    where s = t ^. _source
+treeLines t = mkLineSeg s <<< view _position <$> t ^. _sinks
+    where s = t ^. _source <<< _position
 
 gableSubtree :: Subtree -> List Vector3 -> Subtree
-gableSubtree t vs = mkT $ foldl f (Tuple 0 Nil) (fst <$> t ^. _sinks)
+gableSubtree t vs = mkT $ foldl f (Tuple 0 Nil) (view _position <$> t ^. _sinks)
     where f (Tuple n ls) v = if elem v vs
                              then Tuple (n + 1) (Cons v ls)
                              else Tuple n ls
           mkT (Tuple n ls) = case ls of
-              (v1:v2:_) -> t # _source          .~ (v1 <+> v2) <**> 0.5
-                             # _isGable         .~ true
-                             # _originalSubtree .~ Just t
+              (v1:v2:_) -> let np = (v1 <+> v2) <**> 0.5
+                           in t # _source          %~ set _position np
+                                # _isGable         .~ true
+                                # _originalSubtree .~ Just t
               _ -> t
 
 

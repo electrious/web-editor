@@ -133,7 +133,7 @@ unifyVerts va vb point h lav = do
     pure $ Tuple newLav nv
 
 
-unifyThreeVerts :: Vertex -> Vertex -> Vertex -> Vector3 -> Number -> LAV -> Effect (Tuple LAV (Maybe Vertex))
+unifyThreeVerts :: Vertex -> Vertex -> Vertex -> Vector3 -> Number -> LAV -> Effect (Triple LAV Vertex Boolean)
 unifyThreeVerts va vb vc point h lav = do
     nv <- vertexFrom (lav ^. idLens) point h (va ^. _leftEdge) (vc ^. _rightEdge) (Just $ vc ^. _bisector <<< _direction) (Just $ va ^. _bisector <<< _direction)
 
@@ -159,7 +159,7 @@ unifyThreeVerts va vb vc point h lav = do
         
                    newLav = lav # _vertices .~ fromMaybe vs arr
                                 # _indices  .~ fromMaybe om nm
-               in Tuple newLav (Just nv)
+               in Triple newLav nv false
            else let arr = join $ (\ia ib ic -> deleteAt ic vs >>= deleteAt ib >>= deleteAt ia) <$> idxA <*> idxB <*> idxC
                     -- delete 3 for all indices larger than the nv index
                     updIdx delta nvi i = if i > nvi then i - delta else i
@@ -172,7 +172,7 @@ unifyThreeVerts va vb vc point h lav = do
                         
                     newLav = lav # _vertices .~ fromMaybe vs arr
                                  # _indices  .~ fromMaybe om nm
-                in Tuple newLav Nothing
+                in Triple newLav nv true
 
 
 newtype SLAVState = SLAVState {
