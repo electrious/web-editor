@@ -28,7 +28,7 @@ import Model.ActiveMode (ActiveMode, isActive)
 import Model.SmartHouse.Tree (Tree, TreeNode, TreeOp(..), TreePart, _barrel, _canopy, _crown, _dia, mkTree)
 import Model.UUID (idLens)
 import Rendering.DynamicNode (dynamic)
-import Rendering.Node (Node, _fontSize, _renderOrder, _textAlign, _visible, dynText3D, fixNodeDWith, mesh, node, tapMesh)
+import Rendering.Node (Node, Props, TextProps, _fontSize, _renderOrder, _textAlign, _visible, dynText3D, fixNodeDWith, mesh, node, tapMesh)
 import Three.Core.Face3 (normal)
 import Three.Core.Geometry (BufferGeometry, CircleGeometry, mkCircleGeometry, mkCylinderGeometry)
 import Three.Core.Material (MeshPhongMaterial, mkMeshPhongMaterial)
@@ -131,75 +131,107 @@ heightBtn :: forall e. Dynamic Boolean -> Tree -> Dynamic TreePart -> Dynamic Ve
 heightBtn actDyn tree crownDyn posDyn = node (def # _position .~ posDyn) $
     fixNodeDWith (tree ^. _height) \hDyn -> do
         let tDyn = feetInchStr <$> hDyn
+
+            h = tree ^. _height
+            validF crown p = let z = vecZ p
+                             in z < 50.0 && z > meterVal (crown ^. _height) + 0.5
+        
+            toT v = mkVec3 (vecX v) (vecY v) (vecZ v + 0.5)
+            fromT v = mkVec3 (vecX v) (vecY v) (vecZ v - 0.5)
+
+            cfg = def # _height     .~ h
+                      # _toTarget   .~ toT
+                      # _fromTarget .~ fromT
+                      # _validator  .~ (validF <$> crownDyn)
+                      # _direction  .~ ZOnly
+
             tProp = def # _fontSize  .~ 0.35
                         # _textAlign .~ "center"
-            tWrpCfg = def # _position .~ pure (mkVec3 (-0.44) (0.2) 0.0)
+            tWrpCfg = def # _position .~ pure (mkVec3 (-0.44) 0.2 0.0)
         hEvt <- view _height <$> buildTreeDragBtn actDyn cfg (node tWrpCfg $ void $ dynText3D tProp tDyn)
         pure { input : hEvt, output : hEvt }
 
-    where h = tree ^. _height
-          validF crown p = let z = vecZ p
-                           in z < 50.0 && z > meterVal (crown ^. _height) + 0.5
-        
-          toT v = mkVec3 (vecX v) (vecY v) (vecZ v + 0.5)
-          fromT v = mkVec3 (vecX v) (vecY v) (vecZ v - 0.5)
 
-          cfg = def # _height     .~ h
-                    # _toTarget   .~ toT
-                    # _fromTarget .~ fromT
-                    # _validator  .~ (validF <$> crownDyn)
-                    # _direction  .~ ZOnly
+mkHeightDiaStr :: Meter -> Meter -> String
+mkHeightDiaStr h d = "h: " <> feetInchStr h <> "\nr: " <> feetInchStr d
+
+textProp :: TextProps
+textProp = def # _fontSize  .~ 0.25
+               # _textAlign .~ "center"
+
+textWrapperCfg :: Props
+textWrapperCfg = def # _position .~ pure (mkVec3 (-0.44) 0.25 0.0)
+
+toTarget :: Vector3 -> Vector3
+toTarget v = mkVec3 (vecX v + 0.5) (vecY v) (vecZ v)
+
+fromTarget :: Vector3 -> Vector3
+fromTarget v = mkVec3 (vecX v - 0.5) (vecY v) (vecZ v)
 
 crownBtn :: forall e. Dynamic Boolean -> Tree -> Dynamic Meter -> Dynamic TreePart -> Dynamic Vector3 -> Node e TreeBtnEvts
-crownBtn actDyn tree hDyn barrelDyn posDyn = node (def # _position .~ posDyn) $ buildTreeDragBtn actDyn cfg (pure unit)
-    where c = tree ^. _crown
-          validF h barrel p = let x = vecX p
-                                  z = vecZ p
-                              in x > 0.5 && x < 20.5 && z > meterVal (barrel ^. _height) && z < meterVal h
-          
-          toT v = mkVec3 (vecX v + 0.5) (vecY v) (vecZ v)
-          fromT v = mkVec3 (vecX v - 0.5) (vecY v) (vecZ v)
+crownBtn actDyn tree hDyn barrelDyn posDyn = node (def # _position .~ posDyn) $
+    fixNodeDWith (tree ^. _crown <<< _height) \chDyn ->
+        fixNodeDWith (tree ^. _crown <<< _dia) \cdDyn -> do
+            let c = tree ^. _crown
+                validF h barrel p = let x = vecX p
+                                        z = vecZ p
+                                    in x > 0.5 && x < 20.5 && z > meterVal (barrel ^. _height) && z < meterVal h
+            
+                cfg = def # _height     .~ (c ^. _height)
+                          # _toTarget   .~ toTarget
+                          # _fromTarget .~ fromTarget
+                          # _dia        .~ (c ^. _dia)
+                          # _validator  .~ (validF <$> hDyn <*> barrelDyn)
+                
+                tDyn = mkHeightDiaStr <$> chDyn <*> cdDyn
 
-          cfg = def # _height     .~ (c ^. _height)
-                    # _toTarget   .~ toT
-                    # _fromTarget .~ fromT
-                    # _dia        .~ (c ^. _dia)
-                    # _validator  .~ (validF <$> hDyn <*> barrelDyn)
+            evt <- buildTreeDragBtn actDyn cfg (void $ node textWrapperCfg $ dynText3D textProp tDyn) 
+
+            pure { input: evt ^. _dia, output: { input: evt ^. _height, output: evt }}
 
 
 
 barrelBtn :: forall e. Dynamic Boolean -> Tree -> Dynamic TreePart -> Dynamic TreePart -> Dynamic Vector3 -> Node e TreeBtnEvts
-barrelBtn actDyn tree crownDyn canopyDyn posDyn = node (def # _position .~ posDyn) $ buildTreeDragBtn actDyn cfg (pure unit)
-    where b = tree ^. _barrel
-          validF crown canopy p = let x = vecX p
-                                      z = vecZ p
-                                  in x > 0.5 && x < 20.5 && z > meterVal (canopy ^. _height) && z < meterVal (crown ^. _height)
-          
-          toT v = mkVec3 (vecX v + 0.5) (vecY v) (vecZ v)
-          fromT v = mkVec3 (vecX v - 0.5) (vecY v) (vecZ v)
+barrelBtn actDyn tree crownDyn canopyDyn posDyn = node (def # _position .~ posDyn) $
+    fixNodeDWith (tree ^. _barrel <<< _height) \bhDyn ->
+        fixNodeDWith (tree ^. _barrel <<< _dia) \bdDyn -> do
+            let b = tree ^. _barrel
+                validF crown canopy p = let x = vecX p
+                                            z = vecZ p
+                                        in x > 0.5 && x < 20.5 && z > meterVal (canopy ^. _height) && z < meterVal (crown ^. _height)
+                
+                cfg = def # _height     .~ (b ^. _height)
+                          # _dia        .~ (b ^. _dia)
+                          # _toTarget   .~ toTarget
+                          # _fromTarget .~ fromTarget
+                          # _validator  .~ (validF <$> crownDyn <*> canopyDyn)
+                
+                tDyn = mkHeightDiaStr <$> bhDyn <*> bdDyn
+            evt <- buildTreeDragBtn actDyn cfg (void $ node textWrapperCfg $ dynText3D textProp tDyn)
 
-          cfg = def # _height     .~ (b ^. _height)
-                    # _dia        .~ (b ^. _dia)
-                    # _toTarget   .~ toT
-                    # _fromTarget .~ fromT
-                    # _validator  .~ (validF <$> crownDyn <*> canopyDyn)
+            pure { input: evt ^. _dia, output: { input: evt ^. _height, output: evt }}
 
 
 canopyBtn :: forall e. Dynamic Boolean -> Tree -> Dynamic TreePart -> Dynamic Vector3 -> Node e TreeBtnEvts
-canopyBtn actDyn tree barrelDyn posDyn = node (def # _position .~ posDyn) $ buildTreeDragBtn actDyn cfg (pure unit)
-    where c = tree ^. _canopy
-          validF barrel p = let x = vecX p
-                                z = vecZ p
-                            in x > 0.5 && x < 20.5 && z > 0.0 && z < meterVal (barrel ^. _height)
-          
-          toT v = mkVec3 (vecX v + 0.5) (vecY v) (vecZ v)
-          fromT v = mkVec3 (vecX v - 0.5) (vecY v) (vecZ v)
+canopyBtn actDyn tree barrelDyn posDyn = node (def # _position .~ posDyn) $
+    fixNodeDWith (tree ^. _canopy <<< _height) \chDyn ->
+        fixNodeDWith (tree ^. _canopy <<< _dia) \cdDyn -> do
+            let c = tree ^. _canopy
+                validF barrel p = let x = vecX p
+                                      z = vecZ p
+                                  in x > 0.5 && x < 20.5 && z > 0.0 && z < meterVal (barrel ^. _height)
+                
+                cfg = def # _height     .~ (c ^. _height)
+                          # _dia        .~ (c ^. _dia)
+                          # _toTarget   .~ toTarget
+                          # _fromTarget .~ fromTarget
+                          # _validator  .~ (validF <$> barrelDyn)
+            
+                tDyn = mkHeightDiaStr <$> chDyn <*> cdDyn
+     
+            evt <- buildTreeDragBtn actDyn cfg (void $ node textWrapperCfg $ dynText3D textProp tDyn)
 
-          cfg = def # _height     .~ (c ^. _height)
-                    # _dia        .~ (c ^. _dia)
-                    # _toTarget   .~ toT
-                    # _fromTarget .~ fromT
-                    # _validator  .~ (validF <$> barrelDyn)
+            pure { input: evt ^. _dia, output: { input: evt ^. _height, output: evt }}
 
 
 editTree :: forall e. Tree -> Dynamic ActiveMode -> Node e TreeNode

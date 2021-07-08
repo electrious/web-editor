@@ -39,6 +39,8 @@ instance showTreePart :: Show TreePart where
 _dia :: forall t a r. Newtype t { dia :: a | r } => Lens' t a
 _dia = _Newtype <<< prop (SProxy :: SProxy "dia")
 
+mkTreePart :: Meter -> Meter -> TreePart
+mkTreePart h d = TreePart { height: h, dia: d }
 
 newtype Tree = Tree {
     id       :: UUID,
