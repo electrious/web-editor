@@ -167,12 +167,12 @@ editHouse houseCfg conf = do
 
             -- setup height editor and get the delta event
             -- enable height editor only in EditingHouse mode and actDyn is active
-            deltaEvt <- setupHeightEditor $ def # _modeDyn  .~ ((&&) <$> actDyn <*> (fromBoolean <$> houseEditDyn))
-                                                # _position .~ pure hPos
-                                                # _min      .~ (- meterVal h)
+            hEvt <- setupHeightEditor $ def # _modeDyn  .~ ((&&) <$> actDyn <*> (fromBoolean <$> houseEditDyn))
+                                            # _position .~ hPos
+                                            # _height   .~ h
+                                            # _min      .~ (- meterVal h)
     
-            let hEvt = (+) h <$> deltaEvt  -- new height
-                newHouseEvt1 = sampleDyn houseDyn $ updateHeight <$> hEvt
+            let newHouseEvt1 = sampleDyn houseDyn $ updateHeight <$> hEvt
                 newHouseEvt2 = performEvent $ sampleDyn houseDyn $ flipRoof <$> flipEvt
                 newHouseEvt3 = sampleDyn houseDyn $ sampleDyn actRoofIdDyn $ updateActiveRoofShade <$> conf ^. _shadeSelected
                 
