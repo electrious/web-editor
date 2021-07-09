@@ -8,7 +8,6 @@ import Data.Compactable (compact)
 import Data.Default (class Default, def)
 import Data.Enum (fromEnum)
 import Data.Generic.Rep (class Generic)
-import Data.Show.Generic (genericShow)
 import Data.Lens (Lens', (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
@@ -18,7 +17,7 @@ import Data.Maybe (Maybe(..))
 import Data.Meter (Meter, meterVal)
 import Data.Newtype (class Newtype)
 import Data.Set (Set)
-import Type.Proxy (Proxy(..))
+import Data.Show.Generic (genericShow)
 import Data.Traversable (traverse_)
 import Data.UUID (UUID, genUUID)
 import Data.UUIDMap (UUIDMap)
@@ -45,6 +44,7 @@ import SmartHouse.ShadeOption (ShadeOption(..))
 import Smarthouse.Algorithm.Subtree (Subtree, _isGable)
 import Three.Core.Material (LineBasicMaterial, MeshPhongMaterial, mkLineBasicMaterial, mkMeshBasicMaterialWithTexture, mkMeshPhongMaterial)
 import Three.Math.Vector (Vector3, mkVec3, vecX, vecY, vecZ)
+import Type.Proxy (Proxy(..))
 
 data RoofState = SlopeRoof
                | Gable
@@ -92,10 +92,6 @@ subtreeIndex :: Roof -> Maybe UUID
 subtreeIndex r = case M.values $ r ^. _subtrees of
     (t:Nil) -> Just $ t ^. idLens
     _       -> Nothing
-
-
-updateShadeOption :: Roof -> ShadeOption -> Roof
-updateShadeOption r o = r # _shade .~ o
 
 
 exportRoof :: Meter -> Roof -> JSRoof

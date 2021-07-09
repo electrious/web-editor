@@ -7,8 +7,7 @@ import Control.Alternative (empty)
 import Data.Array as Arr
 import Data.Default (class Default, def)
 import Data.Generic.Rep (class Generic)
-import Data.Show.Generic (genericShow)
-import Data.Lens (Lens', (%~), (.~), (^.))
+import Data.Lens (Lens', set, (%~), (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (List, fromFoldable)
@@ -17,12 +16,12 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Meter (Meter, meter, meterVal)
 import Data.Newtype (class Newtype)
 import Data.Set as S
-import Type.Proxy (Proxy(..))
+import Data.Show.Generic (genericShow)
 import Data.Tuple (Tuple(..))
 import Data.UUID (UUID, emptyUUID, genUUID)
 import Data.UUIDMap (UUIDMap)
 import Data.UUIDMap as UM
-import Editor.Common.Lenses (_floor, _height, _id, _roofs, _slope)
+import Editor.Common.Lenses (_floor, _height, _id, _roofs, _shade, _slope)
 import Editor.RoofManager (ArrayEvents)
 import Effect (Effect)
 import FRP.Event (Event)
@@ -31,7 +30,7 @@ import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Math.Angle (Angle, degree)
 import Model.Polygon (Polygon, _polyVerts, counterClockPoly)
 import Model.Roof.RoofPlate (Point, vec2Point)
-import Model.SmartHouse.Roof (JSRoof, Roof, exportRoof, updateShadeOption)
+import Model.SmartHouse.Roof (JSRoof, Roof, exportRoof)
 import Model.UUID (class HasUUID, idLens)
 import SmartHouse.Algorithm.Edge (Edge)
 import SmartHouse.Algorithm.LAV (_edges, _vertices)
@@ -41,6 +40,7 @@ import SmartHouse.ShadeOption (ShadeOption)
 import Smarthouse.Algorithm.Roofs (generateRoofs)
 import Smarthouse.Algorithm.Subtree (Subtree, flipSubtree)
 import Three.Math.Vector (Vector3)
+import Type.Proxy (Proxy(..))
 
 newtype House = House {
     id       :: UUID,
@@ -124,7 +124,7 @@ flipRoof i h = do
 updateActiveRoofShade :: ShadeOption -> Maybe UUID -> House -> House
 updateActiveRoofShade _ Nothing   h = h
 updateActiveRoofShade s (Just ai) h = h # _roofs %~ M.update f ai
-    where f r = Just $ updateShadeOption r s
+    where f r = Just $ set _shade s r
 
 exportHouse :: House -> JSHouse
 exportHouse h = JSHouse { id: h ^. idLens, floor: floor, height: meterVal $ h ^. _height, roofs: roofs }
