@@ -1,4 +1,4 @@
-module Model.Polygon (Polygon, _polyVerts, newPolygon, polygonAround, numOfVerts,
+module Model.Polygon (Polygon(..), _polyVerts, newPolygon, polygonAround, numOfVerts,
                       addVertexAt, delVertexAt, updateVertAt, polyCenter, polyEdges, polyOutline, polyWindows,
                       polyMidPoints, polygonBBox, counterClockPoly,
                       renderPolygon, class IsPolygon, toPolygon, PolyOrient(..), polygonOrient) where

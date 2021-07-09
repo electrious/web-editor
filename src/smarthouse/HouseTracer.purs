@@ -137,8 +137,8 @@ canUndo = isJust <<< head <<< view _tracedVerts
 undo :: TracerState -> TracerState
 undo s = case s ^. _tracedVerts of
     Nil     -> s
-    (v:Nil) -> def
-    (v:ls)  -> s # _tracedVerts .~ ls
+    (_:Nil) -> def
+    (_:ls)  -> s # _tracedVerts .~ ls
 
 
 resetTracer :: Unit -> TracerState -> TracerState
@@ -213,7 +213,7 @@ pointCloseToLine v l = almostParallel l nl
 
 -- find the most parallel edge in the polygon to the specified point
 paraHelperLine :: TracerState -> Maybe Vector3 -> Maybe (LineSeg Vector3)
-paraHelperLine st Nothing  = Nothing
+paraHelperLine _  Nothing  = Nothing
 paraHelperLine st (Just p) = foldl f Nothing $ allLines st
     where f Nothing l    = if pointCloseToLine p l then Just (extendLine l) else Nothing
           f v@(Just _) _ = v
@@ -226,7 +226,7 @@ paraHelperLine st (Just p) = foldl f Nothing $ allLines st
 
 -- helper line to connect to the first point traced
 endHelperLine :: TracerState -> Maybe Vector3 -> Maybe (LineSeg Vector3)
-endHelperLine st Nothing  = Nothing
+endHelperLine _  Nothing  = Nothing
 endHelperLine st (Just p) = foldl f Nothing $ allLines st
     where tempL = mkLineSeg <$> (st ^. _firstVert) <*> Just p
           f Nothing l    = if fromMaybe false (almostParallel <$> Just l <*> tempL) then mkL l <$> st ^. _firstVert else Nothing

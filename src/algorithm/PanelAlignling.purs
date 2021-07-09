@@ -24,7 +24,7 @@ alignOffset p algn = case algn of
     where offset = meterVal ((size p) ^. _width) / 2.0
 
 alignPanelRows :: Alignment -> List ArrayRow -> List Panel
-alignPanelRows algn Nil  = Nil
+alignPanelRows _    Nil  = Nil
 alignPanelRows algn rows = foldl f Nil rowNums
     where row     = unsafePartial $ head rows
           panel   = unsafePartial $ head $ row ^. _panels

@@ -314,7 +314,7 @@ findXY e = get >>= getVS >>> foldM f Nothing
           getVS s = concatMap (fromFoldable <<< view _vertices) (M.values $ s ^. _lavs)
 
           f Nothing v    = testV opStart opNorm (e ^. _intersection) v
-          f r@(Just _) v = pure r
+          f r@(Just _) _ = pure r
 
 -- test if a vertex is the right candidate for calculating X and Y
 testV :: Vector3 -> Vector3 -> Vector3 -> Vertex -> SLAV (Maybe (Tuple Vertex Vertex))

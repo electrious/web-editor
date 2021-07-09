@@ -1,5 +1,5 @@
 module Editor.Rendering.ButtonsRenderer (ButtonOperation(..),
-    ButtonsRenderer, _plusTapped, _plusDragged, _rotTapped,
+    ButtonsRenderer(..), _plusTapped, _plusDragged, _rotTapped,
     mkButtonsRenderer) where
 
 import Prelude hiding (add)
@@ -88,18 +88,18 @@ applyOp parent cfg (RenderRotateButtons rs) st = do
     nodes <- runRenderingM (traverse render rs) cfg
     traverse_ (flip add parent) nodes
     pure $ nst # _rotBtns .~ nodes
-applyOp parent cfg (HideButtonsExcept pb) st = do
+applyOp parent _ (HideButtonsExcept pb) st = do
     let f p = p ^. _plusButton <<< _id /= pb ^. _id
         hiddenBtns = partition f (st ^. _plusBtns)
     traverse_ (flip remove parent) hiddenBtns.yes
     nst <- delRotNodes parent st
     pure $ nst # _plusBtns .~ hiddenBtns.no
                # _rotBtns  .~ Nil
-applyOp parent cfg (MovePlusButton pb delta) st = do
+applyOp _ _ (MovePlusButton pb delta) st = do
     let pn = find ((==) (pb ^. _id) <<< view (_plusButton <<< _id)) $ st ^. _plusBtns
     npn <- traverse (moveBy delta) pn
     pure $ st # _plusBtns .~ fromFoldable npn
-applyOp parent cfg ResetButtons st = do
+applyOp parent _ ResetButtons st = do
     nst <- delPlusNodes parent st
     _ <- delRotNodes parent nst
     pure $ st # _plusBtns .~ Nil

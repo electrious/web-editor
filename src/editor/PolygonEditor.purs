@@ -40,7 +40,7 @@ mkVertMarkerPoints m polyActive actMarker poly = mkV <$> zip ps (range 0 (length
                                     # _index    .~ idx
                                     # _active   .~ (f idx <$> polyActive <*> actMarker)
                                     # _modifier .~ m
-          f idx act Nothing       = act
+          f _   act Nothing       = act
           f idx act (Just actIdx) = act && fromBoolean (actIdx == idx)
 
 -- create new vertex markers

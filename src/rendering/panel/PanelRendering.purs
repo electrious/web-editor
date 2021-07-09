@@ -1,5 +1,5 @@
 module Editor.Rendering.PanelRendering (PanelRendererConfig(..), _operations,
-    _opacity, PanelRenderer, _allPanels, createPanelRenderer) where
+    _opacity, PanelRenderer(..), _allPanels, createPanelRenderer) where
 
 import Prelude hiding (add)
 

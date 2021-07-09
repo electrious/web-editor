@@ -1,4 +1,4 @@
-module RBush.RBush (BBox, RBush, mkRBush, load, insert, search) where
+module RBush.RBush (BBox(..), RBush, mkRBush, load, insert, search) where
 
 import Prelude
 

@@ -28,11 +28,11 @@ import RBush.RBush (RBush, insert, mkRBush, search)
 import Three.Math.Vector (mkVec2, vecX, vecY)
 
 plusBtnForEmptyArr :: PanelArray -> RoofPlate -> PlusButton
-plusBtnForEmptyArr arr roof = def # _x           .~ meter (vecX center)
-                                  # _y           .~ meter (vecY center)
-                                  # _orientation .~ arr ^. _orientation
-                                  # _slope       .~ arr ^. _config ^. _panelSlope
-                                  # _arrayNumber .~ arr ^. _arrayNumber
+plusBtnForEmptyArr arr _ = def # _x           .~ meter (vecX center)
+                               # _y           .~ meter (vecY center)
+                               # _orientation .~ arr ^. _orientation
+                               # _slope       .~ arr ^. _config ^. _panelSlope
+                               # _arrayNumber .~ arr ^. _arrayNumber
     -- use default center.
     -- TODO: implement PolygonCenter algorithm and calculate the best
     -- position for the default plus button
@@ -52,7 +52,7 @@ sameRowPlusBtns cfg p = b1 : b2 : Nil
           b2 = b # _x  .~ x + w
 
 otherPlusBtns :: ArrayConfig -> PanelArray -> RoofPlate -> Panel -> List PlusButton
-otherPlusBtns cfg arr roof p =
+otherPlusBtns cfg arr _ p =
     let x      = p ^. _x
         y      = p ^. _y
         w      = colDistance cfg p

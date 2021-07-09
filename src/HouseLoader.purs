@@ -1,4 +1,4 @@
-module Editor.HouseLoader (editHouse, House, _loaded, _screenshot, _roofUpdate) where
+module Editor.HouseLoader (editHouse, House(..), _loaded, _screenshot, _roofUpdate) where
 
 import Prelude hiding (add)
 

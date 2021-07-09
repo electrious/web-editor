@@ -26,7 +26,7 @@ mkPolyGeometry poly norm = do
         nv = getVector norm
         ns = const nv <$> vs
 
-        mkUV v = mkVec2 0.0 0.0
+        mkUV _ = mkVec2 0.0 0.0
         uvs = mkUV <$> vs
 
     geo <- mkBufferGeometry

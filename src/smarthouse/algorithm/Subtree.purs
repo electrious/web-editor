@@ -106,7 +106,7 @@ gableSubtree t vs = mkT $ foldl f (Tuple 0 Nil) (view _position <$> t ^. _sinks)
     where f (Tuple n ls) v = if elem v vs
                              then Tuple (n + 1) (Cons v ls)
                              else Tuple n ls
-          mkT (Tuple n ls) = case ls of
+          mkT (Tuple _ ls) = case ls of
               (v1:v2:_) -> let np = (v1 <+> v2) <**> 0.5
                            in t # _source          %~ set _position np
                                 # _isGable         .~ true

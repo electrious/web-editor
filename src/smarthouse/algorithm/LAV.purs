@@ -168,7 +168,7 @@ unifyThreeVerts va vb vc point h lav = do
                     getDelta 1 = 2
                     getDelta _ = 3
 
-                    nm = (\ia ic -> updIdx (getDelta ic) ic <$> m) <$> idxA <*> idxC
+                    nm = (\_ ic -> updIdx (getDelta ic) ic <$> m) <$> idxA <*> idxC
                         
                     newLav = lav # _vertices .~ fromMaybe vs arr
                                  # _indices  .~ fromMaybe om nm

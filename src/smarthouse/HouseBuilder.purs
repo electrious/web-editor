@@ -1,4 +1,4 @@
-module SmartHouse.HouseBuilder (buildHouse, HouseBuilderConfig, HouseBuilt,  _hasHouse) where
+module SmartHouse.HouseBuilder (buildHouse, HouseBuilderConfig(..), HouseBuilt(..),  _hasHouse) where
 
 import Prelude hiding (degree)
 
@@ -253,7 +253,7 @@ renderHouseDict actIdDyn modeDyn houseCfg arrParam shadeEvt roofsDatEvt houses =
     where getMode _ _ Showing                            = Inactive
           getMode h (Just i) Building | h ^. idLens == i = Active
                                       | otherwise        = Inactive
-          getMode h Nothing Building                     = Inactive
+          getMode _ Nothing Building                     = Inactive
           
           render h = if houseRenderMode == EditHouseMode
                      then do

@@ -257,8 +257,7 @@ createPanelLayer cfg = do
     modeDyn <- view _editorMode <$> ask
     d <- liftEffect $ subscribeDyn (((/=) RoofEditing) <$> modeDyn) (flip setVisible layer)
 
-    arrCfgDyn <- view _arrayConfig <$> ask
-    apiCfg    <- view _apiConfig   <$> ask
+    apiCfg <- view _apiConfig <$> ask
     
     let roof = cfg ^. _roof
 
@@ -486,7 +485,7 @@ zeroSlope roof ps | isFlat roof = ps
                   | otherwise   = set _slope def <$> ps
 
 loadPanels :: PanelLayerConfig -> PanelLayerState -> List Panel -> Effect PanelLayerState
-loadPanels cfg st Nil = pure st
+loadPanels _   st Nil = pure st
 loadPanels cfg st ps  = do
     let nps = zeroSlope (cfg ^. _roof) ps
     newLayout <- updateLayout cfg st nps
@@ -603,9 +602,9 @@ dragPanel cfg st d = case d ^. _dragType of
     DragEnd   -> endDragging cfg st (d ^. _object <<< _arrNumber)
 
 startDragging :: PanelLayerConfig -> PanelLayerState -> DragInfo Panel -> Effect PanelLayerState
-startDragging cfg st d = if not (st ^. _roofActive) || st ^. _activeArray /= Just (d ^. _object <<< _arrNumber)
-                         then pure $ clearOperations st
-                         else do
+startDragging _ st d = if not (st ^. _roofActive) || st ^. _activeArray /= Just (d ^. _object <<< _arrNumber)
+                       then pure $ clearOperations st
+                       else do
                             p <- worldToLocal (d ^. _point) (st ^. _object)
                             -- find all panels in the dragged array and put it in tempPanels field
                             let ps         = allPanels st
@@ -618,9 +617,9 @@ startDragging cfg st d = if not (st ^. _roofActive) || st ^. _activeArray /= Jus
 
 
 drag :: PanelLayerConfig -> PanelLayerState -> DragInfo Panel -> Effect PanelLayerState
-drag cfg st d = if not (st ^. _roofActive) || st ^. _activeArray /= Just (d ^. _object <<< _arrNumber)
-                then pure st
-                else do
+drag _ st d = if not (st ^. _roofActive) || st ^. _activeArray /= Just (d ^. _object <<< _arrNumber)
+              then pure st
+              else do
                     p <- worldToLocal (d ^. _point) (st ^. _object)
                     let delta = maybe def (p <-> _) (st ^. _lastDragPos)
                         arrNum = d ^. _object <<< _arrNumber
@@ -748,10 +747,10 @@ updateRoofActive cfg st active = if active
 
 -- update the editor mode. reset all buttons in showing mode and add buttons for active array in arrayediting mode
 updateEditorMode :: PanelLayerConfig -> PanelLayerState -> EditorMode -> Effect PanelLayerState
-updateEditorMode cfg st Showing      = pure $ (clearOperations st) # _btnsOperations .~ singleton ResetButtons
+updateEditorMode _   st Showing      = pure $ (clearOperations st) # _btnsOperations .~ singleton ResetButtons
 updateEditorMode cfg st ArrayEditing = checkAndUpdateBtnOps cfg false $ clearOperations st
-updateEditorMode cfg st RoofEditing  = pure $ clearOperations st
-updateEditorMode cfg st HouseBuilding = pure $ clearOperations st
+updateEditorMode _   st RoofEditing  = pure $ clearOperations st
+updateEditorMode _   st HouseBuilding = pure $ clearOperations st
 
 checkAndUpdateBtnOps :: PanelLayerConfig -> Boolean -> PanelLayerState -> Effect PanelLayerState
 checkAndUpdateBtnOps cfg arrayChanged st = if st ^. _roofActive

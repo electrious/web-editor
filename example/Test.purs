@@ -96,6 +96,6 @@ doTest roofDat panelDat = do
                                                  # _panelType      .~ panelType
                             r <- buildHouse editor builderCfg
 
-                            let readyEvt = const unit <$> filter identity (r ^. _hasHouse)
+                            let _ = const unit <$> filter identity (r ^. _hasHouse)
                             
                             pure unit

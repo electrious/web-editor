@@ -69,7 +69,7 @@ linePoints l = [l ^. _start, l ^. _end]
 mostParaLineSeg :: forall f v. Foldable f => Vector v => LineSeg v -> f (LineSeg v) -> Maybe (Tuple (LineSeg v) Angle)
 mostParaLineSeg target = foldl f Nothing
     where f Nothing l = Just $ Tuple l (linesAngle target l)
-          f lv@(Just (Tuple ll la)) l =
+          f lv@(Just (Tuple _ la)) l =
               let na = linesAngle l target
               in if na < la then Just (Tuple l na) else lv
 

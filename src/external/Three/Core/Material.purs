@@ -22,12 +22,14 @@ foreign import mkLineBasicMaterial :: Int -> Number -> Effect LineBasicMaterial
 -- create LineDashedMaterial with color, line width, scale, dash size and gap size
 foreign import mkLineDashedMaterial :: Int -> Number -> Number -> Number -> Number -> Effect LineDashedMaterial
 
+class IsMaterial :: forall k. k -> Constraint
 class IsMaterial a
 
 instance isMaterialMaterial :: IsMaterial Material
 instance isMaterialMeshBasicMaterial :: IsMaterial MeshBasicMaterial
 instance isMaterialMeshPhongMaterial :: IsMaterial MeshPhongMaterial
 
+class IsLineMaterial :: forall k. k -> Constraint
 class IsLineMaterial a
 
 instance isLineMatLineBasicMaterial :: IsLineMaterial LineBasicMaterial

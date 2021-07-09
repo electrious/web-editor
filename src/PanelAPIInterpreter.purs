@@ -68,7 +68,7 @@ applyOp (AddPanel p) m      = insert (p ^. _uuid) p m
 applyOp (AddPanels ps) m    = foldl (\d p -> insert (p ^. _uuid) p d) m ps
 applyOp (DelPanel pid) m    = delete pid m
 applyOp (DelPanels pids) m  = foldl (flip delete) m pids
-applyOp DeleteAll m         = empty
+applyOp DeleteAll _         = empty
 applyOp (UpdatePanels ps) m = foldl (\d p -> update (const $ Just p) (p ^. _uuid) d) m ps
 
 -- calculate diff between two PanelsDict and return the least needed PanelOperations
@@ -103,13 +103,13 @@ mkPanelAPIInterpreter cfg = PanelAPIInterpreter { finished: debounce t apiResEvt
           apiResEvt = keepLatest $ performEvent $ runOps <$> newOpEvt
 
 callPanelAPI :: Int -> UUID -> PanelOperation -> API (Event Unit)
-callPanelAPI houseId roofId (LoadPanels ps)   = pure Plus.empty
-callPanelAPI houseId roofId (AddPanel p)      = createPanel houseId p
-callPanelAPI houseId roofId (AddPanels ps)    = onlyCallFull ps (toUnfoldable >>> createPanels houseId roofId)
-callPanelAPI houseId roofId (DelPanel pid)    = deletePanels houseId [pid]
-callPanelAPI houseId roofId (DelPanels pids)  = onlyCallFull pids (toUnfoldable >>> deletePanels houseId)
-callPanelAPI houseId roofId DeleteAll         = deletePanelsInRoof houseId roofId
-callPanelAPI houseId roofId (UpdatePanels ps) = onlyCallFull ps (toUnfoldable >>> updatePanels houseId)
+callPanelAPI _ _ (LoadPanels _)            = pure Plus.empty
+callPanelAPI houseId _ (AddPanel p)        = createPanel houseId p
+callPanelAPI houseId roofId (AddPanels ps) = onlyCallFull ps (toUnfoldable >>> createPanels houseId roofId)
+callPanelAPI houseId _ (DelPanel pid)      = deletePanels houseId [pid]
+callPanelAPI houseId _ (DelPanels pids)    = onlyCallFull pids (toUnfoldable >>> deletePanels houseId)
+callPanelAPI houseId roofId DeleteAll      = deletePanelsInRoof houseId roofId
+callPanelAPI houseId _ (UpdatePanels ps)   = onlyCallFull ps (toUnfoldable >>> updatePanels houseId)
 
 -- only call the provided API function if the param is not null
 onlyCallFull :: forall f a. Foldable f => f a -> (f a -> API (Event Unit)) -> API (Event Unit)

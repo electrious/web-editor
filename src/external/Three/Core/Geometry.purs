@@ -13,6 +13,7 @@ import Three.Core.Face3 (Face3)
 import Three.Core.TypedArray (class TypedArray)
 import Three.Math.Vector (Vector2, Vector3)
 
+class IsGeometry :: forall k. k -> Constraint
 class IsGeometry geo
 
 foreign import data BufferGeometry :: Type

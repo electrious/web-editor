@@ -112,7 +112,7 @@ instance renderableWithSlopeStopper :: RenderableWithSlope e StopperRenderableWi
 
 newtype SupportRailRenderableWithSlope = SupportRailRenderableWithSlope SupportRail
 instance renderableWithSlopeSupportRail :: RenderableWithSlope e SupportRailRenderableWithSlope Mesh where
-    renderWithSlope slope (SupportRailRenderableWithSlope s) = liftEffect do
+    renderWithSlope _ (SupportRailRenderableWithSlope s) = liftEffect do
         r <- mkMesh supportRailGeo blackMaterial
         setName "SupportRail" r
         setScale (mkVec3 1.0 (meterVal $ s ^. _length) 1.0) r
@@ -129,7 +129,7 @@ supportRailGeo = unsafePerformEffect $ mkBoxGeometry l 1.0 l
 
 newtype QBaseMountRenderable = QBaseMountRenderable QBaseMount
 instance renderableWithSlopeQBaseMount :: RenderableWithSlope e QBaseMountRenderable Object3D where
-    renderWithSlope slope (QBaseMountRenderable q) = liftEffect do
+    renderWithSlope _ (QBaseMountRenderable q) = liftEffect do
         base <- mkMesh qbMountBaseCy blackMaterial
         setName "base" base
         setPosition (mkVec3 0.0 (meterVal $ inch 0.25) 0.0) base
@@ -161,7 +161,7 @@ qbMountStickCy = unsafePerformEffect $ mkCylinderGeometry r r 1.0 8 false
 
 newtype TiltLegRenderable = TiltLegRenderable TiltLeg
 instance renderableWithSlopeTiltLeg :: RenderableWithSlope e TiltLegRenderable Mesh where
-    renderWithSlope slope (TiltLegRenderable t) = liftEffect do
+    renderWithSlope _ (TiltLegRenderable t) = liftEffect do
         m <- mkMesh tiltLegBox blackMaterial
         setName "TiltLeg" m
         setPosition (mkVec3 (meterVal $ t ^. _x)

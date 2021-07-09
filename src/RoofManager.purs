@@ -212,7 +212,7 @@ isRoofEditing = map ((==) RoofEditing) <<< view _modeDyn <$> ask
 
 -- | function to add the roof recognizer and recognize new roofs
 recognizeNewRoofs :: forall e . HouseMeshData -> Object3D -> Event RoofDict -> Dynamic (Maybe UUID) -> Dynamic Boolean -> Node e (Event (CandidatePoint Vector3))
-recognizeNewRoofs meshData wrapper newRoofs activeRoof canEditRoofDyn = createObjectAdder DefaultAdder point canShowAdder
+recognizeNewRoofs meshData _ newRoofs activeRoof canEditRoofDyn = createObjectAdder DefaultAdder point canShowAdder
     where canShowAdder = (&&) <$> (isNothing <$> activeRoof) <*> canEditRoofDyn
           houseWrapper = meshData ^. _wrapper
 
@@ -297,7 +297,7 @@ createRoofManager param meshData rsDat = do
         -- event of new roofs that will be updated on any change and
         -- run the roof flatten algorithm whenever there's new roof change
         newRoofs  = multicast $ view _roofs <$> roofsData
-        flattened = performEvent $ doFlatten meshData <$> newRoofs
+        _ = performEvent $ doFlatten meshData <$> newRoofs
 
     -- recognize new roofs
     Tuple addedPntEvt adderDisp <- liftEffect $ runNode (recognizeNewRoofs meshData wrapper newRoofs activeRoofDyn canEditRoofDyn) (mkNodeEnv wrapper unit)
@@ -334,5 +334,5 @@ createRoofManager param meshData rsDat = do
         wrapper     : wrapper,
         editedRoofs : multicast $ debounce (Milliseconds 1000.0) $ getRoofEdited <$> newRoofs,
         arrayEvents : arrEvts,
-        disposable  : sequence_ [d, d1, d2, dispose adderDisp]
+        disposable  : sequence_ [d, d1, d2, d3, dispose adderDisp]
     }

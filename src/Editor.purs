@@ -180,7 +180,7 @@ createEditor elem cfg = do
     orbitCtrl <- mkOrbitControls camera (domElement renderer)
     d5 <- setupOrbitControls orbitCtrl $ cfg ^. _flyCameraTarget
 
-    { event: modeEvt, push: setMode } <- create
+    { event: modeEvt, push: pushMode } <- create
 
     let isShowing = (==) Showing <$> step Showing modeEvt
         canEdit = not <$> isShowing
@@ -236,7 +236,7 @@ createEditor elem cfg = do
         render     : renderFunc,
         content    : content,
         sizeDyn    : sizeDyn,
-        setMode    : setMode,
+        setMode    : pushMode,
         disposable : disposable
     }
 

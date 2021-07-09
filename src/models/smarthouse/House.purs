@@ -122,7 +122,7 @@ flipRoof i h = do
 
 
 updateActiveRoofShade :: ShadeOption -> Maybe UUID -> House -> House
-updateActiveRoofShade s Nothing   h = h
+updateActiveRoofShade _ Nothing   h = h
 updateActiveRoofShade s (Just ai) h = h # _roofs %~ M.update f ai
     where f r = Just $ updateShadeOption r s
 

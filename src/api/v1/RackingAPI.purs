@@ -33,5 +33,5 @@ updateRacking req client = do
     dReq <- mkDoRackRequestPB
     setRequest reqPb dReq
     pure $ makeEvent \k -> do
-        doRack dReq (\err resp -> k (fromProto $ getRacking resp)) client
+        doRack dReq (\_ resp -> k (fromProto $ getRacking resp)) client
         pure (pure unit)

@@ -3,6 +3,7 @@ module Three.Core.TypedArray where
 import Three.Core.Face3 (Face3)
 import Three.Math.Vector (Vector2, Vector3)
 
+class TypedArray :: forall k. k -> Constraint
 class TypedArray a
 
 foreign import data Uint16Array :: Type
