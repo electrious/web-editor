@@ -25,15 +25,15 @@ exports.mkLineDashedMaterial = c => w => s => ds => gs => _ => {
     return new lines.LineMaterial({ color: c, linewidth: 0.001 * w, dashed: true, dashSize: ds, gapSize: gs })
 }
 
-exports.setTransparent = _ => t => mat => _ => {
+exports.jssetTransparent = t => mat => _ => {
     mat.transparent = t
 }
 
-exports.setOpacity = _ => o => mat => _ => {
+exports.jssetOpacity = o => mat => _ => {
     mat.opacity = o
 }
 
-exports.setDepthWrite = _ => d => mat => _ => {
+exports.jssetDepthWrite = d => mat => _ => {
     mat.depthWrite = d
 }
 
@@ -41,11 +41,11 @@ exports.frontSide  = three.FrontSide
 exports.backSide   = three.BackSide
 exports.doubleSide = three.DoubleSide
 
-exports.setSide = _ => s => mat => _ => {
+exports.jssetSide = s => mat => _ => {
     mat.side = s
 }
 
-exports.getMaterial = _ => mat => creator => {
+exports.jsgetMaterial = mat => creator => {
     return creator.materials[mat]
 }
 

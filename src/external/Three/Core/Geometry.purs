@@ -10,53 +10,75 @@ import Data.Newtype (class Newtype)
 import Data.Symbol (SProxy(..))
 import Effect (Effect)
 import Three.Core.Face3 (Face3)
-import Three.Core.TypedArray (class TypedArray)
+import Three.Core.TypedArray (class IsTypedArray, TypedArray, toTypedArray)
 import Three.Math.Vector (Vector2, Vector3)
+import Unsafe.Coerce (unsafeCoerce)
 
-class IsGeometry :: forall k. k -> Constraint
-class IsGeometry geo
+class IsGeometry geo where
+    toGeometry :: geo -> BufferGeometry
 
 foreign import data BufferGeometry :: Type
-instance isGeometryBufferGeometry :: IsGeometry BufferGeometry
+instance IsGeometry BufferGeometry where
+    toGeometry = identity
 
 foreign import mkBufferGeometry :: Effect BufferGeometry
 
-foreign import setAttribute :: forall geo. IsGeometry geo => String -> BufferAttribute -> geo -> Effect Unit
-foreign import getAttribute :: forall geo. IsGeometry geo => String -> geo -> BufferAttribute
-foreign import setIndex :: forall geo. IsGeometry geo => BufferAttribute -> geo -> Effect Unit
+foreign import jssetAttribute :: String -> BufferAttribute -> BufferGeometry -> Effect Unit
+foreign import jsgetAttribute :: String -> BufferGeometry -> BufferAttribute
+foreign import jssetIndex :: BufferAttribute -> BufferGeometry -> Effect Unit
 
+setAttribute :: forall geo. IsGeometry geo => String -> BufferAttribute -> geo -> Effect Unit
+setAttribute n attr geo = jssetAttribute n attr (toGeometry geo)
 
-foreign import clone :: forall geo. IsGeometry geo => geo -> Effect geo
+getAttribute :: forall geo. IsGeometry geo => String -> geo -> BufferAttribute
+getAttribute n geo = jsgetAttribute n (toGeometry geo)
 
-foreign import computeVertexNormals :: forall geo. IsGeometry geo => geo -> Effect Unit
+setIndex :: forall geo. IsGeometry geo => BufferAttribute -> geo -> Effect Unit
+setIndex attr geo = jssetIndex attr (toGeometry geo)
+
+foreign import jsclone :: BufferGeometry -> Effect BufferGeometry
+
+clone :: forall geo. IsGeometry geo => geo -> Effect geo 
+clone geo = unsafeCoerce <$> jsclone (toGeometry geo)
+
+foreign import jscomputeVertexNormals :: BufferGeometry -> Effect Unit
+
+computeVertexNormals :: forall geo. IsGeometry geo => geo -> Effect Unit
+computeVertexNormals = jscomputeVertexNormals <<< toGeometry
 
 foreign import data BoxGeometry :: Type
 foreign import mkBoxGeometry :: Number -> Number -> Number -> Effect BoxGeometry
-instance isGeometryBoxGeometry :: IsGeometry BoxGeometry
+instance IsGeometry BoxGeometry where
+    toGeometry = unsafeCoerce
 
 foreign import data CircleGeometry :: Type
 foreign import mkCircleGeometry :: Number -> Int -> Effect CircleGeometry
-instance isGeometryCircleGeometry :: IsGeometry CircleGeometry
+instance IsGeometry CircleGeometry where
+    toGeometry = unsafeCoerce
 
 foreign import data CylinderGeometry :: Type
 foreign import mkCylinderGeometry :: Number -> Number -> Number -> Int -> Boolean -> Effect CylinderGeometry
-instance isGeometryCylinderGeometry :: IsGeometry CylinderGeometry
+instance IsGeometry CylinderGeometry where
+    toGeometry = unsafeCoerce
 
 foreign import data ShapeGeometry :: Type
 foreign import data Shape :: Type
 foreign import mkShape :: Array Vector2 -> Effect Shape
 foreign import mkShapeGeometry :: Shape -> Effect ShapeGeometry
 
-instance isGeometryShapeGeometry :: IsGeometry ShapeGeometry
+instance IsGeometry ShapeGeometry where
+    toGeometry = unsafeCoerce
 
 foreign import data PlaneGeometry :: Type
 foreign import mkPlaneGeometry :: Number -> Number -> Int -> Int -> Effect PlaneGeometry
 
-instance isGeometryPlaneGeometry :: IsGeometry PlaneGeometry
+instance IsGeometry PlaneGeometry where
+    toGeometry = unsafeCoerce
 
 -- | ExtrudeGeometry
 foreign import data ExtrudeGeometry :: Type
-instance isGeometryExtrudeGeometry :: IsGeometry ExtrudeGeometry
+instance IsGeometry ExtrudeGeometry where
+    toGeometry = unsafeCoerce
 
 -- | ExtrudeSettings
 newtype ExtrudeSettings = ExtrudeSettings {
@@ -115,7 +137,10 @@ foreign import mkLineGeometry :: Array Vector3 -> Effect LineGeometry
 
 foreign import data BufferAttribute :: Type
 
-foreign import mkBufferAttribute :: forall a. TypedArray a => a -> Int -> Effect BufferAttribute
+foreign import jsmkBufferAttribute :: TypedArray -> Int -> Effect BufferAttribute
+
+mkBufferAttribute :: forall arr. IsTypedArray arr => arr -> Int -> Effect BufferAttribute
+mkBufferAttribute arr s = jsmkBufferAttribute (toTypedArray arr) s
 
 foreign import isBufferAttribute :: BufferAttribute -> Boolean
 
@@ -129,5 +154,11 @@ foreign import getY :: Int -> BufferAttribute -> Number
 foreign import getZ :: Int -> BufferAttribute -> Number
 
 
-foreign import vertices :: forall geo. IsGeometry geo => geo -> Array Vector3
-foreign import faces :: forall geo. IsGeometry geo => geo -> Array Face3
+foreign import jsvertices :: BufferGeometry -> Array Vector3
+foreign import jsfaces :: BufferGeometry -> Array Face3
+
+vertices :: forall geo. IsGeometry geo => geo -> Array Vector3
+vertices = jsvertices <<< toGeometry
+
+faces :: forall geo. IsGeometry geo => geo -> Array Face3
+faces = jsfaces <<< toGeometry

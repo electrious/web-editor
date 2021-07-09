@@ -16,9 +16,11 @@ instance isObject3DCamera :: IsObject3D Camera where
 instance isObject3DPerspectiveCamera :: IsObject3D PerspectiveCamera where
     toObject3D = unsafeCoerce
 
-class IsObject3D a <= IsCamera a
+class IsObject3D a <= IsCamera a where
+    toCamera :: a -> Camera
 
-instance isCameraPerspectiveCamera :: IsCamera PerspectiveCamera
+instance IsCamera PerspectiveCamera where
+    toCamera = unsafeCoerce
 
 foreign import setAspect :: Number -> PerspectiveCamera -> Effect Unit
 

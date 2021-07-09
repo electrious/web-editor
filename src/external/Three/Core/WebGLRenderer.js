@@ -19,6 +19,6 @@ exports.domElement = r => {
     return r.domElement
 }
 
-exports.render = _ => scene => camera => r => _ => {
+exports.jsrender = scene => camera => r => _ => {
     r.render(scene, camera)
 }

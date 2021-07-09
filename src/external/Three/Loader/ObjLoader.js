@@ -17,7 +17,7 @@ exports.loadMTL = loader => name => cb => _ => {
     loader.load(name, function(mat) { cb(mat)() })
 }
 
-exports.loadOBJ = _ => loader => name => cb => _ => {
+exports.jsloadOBJ = loader => name => cb => _ => {
     loader.load(name, function(obj) { cb(obj)() })
 }
 

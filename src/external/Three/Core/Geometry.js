@@ -5,20 +5,20 @@ exports.mkBufferGeometry = _ => {
     return new three.BufferGeometry();
 }
 
-exports.setAttribute = _ => name => attr => geo => _ => {
+exports.jssetAttribute = name => attr => geo => _ => {
     geo.setAttribute(name, attr);
 }
 
-exports.getAttribute = _ => name => geo => {
+exports.jsgetAttribute = name => geo => {
     return geo.getAttribute(name);
 }
 
-exports.setIndex = _ => idx => geo => _ => {
+exports.jssetIndex = idx => geo => _ => {
     geo.setIndex(idx);
 }
 
 
-exports.vertices = _ => geo => {
+exports.jsvertices = geo => {
     let attr = geo.getAttribute("position");
     let arr = attr.array;
 
@@ -34,7 +34,7 @@ exports.vertices = _ => geo => {
     return vs;
 };
 
-exports.faces = _ => geo => {
+exports.jsfaces = geo => {
     var attr = geo.getIndex();
     let arr = attr.array;
     let al = arr.length / 3;
@@ -52,11 +52,11 @@ exports.faces = _ => geo => {
     return fs;
 };
 
-exports.clone = _ => g => _ => {
+exports.jsclone = g => _ => {
     return g.clone()
 }
 
-exports.computeVertexNormals = _ => geo => _ => {
+exports.jscomputeVertexNormals = geo => _ => {
     geo.computeVertexNormals();
 };
 
@@ -101,7 +101,7 @@ exports.mkLineGeometry = ps => _ => {
 }
 
 
-exports.mkBufferAttribute = _ => arr => s => _ => {
+exports.jsmkBufferAttribute = arr => s => _ => {
     return new three.BufferAttribute(arr, s);
 }
 

@@ -20,7 +20,7 @@ exports.jsSetReceiveShadow = r => o => _ => {
     o.receiveShadow = r
 }
 
-exports.jsChildren = _ => o => {
+exports.jsChildren = o => {
     return o.children
 }
 
@@ -28,7 +28,7 @@ exports.jsHasParent = o => {
     return o.parent !== null && o.parent !== undefined
 }
 
-exports.jsParent = _ => o => {
+exports.jsParent = o => {
     return o.parent
 }
 
@@ -124,7 +124,7 @@ exports.jsLookAt = v => o => _ => {
     o.lookAt(v)
 }
 
-exports.clone = _ => o => _ => {
+exports.jsclone = o => _ => {
     return o.clone()
 }
 

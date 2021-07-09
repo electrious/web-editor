@@ -3,12 +3,15 @@ module Three.Controls.OrbitControls where
 import Prelude
 
 import Effect (Effect)
-import Three.Core.Camera (class IsCamera)
+import Three.Core.Camera (class IsCamera, Camera, toCamera)
 import Three.Math.Vector (Vector3)
 import Web.DOM (Element)
 
 foreign import data OrbitControls :: Type
-foreign import mkOrbitControls :: forall c. IsCamera c => c -> Element -> Effect OrbitControls
+foreign import jsmkOrbitControls :: Camera -> Element -> Effect OrbitControls
+
+mkOrbitControls :: forall c. IsCamera c => c -> Element -> Effect OrbitControls
+mkOrbitControls c = jsmkOrbitControls (toCamera c)
 
 foreign import update :: OrbitControls -> Effect Unit
 foreign import dispose :: OrbitControls -> Effect Unit

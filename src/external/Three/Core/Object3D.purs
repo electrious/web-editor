@@ -6,6 +6,7 @@ import Effect (Effect)
 import Three.Math.Euler (Euler)
 import Three.Math.Matrix (Matrix4, invert)
 import Three.Math.Vector (Vector3, applyMatrix)
+import Unsafe.Coerce (unsafeCoerce)
 
 foreign import data Object3D :: Type
 
@@ -33,19 +34,19 @@ setCastShadow s o = jsSetCastShadow s (toObject3D o)
 setReceiveShadow :: forall a. IsObject3D a => Boolean -> a -> Effect Unit
 setReceiveShadow r o = jsSetReceiveShadow r (toObject3D o)
 
-foreign import jsChildren :: forall a. IsObject3D a => Object3D -> Array a
+foreign import jsChildren :: Object3D -> Array Object3D
 
 children :: forall a b. IsObject3D a => IsObject3D b => a -> Array b
-children = toObject3D >>> jsChildren
+children = toObject3D >>> jsChildren >>> map unsafeCoerce
 
 foreign import jsHasParent :: Object3D -> Boolean
-foreign import jsParent :: forall a. IsObject3D a => Object3D -> a
+foreign import jsParent :: Object3D -> Object3D
 
 hasParent :: forall a. IsObject3D a => a -> Boolean
 hasParent = toObject3D >>> jsHasParent
 
 parent :: forall a b. IsObject3D a => IsObject3D b => a -> b
-parent = toObject3D >>> jsParent
+parent = toObject3D >>> jsParent >>> unsafeCoerce
 
 foreign import jsAdd :: Object3D -> Object3D -> Effect Unit
 foreign import jsRemove :: Object3D -> Object3D -> Effect Unit
@@ -156,7 +157,10 @@ foreign import jsLookAt :: Vector3 -> Object3D -> Effect Unit
 lookAt :: forall a. IsObject3D a => Vector3 -> a -> Effect Unit
 lookAt v o = jsLookAt v (toObject3D o)
 
-foreign import clone :: forall a. IsObject3D a => a -> Effect a
+foreign import jsclone :: Object3D -> Effect Object3D
+
+clone :: forall a. IsObject3D a => a -> Effect a
+clone o = unsafeCoerce <$> jsclone (toObject3D o)
 
 foreign import jsUserData :: Object3D -> String
 foreign import jsSetUserData :: String -> Object3D -> Effect Unit
