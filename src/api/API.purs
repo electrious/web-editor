@@ -8,9 +8,9 @@ import Axios.Types (Header(..), Method)
 import Control.Monad.Except (runExcept, throwError)
 import Control.Monad.Reader (class MonadAsk, ReaderT, ask, runReaderT)
 import Data.Array as Array
+import Data.Compactable (separate)
 import Data.Default (class Default)
-import Data.Either (Either(..), fromRight, isRight)
-import Data.Filterable (filter)
+import Data.Either (Either(..))
 import Data.Generic.Rep (class Generic)
 import Data.Lens (Lens', (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
@@ -25,7 +25,6 @@ import Effect.Class.Console (errorShow)
 import FRP.Event (Event, makeEvent, subscribe)
 import FRP.Event.Extra (performEvent)
 import Foreign.Generic (class Decode, class Encode, F, ForeignError(..), defaultOptions, genericDecode)
-import Partial.Unsafe (unsafePartial)
 
 -- | convert an Aff action into a FRP Event
 affEvt :: forall a. Aff a -> Event (Either Error a)
@@ -39,7 +38,8 @@ tap f evt = makeEvent \k -> subscribe evt \e -> f e *> k e
 
 -- | filter the Right value of Either in an event
 onlyRight :: forall a e. Event (Either e a) -> Event a
-onlyRight = map (unsafePartial fromRight) <<< filter isRight
+onlyRight = f <<< separate
+    where f v = v.right
 
 newtype APIConfig = APIConfig {
     auth    :: Maybe String,

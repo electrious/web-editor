@@ -116,18 +116,26 @@ let additions =
   }
 -------------------------------
 -}
-
-
 let upstream =
-      https://github.com/purescript/package-sets/releases/download/psc-0.13.8-20201007/packages.dhall sha256:35633f6f591b94d216392c9e0500207bb1fec42dd355f4fecdfd186956567b6b
+      https://github.com/purescript/package-sets/releases/download/psc-0.14.2-20210629/packages.dhall sha256:534c490bb73cae75adb5a39871142fd8db5c2d74c90509797a80b8bb0d5c3f7b
 
 let overrides = {=}
 
 let additions =
-      { event-extra =
+      { event =
+        { dependencies = [ "prelude", "filterable" ]
+        , repo = "https://github.com/mikesol/purescript-event.git" -- use a forked version that supports purs 0.14
+        , version = "932381bb71093acfc4d46ce38513ee759af0588b"
+        }
+      , event-extra =
         { dependencies = [ "event" ]
         , repo = "https://github.com/manyoo/event-extra.git"
         , version = "v0.1.9"
+        }
+      , memoize =
+        { dependencies = [ "prelude", "strings" ]
+        , repo = "https://github.com/paf31/purescript-memoize.git"
+        , version = "v5.0.0"
         }
       , axios =
         { dependencies = [ "prelude", "effect", "aff", "foreign-generic" ]
@@ -145,9 +153,20 @@ let additions =
         , version = "v2.0.0"
         }
       , specular =
-        { dependencies = [ "foreign-object", "aff", "debug", "unsafe-reference", "avar", "typelevel-prelude", "contravariant", "record", "prelude", "generics-rep", "random"]
+        { dependencies =
+          [ "foreign-object"
+          , "aff"
+          , "debug"
+          , "unsafe-reference"
+          , "avar"
+          , "typelevel-prelude"
+          , "contravariant"
+          , "record"
+          , "prelude"
+          , "random"
+          ]
         , repo = "https://github.com/restaumatic/purescript-specular.git"
-        , version = "v0.11.0"
+        , version = "94271b2af04e74961e3bd393e86d80c49f8b9267"
         }
       }
 

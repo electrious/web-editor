@@ -3,7 +3,7 @@ module API.V1.Racking.Request where
 import Prelude
 
 import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Show (genericShow)
+import Data.Show.Generic (genericShow)
 import Data.Map (Map)
 import Data.Newtype (class Newtype)
 import Data.Traversable (traverse)

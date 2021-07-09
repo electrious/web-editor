@@ -3,7 +3,7 @@ module Editor.UI.DragInfo where
 import Prelude
 
 import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Show (genericShow)
+import Data.Show.Generic (genericShow)
 import Data.Lens ((^.))
 import Data.Newtype (class Newtype)
 import Editor.Common.Lenses (_distance, _dragType, _point)

@@ -3,7 +3,7 @@ module Model.Racking.RackingSystem where
 import Prelude
 
 import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Show (genericShow)
+import Data.Show.Generic (genericShow)
 import Data.Map (Map, fromFoldable, toUnfoldable)
 import Data.Maybe (fromMaybe)
 import Data.Newtype (class Newtype)

@@ -2,7 +2,7 @@ module Smarthouse.Algorithm.Roofs where
 
 import Prelude
 
-import Data.Array (foldl)
+import Data.Foldable (foldl)
 import Data.Lens (Lens', view, (%~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)

@@ -3,7 +3,7 @@ module Model.Racking.GAF.GAFRackingComponent where
 import Prelude
 
 import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Show (genericShow)
+import Data.Show.Generic (genericShow)
 import Data.Newtype (class Newtype)
 import Editor.Common.ProtoCodable (class ProtoDecodable, fromProto)
 import Effect (Effect)

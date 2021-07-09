@@ -4,9 +4,9 @@ import Data.Bounded (class Bounded, class Ord)
 import Data.Enum (class BoundedEnum, class Enum)
 import Data.Eq (class Eq)
 import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Bounded (genericBottom, genericTop)
-import Data.Generic.Rep.Enum (genericCardinality, genericFromEnum, genericPred, genericSucc, genericToEnum)
-import Data.Generic.Rep.Ord (genericCompare)
+import Data.Bounded.Generic (genericBottom, genericTop)
+import Data.Enum.Generic (genericCardinality, genericFromEnum, genericPred, genericSucc, genericToEnum)
+import Data.Ord.Generic (genericCompare)
 import Data.Show (class Show)
 
 data ShadeOption = NoShade

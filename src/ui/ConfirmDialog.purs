@@ -3,7 +3,7 @@ module UI.ConfirmDialog where
 import Prelude hiding (div)
 
 import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Show (genericShow)
+import Data.Show.Generic (genericShow)
 import Model.ActiveMode (ActiveMode(..))
 import Specular.Dom.Browser (Attrs)
 import Specular.Dom.Element (attrsD, class_, classes, el, text)

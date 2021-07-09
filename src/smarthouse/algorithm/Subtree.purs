@@ -2,9 +2,9 @@ module Smarthouse.Algorithm.Subtree where
 
 import Prelude
 
-import Data.Array (foldl)
+import Data.Foldable (foldl)
 import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Show (genericShow)
+import Data.Show.Generic (genericShow)
 import Data.Lens (Lens', set, view, (%~), (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)

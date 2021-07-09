@@ -4,7 +4,7 @@ import Prelude
 
 import Data.Lens ((^.))
 import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Show (genericShow)
+import Data.Show.Generic (genericShow)
 import Data.Newtype (class Newtype)
 import Editor.Common.Lenses (_id)
 import Foreign.Generic (class Decode, class Encode, defaultOptions, genericDecode, genericEncode)

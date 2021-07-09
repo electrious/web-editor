@@ -4,11 +4,11 @@ import Prelude
 
 import Algorithm.MeshFlatten (_vertex)
 import Control.Monad.RWS (get)
-import Data.Array (foldl, (!!))
+import Data.Array ((!!))
 import Data.Array as Arr
 import Data.Compactable (compact)
 import Data.Filterable (filter)
-import Data.Foldable (class Foldable, minimumBy, traverse_)
+import Data.Foldable (class Foldable, foldl, minimumBy, traverse_)
 import Data.Lens (view, (^.))
 import Data.List (List(..), concatMap, foldM, fromFoldable, singleton)
 import Data.Map as M

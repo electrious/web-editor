@@ -4,9 +4,9 @@ import Prelude
 
 import Data.Enum (class BoundedEnum, class Enum)
 import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Bounded (genericBottom, genericTop)
-import Data.Generic.Rep.Enum (genericCardinality, genericFromEnum, genericPred, genericSucc, genericToEnum)
-import Data.Generic.Rep.Show (genericShow)
+import Data.Bounded.Generic (genericBottom, genericTop)
+import Data.Enum.Generic (genericCardinality, genericFromEnum, genericPred, genericSucc, genericToEnum)
+import Data.Show.Generic (genericShow)
 import Editor.Common.ProtoCodable (class ProtoDecodable)
 
 newtype LRPB = LRPB Int

@@ -8,7 +8,7 @@ import Data.Compactable (compact)
 import Data.Default (class Default, def)
 import Data.Enum (fromEnum)
 import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Show (genericShow)
+import Data.Show.Generic (genericShow)
 import Data.Lens (Lens', (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
@@ -153,7 +153,6 @@ renderActRoofOutline Showing    _      = pure unit
 renderRoof :: Dynamic Boolean -> Dynamic (Maybe UUID) -> Roof -> Node HouseTextureInfo RoofEvents
 renderRoof enableDyn actIdDyn roof = do
     let poly  = roof ^. _polygon
-        gable = canBeGable roof
 
         actDyn = getRoofActive roof <$> actIdDyn
 

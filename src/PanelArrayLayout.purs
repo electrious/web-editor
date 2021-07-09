@@ -22,7 +22,7 @@ import Data.Tuple (Tuple(..))
 import Data.Unfoldable as Unfoldable
 import Editor.Common.Lenses (_centerX, _centerY, _config, _panels, _panelsUpdated)
 import Effect (Effect)
-import Global (infinity)
+import Data.Number (infinity)
 import Math (abs)
 import Model.PanelArray (PanelArray, mkArrayWithCenter, mkPanelArray, mkPanelArrayMap, simplePanelArray)
 import Model.Roof.ArrayConfig (ArrayConfig, _gapY)
