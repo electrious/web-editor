@@ -17,7 +17,7 @@ import Data.Map as Map
 import Data.Map.Internal (keys)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Data.Time.Duration (Milliseconds(..))
 import Data.Traversable (class Foldable, traverse)
 import Data.Tuple (Tuple(..))
@@ -49,7 +49,7 @@ instance defaultPanelAPIInterpreterConfig :: Default PanelAPIInterpreterConfig w
     }
 
 _clientId :: forall t a r. Newtype t { clientId :: a | r } => Lens' t a
-_clientId = _Newtype <<< prop (SProxy :: SProxy "clientId")
+_clientId = _Newtype <<< prop (Proxy :: Proxy "clientId")
 
 newtype PanelAPIInterpreter = PanelAPIInterpreter {
     finished :: Event Unit
@@ -58,7 +58,7 @@ newtype PanelAPIInterpreter = PanelAPIInterpreter {
 derive instance newtypePanelAPIInterpreter :: Newtype PanelAPIInterpreter _
 
 _finished :: forall t a r. Newtype t { finished :: a | r } => Lens' t a
-_finished = _Newtype <<< prop (SProxy :: SProxy "finished")
+_finished = _Newtype <<< prop (Proxy :: Proxy "finished")
 
 
 -- apply panel operations to internal panel dicts

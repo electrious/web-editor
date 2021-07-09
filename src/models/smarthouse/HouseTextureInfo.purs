@@ -9,7 +9,7 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Meter (meter)
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Editor.Common.Lenses (_height, _width)
 import Editor.SceneEvent as S
 import FRP.Event (Event)
@@ -38,13 +38,13 @@ mkHouseTextureInfo t imgSz img ppm = HouseTextureInfo {
     }
 
 _texture :: forall t a r. Newtype t { texture :: a | r } => Lens' t a
-_texture = _Newtype <<< prop (SProxy :: SProxy "texture")
+_texture = _Newtype <<< prop (Proxy :: Proxy "texture")
 
 _size :: forall t a r. Newtype t { size :: a | r } => Lens' t a
-_size = _Newtype <<< prop (SProxy :: SProxy "size")
+_size = _Newtype <<< prop (Proxy :: Proxy "size")
 
 _imageSize :: forall t a r. Newtype t { imageSize :: a | r } => Lens' t a
-_imageSize = _Newtype <<< prop (SProxy :: SProxy "imageSize")
+_imageSize = _Newtype <<< prop (Proxy :: Proxy "imageSize")
 
 _imageFile :: forall t a r. Newtype t { imageFile :: a | r } => Lens' t a
-_imageFile = _Newtype <<< prop (SProxy :: SProxy "imageFile")
+_imageFile = _Newtype <<< prop (Proxy :: Proxy "imageFile")

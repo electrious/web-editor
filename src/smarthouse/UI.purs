@@ -10,7 +10,7 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Editor.Common.Lenses (_buttons, _height, _shadeSelected, _width)
 import Editor.Editor (_sizeDyn)
 import Editor.SceneEvent (Size, size)
@@ -48,10 +48,10 @@ instance defaultBuilderUIConf :: Default BuilderUIConf where
         }
 
 _savingStepDyn :: forall t a r. Newtype t { savingStepDyn :: a | r } => Lens' t a
-_savingStepDyn = _Newtype <<< prop (SProxy :: SProxy "savingStepDyn")
+_savingStepDyn = _Newtype <<< prop (Proxy :: Proxy "savingStepDyn")
 
 _activeItemDyn :: forall t a r. Newtype t { activeItemDyn :: a | r } => Lens' t a
-_activeItemDyn = _Newtype <<< prop (SProxy :: SProxy "activeItemDyn")
+_activeItemDyn = _Newtype <<< prop (Proxy :: Proxy "activeItemDyn")
 
 
 newtype BuilderUIEvents = BuilderUIEvents {

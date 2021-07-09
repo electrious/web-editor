@@ -7,7 +7,7 @@ import Data.Lens (Lens')
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Effect (Effect)
 import Three.Core.Face3 (Face3)
 import Three.Core.TypedArray (class IsTypedArray, TypedArray, toTypedArray)
@@ -107,28 +107,28 @@ instance defaultExtrudeSettings :: Default ExtrudeSettings where
         }
 
 _curveSegments :: forall t a r. Newtype t { curveSegments :: a | r } => Lens' t a
-_curveSegments = _Newtype <<< prop (SProxy :: SProxy "curveSegments")
+_curveSegments = _Newtype <<< prop (Proxy :: Proxy "curveSegments")
 
 _steps :: forall t a r. Newtype t { steps :: a | r } => Lens' t a
-_steps = _Newtype <<< prop (SProxy :: SProxy "steps")
+_steps = _Newtype <<< prop (Proxy :: Proxy "steps")
 
 _depth :: forall t a r. Newtype t { depth :: a | r } => Lens' t a
-_depth = _Newtype <<< prop (SProxy :: SProxy "depth")
+_depth = _Newtype <<< prop (Proxy :: Proxy "depth")
 
 _bevelEnabled :: forall t a r. Newtype t { bevelEnabled :: a | r } => Lens' t a
-_bevelEnabled = _Newtype <<< prop (SProxy :: SProxy "bevelEnabled")
+_bevelEnabled = _Newtype <<< prop (Proxy :: Proxy "bevelEnabled")
 
 _bevelThickness :: forall t a r. Newtype t { bevelThickness :: a | r } => Lens' t a
-_bevelThickness = _Newtype <<< prop (SProxy :: SProxy "bevelThickness")
+_bevelThickness = _Newtype <<< prop (Proxy :: Proxy "bevelThickness")
 
 _bevelSize :: forall t a r. Newtype t { bevelSize :: a | r } => Lens' t a
-_bevelSize = _Newtype <<< prop (SProxy :: SProxy "bevelSize")
+_bevelSize = _Newtype <<< prop (Proxy :: Proxy "bevelSize")
 
 _bevelOffset :: forall t a r. Newtype t { bevelOffset :: a | r } => Lens' t a
-_bevelOffset = _Newtype <<< prop (SProxy :: SProxy "bevelOffset")
+_bevelOffset = _Newtype <<< prop (Proxy :: Proxy "bevelOffset")
 
 _bevelSegments :: forall t a r. Newtype t { bevelSegments :: a | r } => Lens' t a
-_bevelSegments = _Newtype <<< prop (SProxy :: SProxy "bevelSegments")
+_bevelSegments = _Newtype <<< prop (Proxy :: Proxy "bevelSegments")
 
 foreign import mkExtrudeGeometry :: Shape -> ExtrudeSettings -> Effect ExtrudeGeometry
 

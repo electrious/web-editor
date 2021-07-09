@@ -14,7 +14,7 @@ import Data.Lens.Record (prop)
 import Data.List (List(..), filter, fromFoldable, head, null, snoc, tail, zipWith)
 import Data.Maybe (fromMaybe)
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Data.Tuple (Tuple(..), snd)
 import Editor.Common.Lenses (_center, _normal, _rotation)
 import Math (abs, atan, sqrt)
@@ -42,10 +42,10 @@ instance defaultRoofPlateTransform :: Default RoofPlateTransform where
           }
 
 _right :: forall t a r. Newtype t { right :: a | r } => Lens' t a
-_right = _Newtype <<< prop (SProxy :: SProxy "right")
+_right = _Newtype <<< prop (Proxy :: Proxy "right")
 
 _top :: forall t a r. Newtype t { top :: a | r } => Lens' t a
-_top = _Newtype <<< prop (SProxy :: SProxy "top")
+_top = _Newtype <<< prop (Proxy :: Proxy "top")
 
 -- | transform a point in roofplate's local coordinate to global coordinate
 transformVector :: RoofPlateTransform -> Vector3 -> Vector3

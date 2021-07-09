@@ -9,7 +9,7 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Data.Tuple (Tuple(..))
 import FRP.Dynamic (Dynamic)
 import FRP.Event (Event)
@@ -38,10 +38,10 @@ instance defaultEditPane :: Default EditPane where
     }
 
 _buildTree :: forall t a r. Newtype t { buildTree :: a | r } => Lens' t a
-_buildTree = _Newtype <<< prop (SProxy :: SProxy "buildTree")
+_buildTree = _Newtype <<< prop (Proxy :: Proxy "buildTree")
 
 _activeItem :: forall t a r. Newtype t { activeItem :: a | r } => Lens' t a
-_activeItem = _Newtype <<< prop (SProxy :: SProxy "activeItem")
+_activeItem = _Newtype <<< prop (Proxy :: Proxy "activeItem")
 
 -- | button to allow user to build a new tree
 treeBtn :: Widget (S.Event Boolean)

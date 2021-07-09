@@ -11,7 +11,7 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
 import Data.Show (class Show)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import FRP.Event (Event)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
@@ -39,7 +39,7 @@ toJSFieldName "provider" = "Provider"
 toJSFieldName _          = ""
 
 _provider :: forall t a r. Newtype t { provider :: a | r } => Lens' t a
-_provider = _Newtype <<< prop (SProxy :: SProxy "provider")
+_provider = _Newtype <<< prop (Proxy :: Proxy "provider")
 
 
 -- Image api response data
@@ -63,10 +63,10 @@ toRespJSField "provider"      = "Provider"
 toRespJSField _               = ""
 
 _link :: forall t a r. Newtype t { link :: a | r } => Lens' t a
-_link = _Newtype <<< prop (SProxy :: SProxy "link")
+_link = _Newtype <<< prop (Proxy :: Proxy "link")
 
 _pixelPerMeter :: forall t a r. Newtype t { pixelPerMeter :: a | r } => Lens' t a
-_pixelPerMeter = _Newtype <<< prop (SProxy :: SProxy "pixelPerMeter")
+_pixelPerMeter = _Newtype <<< prop (Proxy :: Proxy "pixelPerMeter")
 
 getImageMeta :: ImageReq -> API (Event ImageResp)
 getImageMeta req = callAPI' POST "/v3/projects.GetHouseImage" req

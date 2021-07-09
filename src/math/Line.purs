@@ -9,7 +9,7 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Math.LineSeg (LineSeg, _start, direction)
 import Math.Utils (lineIntersection)
 import Three.Math.Vector (class Vector, Vector3, length, (<**>), (<+>), (<->), (<.>))
@@ -26,10 +26,10 @@ instance showLine :: Show v => Show (Line v) where
     show = genericShow
     
 _origin :: forall t a r. Newtype t { origin :: a | r } => Lens' t a
-_origin = _Newtype <<< prop (SProxy :: SProxy "origin")
+_origin = _Newtype <<< prop (Proxy :: Proxy "origin")
 
 _direction :: forall t a r. Newtype t { direction :: a | r } => Lens' t a
-_direction = _Newtype <<< prop (SProxy :: SProxy "direction")
+_direction = _Newtype <<< prop (Proxy :: Proxy "direction")
 
 line :: forall v. v -> v -> Line v
 line o d = Line { origin : o, direction : d }

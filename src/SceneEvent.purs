@@ -14,7 +14,7 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Data.Time.Duration (Milliseconds(..))
 import Data.Traversable (sequence_, traverse)
 import Editor.Common.Lenses (_dragType, _dragged, _height, _mouseMove, _tapped, _width, _x, _y)
@@ -213,7 +213,7 @@ instance disposableRaycastSetup :: Disposable RaycastSetup where
     dispose (RaycastSetup { disposable }) = disposable
 
 _dragEvent :: Lens' RaycastSetup (Event DragEvent)
-_dragEvent = _Newtype <<< prop (SProxy :: SProxy "dragEvent")
+_dragEvent = _Newtype <<< prop (Proxy :: Proxy "dragEvent")
 
 -- | setup all raycasting needed to process user inputs and send
 -- them to the corresponding 3D object in the scene

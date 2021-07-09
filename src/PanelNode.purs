@@ -17,7 +17,7 @@ import Data.List (List(..), (:))
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Meter (meterVal)
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Editor.Common.Lenses (_dragged, _height, _mesh, _orientation, _rackingType, _tapped, _x, _y)
 import Editor.Rendering.DefMaterials (loadMaterial)
 import Editor.UI.DragInfo (DragInfo, mkDragInfo)
@@ -125,16 +125,16 @@ instance isObject3DPanelNode :: IsObject3D PanelNode where
     toObject3D = toObject3D <<< view _panelObject
 
 _panel :: forall t a r. Newtype t { panel :: a | r } => Lens' t a
-_panel = _Newtype <<< prop (SProxy :: SProxy "panel")
+_panel = _Newtype <<< prop (Proxy :: Proxy "panel")
 
 _panelObject :: forall t a r. Newtype t { panelObject :: a | r } => Lens' t a
-_panelObject = _Newtype <<< prop (SProxy :: SProxy "panelObject")
+_panelObject = _Newtype <<< prop (Proxy :: Proxy "panelObject")
 
 _materials :: forall t a r. Newtype t { materials :: a | r } => Lens' t a
-_materials = _Newtype <<< prop (SProxy :: SProxy "materials")
+_materials = _Newtype <<< prop (Proxy :: Proxy "materials")
 
 _materialURL :: forall t a r. Newtype t { materialURL :: a | r } => Lens' t a
-_materialURL = _Newtype <<< prop (SProxy :: SProxy "materialURL")
+_materialURL = _Newtype <<< prop (Proxy :: Proxy "materialURL")
 
 mkTopFrame :: forall geo mat. IsGeometry geo => IsMaterial mat => geo -> mat -> Effect Mesh
 mkTopFrame geo mat = do

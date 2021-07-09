@@ -23,7 +23,7 @@ import Data.Map (lookup, size)
 import Data.Maybe (Maybe(..), fromMaybe, maybe)
 import Data.Meter (meterVal)
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Data.Time.Duration (Milliseconds(..))
 import Data.Tuple (Tuple(..))
 import Data.UUID (UUID, genUUID)
@@ -79,13 +79,13 @@ newtype PanelLayerConfig = PanelLayerConfig {
 derive instance newtypePanelLayerConfig :: Newtype PanelLayerConfig _
 
 _roofActive :: forall t a r. Newtype t { roofActive :: a | r } => Lens' t a
-_roofActive = _Newtype <<< prop (SProxy :: SProxy "roofActive")
+_roofActive = _Newtype <<< prop (Proxy :: Proxy "roofActive")
 
 _mainOrientation :: forall t a r. Newtype t { mainOrientation :: a | r } => Lens' t a
-_mainOrientation = _Newtype <<< prop (SProxy :: SProxy "mainOrientation")
+_mainOrientation = _Newtype <<< prop (Proxy :: Proxy "mainOrientation")
 
 _initPanels :: forall t a r. Newtype t { initPanels :: a | r } => Lens' t a
-_initPanels = _Newtype <<< prop (SProxy :: SProxy "initPanels")
+_initPanels = _Newtype <<< prop (Proxy :: Proxy "initPanels")
 
 newtype PanelLayer = PanelLayer {
     object              :: Object3D,
@@ -131,31 +131,31 @@ defPanelLayerWith obj roof renderer btnsRenderer apiInterpreter = PanelLayer {
 }
 
 _renderer :: forall t a r. Newtype t { renderer :: a | r } => Lens' t a
-_renderer = _Newtype <<< prop (SProxy :: SProxy "renderer")
+_renderer = _Newtype <<< prop (Proxy :: Proxy "renderer")
 
 _btnsRenderer :: forall t a r. Newtype t { btnsRenderer :: a | r } => Lens' t a
-_btnsRenderer = _Newtype <<< prop (SProxy :: SProxy "btnsRenderer")
+_btnsRenderer = _Newtype <<< prop (Proxy :: Proxy "btnsRenderer")
 
 _apiInterpreter :: forall t a r. Newtype t { apiInterpreter :: a | r } => Lens' t a
-_apiInterpreter = _Newtype <<< prop (SProxy :: SProxy "apiInterpreter")
+_apiInterpreter = _Newtype <<< prop (Proxy :: Proxy "apiInterpreter")
 
 _arrayChanged :: forall t a r. Newtype t { arrayChanged :: a | r } => Lens' t a
-_arrayChanged = _Newtype <<< prop (SProxy :: SProxy "arrayChanged")
+_arrayChanged = _Newtype <<< prop (Proxy :: Proxy "arrayChanged")
 
 _serverUpdated :: forall t a r. Newtype t {serverUpdated :: a | r } => Lens' t a
-_serverUpdated = _Newtype <<< prop (SProxy :: SProxy "serverUpdated")
+_serverUpdated = _Newtype <<< prop (Proxy :: Proxy "serverUpdated")
 
 _arrayDragging :: forall t a r. Newtype t { arrayDragging :: a | r } => Lens' t a
-_arrayDragging = _Newtype <<< prop (SProxy :: SProxy "arrayDragging")
+_arrayDragging = _Newtype <<< prop (Proxy :: Proxy "arrayDragging")
 
 _plusDragging :: forall t a r. Newtype t { plusDragging :: a | r } => Lens' t a
-_plusDragging = _Newtype <<< prop (SProxy :: SProxy "plusDragging")
+_plusDragging = _Newtype <<< prop (Proxy :: Proxy "plusDragging")
 
 _inactiveRoofTapped :: forall t a r. Newtype t { inactiveRoofTapped :: a | r } => Lens' t a
-_inactiveRoofTapped = _Newtype <<< prop (SProxy :: SProxy "inactiveRoofTapped")
+_inactiveRoofTapped = _Newtype <<< prop (Proxy :: Proxy "inactiveRoofTapped")
 
 _currentPanels :: forall t a r. Newtype t { currentPanels :: a | r } => Lens' t a
-_currentPanels = _Newtype <<< prop (SProxy :: SProxy "currentPanels")
+_currentPanels = _Newtype <<< prop (Proxy :: Proxy "currentPanels")
 
 -- | internal panel layer state data structure
 newtype PanelLayerState = PanelLayerState {
@@ -202,34 +202,34 @@ mkState obj = PanelLayerState {
     }
 
 _activeArray :: forall t a r. Newtype t { activeArray :: a | r } => Lens' t a
-_activeArray = _Newtype <<< prop (SProxy :: SProxy "activeArray")
+_activeArray = _Newtype <<< prop (Proxy :: Proxy "activeArray")
 
 _oldActiveArray :: forall t a r. Newtype t { oldActiveArray :: a | r } => Lens' t a
-_oldActiveArray = _Newtype <<< prop (SProxy :: SProxy "oldActiveArray")
+_oldActiveArray = _Newtype <<< prop (Proxy :: Proxy "oldActiveArray")
 
 _layout :: forall t a r. Newtype t { layout :: a | r } => Lens' t a
-_layout = _Newtype <<< prop (SProxy :: SProxy "layout")
+_layout = _Newtype <<< prop (Proxy :: Proxy "layout")
 
 _initDragPos :: forall t a r. Newtype t { initDragPos :: a | r } => Lens' t a
-_initDragPos = _Newtype <<< prop (SProxy :: SProxy "initDragPos")
+_initDragPos = _Newtype <<< prop (Proxy :: Proxy "initDragPos")
 
 _lastDragPos :: forall t a r. Newtype t { lastDragPos :: a | r } => Lens' t a
-_lastDragPos = _Newtype <<< prop (SProxy :: SProxy "lastDragPos")
+_lastDragPos = _Newtype <<< prop (Proxy :: Proxy "lastDragPos")
 
 _tempPanels :: forall t a r. Newtype t { tempPanels :: a | r } => Lens' t a
-_tempPanels = _Newtype <<< prop (SProxy :: SProxy "tempPanels")
+_tempPanels = _Newtype <<< prop (Proxy :: Proxy "tempPanels")
 
 _orientationToUse :: forall t a r. Newtype t { orientationToUse :: a | r } => Lens' t a
-_orientationToUse = _Newtype <<< prop (SProxy :: SProxy "orientationToUse")
+_orientationToUse = _Newtype <<< prop (Proxy :: Proxy "orientationToUse")
 
 _panelOperations :: forall t a r. Newtype t { panelOperations :: a | r } => Lens' t a
-_panelOperations = _Newtype <<< prop (SProxy :: SProxy "panelOperations")
+_panelOperations = _Newtype <<< prop (Proxy :: Proxy "panelOperations")
 
 _arrayOperations :: forall t a r. Newtype t { arrayOperations :: a | r } => Lens' t a
-_arrayOperations = _Newtype <<< prop (SProxy :: SProxy "arrayOperations")
+_arrayOperations = _Newtype <<< prop (Proxy :: Proxy "arrayOperations")
 
 _btnsOperations :: forall t a r. Newtype t { btnsOperations :: a | r } => Lens' t a
-_btnsOperations = _Newtype <<< prop (SProxy :: SProxy "btnsOperations")
+_btnsOperations = _Newtype <<< prop (Proxy :: Proxy "btnsOperations")
 
 
 data PanelLayerOperation = POLoadPanels (List Panel)

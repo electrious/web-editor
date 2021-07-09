@@ -11,7 +11,7 @@ import Data.Lens.Record (prop)
 import Data.List (List(..), elem, (:))
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Data.Tuple (Tuple(..))
 import Data.UUID (UUID, genUUID)
 import Editor.Common.Lenses (_id, _position)
@@ -60,19 +60,19 @@ instance showSubtree :: Show Subtree where
                      "}"
     
 _source :: forall t a r. Newtype t { source :: a | r } => Lens' t a
-_source = _Newtype <<< prop (SProxy :: SProxy "source")
+_source = _Newtype <<< prop (Proxy :: Proxy "source")
 
 _sinks :: forall t a r. Newtype t { sinks :: a | r } => Lens' t a
-_sinks = _Newtype <<< prop (SProxy :: SProxy "sinks")
+_sinks = _Newtype <<< prop (Proxy :: Proxy "sinks")
 
 _subtreeType :: forall t a r. Newtype t { subtreeType :: a | r } => Lens' t a
-_subtreeType = _Newtype <<< prop (SProxy :: SProxy "subtreeType")
+_subtreeType = _Newtype <<< prop (Proxy :: Proxy "subtreeType")
 
 _isGable :: forall t a r. Newtype t { isGable :: a | r } => Lens' t a
-_isGable = _Newtype <<< prop (SProxy :: SProxy "isGable")
+_isGable = _Newtype <<< prop (Proxy :: Proxy "isGable")
 
 _originalSubtree :: forall t a r. Newtype t { originalSubtree :: a | r } => Lens' t a
-_originalSubtree = _Newtype <<< prop (SProxy :: SProxy "originalSubtree")
+_originalSubtree = _Newtype <<< prop (Proxy :: Proxy "originalSubtree")
 
 
 subtree :: SubtreeType -> VertNode -> List VertNode -> List Edge -> Effect Subtree

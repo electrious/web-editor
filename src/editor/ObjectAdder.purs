@@ -9,7 +9,7 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Data.Traversable (traverse)
 import Editor.Common.Lenses (_name, _position, _rotation, _tapped)
 import Effect.Unsafe (unsafePerformEffect)
@@ -36,7 +36,7 @@ newtype CandidatePoint v = CandidatePoint {
 derive instance newtypeCandidatePoint :: Newtype (CandidatePoint v) _
 
 _faceNormal :: forall t a r. Newtype t { faceNormal :: a | r } => Lens' t a
-_faceNormal = _Newtype <<< prop (SProxy :: SProxy "faceNormal")
+_faceNormal = _Newtype <<< prop (Proxy :: Proxy "faceNormal")
 
 mkCandidatePoint :: forall v. v -> Vector3 -> CandidatePoint v
 mkCandidatePoint p n = CandidatePoint { position : p, faceNormal : n }

@@ -10,7 +10,7 @@ import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..))
 import Data.Meter (meterVal)
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Editor.Common.Lenses (_button, _dragged, _height, _orientation, _tapped, _x, _y, _z)
 import Editor.UI.DragInfo (DragInfo, mkDragInfo)
 import Effect (Effect)
@@ -42,7 +42,7 @@ instance isObject3DPlusButtonNode :: IsObject3D PlusButtonNode where
     toObject3D = view _button
 
 _plusButton :: forall t a r. Newtype t { plusButton :: a | r } => Lens' t a
-_plusButton = _Newtype <<< prop (SProxy :: SProxy "plusButton")
+_plusButton = _Newtype <<< prop (Proxy :: Proxy "plusButton")
 
 plusButtonGeo :: Unit -> BoxGeometry
 plusButtonGeo = memoize $ const $ unsafePerformEffect $ mkBoxGeometry 1.0 1.0 0.001

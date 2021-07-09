@@ -8,7 +8,7 @@ import Data.Lens (Lens', view, (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Data.UUID (UUID, genUUID)
 import Editor.Common.Lenses (_id, _position)
 import Effect (Effect)
@@ -41,19 +41,19 @@ instance hasUUIDEdge :: HasUUID Edge where
     idLens = _id
 
 _line :: forall t a r. Newtype t { line :: a | r } => Lens' t a
-_line = _Newtype <<< prop (SProxy :: SProxy "line")
+_line = _Newtype <<< prop (Proxy :: Proxy "line")
 
 _leftVertex :: forall t a r. Newtype t { leftVertex :: a | r } => Lens' t a
-_leftVertex = _Newtype <<< prop (SProxy :: SProxy "leftVertex")
+_leftVertex = _Newtype <<< prop (Proxy :: Proxy "leftVertex")
 
 _rightVertex :: forall t a r. Newtype t { rightVertex :: a | r } => Lens' t a
-_rightVertex = _Newtype <<< prop (SProxy :: SProxy "rightVertex")
+_rightVertex = _Newtype <<< prop (Proxy :: Proxy "rightVertex")
 
 _leftBisector :: forall t a r. Newtype t { leftBisector :: a | r } => Lens' t a
-_leftBisector = _Newtype <<< prop (SProxy :: SProxy "leftBisector")
+_leftBisector = _Newtype <<< prop (Proxy :: Proxy "leftBisector")
 
 _rightBisector :: forall t a r. Newtype t { rightBisector :: a | r } => Lens' t a
-_rightBisector = _Newtype <<< prop (SProxy :: SProxy "rightBisector")
+_rightBisector = _Newtype <<< prop (Proxy :: Proxy "rightBisector")
 
 edge :: VertInfo -> VertInfo -> Effect Edge
 edge lv rv = do

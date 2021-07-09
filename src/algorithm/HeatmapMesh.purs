@@ -15,7 +15,7 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
 import Data.Number (infinity)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Editor.Common.Lenses (_index, _position, _x, _y)
@@ -52,7 +52,7 @@ instance vertexIndexedVertex :: Vertex IndexedVertex where
     vertY = view _y
 
 _vertType :: forall t a r. Newtype t { vertType :: a | r } => Lens' t a
-_vertType = _Newtype <<< prop (SProxy :: SProxy "vertType")
+_vertType = _Newtype <<< prop (Proxy :: Proxy "vertType")
 
 mkIndexedVertex :: Number -> Number -> Int -> VertexType -> IndexedVertex
 mkIndexedVertex x y i t = IndexedVertex { x : x, y : y, index : i, vertType : t }

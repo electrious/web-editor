@@ -12,7 +12,7 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Editor.Common.Lenses (_dragged, _enabled, _isActive, _name, _position, _rotation, _tapped)
 import Editor.SceneEvent (isDragEnd, isDragStart)
 import Effect.Class (liftEffect)
@@ -54,16 +54,16 @@ instance defaultDragObjCfg :: Default (DragObjCfg geo) where
         }
 
 _customGeo :: forall t a r. Newtype t { customGeo :: a | r } => Lens' t a
-_customGeo = _Newtype <<< prop (SProxy :: SProxy "customGeo")
+_customGeo = _Newtype <<< prop (Proxy :: Proxy "customGeo")
 
 _customMat :: forall t a r. Newtype t { customMat :: a | r } => Lens' t a
-_customMat = _Newtype <<< prop (SProxy :: SProxy "customMat")
+_customMat = _Newtype <<< prop (Proxy :: Proxy "customMat")
 
 _validator :: forall t a r. Newtype t { validator :: a | r } => Lens' t a
-_validator = _Newtype <<< prop (SProxy :: SProxy "validator")
+_validator = _Newtype <<< prop (Proxy :: Proxy "validator")
 
 _deltaTransform :: forall t a r. Newtype t { deltaTransform :: a | r } => Lens' t a
-_deltaTransform = _Newtype <<< prop (SProxy :: SProxy "deltaTransform")
+_deltaTransform = _Newtype <<< prop (Proxy :: Proxy "deltaTransform")
 
 newtype DraggableObject = DraggableObject {
     tapped     :: Event Unit,
@@ -74,7 +74,7 @@ newtype DraggableObject = DraggableObject {
 derive instance newtypeDraggableEvent :: Newtype DraggableObject _
 
 _isDragging :: forall t a r. Newtype t { isDragging :: a | r } => Lens' t a
-_isDragging = _Newtype <<< prop (SProxy :: SProxy "isDragging")
+_isDragging = _Newtype <<< prop (Proxy :: Proxy "isDragging")
 
 -- | create the default material
 defMaterial :: MeshBasicMaterial

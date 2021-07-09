@@ -11,7 +11,7 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Meter (Meter, meter)
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Data.UUID (UUID, emptyUUID, genUUID)
 import Editor.Common.Lenses (_height, _id, _position)
 import Effect (Effect)
@@ -37,7 +37,7 @@ instance Show TreePart where
 
 
 _dia :: forall t a r. Newtype t { dia :: a | r } => Lens' t a
-_dia = _Newtype <<< prop (SProxy :: SProxy "dia")
+_dia = _Newtype <<< prop (Proxy :: Proxy "dia")
 
 mkTreePart :: Meter -> Meter -> TreePart
 mkTreePart h d = TreePart { height: h, dia: d }
@@ -75,13 +75,13 @@ instance Default Tree where
         }
 
 _crown :: forall t a r. Newtype t { crown :: a | r } => Lens' t a
-_crown = _Newtype <<< prop (SProxy :: SProxy "crown")
+_crown = _Newtype <<< prop (Proxy :: Proxy "crown")
 
 _barrel :: forall t a r. Newtype t { barrel :: a | r } => Lens' t a
-_barrel = _Newtype <<< prop (SProxy :: SProxy "barrel")
+_barrel = _Newtype <<< prop (Proxy :: Proxy "barrel")
 
 _canopy :: forall t a r. Newtype t { canopy :: a | r } => Lens' t a
-_canopy = _Newtype <<< prop (SProxy :: SProxy "canopy")
+_canopy = _Newtype <<< prop (Proxy :: Proxy "canopy")
 
 
 mkTree :: Vector3 -> Effect Tree

@@ -12,7 +12,7 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Editor.Common.Lenses (_color, _name, _parent, _position, _rotation, _scale)
@@ -43,7 +43,7 @@ instance functorNodeEnv :: Functor NodeEnv where
               }
 
 _env :: forall t a r. Newtype t { env :: a | r } => Lens' t a
-_env = _Newtype <<< prop (SProxy :: SProxy "env")
+_env = _Newtype <<< prop (Proxy :: Proxy "env")
 
 mkNodeEnv :: forall o e. IsObject3D o => o -> e -> NodeEnv e
 mkNodeEnv obj e = NodeEnv { parent : toObject3D obj, env : e }
@@ -114,22 +114,22 @@ instance defaultProps :: Default Props where
         }
 
 _castShadow :: forall t a r. Newtype t { castShadow :: a | r } => Lens' t a
-_castShadow = _Newtype <<< prop (SProxy :: SProxy "castShadow")
+_castShadow = _Newtype <<< prop (Proxy :: Proxy "castShadow")
 
 _receiveShadow :: forall t a r. Newtype t { receiveShadow :: a | r } => Lens' t a
-_receiveShadow = _Newtype <<< prop (SProxy :: SProxy "receiveShadow")
+_receiveShadow = _Newtype <<< prop (Proxy :: Proxy "receiveShadow")
 
 _target :: forall t a r. Newtype t { target :: a | r } => Lens' t a
-_target = _Newtype <<< prop (SProxy :: SProxy "target")
+_target = _Newtype <<< prop (Proxy :: Proxy "target")
 
 _visible :: forall t a r. Newtype t { visible :: a | r } => Lens' t a
-_visible = _Newtype <<< prop (SProxy :: SProxy "visible")
+_visible = _Newtype <<< prop (Proxy :: Proxy "visible")
 
 _raycastable :: forall t a r. Newtype t { raycastable :: a | r } => Lens' t a
-_raycastable = _Newtype <<< prop (SProxy :: SProxy "raycastable")
+_raycastable = _Newtype <<< prop (Proxy :: Proxy "raycastable")
 
 _renderOrder :: forall t a r. Newtype t { renderOrder :: a | r } => Lens' t a
-_renderOrder = _Newtype <<< prop (SProxy :: SProxy "renderOrder")
+_renderOrder = _Newtype <<< prop (Proxy :: Proxy "renderOrder")
 
 setupProps :: forall o. IsObject3D o => Props -> o -> Effect (Effect Unit)
 setupProps prop o = do
@@ -215,10 +215,10 @@ instance defaultTextProps :: Default TextProps where
     }
 
 _fontSize :: forall t a r. Newtype t { fontSize :: a | r } => Lens' t a
-_fontSize = _Newtype <<< prop (SProxy :: SProxy "fontSize")
+_fontSize = _Newtype <<< prop (Proxy :: Proxy "fontSize")
 
 _textAlign :: forall t a r. Newtype t { textAlign :: a | r } => Lens' t a
-_textAlign = _Newtype <<< prop (SProxy :: SProxy "textAlign")
+_textAlign = _Newtype <<< prop (Proxy :: Proxy "textAlign")
 
 text3D :: forall e. TextProps -> String -> Node e Text
 text3D prop s = do

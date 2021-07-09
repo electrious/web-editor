@@ -17,7 +17,7 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Meter (Meter, meter, meterVal)
 import Data.Newtype (class Newtype)
 import Data.Set as S
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Data.Tuple (Tuple(..))
 import Data.UUID (UUID, emptyUUID, genUUID)
 import Data.UUIDMap (UUIDMap)
@@ -74,7 +74,7 @@ instance HasUUID House where
     idLens = _id
 
 _trees :: forall t a r. Newtype t { trees :: a | r } => Lens' t a
-_trees = _Newtype <<< prop (SProxy :: SProxy "trees")
+_trees = _Newtype <<< prop (Proxy :: Proxy "trees")
 
 createHouseFrom :: Angle -> Polygon Vector3 -> Effect House
 createHouseFrom slope poly = do
@@ -196,13 +196,13 @@ instance Default HouseNode where
         }
 
 _roofTapped :: forall t a r. Newtype t { roofTapped :: a | r } => Lens' t a
-_roofTapped = _Newtype <<< prop (SProxy :: SProxy "roofTapped")
+_roofTapped = _Newtype <<< prop (Proxy :: Proxy "roofTapped")
 
 _wallTapped :: forall t a r. Newtype t { wallTapped :: a | r } => Lens' t a
-_wallTapped = _Newtype <<< prop (SProxy :: SProxy "wallTapped")
+_wallTapped = _Newtype <<< prop (Proxy :: Proxy "wallTapped")
 
 _activeRoof :: forall t a r. Newtype t { activeRoof :: a | r } => Lens' t a
-_activeRoof = _Newtype <<< prop (SProxy :: SProxy "activeRoof")
+_activeRoof = _Newtype <<< prop (Proxy :: Proxy "activeRoof")
 
 houseTapped :: HouseNode -> Event UUID
 houseTapped h = (const i <$> h ^. _roofTapped) <|> (const i <$> h ^. _wallTapped)

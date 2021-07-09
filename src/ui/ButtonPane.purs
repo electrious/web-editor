@@ -8,7 +8,7 @@ import Data.Lens (Lens', (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import FRP.Event (Event)
 import Specular.Dom.Browser (Attrs)
 import Specular.Dom.Element (attrs, classes, text)
@@ -37,16 +37,16 @@ instance defaultButtonsConf :: Default ButtonsConf where
         }
 
 _showCloseDyn :: forall t a r. Newtype t { showCloseDyn :: a | r } => Lens' t a
-_showCloseDyn = _Newtype <<< prop (SProxy :: SProxy "showCloseDyn")
+_showCloseDyn = _Newtype <<< prop (Proxy :: Proxy "showCloseDyn")
 
 _showSaveDyn :: forall t a r. Newtype t { showSaveDyn :: a | r } => Lens' t a
-_showSaveDyn = _Newtype <<< prop (SProxy :: SProxy "showSaveDyn")
+_showSaveDyn = _Newtype <<< prop (Proxy :: Proxy "showSaveDyn")
 
 _showResetDyn :: forall t a r. Newtype t { showResetDyn :: a | r } => Lens' t a
-_showResetDyn = _Newtype <<< prop (SProxy :: SProxy "showResetDyn")
+_showResetDyn = _Newtype <<< prop (Proxy :: Proxy "showResetDyn")
 
 _showUndoDyn :: forall t a r. Newtype t { showUndoDyn :: a | r } => Lens' t a
-_showUndoDyn = _Newtype <<< prop (SProxy :: SProxy "showUndoDyn")
+_showUndoDyn = _Newtype <<< prop (Proxy :: Proxy "showUndoDyn")
 
 
 newtype ButtonsPane = ButtonsPane {
@@ -66,16 +66,16 @@ instance defaultButtonsPane :: Default ButtonsPane where
         }
 
 _close :: forall t a r. Newtype t { close :: a | r } => Lens' t a
-_close = _Newtype <<< prop (SProxy :: SProxy "close")
+_close = _Newtype <<< prop (Proxy :: Proxy "close")
 
 _save :: forall t a r. Newtype t { save :: a | r } => Lens' t a
-_save = _Newtype <<< prop (SProxy :: SProxy "save")
+_save = _Newtype <<< prop (Proxy :: Proxy "save")
 
 _reset :: forall t a r. Newtype t { reset :: a | r } => Lens' t a
-_reset = _Newtype <<< prop (SProxy :: SProxy "reset")
+_reset = _Newtype <<< prop (Proxy :: Proxy "reset")
 
 _undo :: forall t a r. Newtype t { undo :: a | r } => Lens' t a
-_undo = _Newtype <<< prop (SProxy :: SProxy "undo")
+_undo = _Newtype <<< prop (Proxy :: Proxy "undo")
                     
 btnsStyle :: Attrs
 btnsStyle = mkStyle [

@@ -12,7 +12,7 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import FRP.Event (Event, keepLatest)
 import FRP.Event.Extra (delay, multicast)
 import Foreign (Foreign)
@@ -111,7 +111,7 @@ fieldTrans _         = ""
 
 
 _success :: forall t a r. Newtype t { success :: a | r } => Lens' t a
-_success = _Newtype <<< prop (SProxy :: SProxy "success")
+_success = _Newtype <<< prop (Proxy :: Proxy "success")
 
 
 succeeded :: ReadyAPIResp -> Boolean

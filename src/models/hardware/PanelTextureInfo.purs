@@ -9,7 +9,7 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 
 -- texture info needed to render panels
 newtype PanelTextureInfo = PanelTextureInfo {
@@ -29,10 +29,10 @@ instance defaultPanelTextureInfo :: Default PanelTextureInfo where
                            }
 
 _standard :: forall t a r . Newtype t { standard :: a | r } => Lens' t a
-_standard = _Newtype <<< prop (SProxy :: SProxy "standard")
+_standard = _Newtype <<< prop (Proxy :: Proxy "standard")
 
 _premium :: forall t a r . Newtype t { premium :: a | r } => Lens' t a
-_premium = _Newtype <<< prop (SProxy :: SProxy "premium")
+_premium = _Newtype <<< prop (Proxy :: Proxy "premium")
 
 _standard72 :: forall t a r . Newtype t { standard72 :: a | r } => Lens' t a
-_standard72 = _Newtype <<< prop (SProxy :: SProxy "standard72")
+_standard72 = _Newtype <<< prop (Proxy :: Proxy "standard72")

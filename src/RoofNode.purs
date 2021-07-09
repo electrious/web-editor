@@ -16,7 +16,7 @@ import Data.Lens.Record (prop)
 import Data.List (List)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Data.Traversable (sequence_, traverse, traverse_)
 import Data.Tuple (Tuple(..))
 import Data.UUID (UUID)
@@ -121,7 +121,7 @@ instance disposableRoofNode :: Disposable RoofNode where
     dispose (RoofNode { disposable }) = disposable
 
 _roofObject :: Lens' RoofNode Object3D
-_roofObject = _Newtype <<< prop (SProxy :: SProxy "roofObject")
+_roofObject = _Newtype <<< prop (Proxy :: Proxy "roofObject")
 
 -- | default material for roof plate.
 defMaterial :: MeshBasicMaterial

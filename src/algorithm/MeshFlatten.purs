@@ -10,7 +10,7 @@ import Data.Lens (Lens', (^.), (.~))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Data.Tuple (fst, snd)
 import Editor.Common.Lenses (_center, _index, _item, _maxX, _maxY, _minX, _minY, _normal, _polygon, _position)
 import Effect (Effect)
@@ -37,7 +37,7 @@ instance defaultVertexItem :: Default VertexItem where
     }
 
 _vertex :: forall t a r. Newtype t { vertex :: a | r } => Lens' t a
-_vertex = _Newtype <<< prop (SProxy :: SProxy "vertex" )
+_vertex = _Newtype <<< prop (Proxy :: Proxy "vertex" )
 
 -- | offset used to calculate bounding box for a point
 vertexOffset :: Number

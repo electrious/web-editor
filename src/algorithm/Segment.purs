@@ -7,7 +7,7 @@ import Data.Lens (Lens', (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Editor.Common.Lenses (_y)
 import Math (abs)
 
@@ -32,13 +32,13 @@ instance defaultSegment :: Default a => Default (Segment a) where
     def = mkSegment 0.0 0.0 0.0 def
 
 _startX :: forall t a r. Newtype t { startX :: a | r } => Lens' t a
-_startX = _Newtype <<< prop (SProxy :: SProxy "startX")
+_startX = _Newtype <<< prop (Proxy :: Proxy "startX")
 
 _endX :: forall t a r. Newtype t { endX :: a | r } => Lens' t a
-_endX = _Newtype <<< prop (SProxy :: SProxy "endX")
+_endX = _Newtype <<< prop (Proxy :: Proxy "endX")
 
 _segData :: forall t a r. Newtype t { segData :: a | r } => Lens' t a
-_segData = _Newtype <<< prop (SProxy :: SProxy "segData")
+_segData = _Newtype <<< prop (Proxy :: Proxy "segData")
 
 mkSegment :: forall a. Number -> Number -> Number -> a -> Segment a
 mkSegment sx ex y d = Segment {

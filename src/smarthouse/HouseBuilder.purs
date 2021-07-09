@@ -24,7 +24,7 @@ import Data.Map as M
 import Data.Maybe (Maybe(..), isNothing)
 import Data.Meter (meterVal)
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Data.Traversable (traverse)
 import Data.Tuple (fst)
 import Data.UUID (UUID)
@@ -122,13 +122,13 @@ instance Default HouseBuilt where
         }
 
 _hasHouse :: forall t a r. Newtype t { hasHouse :: a | r } => Lens' t a
-_hasHouse = _Newtype <<< prop (SProxy :: SProxy "hasHouse")
+_hasHouse = _Newtype <<< prop (Proxy :: Proxy "hasHouse")
 
 _saveStepEvt :: forall t a r. Newtype t { saveStepEvt :: a | r } => Lens' t a
-_saveStepEvt = _Newtype <<< prop (SProxy :: SProxy "saveStepEvt")
+_saveStepEvt = _Newtype <<< prop (Proxy :: Proxy "saveStepEvt")
 
 _activeItem :: forall t a r. Newtype t { activeItem :: a | r } => Lens' t a
-_activeItem = _Newtype <<< prop (SProxy :: SProxy "activeItem")
+_activeItem = _Newtype <<< prop (Proxy :: Proxy "activeItem")
 
 compactHouseBuilt :: Event HouseBuilt -> HouseBuilt
 compactHouseBuilt e = def # _hasHouse    .~ keepLatest (view _hasHouse    <$> e)
@@ -183,13 +183,13 @@ instance Default HouseDictData where
         }
 
 _houses :: forall t a r. Newtype t { houses :: a | r } => Lens' t a
-_houses = _Newtype <<< prop (SProxy :: SProxy "houses")
+_houses = _Newtype <<< prop (Proxy :: Proxy "houses")
 
 _housesToRender :: forall t a r. Newtype t { housesToRender :: a | r } => Lens' t a
-_housesToRender = _Newtype <<< prop (SProxy :: SProxy "housesToRender")
+_housesToRender = _Newtype <<< prop (Proxy :: Proxy "housesToRender")
 
 _treesToRender :: forall t a r. Newtype t { treesToRender :: a | r } => Lens' t a
-_treesToRender = _Newtype <<< prop (SProxy :: SProxy "treesToRender")
+_treesToRender = _Newtype <<< prop (Proxy :: Proxy "treesToRender")
 
 
 hasHouse :: HouseDictData -> Boolean
@@ -306,7 +306,7 @@ instance Default BuilderInputEvts where
         }
 
 _export :: forall t a r. Newtype t { export :: a | r } => Lens' t a
-_export = _Newtype <<< prop (SProxy :: SProxy "export")
+_export = _Newtype <<< prop (Proxy :: Proxy "export")
 
 
 createHouseBuilder :: BuilderInputEvts -> Node HouseBuilderConfig HouseBuilt

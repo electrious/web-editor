@@ -20,7 +20,7 @@ import Data.Map (lookup, update)
 import Data.Map as M
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Data.Traversable (sequence)
 import Data.Triple (Triple(..))
 import Data.Tuple (Tuple(..))
@@ -189,16 +189,16 @@ instance defaultSLAV :: Default SLAVState where
     def = SLAVState { lavs : M.empty, edges : [], validStates : M.empty }
 
 _lavs :: forall t a r. Newtype t { lavs :: a | r } => Lens' t a
-_lavs = _Newtype <<< prop (SProxy :: SProxy "lavs")
+_lavs = _Newtype <<< prop (Proxy :: Proxy "lavs")
 
 _vertices :: forall t a r. Newtype t { vertices :: a | r } => Lens' t a
-_vertices = _Newtype <<< prop (SProxy :: SProxy "vertices")
+_vertices = _Newtype <<< prop (Proxy :: Proxy "vertices")
 
 _edges :: forall t a r. Newtype t { edges :: a | r } => Lens' t a
-_edges = _Newtype <<< prop (SProxy :: SProxy "edges")
+_edges = _Newtype <<< prop (Proxy :: Proxy "edges")
 
 _validStates :: forall t a r. Newtype t { validStates :: a | r } => Lens' t a
-_validStates = _Newtype <<< prop (SProxy :: SProxy "validStates")
+_validStates = _Newtype <<< prop (Proxy :: Proxy "validStates")
 
 
 type SLAV = StateT SLAVState Effect

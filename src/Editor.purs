@@ -11,7 +11,7 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Editor.Common.Lenses (_deltaX, _deltaY, _height, _shiftDragged, _width, _zoomed)
 import Editor.Disposable (class Disposable, dispose)
 import Editor.EditorMode (EditorMode(..))
@@ -52,10 +52,10 @@ instance defaultEditorConfig :: Default EditorConfig where
     }
 
 _sizeDyn :: forall t a r. Newtype t { sizeDyn :: a | r } => Lens' t a
-_sizeDyn = _Newtype <<< prop (SProxy :: SProxy "sizeDyn")
+_sizeDyn = _Newtype <<< prop (Proxy :: Proxy "sizeDyn")
 
 _flyCameraTarget :: forall t a r. Newtype t { flyCameraTarget :: a | r } => Lens' t a
-_flyCameraTarget = _Newtype <<< prop (SProxy :: SProxy "flyCameraTarget")
+_flyCameraTarget = _Newtype <<< prop (Proxy :: Proxy "flyCameraTarget")
 
 -- | internal record that defines all components for threejs related objects
 newtype Editor = Editor {
@@ -75,10 +75,10 @@ instance isObject3DEditor :: IsObject3D Editor where
     toObject3D = view _content
 
 _canvas :: forall t a r. Newtype t { canvas :: a | r } => Lens' t a
-_canvas = _Newtype <<< prop (SProxy :: SProxy "canvas")
+_canvas = _Newtype <<< prop (Proxy :: Proxy "canvas")
 
 _content :: forall t a r. Newtype t { content :: a | r } => Lens' t a
-_content = _Newtype <<< prop (SProxy :: SProxy "content")
+_content = _Newtype <<< prop (Proxy :: Proxy "content")
 
 renderEditor :: Editor -> Effect Unit
 renderEditor (Editor s) = s.render

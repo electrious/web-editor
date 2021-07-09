@@ -9,7 +9,7 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Editor.Common.Lenses (_shade, _shadeSelected)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic)
@@ -38,7 +38,7 @@ instance Default ActiveItemUI where
         }
 
 _deleteHouse :: forall t a r. Newtype t { deleteHouse :: a | r } => Lens' t a
-_deleteHouse = _Newtype <<< prop (SProxy :: SProxy "deleteHouse")
+_deleteHouse = _Newtype <<< prop (Proxy :: Proxy "deleteHouse")
 
 
 

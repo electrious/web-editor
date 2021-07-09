@@ -18,7 +18,7 @@ import Data.Lens.Record (prop)
 import Data.Map as Map
 import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Editor.Common.Lenses (_alignment, _apiConfig, _houseId, _leadId, _modeDyn, _orientation, _panels, _parent, _roofRackings, _roofs, _wrapper)
 import Editor.Disposable (dispose)
 import Editor.Editor (Editor, _canvas, _sizeDyn, addDisposable, setMode)
@@ -129,13 +129,13 @@ newtype HouseLoaded = HouseLoaded {
 derive instance newtypeHouseLoaded :: Newtype HouseLoaded _
 
 _loaded :: forall t a r. Newtype t { loaded :: a | r } => Lens' t a
-_loaded = _Newtype <<< prop (SProxy :: SProxy "loaded")
+_loaded = _Newtype <<< prop (Proxy :: Proxy "loaded")
 
 _screenshot :: forall t a r. Newtype t { screenshot :: a | r } => Lens' t a
-_screenshot = _Newtype <<< prop (SProxy :: SProxy "screenshot")
+_screenshot = _Newtype <<< prop (Proxy :: Proxy "screenshot")
 
 _roofUpdate :: forall t a r. Newtype t { roofUpdate :: a | r } => Lens' t a
-_roofUpdate = _Newtype <<< prop (SProxy :: SProxy "roofUpdate")
+_roofUpdate = _Newtype <<< prop (Proxy :: Proxy "roofUpdate")
 
 loadHouse :: Editor -> ArrayEditParam -> HouseEditor HouseLoaded
 loadHouse editor param = do

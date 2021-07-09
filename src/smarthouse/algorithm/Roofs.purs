@@ -11,7 +11,7 @@ import Data.Map as M
 import Data.Newtype (class Newtype)
 import Data.Set (Set)
 import Data.Set as S
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..), fst, snd)
 import Data.UUID (UUID)
@@ -58,10 +58,10 @@ instance ordRoofData :: Ord RoofData where
     compare = comparing (view idLens)
 
 _edgeNodes :: forall t a r. Newtype t { edgeNodes :: a | r } => Lens' t a
-_edgeNodes = _Newtype <<< prop (SProxy :: SProxy "edgeNodes")
+_edgeNodes = _Newtype <<< prop (Proxy :: Proxy "edgeNodes")
 
 _edge :: forall t a r. Newtype t { edge :: a | r } => Lens' t a
-_edge = _Newtype <<< prop (SProxy :: SProxy "edge")
+_edge = _Newtype <<< prop (Proxy :: Proxy "edge")
 
 -- all nodes in the roof polygon of an edge, but omit the MergedNode
 -- if the edge should be merged

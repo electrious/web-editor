@@ -8,7 +8,7 @@ import Data.Lens (Lens', view, (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Editor.Common.Lenses (_apiConfig, _modeDyn, _panelType, _textureInfo)
 import Editor.EditorMode (EditorMode)
 import Editor.HouseEditor (HouseEditor, _heatmapTexture, _rotBtnTexture)
@@ -34,10 +34,10 @@ newtype ArrayBuilderEnv = ArrayBuilderEnv {
 derive instance newtypeArrayBuilderEnv :: Newtype ArrayBuilderEnv _
 
 _arrayConfig :: forall t a r. Newtype t { arrayConfig :: a | r } => Lens' t a
-_arrayConfig = _Newtype <<< prop (SProxy :: SProxy "arrayConfig")
+_arrayConfig = _Newtype <<< prop (Proxy :: Proxy "arrayConfig")
 
 _editorMode :: forall t a r. Newtype t { editorMode :: a | r } => Lens' t a
-_editorMode = _Newtype <<< prop (SProxy :: SProxy "editorMode")
+_editorMode = _Newtype <<< prop (Proxy :: Proxy "editorMode")
 
 newtype RendererConfig = RendererConfig {
     heatmapMaterial      :: MeshBasicMaterial,
@@ -47,10 +47,10 @@ newtype RendererConfig = RendererConfig {
 derive instance newtypeRendererConfig :: Newtype RendererConfig _
 
 _heatmapMaterial :: forall t a r. Newtype t { heatmapMaterial :: a | r } => Lens' t a
-_heatmapMaterial = _Newtype <<< prop (SProxy :: SProxy "heatmapMaterial")
+_heatmapMaterial = _Newtype <<< prop (Proxy :: Proxy "heatmapMaterial")
 
 _rotateButtonMaterial :: forall t a r. Newtype t { rotateButtonMaterial :: a | r } => Lens' t a
-_rotateButtonMaterial = _Newtype <<< prop (SProxy :: SProxy "rotateButtonMaterial")
+_rotateButtonMaterial = _Newtype <<< prop (Proxy :: Proxy "rotateButtonMaterial")
 
 -- | ArrayBuilder is the monad to build arrays in
 newtype ArrayBuilder a = ArrayBuilder (ReaderT ArrayBuilderEnv (RenderingM RendererConfig) a)

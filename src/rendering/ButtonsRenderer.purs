@@ -13,7 +13,7 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (List(..), find, fromFoldable, partition)
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Data.Traversable (traverse, traverse_)
 import Editor.Common.Lenses (_dragged, _id, _tapped)
 import Editor.UI.DragInfo (DragInfo)
@@ -49,13 +49,13 @@ newtype ButtonsRenderer = ButtonsRenderer {
 derive instance newtypeButtonsRenderer :: Newtype ButtonsRenderer _
 
 _plusTapped :: forall t a r. Newtype t { plusTapped :: a | r } => Lens' t a
-_plusTapped = _Newtype <<< prop (SProxy :: SProxy "plusTapped")
+_plusTapped = _Newtype <<< prop (Proxy :: Proxy "plusTapped")
 
 _plusDragged :: forall t a r. Newtype t { plusDragged :: a | r } => Lens' t a
-_plusDragged = _Newtype <<< prop (SProxy :: SProxy "plusDragged")
+_plusDragged = _Newtype <<< prop (Proxy :: Proxy "plusDragged")
 
 _rotTapped :: forall t a r. Newtype t { rotTapped :: a | r } => Lens' t a
-_rotTapped = _Newtype <<< prop (SProxy :: SProxy "rotTapped")
+_rotTapped = _Newtype <<< prop (Proxy :: Proxy "rotTapped")
 
 
 newtype ButtonRendererState = ButtonRendererState {
@@ -71,10 +71,10 @@ instance defaultButtonRendererState :: Default ButtonRendererState where
     }
 
 _plusBtns :: forall t a r. Newtype t { plusBtns :: a | r } => Lens' t a
-_plusBtns = _Newtype <<< prop (SProxy :: SProxy "plusBtns")
+_plusBtns = _Newtype <<< prop (Proxy :: Proxy "plusBtns")
 
 _rotBtns :: forall t a r. Newtype t { rotBtns :: a | r } => Lens' t a
-_rotBtns = _Newtype <<< prop (SProxy :: SProxy "rotBtns")
+_rotBtns = _Newtype <<< prop (Proxy :: Proxy "rotBtns")
 
 -- | helper function to apply buttons operation and update the internal state
 applyOp :: forall a. IsObject3D a => a -> MeshBasicMaterial -> ButtonOperation -> ButtonRendererState -> Effect ButtonRendererState

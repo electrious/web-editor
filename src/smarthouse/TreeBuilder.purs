@@ -13,7 +13,7 @@ import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..))
 import Data.Meter (Meter, feetInchStr, meter, meterVal)
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Editor.Common.Lenses (_face, _height, _isActive, _name, _parent, _point, _position, _rotation, _tapped, _updated)
 import Editor.ObjectAdder (AdderType(..), createObjectAdder, mkCandidatePoint)
 import Editor.SceneEvent (SceneMouseMoveEvent)
@@ -332,10 +332,10 @@ instance defaultTreeDragBtn :: Default TreeDragBtn where
 
 
 _toTarget :: forall t a r. Newtype t { toTarget :: a | r } => Lens' t a
-_toTarget = _Newtype <<< prop (SProxy :: SProxy "toTarget")
+_toTarget = _Newtype <<< prop (Proxy :: Proxy "toTarget")
 
 _fromTarget :: forall t a r. Newtype t { fromTarget :: a | r } => Lens' t a
-_fromTarget = _Newtype <<< prop (SProxy :: SProxy "fromTarget")
+_fromTarget = _Newtype <<< prop (Proxy :: Proxy "fromTarget")
 
 
 newtype TreeBtnEvts = TreeBtnEvts {

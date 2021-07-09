@@ -9,7 +9,7 @@ import Data.Lens (Lens')
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Data.UUID (UUID)
 import Foreign.Generic (class Decode, class Encode, defaultOptions, genericDecode, genericEncode)
 
@@ -34,7 +34,7 @@ instance functorRoofSpecific :: Functor RoofSpecific where
     map f (RoofSpecific r) = RoofSpecific $ r { value = f r.value }
 
 _value :: forall t a r. Newtype t { value :: a | r } => Lens' t a
-_value = _Newtype <<< prop (SProxy :: SProxy "value")
+_value = _Newtype <<< prop (Proxy :: Proxy "value")
 
 mkRoofSpecific :: forall a. UUID -> a -> RoofSpecific a
 mkRoofSpecific i v = RoofSpecific {

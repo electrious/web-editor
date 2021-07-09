@@ -18,7 +18,7 @@ import Data.Lens.Record (prop)
 import Data.List.NonEmpty (singleton)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Effect (Effect)
 import Effect.Aff (Aff, Error, error, killFiber, launchAff_, runAff)
 import Effect.Class.Console (errorShow)
@@ -59,13 +59,13 @@ instance defaultAPIConfig :: Default APIConfig where
         baseUrl : ""
     }
 _auth :: Lens' APIConfig (Maybe String)
-_auth = _Newtype <<< prop (SProxy :: SProxy "auth")
+_auth = _Newtype <<< prop (Proxy :: Proxy "auth")
 
 _xUserId :: Lens' APIConfig (Maybe Int)
-_xUserId = _Newtype <<< prop (SProxy :: SProxy "xUserId")
+_xUserId = _Newtype <<< prop (Proxy :: Proxy "xUserId")
 
 _baseUrl :: Lens' APIConfig String
-_baseUrl = _Newtype <<< prop (SProxy :: SProxy "baseUrl")
+_baseUrl = _Newtype <<< prop (Proxy :: Proxy "baseUrl")
 
 newtype API a = API (ReaderT APIConfig Effect a)
 

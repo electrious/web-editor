@@ -10,7 +10,7 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Meter (Meter, inch, meter)
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Data.UUID (UUID)
 import Editor.Common.Lenses (_arrayNumber, _height, _id, _width, _x, _y, _z)
 import Editor.Common.ProtoCodable (class ProtoDecodable, fromProto)
@@ -75,4 +75,4 @@ instance protoDecodableMount :: ProtoDecodable Mount MountPB where
     }
 
 _clampX :: Lens' Mount Meter
-_clampX = _Newtype <<< prop (SProxy :: SProxy "clampX")
+_clampX = _Newtype <<< prop (Proxy :: Proxy "clampX")

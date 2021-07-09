@@ -13,7 +13,7 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Editor.Common.Lenses (_canDrag, _deltaX, _deltaY, _distance, _dragType, _isDragging, _x, _y)
 import Editor.Input.Commoon (DragEvent, DragType(..), TapEvent, distance, dragDistance, middlePoint)
 import Editor.Input.Drag (dragged)
@@ -42,7 +42,7 @@ instance defaultDoubleTouchEvent :: Default DoubleTouchEvent where
     def = DoubleTouchEvent { dragType: DragStart, midPoint: def, distance: 0.0, rotation: degree 0.0 }
 
 _midPoint :: forall t a r. Newtype t { midPoint :: a | r } => Lens' t a
-_midPoint = _Newtype <<< prop (SProxy :: SProxy "midPoint")
+_midPoint = _Newtype <<< prop (Proxy :: Proxy "midPoint")
 
 singleTouchTap :: Element -> TouchEvent -> Maybe TapEvent
 singleTouchTap elem = touchPosAt elem 0
@@ -113,13 +113,13 @@ instance defaultDoubleTouchState :: Default DoubleTouchState where
     }
 
 _curType :: Lens' DoubleTouchState DoubleTouchType
-_curType = _Newtype <<< prop (SProxy :: SProxy "curType")
+_curType = _Newtype <<< prop (Proxy :: Proxy "curType")
 
 _lastDrag :: Lens' DoubleTouchState (Maybe DoubleTouchEvent)
-_lastDrag = _Newtype <<< prop (SProxy :: SProxy "lastDrag")
+_lastDrag = _Newtype <<< prop (Proxy :: Proxy "lastDrag")
 
 _curDrag :: Lens' DoubleTouchState (Maybe DoubleTouchEvent)
-_curDrag = _Newtype <<< prop (SProxy :: SProxy "curDrag")
+_curDrag = _Newtype <<< prop (Proxy :: Proxy "curDrag")
 
 determineGesture :: DoubleTouchEvent -> DoubleTouchEvent -> DoubleTouchType
 determineGesture oldE newE = let mvDst = distance (newE ^. _midPoint) (oldE ^. _midPoint)

@@ -10,7 +10,7 @@ import Data.Lens (Lens', view)
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Editor.Common.Lenses (_apiConfig)
 import Editor.EditorMode (EditorMode(..))
 import Editor.PanelNode (PanelOpacity)
@@ -41,7 +41,7 @@ instance defaultArrayEditParam :: Default ArrayEditParam where
     }
 
 _heatmap :: forall t a r. Newtype t { heatmap :: a | r } => Lens' t a
-_heatmap = _Newtype <<< prop (SProxy :: SProxy "heatmap")
+_heatmap = _Newtype <<< prop (Proxy :: Proxy "heatmap")
 
 newtype HouseConfig = HouseConfig {
     leadId          :: Int,
@@ -76,19 +76,19 @@ instance defaultHouseConfig :: Default HouseConfig where
     }
 
 _roofplates :: forall t a r. Newtype t { roofplates :: a | r } => Lens' t a
-_roofplates = _Newtype <<< prop (SProxy :: SProxy "roofplates")
+_roofplates = _Newtype <<< prop (Proxy :: Proxy "roofplates")
 
 _dataServer :: forall t a r. Newtype t { dataServer :: a | r } => Lens' t a
-_dataServer = _Newtype <<< prop (SProxy :: SProxy "dataServer")
+_dataServer = _Newtype <<< prop (Proxy :: Proxy "dataServer")
 
 _rotBtnTexture :: forall t a r. Newtype t { rotBtnTexture :: a | r } => Lens' t a
-_rotBtnTexture = _Newtype <<< prop (SProxy :: SProxy "rotBtnTexture")
+_rotBtnTexture = _Newtype <<< prop (Proxy :: Proxy "rotBtnTexture")
 
 _heatmapTexture :: forall t a r. Newtype t { heatmapTexture :: a | r } => Lens' t a
-_heatmapTexture = _Newtype <<< prop (SProxy :: SProxy "heatmapTexture")
+_heatmapTexture = _Newtype <<< prop (Proxy :: Proxy "heatmapTexture")
 
 _screenshotDelay :: forall t a r. Newtype t { screenshotDelay :: a | r } => Lens' t a
-_screenshotDelay = _Newtype <<< prop (SProxy :: SProxy "screenshotDelay")
+_screenshotDelay = _Newtype <<< prop (Proxy :: Proxy "screenshotDelay")
 
 newtype HouseEditor a = HouseEditor (ReaderT HouseConfig Effect a)
 

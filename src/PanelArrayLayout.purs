@@ -17,7 +17,7 @@ import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Meter (meterVal)
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Data.Tuple (Tuple(..))
 import Data.Unfoldable as Unfoldable
 import Editor.Common.Lenses (_centerX, _centerY, _config, _panels, _panelsUpdated)
@@ -54,10 +54,10 @@ instance defaultPanelsLayout :: Default PanelsLayout where
     }
 
 _tree :: Lens' PanelsLayout (RBush Panel)
-_tree = _Newtype <<< prop (SProxy :: SProxy "tree")
+_tree = _Newtype <<< prop (Proxy :: Proxy "tree")
 
 _arrays :: Lens' PanelsLayout (Map Int PanelArray)
-_arrays = _Newtype <<< prop (SProxy :: SProxy "arrays")
+_arrays = _Newtype <<< prop (Proxy :: Proxy "arrays")
 
 layoutPanels :: forall f. Foldable f => Functor f => f Panel -> ArrayConfig -> Effect PanelsLayout
 layoutPanels ps cfg = do

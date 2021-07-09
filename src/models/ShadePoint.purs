@@ -6,7 +6,7 @@ import Data.Lens (Lens', (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Editor.Common.Lenses (_rating, _x, _y, _z)
 import Model.Roof.RoofPlate (UnifiedPoint)
 import Three.Math.Vector (Vector3, mkVec3)
@@ -19,7 +19,7 @@ newtype ShadePoint = ShadePoint {
 derive instance newtypeShade :: Newtype ShadePoint _
 
 _intensity :: forall t a r. Newtype t { intensity :: a | r } => Lens' t a
-_intensity = _Newtype <<< prop (SProxy :: SProxy "intensity")
+_intensity = _Newtype <<< prop (Proxy :: Proxy "intensity")
 
 mkShadePoint :: Vector3 -> Number -> ShadePoint
 mkShadePoint p i = ShadePoint { position : p, intensity : i }

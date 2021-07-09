@@ -11,7 +11,7 @@ import Data.Lens.Record (prop)
 import Data.List (List(..), (:))
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Data.Tuple (Tuple(..), fst)
 import Math.Angle (Angle)
 import Math.Utils (lineIntersection)
@@ -35,10 +35,10 @@ instance functorLineSeg :: Functor LineSeg where
     map f (LineSeg { start: sl, end: el}) = LineSeg { start: f sl, end: f el }
 
 _start :: forall t a r. Newtype t { start :: a | r } => Lens' t a
-_start = _Newtype <<< prop (SProxy :: SProxy "start")
+_start = _Newtype <<< prop (Proxy :: Proxy "start")
 
 _end :: forall t a r. Newtype t { end :: a | r } => Lens' t a
-_end = _Newtype <<< prop (SProxy :: SProxy "end")
+_end = _Newtype <<< prop (Proxy :: Proxy "end")
 
 mkLineSeg :: forall v. v -> v -> LineSeg v
 mkLineSeg v1 v2 = LineSeg { start : v1, end : v2 }

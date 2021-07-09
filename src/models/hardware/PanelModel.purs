@@ -12,7 +12,7 @@ import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
 import Data.Number.Format (fixed, toStringWith)
 import Data.String (drop)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Editor.Common.Lenses (_name)
 import Foreign.Generic (class Decode, class Encode, defaultOptions, genericDecode, genericEncode)
 
@@ -62,19 +62,19 @@ fieldTrans "sizeLong"     = "size_long"
 fieldTrans _              = ""
 
 _power :: forall t a r. Newtype t { power :: a | r } => Lens' t a
-_power = _Newtype <<< prop (SProxy :: SProxy "power")
+_power = _Newtype <<< prop (Proxy :: Proxy "power")
 
 _isDefault :: forall t a r. Newtype t { isDefault :: a | r } => Lens' t a
-_isDefault = _Newtype <<< prop (SProxy :: SProxy "isDefault")
+_isDefault = _Newtype <<< prop (Proxy :: Proxy "isDefault")
 
 _pricePerWatt :: forall t a r. Newtype t { pricePerWatt :: a | r } => Lens' t a
-_pricePerWatt = _Newtype <<< prop (SProxy :: SProxy "pricePerWatt")
+_pricePerWatt = _Newtype <<< prop (Proxy :: Proxy "pricePerWatt")
 
 _sizeShort :: forall t a r. Newtype t { sizeShort :: a | r } => Lens' t a
-_sizeShort = _Newtype <<< prop (SProxy :: SProxy "sizeShort")
+_sizeShort = _Newtype <<< prop (Proxy :: Proxy "sizeShort")
 
 _sizeLong :: forall t a r. Newtype t { sizeLong :: a | r } => Lens' t a
-_sizeLong = _Newtype <<< prop (SProxy :: SProxy "sizeLong")
+_sizeLong = _Newtype <<< prop (Proxy :: Proxy "sizeLong")
 
 priceString :: PanelModel -> String
 priceString pm = if p > 0.0 && p < 1.0

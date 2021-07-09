@@ -8,7 +8,7 @@ import Data.Lens (Lens', (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Editor.Common.Lenses (_distance)
 import SmartHouse.Algorithm.Edge (Edge)
 import SmartHouse.Algorithm.Vertex (Vertex)
@@ -28,13 +28,13 @@ instance showEdgeE :: Show EdgeE where
     show = genericShow
 
 _intersection :: forall t a r. Newtype t { intersection :: a | r } => Lens' t a
-_intersection = _Newtype <<< prop (SProxy :: SProxy "intersection")
+_intersection = _Newtype <<< prop (Proxy :: Proxy "intersection")
 
 _vertexA :: forall t a r. Newtype t { vertexA :: a | r } => Lens' t a
-_vertexA = _Newtype <<< prop (SProxy :: SProxy "vertexA")
+_vertexA = _Newtype <<< prop (Proxy :: Proxy "vertexA")
 
 _vertexB :: forall t a r. Newtype t { vertexB :: a | r } => Lens' t a
-_vertexB = _Newtype <<< prop (SProxy :: SProxy "vertexB")
+_vertexB = _Newtype <<< prop (Proxy :: Proxy "vertexB")
 
 
 -- event to merge three consecutive bisectors at one intersection point
@@ -52,7 +52,7 @@ instance showEdgesE :: Show EdgesE where
     show = genericShow
 
 _vertexC :: forall t a r. Newtype t { vertexC :: a | r } => Lens' t a
-_vertexC = _Newtype <<< prop (SProxy :: SProxy "vertexC")
+_vertexC = _Newtype <<< prop (Proxy :: Proxy "vertexC")
 
 
 newtype SplitE = SplitE {
@@ -69,7 +69,7 @@ instance showSplitE :: Show SplitE where
 
 
 _oppositeEdge :: forall t a r. Newtype t { oppositeEdge :: a | r } => Lens' t a
-_oppositeEdge = _Newtype <<< prop (SProxy :: SProxy "oppositeEdge")
+_oppositeEdge = _Newtype <<< prop (Proxy :: Proxy "oppositeEdge")
 
 
 data PointEvent = EdgeEvent EdgeE

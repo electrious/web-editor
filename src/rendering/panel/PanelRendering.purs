@@ -14,7 +14,7 @@ import Data.Map (Map, delete, fromFoldable, insert, lookup, member, union, updat
 import Data.Map as Map
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Data.Traversable (traverse)
 import Data.Triple (Triple(..))
 import Data.Tuple (Tuple(..))
@@ -44,10 +44,10 @@ newtype PanelRendererConfig = PanelRendererConfig {
 derive instance newtypePanelRendererConfig :: Newtype PanelRendererConfig _
 
 _operations :: forall t a r. Newtype t { operations :: a | r } => Lens' t a
-_operations = _Newtype <<< prop (SProxy :: SProxy "operations")
+_operations = _Newtype <<< prop (Proxy :: Proxy "operations")
 
 _opacity :: forall t a r. Newtype t { opacity :: a | r } => Lens' t a
-_opacity = _Newtype <<< prop (SProxy :: SProxy "opacity")
+_opacity = _Newtype <<< prop (Proxy :: Proxy "opacity")
 
 -- | Panel Renderer that manages all panels rendered
 newtype PanelRenderer = PanelRenderer {
@@ -59,7 +59,7 @@ newtype PanelRenderer = PanelRenderer {
 derive instance newtypePanelRenderer :: Newtype PanelRenderer _
 
 _allPanels :: forall t a r. Newtype t { allPanels :: a | r } => Lens' t a
-_allPanels = _Newtype <<< prop (SProxy :: SProxy "allPanels")
+_allPanels = _Newtype <<< prop (Proxy :: Proxy "allPanels")
 
 -- | internal state of the panel renderer, which manages all rendered panels
 -- and temporary panels
@@ -72,10 +72,10 @@ newtype RendererState = RendererState {
 derive instance newtypeRendererState :: Newtype RendererState _
 
 _renderedPanels :: forall t a r. Newtype t { renderedPanels :: a | r } => Lens' t a
-_renderedPanels = _Newtype <<< prop (SProxy :: SProxy "renderedPanels")
+_renderedPanels = _Newtype <<< prop (Proxy :: Proxy "renderedPanels")
 
 _tempPanelNodes :: forall t a r. Newtype t { tempPanelNodes :: a | r } => Lens' t a
-_tempPanelNodes = _Newtype <<< prop (SProxy :: SProxy "tempPanelNodes")
+_tempPanelNodes = _Newtype <<< prop (Proxy :: Proxy "tempPanelNodes")
 
 panelRendered :: Panel -> RendererState -> Boolean
 panelRendered p st = member (p ^. _uuid) (st ^. _renderedPanels)

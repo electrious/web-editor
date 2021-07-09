@@ -10,7 +10,7 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Meter (Meter, inch, meter, meterVal)
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Editor.Common.Lenses (_height, _rackingType, _width)
 import Math.Angle (Angle, cos, degree)
 import Model.Racking.RackingType (RackingType(..))
@@ -39,16 +39,16 @@ instance defaultArrayConfig :: Default ArrayConfig where
             }
 
 _panelSlope :: Lens' ArrayConfig Angle
-_panelSlope = _Newtype <<< prop (SProxy :: SProxy "panelSlope")
+_panelSlope = _Newtype <<< prop (Proxy :: Proxy "panelSlope")
 
 _panelLowestZ :: Lens' ArrayConfig Meter
-_panelLowestZ = _Newtype <<< prop (SProxy :: SProxy "panelLowestZ")
+_panelLowestZ = _Newtype <<< prop (Proxy :: Proxy "panelLowestZ")
 
 _gapX :: forall t a r. Newtype t { gapX :: a | r } => Lens' t a
-_gapX = _Newtype <<< prop (SProxy :: SProxy "gapX")
+_gapX = _Newtype <<< prop (Proxy :: Proxy "gapX")
 
 _gapY :: forall t a r. Newtype t { gapY :: a | r } => Lens' t a
-_gapY = _Newtype <<< prop (SProxy :: SProxy "gapY")
+_gapY = _Newtype <<< prop (Proxy :: Proxy "gapY")
 
 fxArrayConfig :: ArrayConfig
 fxArrayConfig = def # _rackingType .~ FX

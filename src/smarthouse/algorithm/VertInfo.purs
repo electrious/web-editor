@@ -8,7 +8,7 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe, fromMaybe)
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Data.Tuple (Tuple(..))
 import Math.LineSeg (LineSeg, direction)
 import SmartHouse.Algorithm.Ray (Ray, ray)
@@ -26,13 +26,13 @@ newtype VertInfo = VertInfo {
 derive instance newtypeVertInfo :: Newtype VertInfo _
 
 _isReflex :: forall t a r. Newtype t { isReflex :: a | r } => Lens' t a
-_isReflex = _Newtype <<< prop (SProxy :: SProxy "isReflex")
+_isReflex = _Newtype <<< prop (Proxy :: Proxy "isReflex")
 
 _bisector :: forall t a r. Newtype t { bisector :: a | r } => Lens' t a
-_bisector = _Newtype <<< prop (SProxy :: SProxy "bisector")
+_bisector = _Newtype <<< prop (Proxy :: Proxy "bisector")
 
 _usable :: forall t a r. Newtype t { usable :: a | r } => Lens' t a
-_usable = _Newtype <<< prop (SProxy :: SProxy "usable")
+_usable = _Newtype <<< prop (Proxy :: Proxy "usable")
 
 _cross :: forall v. Vector v => v -> v -> Number
 _cross v1 v2 = vecX v1 * vecY v2 - vecX v2 * vecY v1

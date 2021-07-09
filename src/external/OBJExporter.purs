@@ -7,7 +7,7 @@ import Data.Lens (Lens')
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Effect (Effect)
 import Web.File (File)
 import Three.Core.Object3D (Object3D)
@@ -23,7 +23,7 @@ derive instance newtypeMeshFiles :: Newtype MeshFiles _
 derive instance genericMeshFiles :: Generic MeshFiles _
 
 _obj :: forall t a r. Newtype t { obj :: a | r } => Lens' t a
-_obj = _Newtype <<< prop (SProxy :: SProxy "obj")
+_obj = _Newtype <<< prop (Proxy :: Proxy "obj")
 
 _mtl :: forall t a r. Newtype t { mtl :: a | r } => Lens' t a
-_mtl = _Newtype <<< prop (SProxy :: SProxy "mtl")
+_mtl = _Newtype <<< prop (Proxy :: Proxy "mtl")

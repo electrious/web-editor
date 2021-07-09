@@ -22,7 +22,7 @@ import Data.Map as Map
 import Data.Maybe (Maybe(..))
 import Data.Meter (Meter, meter, meterVal)
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Data.Tuple (Tuple(..))
 import Data.UUID (UUID, emptyUUID, genUUID, toString)
 import Editor.Common.Lenses (_alignment, _height, _orientation, _slope, _width, _x, _y)
@@ -215,19 +215,19 @@ instance defaultPanel :: Default Panel where
         alignment      : Grid
     }
 _uuid :: Lens' Panel UUID
-_uuid = _Newtype <<< prop (SProxy :: SProxy "uuid")
+_uuid = _Newtype <<< prop (Proxy :: Proxy "uuid")
 
 _roofUUID :: Lens' Panel UUID
-_roofUUID = _Newtype <<< prop (SProxy :: SProxy "roofplate_uuid")
+_roofUUID = _Newtype <<< prop (Proxy :: Proxy "roofplate_uuid")
 
 _roofplateId :: Lens' Panel Int
-_roofplateId = _Newtype <<< prop (SProxy :: SProxy "roofplate_id")
+_roofplateId = _Newtype <<< prop (Proxy :: Proxy "roofplate_id")
 
 _row_number :: Lens' Panel Int
-_row_number = _Newtype <<< prop (SProxy :: SProxy "row_number")
+_row_number = _Newtype <<< prop (Proxy :: Proxy "row_number")
 
 _arrNumber :: Lens' Panel Int
-_arrNumber = _Newtype <<< prop (SProxy :: SProxy "array_number")
+_arrNumber = _Newtype <<< prop (Proxy :: Proxy "array_number")
 
 
 -- | panel default width and height

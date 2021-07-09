@@ -7,7 +7,7 @@ import Data.Lens (Lens', (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Editor.Common.Lenses (_alignment)
 import Editor.HouseEditor (ArrayEditParam, _heatmap)
 import Editor.PanelNode (PanelOpacity(..))
@@ -38,7 +38,7 @@ instance defaultArrayEditorUIOpt :: Default ArrayEditorUIOpt where
         }
 
 _alignmentEnabled :: forall t a r. Newtype t { alignmentEnabled :: a | r } => Lens' t a
-_alignmentEnabled = _Newtype <<< prop (SProxy :: SProxy "alignmentEnabled")
+_alignmentEnabled = _Newtype <<< prop (Proxy :: Proxy "alignmentEnabled")
 
 
 arrayEditorPane :: ArrayEditorUIOpt -> Widget ArrayEditParam

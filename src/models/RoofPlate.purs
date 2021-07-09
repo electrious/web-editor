@@ -14,7 +14,7 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Data.UUID (UUID, emptyUUID, genUUID, parseUUID, toString)
 import Editor.Common.Lenses (_alignment, _center, _id, _leadId, _normal, _orientation, _rotation, _slope)
 import Effect (Effect)
@@ -76,19 +76,19 @@ instance isPolygonRoofPlate :: IsPolygon RoofPlate Vector2 where
         where f v = mkVec2 (vecX v) (vecY v)
 
 _roofIntId :: Lens' RoofPlate Int
-_roofIntId = _Newtype <<< prop (SProxy :: SProxy "intId")
+_roofIntId = _Newtype <<< prop (Proxy :: Proxy "intId")
 
 _borderPoints :: Lens' RoofPlate (Array Vector3)
-_borderPoints = _Newtype <<< prop (SProxy :: SProxy "borderPoints")
+_borderPoints = _Newtype <<< prop (Proxy :: Proxy "borderPoints")
 
 _unifiedPoints :: Lens' RoofPlate (Maybe (Array UnifiedPoint))
-_unifiedPoints = _Newtype <<< prop (SProxy :: SProxy "unifiedPoints")
+_unifiedPoints = _Newtype <<< prop (Proxy :: Proxy "unifiedPoints")
 
 _coefs :: Lens' RoofPlate (Array Number)
-_coefs = _Newtype <<< prop (SProxy :: SProxy "coefs")
+_coefs = _Newtype <<< prop (Proxy :: Proxy "coefs")
 
 _azimuth :: Lens' RoofPlate Angle
-_azimuth = _Newtype <<< prop (SProxy :: SProxy "azimuth")
+_azimuth = _Newtype <<< prop (Proxy :: Proxy "azimuth")
 
 isFlat :: RoofPlate -> Boolean
 isFlat r = degreeVal (r ^. _slope) < 4.0
@@ -302,13 +302,13 @@ instance encodeRoofEdited :: Encode RoofEdited where
     encode = genericEncode (defaultOptions { unwrapSingleConstructors = true })
 
 _ground :: Lens' RoofEdited Point
-_ground = _Newtype <<< prop (SProxy :: SProxy "ground")
+_ground = _Newtype <<< prop (Proxy :: Proxy "ground")
 
 _inclined :: Lens' RoofEdited Point
-_inclined = _Newtype <<< prop (SProxy :: SProxy "inclined")
+_inclined = _Newtype <<< prop (Proxy :: Proxy "inclined")
 
 _contours :: Lens' RoofEdited (Array Point)
-_contours = _Newtype <<< prop (SProxy :: SProxy "contours")
+_contours = _Newtype <<< prop (Proxy :: Proxy "contours")
 
 toRoofEdited :: RoofPlate -> RoofEdited
 toRoofEdited r = RoofEdited {

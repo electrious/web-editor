@@ -12,7 +12,7 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Data.Tuple (Tuple(..))
 import Editor.Common.Lenses (_active, _enabled, _index, _isActive, _isDragging, _name, _position, _tapped)
 import Effect (Effect)
@@ -61,7 +61,7 @@ instance defaultVertMarkerPoint :: (Default i, Default v) => Default (VertMarker
         }
 
 _modifier :: forall t a r. Newtype t { modifier :: a | r } => Lens' t a
-_modifier = _Newtype <<< prop (SProxy :: SProxy "modifier")
+_modifier = _Newtype <<< prop (Proxy :: Proxy "modifier")
 
 newtype VertMarker i v = VertMarker {
     tapped     :: Event (Tuple i v),
@@ -73,7 +73,7 @@ newtype VertMarker i v = VertMarker {
 derive instance newtypeVertMarker :: Newtype (VertMarker i v) _
 
 _dragEndPos :: forall t a r. Newtype t { dragEndPos :: a | r } => Lens' t a
-_dragEndPos = _Newtype <<< prop (SProxy :: SProxy "dragEndPos")
+_dragEndPos = _Newtype <<< prop (Proxy :: Proxy "dragEndPos")
 
 instance nodeRenderableVertMarkerPoint :: Vector v => NodeRenderable e (VertMarkerPoint i v) (VertMarker i v) where
     render m = do
@@ -116,10 +116,10 @@ newtype MidMarkerPoint i v = MidMarkerPoint {
 derive instance newtypeMidMarkerPoint :: Newtype (MidMarkerPoint i v) _
 
 _vert1 :: forall t a r. Newtype t { vert1 :: a | r } => Lens' t a
-_vert1 = _Newtype <<< prop (SProxy :: SProxy "vert1")
+_vert1 = _Newtype <<< prop (Proxy :: Proxy "vert1")
 
 _vert2 :: forall t a r. Newtype t { vert2 :: a | r } => Lens' t a
-_vert2 = _Newtype <<< prop (SProxy :: SProxy "vert2")
+_vert2 = _Newtype <<< prop (Proxy :: Proxy "vert2")
 
 newtype MidMarker i v = MidMarker {
     tapped :: Event (MidMarkerPoint i v)

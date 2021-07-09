@@ -14,7 +14,7 @@ import Data.List (List(..), reverse, singleton, sortBy, toUnfoldable, (:))
 import Data.Map (empty, insert, lookup, update, values)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Data.Tuple (Tuple(..))
 import Data.Unfoldable (class Unfoldable)
 import Editor.Common.Lenses (_y)
@@ -30,7 +30,7 @@ instance defaultSegmentRow :: Default (SegmentRow a) where
 instance functorSegmentRow :: Functor SegmentRow where
     map f sr = mkSegmentRow (map f <$> (sr ^. _segments)) (sr ^. _y)
 _segments :: forall t a r. Newtype t { segments :: a | r } => Lens' t a
-_segments = _Newtype <<< prop (SProxy :: SProxy "segments")
+_segments = _Newtype <<< prop (Proxy :: Proxy "segments")
 
 mkSegmentRow :: forall a. List (Segment a) -> Number -> SegmentRow a
 mkSegmentRow ss y = SegmentRow { segments: ss, y: y }

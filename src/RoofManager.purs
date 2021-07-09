@@ -22,7 +22,7 @@ import Data.Map (Map, delete, insert, lookup, values)
 import Data.Map as M
 import Data.Maybe (Maybe(..), fromMaybe, isNothing)
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Data.Time.Duration (Milliseconds(..))
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
@@ -84,10 +84,10 @@ instance disposableRoofManager :: Disposable RoofManager where
     dispose r = r ^. _disposable
 
 _editedRoofs :: Lens' RoofManager (Event (Array RoofEdited))
-_editedRoofs = _Newtype <<< prop (SProxy :: SProxy "editedRoofs")
+_editedRoofs = _Newtype <<< prop (Proxy :: Proxy "editedRoofs")
 
 _arrayEvents :: forall t a r. Newtype t { arrayEvents :: a | r } => Lens' t a
-_arrayEvents = _Newtype <<< prop (SProxy :: SProxy "arrayEvents")
+_arrayEvents = _Newtype <<< prop (Proxy :: Proxy "arrayEvents")
 
 type RoofDict = UUIDMap RoofPlate
 
@@ -100,7 +100,7 @@ newtype RoofDictData = RoofDictData {
 derive instance newtypeRoofDictData :: Newtype RoofDictData _
 
 _roofsToRender :: Lens' RoofDictData (Maybe RoofDict)
-_roofsToRender = _Newtype <<< prop (SProxy :: SProxy "roofsToRender")
+_roofsToRender = _Newtype <<< prop (Proxy :: Proxy "roofsToRender")
 
 -- mark all roofs to be rendered
 renderAll :: RoofDictData -> RoofDictData
@@ -266,7 +266,7 @@ instance defaultRoofsData :: Default RoofsData where
 
 
 _racks :: forall t a r. Newtype t { racks :: a | r } => Lens' t a
-_racks = _Newtype <<< prop (SProxy :: SProxy "racks")
+_racks = _Newtype <<< prop (Proxy :: Proxy "racks")
 
 -- | create RoofManager for an array of roofs
 createRoofManager :: ArrayEditParam -> HouseMeshData -> RoofsData -> HouseEditor RoofManager

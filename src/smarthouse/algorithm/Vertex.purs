@@ -9,7 +9,7 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Data.Tuple (Tuple(..))
 import Data.UUID (UUID, genUUID)
 import Editor.Common.Lenses (_height, _id, _position)
@@ -43,13 +43,13 @@ instance hasUUID :: HasUUID Vertex where
     idLens = _id
 
 _leftEdge :: forall t a r. Newtype t { leftEdge :: a | r } => Lens' t a
-_leftEdge = _Newtype <<< prop (SProxy :: SProxy "leftEdge")
+_leftEdge = _Newtype <<< prop (Proxy :: Proxy "leftEdge")
 
 _rightEdge :: forall t a r. Newtype t { rightEdge :: a | r } => Lens' t a
-_rightEdge = _Newtype <<< prop (SProxy :: SProxy "rightEdge")
+_rightEdge = _Newtype <<< prop (Proxy :: Proxy "rightEdge")
 
 _lavId :: forall t a r. Newtype t { lavId :: a | r } => Lens' t a
-_lavId = _Newtype <<< prop (SProxy :: SProxy "lavId")
+_lavId = _Newtype <<< prop (Proxy :: Proxy "lavId")
 
 
 vertToSink :: Vertex -> Tuple Vector3 Number

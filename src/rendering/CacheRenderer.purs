@@ -13,7 +13,7 @@ import Data.Lens.Record (prop)
 import Data.List (List(..), drop, head, length, tail, take)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Editor.Disposable (class Disposable, dispose)
 import Effect.Class (class MonadEffect, liftEffect)
 import Rendering.Renderable (class Renderable, RenderingM)
@@ -30,10 +30,10 @@ instance defaultCache :: Default (Cache a) where
     def = Cache { rendering : Nil, idle : Nil }
 
 _rendering :: forall t a r. Newtype t { rendering :: a | r } => Lens' t a
-_rendering = _Newtype <<< prop (SProxy :: SProxy "rendering")
+_rendering = _Newtype <<< prop (Proxy :: Proxy "rendering")
 
 _idle :: forall t a r. Newtype t { idle :: a | r } => Lens' t a
-_idle = _Newtype <<< prop (SProxy :: SProxy "idle")
+_idle = _Newtype <<< prop (Proxy :: Proxy "idle")
 
 
 -- | ReRenderable will be ab able to update rendered node with new value

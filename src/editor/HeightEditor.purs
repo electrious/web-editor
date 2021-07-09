@@ -10,7 +10,7 @@ import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Meter (Meter, feetInchStr, meter)
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Editor.Common.Lenses (_height, _isActive, _modeDyn, _position, _rotation)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic)
@@ -47,13 +47,13 @@ instance defaultHeightEditorConf :: Default HeightEditorConf where
         }
 
 _min :: forall t a r. Newtype t { min :: a | r } => Lens' t a
-_min = _Newtype <<< prop (SProxy :: SProxy "min")
+_min = _Newtype <<< prop (Proxy :: Proxy "min")
 
 _max :: forall t a r. Newtype t { max :: a | r } => Lens' t a
-_max = _Newtype <<< prop (SProxy :: SProxy "max")
+_max = _Newtype <<< prop (Proxy :: Proxy "max")
 
 _arrowMaterial :: forall t a r. Newtype t { arrowMaterial :: a | r } => Lens' t a
-_arrowMaterial = _Newtype <<< prop (SProxy :: SProxy "arrowMaterial")
+_arrowMaterial = _Newtype <<< prop (Proxy :: Proxy "arrowMaterial")
 
 dragArrowPos :: forall f v. Foldable f => Vector v => f v -> Vector3
 dragArrowPos vs = mkVec3 x y 0.5

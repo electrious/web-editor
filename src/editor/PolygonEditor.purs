@@ -13,7 +13,7 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Data.Tuple (Tuple(..), fst)
 import Editor.Common.Lenses (_active, _index, _name, _polygon, _position, _tapped)
 import Editor.MarkerPoint (MidMarker, MidMarkerPoint(..), Modifier, VertMarker, VertMarkerPoint, _modifier, getVertMarkerActiveStatus, getVertMarkerDragging)
@@ -114,10 +114,10 @@ instance defaultPolyEditorConf :: Default (PolyEditorConf v) where
         }
 
 _vertModifier :: forall t a r. Newtype t { vertModifier :: a | r } => Lens' t a
-_vertModifier = _Newtype <<< prop (SProxy :: SProxy "vertModifier")
+_vertModifier = _Newtype <<< prop (Proxy :: Proxy "vertModifier")
 
 _showFinish :: forall t a r. Newtype t { showFinish :: a | r } => Lens' t a
-_showFinish = _Newtype <<< prop (SProxy :: SProxy "showFinish")
+_showFinish = _Newtype <<< prop (Proxy :: Proxy "showFinish")
 
 newtype PolyEditor v = PolyEditor {
     polygon    :: Event (Polygon v),
@@ -129,7 +129,7 @@ newtype PolyEditor v = PolyEditor {
 derive instance newtypePolyEditor :: Newtype (PolyEditor v) _
 
 _delete :: forall t a r. Newtype t { delete :: a | r } => Lens' t a
-_delete = _Newtype <<< prop (SProxy :: SProxy "delete")
+_delete = _Newtype <<< prop (Proxy :: Proxy "delete")
 
 updateVertex :: forall v. Tuple Int v -> Polygon v -> Polygon v
 updateVertex (Tuple i v) p = updateVertAt i v p

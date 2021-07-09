@@ -16,7 +16,7 @@ import Data.Lens.Record (prop)
 import Data.List (List(..), head, (:))
 import Data.Maybe (Maybe(..), fromMaybe, isJust)
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Data.Tuple (Tuple(..), fst)
 import Editor.Common.Lenses (_face, _modeDyn, _mouseMove, _name, _parent, _point, _position)
 import Editor.ObjectAdder (AdderType(..), createObjectAdder, mkCandidatePoint)
@@ -55,10 +55,10 @@ instance defaultHouseTracerConf :: Default HouseTracerConf where
         }
 
 _undoTracing :: forall t a r. Newtype t { undoTracing :: a | r } => Lens' t a
-_undoTracing = _Newtype <<< prop (SProxy :: SProxy "undoTracing")
+_undoTracing = _Newtype <<< prop (Proxy :: Proxy "undoTracing")
 
 _stopTracing :: forall t a r. Newtype t { stopTracing :: a | r } => Lens' t a
-_stopTracing = _Newtype <<< prop (SProxy :: SProxy "stopTracing")
+_stopTracing = _Newtype <<< prop (Proxy :: Proxy "stopTracing")
 
 data TracerMode = Waiting  -- waiting user to start tracing
                 | Tracing
@@ -88,13 +88,13 @@ instance defaultTracerResult :: Default TracerResult where
         }
 
 _tracedPolygon :: forall t a r. Newtype t { tracedPolygon :: a | r } => Lens' t a
-_tracedPolygon = _Newtype <<< prop (SProxy :: SProxy "tracedPolygon")
+_tracedPolygon = _Newtype <<< prop (Proxy :: Proxy "tracedPolygon")
 
 _tracerMode :: forall t a r. Newtype t { tracerMode :: a | r } => Lens' t a
-_tracerMode = _Newtype <<< prop (SProxy :: SProxy "tracerMode")
+_tracerMode = _Newtype <<< prop (Proxy :: Proxy "tracerMode")
 
 _canUndo :: forall t a r. Newtype t { canUndo :: a | r } => Lens' t a
-_canUndo = _Newtype <<< prop (SProxy :: SProxy "canUndo")
+_canUndo = _Newtype <<< prop (Proxy :: Proxy "canUndo")
 
 -- internal state data
 newtype TracerState = TracerState {
@@ -115,10 +115,10 @@ instance showTracerState :: Show TracerState where
     show = genericShow
 
 _tracedVerts :: forall t a r. Newtype t { tracedVerts :: a | r } => Lens' t a
-_tracedVerts = _Newtype <<< prop (SProxy :: SProxy "tracedVerts")
+_tracedVerts = _Newtype <<< prop (Proxy :: Proxy "tracedVerts")
 
 _firstVert :: forall t a r. Newtype t { firstVert :: a | r } => Lens' t a
-_firstVert = _Newtype <<< prop (SProxy :: SProxy "firstVert")
+_firstVert = _Newtype <<< prop (Proxy :: Proxy "firstVert")
 
 addNewVert :: Vector3 -> TracerState -> TracerState
 addNewVert v s = case s ^. _firstVert of

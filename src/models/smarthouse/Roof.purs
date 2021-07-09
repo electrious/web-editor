@@ -18,7 +18,7 @@ import Data.Maybe (Maybe(..))
 import Data.Meter (Meter, meterVal)
 import Data.Newtype (class Newtype)
 import Data.Set (Set)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Data.Traversable (traverse_)
 import Data.UUID (UUID, genUUID)
 import Data.UUIDMap (UUIDMap)
@@ -71,7 +71,7 @@ instance HasUUID Roof where
     idLens = _id
 
 _subtrees :: forall t a r. Newtype t { subtrees :: a | r } => Lens' t a
-_subtrees = _Newtype <<< prop (SProxy :: SProxy "subtrees")
+_subtrees = _Newtype <<< prop (Proxy :: Proxy "subtrees")
 
 createRoofFrom :: Polygon Vector3 -> Set Subtree -> Vector3 -> Effect Roof
 createRoofFrom p ts n = do
@@ -132,7 +132,7 @@ instance Default RoofEvents where
         }
 
 _flipped :: forall t a r. Newtype t { flipped :: a | r } => Lens' t a
-_flipped = _Newtype <<< prop (SProxy :: SProxy "flipped")
+_flipped = _Newtype <<< prop (Proxy :: Proxy "flipped")
 
 -- material for active roof outline
 actLineMat :: LineBasicMaterial

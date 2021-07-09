@@ -16,7 +16,7 @@ import Data.Map as M
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Meter (Meter, meterVal)
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Data.Traversable (class Traversable, traverse)
 import Data.UUID (UUID)
 import Editor.ArrayBuilder (runArrayBuilder)
@@ -92,16 +92,16 @@ instance defaultHouseEditorConf :: Default HouseEditorConf where
         }
 
 _builderModeDyn :: forall t a r. Newtype t { builderModeDyn :: a | r } => Lens' t a
-_builderModeDyn = _Newtype <<< prop (SProxy :: SProxy "builderModeDyn")
+_builderModeDyn = _Newtype <<< prop (Proxy :: Proxy "builderModeDyn")
 
 _house :: forall t a r. Newtype t { house :: a | r } => Lens' t a
-_house = _Newtype <<< prop (SProxy :: SProxy "house")
+_house = _Newtype <<< prop (Proxy :: Proxy "house")
 
 _roofsData :: forall t a r. Newtype t { roofsData :: a | r } => Lens' t a
-_roofsData = _Newtype <<< prop (SProxy :: SProxy "roofsData")
+_roofsData = _Newtype <<< prop (Proxy :: Proxy "roofsData")
 
 _arrayEditParam :: forall t a r. Newtype t { arrayEditParam :: a | r } => Lens' t a
-_arrayEditParam = _Newtype <<< prop (SProxy :: SProxy "arrayEditParam")
+_arrayEditParam = _Newtype <<< prop (Proxy :: Proxy "arrayEditParam")
 
 
 -- whether the house editor is in the mode for house editing or

@@ -11,7 +11,7 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Data.Tuple (Tuple(..))
 import Editor.Common.Lenses (_apiConfig, _height, _houseId, _modeDyn, _roofs, _width)
 import Editor.Editor (_sizeDyn)
@@ -56,10 +56,10 @@ instance defaultRoofEditorUIOpt :: Default RoofEditorUIOpt where
         }
 
 _mode :: forall t a r. Newtype t { mode :: a | r } => Lens' t a
-_mode = _Newtype <<< prop (SProxy :: SProxy "mode")
+_mode = _Newtype <<< prop (Proxy :: Proxy "mode")
 
 _arrayOpt :: forall t a r. Newtype t { arrayOpt :: a | r } => Lens' t a
-_arrayOpt = _Newtype <<< prop (SProxy :: SProxy "arrayOpt")
+_arrayOpt = _Newtype <<< prop (Proxy :: Proxy "arrayOpt")
 
 
 newtype RoofEditorUIResult = RoofEditorUIResult {
@@ -71,10 +71,10 @@ newtype RoofEditorUIResult = RoofEditorUIResult {
 derive instance newtypeRoofEditorUIResult :: Newtype RoofEditorUIResult _
 
 _arrayParam :: forall t a r. Newtype t { arrayParam :: a | r } => Lens' t a
-_arrayParam = _Newtype <<< prop (SProxy :: SProxy "arrayParam")
+_arrayParam = _Newtype <<< prop (Proxy :: Proxy "arrayParam")
 
 _editorOp :: forall t a r. Newtype t { editorOp :: a | r } => Lens' t a
-_editorOp = _Newtype <<< prop (SProxy :: SProxy "editorOp")
+_editorOp = _Newtype <<< prop (Proxy :: Proxy "editorOp")
 
 roofEditorUI :: RoofEditorUIOpt -> Widget RoofEditorUIResult
 roofEditorUI opt = do
