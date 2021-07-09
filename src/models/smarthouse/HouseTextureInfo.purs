@@ -24,7 +24,7 @@ newtype HouseTextureInfo = HouseTextureInfo {
     size          :: Size
     }
 
-derive instance newtypeHouseTextureInfo :: Newtype HouseTextureInfo _
+derive instance Newtype HouseTextureInfo _
 
 mkHouseTextureInfo :: Texture -> S.Size -> Event File -> Number -> HouseTextureInfo
 mkHouseTextureInfo t imgSz img ppm = HouseTextureInfo {

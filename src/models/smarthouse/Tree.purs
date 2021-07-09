@@ -24,15 +24,15 @@ newtype TreePart = TreePart {
     dia    :: Meter
     }
 
-derive instance newtypeTreepart :: Newtype TreePart _
-derive instance genericTreePart :: Generic TreePart _
-derive instance eqTreePart :: Eq TreePart
-instance defaultTreePart :: Default TreePart where
+derive instance Newtype TreePart _
+derive instance Generic TreePart _
+derive instance Eq TreePart
+instance Default TreePart where
     def = TreePart {
         height : def,
         dia    : def
         }
-instance showTreePart :: Show TreePart where
+instance Show TreePart where
     show = genericShow
 
 
@@ -53,14 +53,14 @@ newtype Tree = Tree {
     }
 
 
-derive instance newtypeTree :: Newtype Tree _
-derive instance genericTree :: Generic Tree _
-derive instance eqTree :: Eq Tree
-instance hasUUIDTree :: HasUUID Tree where
+derive instance Newtype Tree _
+derive instance Generic Tree _
+derive instance Eq Tree
+instance HasUUID Tree where
     idLens = _id
-instance showTree :: Show Tree where
+instance Show Tree where
     show = genericShow
-instance defaultTree :: Default Tree where
+instance Default Tree where
     def = Tree {
         id       : emptyUUID,
         height   : meter 10.0,
@@ -102,10 +102,10 @@ newtype TreeNode = TreeNode {
     updated :: Event TreeOp
 }
 
-derive instance newtypeTreeNode :: Newtype TreeNode _
-instance hasUUIDTreeNode :: HasUUID TreeNode where
+derive instance Newtype TreeNode _
+instance HasUUID TreeNode where
     idLens = _id
-instance defaultTreeNode :: Default TreeNode where
+instance Default TreeNode where
     def = TreeNode {
         id      : emptyUUID,
         tapped  : empty,

@@ -5,7 +5,7 @@ import Prelude
 data BuilderMode = Building
                  | Showing
 
-derive instance eqBuilderMode :: Eq BuilderMode
+derive instance Eq BuilderMode
 
 isBuilding :: BuilderMode -> Boolean
 isBuilding = (==) Building

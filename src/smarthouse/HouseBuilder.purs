@@ -90,8 +90,8 @@ newtype HouseBuilderConfig = HouseBuilderConfig {
     apiConfig      :: APIConfig
 }
 
-derive instance newtypeHouseBuilderConfig :: Newtype HouseBuilderConfig _
-instance defaultHouseBuilderConfig :: Default HouseBuilderConfig where
+derive instance Newtype HouseBuilderConfig _
+instance Default HouseBuilderConfig where
     def = HouseBuilderConfig {
         leadId         : 0,
 
@@ -111,8 +111,8 @@ newtype HouseBuilt = HouseBuilt {
     activeItem  :: Event (Maybe ActiveItem)
     }
 
-derive instance newtypeHouseBuilt :: Newtype HouseBuilt _
-instance defaultHouseBuilt :: Default HouseBuilt where
+derive instance Newtype HouseBuilt _
+instance Default HouseBuilt where
     def = HouseBuilt {
         hasHouse    : empty,
         tracerMode  : empty,
@@ -170,11 +170,11 @@ newtype HouseDictData = HouseDictData {
     treesToRender  :: Maybe TreeDict
     }
 
-derive instance newtypeHouseDictData :: Newtype HouseDictData _
-derive instance genericHouseDictData :: Generic HouseDictData _
-instance showHouseDictData :: Show HouseDictData where
+derive instance Newtype HouseDictData _
+derive instance Generic HouseDictData _
+instance Show HouseDictData where
     show = genericShow
-instance defaultHouseDictData :: Default HouseDictData where
+instance Default HouseDictData where
     def = HouseDictData {
         houses         : M.empty,
         trees          : M.empty,
@@ -294,8 +294,8 @@ newtype BuilderInputEvts = BuilderInputEvts {
     buildTree     :: Event Boolean
     }
 
-derive instance newtypeBuilderInputEvts :: Newtype BuilderInputEvts _
-instance defaultBuilderInputEvts :: Default BuilderInputEvts where
+derive instance Newtype BuilderInputEvts _
+instance Default BuilderInputEvts where
     def = BuilderInputEvts {
         export        : empty,
         undoTracing   : empty,

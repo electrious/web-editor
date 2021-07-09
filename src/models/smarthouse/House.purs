@@ -53,9 +53,9 @@ newtype House = House {
     roofs    :: UUIDMap Roof
     }
 
-derive instance newtypeHouse :: Newtype House _
-derive instance genericHouse :: Generic House _
-instance defaultHouse :: Default House where
+derive instance Newtype House _
+derive instance Generic House _
+instance Default House where
     def = House {
         id       : emptyUUID,
         floor    : def,
@@ -66,11 +66,11 @@ instance defaultHouse :: Default House where
         edges    : empty,
         roofs    : M.empty
         }
-instance eqHouse :: Eq House where
+instance Eq House where
     eq h1 h2 = h1 ^. _id == h2 ^. _id
-instance showHouse :: Show House where
+instance Show House where
     show = genericShow
-instance hasUUIDHouse :: HasUUID House where
+instance HasUUID House where
     idLens = _id
 
 _trees :: forall t a r. Newtype t { trees :: a | r } => Lens' t a
@@ -139,12 +139,12 @@ newtype JSHouse = JSHouse {
     roofs  :: Array JSRoof
     }
 
-derive instance genericJSHouse :: Generic JSHouse _
-instance showJSHouse :: Show JSHouse where
+derive instance Generic JSHouse _
+instance Show JSHouse where
     show = genericShow
-instance encodeJSHouse :: Encode JSHouse where
+instance Encode JSHouse where
     encode = genericEncode (defaultOptions { unwrapSingleConstructors = true })
-instance decodeJSHouse :: Decode JSHouse where
+instance Decode JSHouse where
     decode = genericDecode (defaultOptions { unwrapSingleConstructors = true })
 
 
@@ -153,10 +153,10 @@ newtype JSHouses = JSHouses {
     houses :: Array JSHouse
     }
 
-derive instance genericJSHouses :: Generic JSHouses _
-instance showJSHouses :: Show JSHouses where
+derive instance Generic JSHouses _
+instance Show JSHouses where
     show = genericShow
-instance encodeJSHouses :: Encode JSHouses where
+instance Encode JSHouses where
     encode = genericEncode (defaultOptions { unwrapSingleConstructors = true })
 
 -- | Types of operation applied to houses
@@ -164,10 +164,10 @@ data HouseOp = HouseOpCreate House
              | HouseOpDelete UUID
              | HouseOpUpdate House
 
-derive instance genericHouseOp :: Generic HouseOp _
-derive instance eqHouseOp :: Eq HouseOp
+derive instance Generic HouseOp _
+derive instance Eq HouseOp
 
-instance showHouseOp :: Show HouseOp where
+instance Show HouseOp where
     show = genericShow
 
 
@@ -181,10 +181,10 @@ newtype HouseNode = HouseNode {
     arrayEvents :: ArrayEvents
     }
 
-derive instance newtypeHouseNode :: Newtype HouseNode _
-instance hasUUIDHouseNode :: HasUUID HouseNode where
+derive instance Newtype HouseNode _
+instance HasUUID HouseNode where
     idLens = _id
-instance defaultHouseNode :: Default HouseNode where
+instance Default HouseNode where
     def = HouseNode {
         id          : emptyUUID,
         roofTapped  : empty,

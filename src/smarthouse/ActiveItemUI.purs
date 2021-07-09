@@ -30,8 +30,8 @@ newtype ActiveItemUI = ActiveItemUI {
     shadeSelected :: Event ShadeOption
     }
 
-derive instance newtypeActiveItemUI :: Newtype ActiveItemUI _
-instance defaultActiveItemUI :: Default ActiveItemUI where
+derive instance Newtype ActiveItemUI _
+instance Default ActiveItemUI where
     def = ActiveItemUI {
         deleteHouse   : empty,
         shadeSelected : empty

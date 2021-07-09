@@ -49,7 +49,7 @@ import Three.Math.Vector (Vector3, mkVec3, vecX, vecY, vecZ)
 data RoofState = SlopeRoof
                | Gable
 
-derive instance eqRoofState :: Eq RoofState
+derive instance Eq RoofState
 
 newtype Roof = Roof {
     id       :: UUID,
@@ -61,13 +61,13 @@ newtype Roof = Roof {
     normal   :: Vector3
     }
 
-derive instance newtypeRoof :: Newtype Roof _
-derive instance genericRoof :: Generic Roof _
-instance showRoof :: Show Roof where
+derive instance Newtype Roof _
+derive instance Generic Roof _
+instance Show Roof where
     show = genericShow
-instance eqRoof :: Eq Roof where
+instance Eq Roof where
     eq r1 r2 = r1 ^. idLens == r2 ^. idLens
-instance hasUUIDRoof :: HasUUID Roof where
+instance HasUUID Roof where
     idLens = _id
 
 _subtrees :: forall t a r. Newtype t { subtrees :: a | r } => Lens' t a
@@ -111,12 +111,12 @@ newtype JSRoof = JSRoof {
     shade   :: Int
     }
 
-derive instance genericJSRoof :: Generic JSRoof _
-instance showJSRoof :: Show JSRoof where
+derive instance Generic JSRoof _
+instance Show JSRoof where
     show = genericShow
-instance encodeJSRoof :: Encode JSRoof where
+instance Encode JSRoof where
     encode = genericEncode (defaultOptions { unwrapSingleConstructors = true })
-instance decodeJSRoof :: Decode JSRoof where
+instance Decode JSRoof where
     decode = genericDecode (defaultOptions { unwrapSingleConstructors = true })
 
 newtype RoofEvents = RoofEvents {
@@ -124,8 +124,8 @@ newtype RoofEvents = RoofEvents {
     flipped :: Event UUID   -- event to flip the roof state, the Int is index of the subtree
     }
 
-derive instance newtypeRoofEvents :: Newtype RoofEvents _
-instance defaultRoofEvents :: Default RoofEvents where
+derive instance Newtype RoofEvents _
+instance Default RoofEvents where
     def = RoofEvents {
         tapped  : empty,
         flipped : empty
