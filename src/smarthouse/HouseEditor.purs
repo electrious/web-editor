@@ -16,7 +16,6 @@ import Data.Map as M
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Meter (Meter, meterVal)
 import Data.Newtype (class Newtype)
-import Type.Proxy (Proxy(..))
 import Data.Traversable (class Traversable, traverse)
 import Data.UUID (UUID)
 import Editor.ArrayBuilder (runArrayBuilder)
@@ -58,6 +57,7 @@ import Three.Core.Geometry (_bevelEnabled, _depth, mkExtrudeGeometry, mkShape)
 import Three.Core.Material (MeshPhongMaterial, mkLineBasicMaterial, mkMeshPhongMaterial)
 import Three.Core.Object3D (add, remove)
 import Three.Math.Vector (Vector3, mkVec3, toVec2, vecX, vecY)
+import Type.Proxy (Proxy(..))
 import UI.RoofEditorUI (_mode)
 import Util (latestAnyEvtWith)
 
@@ -147,14 +147,15 @@ editHouse houseCfg conf = do
                                      # _name     .~ "roofs") do
                 let roofsDyn = view _roofs <$> houseDyn
                     actRDyn = g <$> actRoofDyn <*> roofsDyn
+                    buildModeDyn = conf ^. _builderModeDyn
                 node (def # _name .~ "roof-lines"
                           # _position .~ pure (mkVec3 0.0 0.0 0.02)) do
                     -- render ridge lines
-                    dynamic_ $ renderSubtrees <$> houseDyn
+                    dynamic_ $ renderSubtrees <$> houseDyn <*> buildModeDyn
                     -- render edge lines
-                    dynamic_ $ traverse_ renderLine <<< map (view _line) <<< view _edges <$> houseDyn
+                    dynamic_ $ renderEdgeLines <$> houseDyn <*> buildModeDyn
                     -- render roof outlines dynamically
-                    dynamic_ $ renderActRoofOutline <$> (conf ^. _builderModeDyn) <*> actRDyn
+                    dynamic_ $ renderActRoofOutline <$> buildModeDyn <*> actRDyn
 
                 -- render roofs dynamically
                 dynamic $ renderBuilderRoofs houseEditDyn actRoofDyn <$> roofsDyn
@@ -208,12 +209,19 @@ renderWalls poly height = do
     pure $ const unit <$> m ^. _tapped
 
 -- render all subtree lines with length text
-renderSubtrees :: forall e. House -> Node e Unit
-renderSubtrees h = traverse_ (renderSubtree h) (h ^. _trees)
+renderSubtrees :: forall e. House -> BuilderMode -> Node e Unit
+renderSubtrees h Building = traverse_ (renderSubtree h) (h ^. _trees)
+renderSubtrees _ Showing  = pure unit
 
 renderSubtree :: forall e. House -> Subtree -> Node e Unit
 renderSubtree h t = traverse_ renderLine ls
     where ls = map (view _position <<< flip getVertNode h) <$> treeLines t
+
+
+-- render all house edge lines
+renderEdgeLines :: forall e. House -> BuilderMode -> Node e Unit
+renderEdgeLines h Building = traverse_ renderLine (view _line <$> h ^. _edges)
+renderEdgeLines _ Showing  = pure unit
 
 renderBuilderRoofs :: forall f. Traversable f => Dynamic Boolean -> Dynamic (Maybe UUID) -> f Roof -> Node HouseTextureInfo (f RoofEvents)
 renderBuilderRoofs houseEditDyn actRoofDyn = traverse (renderRoof houseEditDyn actRoofDyn)

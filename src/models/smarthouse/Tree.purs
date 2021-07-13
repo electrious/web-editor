@@ -5,19 +5,19 @@ import Prelude
 import Control.Plus (empty)
 import Data.Default (class Default, def)
 import Data.Generic.Rep (class Generic)
-import Data.Show.Generic (genericShow)
 import Data.Lens (Lens', (.~))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Meter (Meter, meter)
 import Data.Newtype (class Newtype)
-import Type.Proxy (Proxy(..))
+import Data.Show.Generic (genericShow)
 import Data.UUID (UUID, emptyUUID, genUUID)
 import Editor.Common.Lenses (_height, _id, _position)
 import Effect (Effect)
 import FRP.Event (Event)
 import Model.UUID (class HasUUID)
 import Three.Math.Vector (Vector3)
+import Type.Proxy (Proxy(..))
 
 newtype TreePart = TreePart {
     height :: Meter,
