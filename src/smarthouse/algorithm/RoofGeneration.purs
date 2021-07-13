@@ -1,4 +1,4 @@
-module Smarthouse.Algorithm.Roofs where
+module Smarthouse.Algorithm.RoofGeneration where
 
 import Prelude
 
