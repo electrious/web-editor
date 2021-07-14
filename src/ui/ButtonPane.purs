@@ -108,20 +108,20 @@ buttons conf =
                    # _undo  .~ undoEvt
 
 saveBtn :: Boolean -> Widget (S.Event Unit)
-saveBtn true  = buttonOnClick (pure $ mkAttrs ["class" :~ "uk-button uk-margin-left"]) (text "Save")
+saveBtn true  = buttonOnClick (pure $ mkAttrs ["class" :~ "uk-button uk-margin-left uk-background-default"]) (text "Save")
 saveBtn false = pure never
 
 
 closeBtn :: Boolean -> Widget (S.Event Unit)
-closeBtn true  = buttonOnClick (pure $ mkAttrs ["class" :~ "uk-button uk-margin-left uk-modal-close"]) (text "Close")
+closeBtn true  = buttonOnClick (pure $ mkAttrs ["class" :~ "uk-button uk-margin-left uk-modal-close uk-background-default"]) (text "Close")
 closeBtn false = pure never
 
 
 resetBtn :: Boolean -> Widget (S.Event Unit)
-resetBtn true  = buttonOnClick (pure $ mkAttrs ["class" :~ "uk-button uk-margin-left"]) (text "Reset")
+resetBtn true  = buttonOnClick (pure $ mkAttrs ["class" :~ "uk-button uk-margin-left uk-background-default"]) (text "Reset")
 resetBtn false = pure never
 
 
 undoBtn :: Boolean -> Widget (S.Event Unit)
-undoBtn true  = buttonOnClick (pure $ mkAttrs ["class" :~ "uk-button"]) (text "Undo")
+undoBtn true  = buttonOnClick (pure $ mkAttrs ["class" :~ "uk-button uk-background-default"]) (text "Undo")
 undoBtn false = pure never
