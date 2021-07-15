@@ -16,7 +16,6 @@ import Data.Default (class Default, def)
 import Data.Filterable (filter)
 import Data.Foldable (class Foldable)
 import Data.Generic.Rep (class Generic)
-import Data.Show.Generic (genericShow)
 import Data.Lens (Lens', view, (%~), (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
@@ -24,12 +23,12 @@ import Data.Map as M
 import Data.Maybe (Maybe(..), isNothing)
 import Data.Meter (meterVal)
 import Data.Newtype (class Newtype)
-import Type.Proxy (Proxy(..))
+import Data.Show.Generic (genericShow)
 import Data.Traversable (traverse)
 import Data.Tuple (fst)
 import Data.UUID (UUID)
 import Data.UUIDMap (UUIDMap)
-import Editor.Common.Lenses (_apiConfig, _buttons, _height, _houseId, _leadId, _modeDyn, _mouseMove, _name, _panelType, _panels, _parent, _roofs, _shadeSelected, _tapped, _textureInfo, _updated, _width)
+import Editor.Common.Lenses (_apiConfig, _buttons, _height, _houseId, _leadId, _modeDyn, _mouseMove, _name, _panelType, _panels, _parent, _roofs, _shadeSelected, _slope, _tapped, _textureInfo, _updated, _width)
 import Editor.Editor (Editor, _sizeDyn, setMode)
 import Editor.EditorMode as EditorMode
 import Editor.HouseEditor (ArrayEditParam, HouseConfig, _dataServer, _heatmapTexture, _rotBtnTexture)
@@ -37,10 +36,10 @@ import Editor.RoofManager (RoofsData)
 import Editor.SceneEvent (size)
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import FRP.Dynamic (Dynamic, gateDyn, sampleDyn, step)
+import FRP.Dynamic (Dynamic, dynEvent, gateDyn, performDynamic, sampleDyn, step)
 import FRP.Event (Event, create, keepLatest, sampleOn, sampleOn_, subscribe)
 import FRP.Event.Extra (delay, multicast, performEvent)
-import Math.Angle (degree)
+import Math.Angle (Angle, degree)
 import Model.ActiveMode (ActiveMode(..), fromBoolean, isActive)
 import Model.Hardware.PanelTextureInfo (PanelTextureInfo)
 import Model.Hardware.PanelType (PanelType(..))
@@ -65,6 +64,7 @@ import Specular.Dom.Widget (runMainWidgetInNode)
 import Three.Core.Geometry (mkPlaneGeometry)
 import Three.Core.Material (mkMeshBasicMaterialWithTexture)
 import Three.Loader.TextureLoader (clampToEdgeWrapping, repeatWrapping, setRepeat, setWrapS, setWrapT, textureHeight, textureImageEvt, textureWidth)
+import Type.Proxy (Proxy(..))
 import UI.ButtonPane (_close, _reset, _save, _showResetDyn, _showSaveDyn, _undo)
 import UI.EditPane (_buildTree)
 import UI.EditorUIOp (EditorUIOp(..))
@@ -290,6 +290,7 @@ newtype BuilderInputEvts = BuilderInputEvts {
     undoTracing   :: Event Unit,
     stopTracing   :: Event Unit,
     shadeSelected :: Event ShadeOption,
+    slope         :: Event Angle,
     deleteHouse   :: Event Unit,
     buildTree     :: Event Boolean
     }
@@ -301,6 +302,7 @@ instance Default BuilderInputEvts where
         undoTracing   : empty,
         stopTracing   : empty,
         shadeSelected : empty,
+        slope         : empty,
         deleteHouse   : empty,
         buildTree     : empty
         }
@@ -380,7 +382,12 @@ builderForHouse evts tInfo =
                     newTreeEvt <- buildTree (treeBuilderMode <$> actIdDyn <*> modeDyn <*> buildTreeDyn) mouseEvt
 
                     -- create house from the traced polygon
-                    let houseEvt = performEvent $ createHouseFrom (degree 30.0) <$> (traceRes ^. _tracedPolygon)
+                    let slopeDyn  = step (degree 30.0) (evts ^. _slope)
+                        polyDyn   = step Nothing $ Just <$> traceRes ^. _tracedPolygon
+                        mkHouse s = traverse (createHouseFrom s)
+                        houseDyn  = performDynamic $ mkHouse <$> slopeDyn <*> polyDyn
+                        houseEvt  = compact $ dynEvent houseDyn
+
                         addHouseEvt = HouseOpCreate <$> houseEvt
                         updHouseEvt = keepLatest (getHouseUpd <$> nodesEvt)
 
