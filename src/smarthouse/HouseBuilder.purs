@@ -491,7 +491,7 @@ buildHouse editor cfg = do
     res <- fst <$> runNode (createHouseBuilder inputEvts) (mkNodeEnv editor cfg)
     let parentEl = unsafeCoerce $ editor ^. _parent
         conf     = def # _sizeDyn       .~ (editor ^. _sizeDyn)
-                       # _showSaveDyn   .~ step false (res ^. _hasHouse)
+                       # _showSaveDyn   .~ step false (res ^. _hasHouse <|> const false <$> expEvt)
                        # _showResetDyn  .~ step false ((==) Tracing <$> (res ^. _tracerMode))
                        # _savingStepDyn .~ step NotSaving (res ^. _saveStepEvt)
                        # _activeItemDyn .~ step Nothing (res ^. _activeItem)
