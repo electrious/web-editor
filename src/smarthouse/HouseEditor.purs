@@ -41,10 +41,11 @@ import Model.Racking.OldRackingSystem (OldRoofRackingData, guessRackingType)
 import Model.Racking.RackingType (RackingType(..))
 import Model.Roof.Panel (Alignment(..), Orientation(..), PanelsDict, panelsDict)
 import Model.Roof.RoofPlate (RoofPlate, _roofIntId)
-import Model.SmartHouse.House (House, HouseNode, HouseOp(..), _activeRoof, _roofTapped, _trees, _wallTapped, flipRoof, getRoof, getVertNode, updateActiveRoofShade, updateHeight)
+import Model.SmartHouse.House (House, _trees, flipRoof, getVertNode, updateActiveRoofShade, updateHeight)
 import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo)
 import Model.SmartHouse.Roof (Roof, RoofEvents, _flipped, renderActRoofOutline, renderRoof)
 import Model.UUID (idLens)
+import Models.SmartHouse.ActiveItem (ActHouseRoof)
 import Rendering.DynamicNode (dynamic, dynamic_)
 import Rendering.Line (renderLine, renderLineWith)
 import Rendering.Node (Node, fixNodeDWith, getEnv, getParent, localEnv, node, tapMesh)
@@ -53,6 +54,7 @@ import SmartHouse.Algorithm.LAV (_edges)
 import SmartHouse.BuilderMode (BuilderMode(..))
 import SmartHouse.ShadeOption (ShadeOption)
 import Smarthouse.Algorithm.Subtree (Subtree, _sinks, _source, treeLines)
+import Smarthouse.HouseNode (HouseNode, HouseOp(..), _actHouseRoof, _activated)
 import Three.Core.Geometry (_bevelEnabled, _depth, mkExtrudeGeometry, mkShape)
 import Three.Core.Material (MeshPhongMaterial, mkLineBasicMaterial, mkMeshPhongMaterial)
 import Three.Core.Object3D (add, remove)
@@ -103,6 +105,11 @@ _roofsData = _Newtype <<< prop (Proxy :: Proxy "roofsData")
 _arrayEditParam :: forall t a r. Newtype t { arrayEditParam :: a | r } => Lens' t a
 _arrayEditParam = _Newtype <<< prop (Proxy :: Proxy "arrayEditParam")
 
+
+getRoof :: Maybe UUID -> House -> ActHouseRoof
+getRoof Nothing h  = def # _house .~ h
+getRoof (Just i) h = def # _house .~ h
+                         # _roof  .~ M.lookup i (h ^. _roofs)
 
 -- whether the house editor is in the mode for house editing or
 -- loaded all roofs/arrays for editing the arrays
@@ -179,15 +186,17 @@ editHouse houseCfg conf = do
                 
                 newHouseEvt  = multicast $ newHouseEvt1 <|> newHouseEvt2 <|> newHouseEvt3
 
-                roofTappedEvt = latestAnyEvtWith (view _tapped) roofEvtsDyn
+                roofTappedEvt = multicast $ latestAnyEvtWith (view _tapped) roofEvtsDyn
+
+                validRoofTappedEvt = gateDyn (not <<< isActive <$> actDyn) roofTappedEvt
+                wallTappedEvt = const (house ^. idLens) <$> wallTap
 
                 activeRoofDyn = getRoof <$> actRoofDyn <*> houseDyn
                 
-                hn = def # _id         .~ (house ^. idLens)
-                         # _roofTapped .~ gateDyn (not <<< isActive <$> actDyn) roofTappedEvt
-                         # _wallTapped .~ wallTap
-                         # _updated    .~ (HouseOpUpdate <$> newHouseEvt)
-                         # _activeRoof .~ dynEvent activeRoofDyn
+                hn = def # _id           .~ (house ^. idLens)
+                         # _activated    .~ (validRoofTappedEvt <|> wallTappedEvt)
+                         # _updated      .~ (HouseOpUpdate <$> newHouseEvt)
+                         # _actHouseRoof .~ dynEvent activeRoofDyn
 
                 -- render all roof nodes if available
                 roofsDyn = step Nothing $ Just <$> conf ^. _roofsData

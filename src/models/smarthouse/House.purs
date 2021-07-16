@@ -2,7 +2,6 @@ module Model.SmartHouse.House where
 
 import Prelude hiding (degree)
 
-import Control.Alt ((<|>))
 import Control.Alternative (empty)
 import Data.Array as Arr
 import Data.Default (class Default, def)
@@ -22,9 +21,7 @@ import Data.UUID (UUID, emptyUUID, genUUID)
 import Data.UUIDMap (UUIDMap)
 import Data.UUIDMap as UM
 import Editor.Common.Lenses (_floor, _height, _id, _roofs, _shade, _slope)
-import Editor.RoofManager (ArrayEvents)
 import Effect (Effect)
-import FRP.Event (Event)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Math.Angle (Angle, degree)
@@ -97,10 +94,6 @@ createHouseFrom slope poly = do
 updateHeight :: Meter -> House -> House
 updateHeight height h = h # _height .~ height
 
-getRoof :: Maybe UUID -> House -> Maybe Roof
-getRoof Nothing _  = Nothing
-getRoof (Just i) h = M.lookup i $ h ^. _roofs
-
 -- load up to date VertNode
 getVertNode :: VertNode -> House -> VertNode
 getVertNode v h = fromMaybe v $ M.lookup (v ^. idLens) (h ^. _vertices)
@@ -158,52 +151,3 @@ instance Show JSHouses where
     show = genericShow
 instance Encode JSHouses where
     encode = genericEncode (defaultOptions { unwrapSingleConstructors = true })
-
--- | Types of operation applied to houses
-data HouseOp = HouseOpCreate House
-             | HouseOpDelete UUID
-             | HouseOpUpdate House
-
-derive instance Generic HouseOp _
-derive instance Eq HouseOp
-
-instance Show HouseOp where
-    show = genericShow
-
-
-newtype HouseNode = HouseNode {
-    id          :: UUID,
-    roofTapped  :: Event UUID,
-    wallTapped  :: Event Unit,
-    updated     :: Event HouseOp,
-    activeRoof  :: Event (Maybe Roof),
-
-    arrayEvents :: ArrayEvents
-    }
-
-derive instance Newtype HouseNode _
-instance HasUUID HouseNode where
-    idLens = _id
-instance Default HouseNode where
-    def = HouseNode {
-        id          : emptyUUID,
-        roofTapped  : empty,
-        wallTapped  : empty,
-        updated     : empty,
-        activeRoof  : empty,
-
-        arrayEvents : def
-        }
-
-_roofTapped :: forall t a r. Newtype t { roofTapped :: a | r } => Lens' t a
-_roofTapped = _Newtype <<< prop (Proxy :: Proxy "roofTapped")
-
-_wallTapped :: forall t a r. Newtype t { wallTapped :: a | r } => Lens' t a
-_wallTapped = _Newtype <<< prop (Proxy :: Proxy "wallTapped")
-
-_activeRoof :: forall t a r. Newtype t { activeRoof :: a | r } => Lens' t a
-_activeRoof = _Newtype <<< prop (Proxy :: Proxy "activeRoof")
-
-houseTapped :: HouseNode -> Event UUID
-houseTapped h = (const i <$> h ^. _roofTapped) <|> (const i <$> h ^. _wallTapped)
-    where i = h ^. idLens

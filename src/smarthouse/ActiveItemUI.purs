@@ -4,13 +4,12 @@ import Prelude hiding (div)
 
 import Control.Alternative (empty)
 import Data.Default (class Default, def)
-import Data.Lens (Lens', (.~), (^.))
+import Data.Lens (Lens', view, (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (class Newtype)
-import Type.Proxy (Proxy(..))
-import Editor.Common.Lenses (_shade, _shadeSelected)
+import Editor.Common.Lenses (_roof, _shade, _shadeSelected)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic)
 import FRP.Event (Event)
@@ -21,6 +20,7 @@ import Specular.Dom.Browser (Attrs)
 import Specular.Dom.Element (attrsD, class_, classes, dynText)
 import Specular.Dom.Widget (Widget)
 import Specular.Dom.Widgets.Button (buttonOnClick)
+import Type.Proxy (Proxy(..))
 import UI.Bridge (fromUIEvent, toUIDyn)
 import UI.Utils (div, mkAttrs, mkStyle, (:~))
 
@@ -49,17 +49,17 @@ activeItemUIStyle d = mkStyle [
 
 
 getShadeOption :: ActiveItem -> Maybe ShadeOption
-getShadeOption (ActiveRoof r) = Just $ r ^. _shade
+getShadeOption (ActiveHouse r) = view _shade <$> r ^. _roof
 getShadeOption (ActiveTree _) = Nothing
 
 
 subtitle :: Maybe ActiveItem -> String
-subtitle (Just (ActiveRoof _)) = "Current House:"
+subtitle (Just (ActiveHouse _)) = "Current House:"
 subtitle (Just (ActiveTree _)) = "Current Tree:"
 subtitle Nothing = ""
 
 delBtnLabel :: Maybe ActiveItem -> String
-delBtnLabel (Just (ActiveRoof _)) = "Delete This House"
+delBtnLabel (Just (ActiveHouse _)) = "Delete This House"
 delBtnLabel (Just (ActiveTree _)) = "Delete This Tree"
 delBtnLabel Nothing = ""
 

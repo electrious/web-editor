@@ -43,12 +43,11 @@ import Math.Angle (Angle, degree)
 import Model.ActiveMode (ActiveMode(..), fromBoolean, isActive)
 import Model.Hardware.PanelTextureInfo (PanelTextureInfo)
 import Model.Hardware.PanelType (PanelType(..))
-import Model.SmartHouse.House (House, HouseNode, HouseOp(..), JSHouses(..), _activeRoof, _trees, createHouseFrom, exportHouse, houseTapped)
+import Model.SmartHouse.House (House, JSHouses(..), _trees, createHouseFrom, exportHouse)
 import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo, _imageFile, _size, _texture, mkHouseTextureInfo)
-import Model.SmartHouse.Roof (Roof)
 import Model.SmartHouse.Tree (Tree, TreeNode, TreeOp(..))
 import Model.UUID (idLens)
-import Models.SmartHouse.ActiveItem (ActiveItem(..))
+import Models.SmartHouse.ActiveItem (ActHouseRoof, ActiveItem(..))
 import OBJExporter (MeshFiles, exportObject)
 import Rendering.DynamicNode (eventNode)
 import Rendering.Node (Node, fixNodeDWith, fixNodeE, fixNodeEWith, getEnv, getParent, localEnv, mkNodeEnv, node, runNode, tapMouseMesh)
@@ -60,6 +59,7 @@ import SmartHouse.HouseTracer (TracerMode(..), _stopTracing, _tracedPolygon, _tr
 import SmartHouse.ShadeOption (ShadeOption)
 import SmartHouse.TreeBuilder (buildTree, editTree)
 import SmartHouse.UI (_activeItemDyn, _savingStepDyn, houseBuilderUI)
+import Smarthouse.HouseNode (HouseNode, HouseOp(..), _actHouseRoof, _activated)
 import Specular.Dom.Widget (runMainWidgetInNode)
 import Three.Core.Geometry (mkPlaneGeometry)
 import Three.Core.Material (mkMeshBasicMaterialWithTexture)
@@ -230,13 +230,13 @@ exportHouses hd = JSHouses { houses : fromFoldable $ M.values $ exportHouse <$> 
 getHouseUpd :: forall f. Foldable f => Functor f => f HouseNode -> Event HouseOp
 getHouseUpd = foldEvtWith (view _updated)
 
-getActiveRoof :: forall f. Foldable f => Functor f => f HouseNode -> Event (Maybe Roof)
-getActiveRoof = foldEvtWith (view _activeRoof)
+getActiveRoof :: forall f. Foldable f => Functor f => f HouseNode -> Event ActHouseRoof
+getActiveRoof = foldEvtWith (view _actHouseRoof)
 
 -- get the activated house from a list of house nodes
 getActivated :: forall f. Foldable f => Functor f => f HouseNode -> Event UUID
 getActivated = foldEvtWith f
-    where f n = const (n ^. idLens) <$> houseTapped n
+    where f n = const (n ^. idLens) <$> n ^. _activated
 
 getTappedTree :: forall f. Foldable f => Functor f => f TreeNode -> Event UUID
 getTappedTree = foldEvtWith f
@@ -361,7 +361,7 @@ builderForHouse evts tInfo =
                     let deactEvt    = multicast $ const Nothing <$> helper ^. _tapped
 
                         actEvt      = keepLatest $ getActivated <$> nodesEvt
-                        actRoofEvt  = keepLatest $ map (map ActiveRoof) <<< getActiveRoof <$> nodesEvt
+                        actRoofEvt  = Just <$> keepLatest (map ActiveHouse <<< getActiveRoof <$> nodesEvt)
 
                         treeTapEvt = multicast $ keepLatest $ getTappedTree <$> treesEvt
                         actTreeEvt = map ActiveTree <$> (sampleOn hdEvt $ getActiveTree <$> treeTapEvt)
