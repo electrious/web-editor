@@ -17,9 +17,10 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Meter (Meter, meterVal)
 import Data.Newtype (class Newtype)
 import Data.Traversable (class Traversable, traverse)
+import Data.Tuple (Tuple(..))
 import Data.UUID (UUID)
 import Editor.ArrayBuilder (runArrayBuilder)
-import Editor.Common.Lenses (_alignment, _floor, _height, _houseId, _id, _modeDyn, _name, _orientation, _panelType, _panels, _position, _roof, _roofs, _shadeSelected, _tapped, _updated)
+import Editor.Common.Lenses (_alignment, _floor, _height, _houseId, _id, _modeDyn, _name, _orientation, _panelType, _panels, _position, _roof, _roofs, _shadeSelected, _slope, _tapped, _updated)
 import Editor.Disposable (Disposee(..))
 import Editor.HeightEditor (_min, dragArrowPos, setupHeightEditor)
 import Editor.HouseEditor (ArrayEditParam, HouseConfig, _heatmap, runHouseEditor)
@@ -41,7 +42,7 @@ import Model.Racking.OldRackingSystem (OldRoofRackingData, guessRackingType)
 import Model.Racking.RackingType (RackingType(..))
 import Model.Roof.Panel (Alignment(..), Orientation(..), PanelsDict, panelsDict)
 import Model.Roof.RoofPlate (RoofPlate, _roofIntId)
-import Model.SmartHouse.House (House, _trees, flipRoof, getVertNode, updateActiveRoofShade, updateHeight)
+import Model.SmartHouse.House (House, _peakPoint, _trees, flipRoof, getVertNode, updateActiveRoofShade, updateHeight, updateSlopes)
 import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo)
 import Model.SmartHouse.Roof (Roof, RoofEvents, _flipped, renderActRoofOutline, renderRoof)
 import Model.UUID (idLens)
@@ -53,6 +54,7 @@ import SmartHouse.Algorithm.Edge (_line)
 import SmartHouse.Algorithm.LAV (_edges)
 import SmartHouse.BuilderMode (BuilderMode(..))
 import SmartHouse.ShadeOption (ShadeOption)
+import SmartHouse.SlopeEditor (_maxHeightToEdge, slopeEditor)
 import Smarthouse.Algorithm.Subtree (Subtree, _sinks, _source, treeLines)
 import Smarthouse.HouseNode (HouseNode, HouseOp(..), _actHouseRoof, _activated)
 import Three.Core.Geometry (_bevelEnabled, _depth, mkExtrudeGeometry, mkShape)
@@ -148,10 +150,12 @@ editHouse houseCfg conf = do
 
                 -- id of active roof, taking into account of the house activeness
                 actRoofDyn = f <$> actDyn <*> actRoofIdDyn
+                
+                canEditDyn = (&&) <$> actDyn <*> (fromBoolean <$> houseEditDyn)
 
             -- render roofs
-            roofEvtsDyn <- node (def # _position .~ pDyn
-                                     # _name     .~ "roofs") do
+            Tuple roofEvtsDyn sEvt <- node (def # _position .~ pDyn
+                                                # _name     .~ "roofs") do
                 let roofsDyn = view _roofs <$> houseDyn
                     actRDyn = g <$> actRoofDyn <*> roofsDyn
                     buildModeDyn = conf ^. _builderModeDyn
@@ -165,7 +169,17 @@ editHouse houseCfg conf = do
                     dynamic_ $ renderActRoofOutline <$> buildModeDyn <*> actRDyn
 
                 -- render roofs dynamically
-                dynamic $ renderBuilderRoofs houseEditDyn actRoofDyn <$> roofsDyn
+                roofEvts <- dynamic $ renderBuilderRoofs houseEditDyn actRoofDyn <$> roofsDyn
+                
+                -- setup slope editor and get the new slope event
+                -- enable slope editor only in EditingHouse mode and actDyn is active
+                let peak = getVertNode (house ^. _peakPoint) house
+                sEvt <- slopeEditor $ def # _modeDyn  .~ canEditDyn
+                                          # _position .~ peak ^. _position
+                                          # _slope    .~ house ^. _slope
+                                          # _maxHeightToEdge .~ (house ^. _peakPoint <<< _height)
+
+                pure $ Tuple roofEvts sEvt
 
 
             let flipEvt = latestAnyEvtWith (view _flipped) roofEvtsDyn
@@ -173,18 +187,20 @@ editHouse houseCfg conf = do
                 hPos2D = dragArrowPos $ house ^. _floor <<< _polyVerts
                 hPos   = mkVec3 (vecX hPos2D) (vecY hPos2D) (meterVal h)
 
-            -- setup height editor and get the delta event
+            -- setup height editor and get the height event
             -- enable height editor only in EditingHouse mode and actDyn is active
-            hEvt <- setupHeightEditor $ def # _modeDyn  .~ ((&&) <$> actDyn <*> (fromBoolean <$> houseEditDyn))
+            hEvt <- setupHeightEditor $ def # _modeDyn  .~ canEditDyn
                                             # _position .~ hPos
                                             # _height   .~ h
                                             # _min      .~ (- meterVal h)
+        
     
             let newHouseEvt1 = sampleDyn houseDyn $ updateHeight <$> hEvt
-                newHouseEvt2 = performEvent $ sampleDyn houseDyn $ flipRoof <$> flipEvt
-                newHouseEvt3 = sampleDyn houseDyn $ sampleDyn actRoofIdDyn $ updateActiveRoofShade <$> conf ^. _shadeSelected
+                newHouseEvt2 = performEvent $ sampleDyn houseDyn $ updateSlopes <$> sEvt
+                newHouseEvt3 = performEvent $ sampleDyn houseDyn $ flipRoof <$> flipEvt
+                newHouseEvt4 = sampleDyn houseDyn $ sampleDyn actRoofIdDyn $ updateActiveRoofShade <$> conf ^. _shadeSelected
                 
-                newHouseEvt  = multicast $ newHouseEvt1 <|> newHouseEvt2 <|> newHouseEvt3
+                newHouseEvt  = multicast $ newHouseEvt1 <|> newHouseEvt2 <|> newHouseEvt3 <|> newHouseEvt4
 
                 roofTappedEvt = multicast $ latestAnyEvtWith (view _tapped) roofEvtsDyn
 

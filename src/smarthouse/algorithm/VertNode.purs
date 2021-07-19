@@ -2,11 +2,12 @@ module SmartHouse.Algorithm.VertNode where
 
 import Prelude
 
+import Data.Default (class Default, def)
 import Data.Generic.Rep (class Generic)
-import Data.Show.Generic (genericShow)
 import Data.Lens ((^.))
 import Data.Newtype (class Newtype)
-import Data.UUID (UUID, genUUID)
+import Data.Show.Generic (genericShow)
+import Data.UUID (UUID, emptyUUID, genUUID)
 import Editor.Common.Lenses (_height, _id, _position)
 import Effect (Effect)
 import Model.UUID (class HasUUID, idLens)
@@ -20,14 +21,20 @@ newtype VertNode = VertNode {
     height   :: Number
 }
 
-derive instance newtypeVertNode :: Newtype VertNode _
-derive instance genericVertNode :: Generic VertNode _
-instance showVertNode :: Show VertNode where
+derive instance Newtype VertNode _
+derive instance Generic VertNode _
+instance Show VertNode where
     show = genericShow
-instance eqVertNode :: Eq VertNode where
+instance Eq VertNode where
     eq v1 v2 = v1 ^. idLens == v2 ^. idLens
-instance hasUUIDVertNode :: HasUUID VertNode where
+instance HasUUID VertNode where
     idLens = _id
+instance Default VertNode where
+    def = VertNode {
+        id       : emptyUUID,
+        position : def,
+        height   : 0.0
+    }
 
 vertNodeFromVertex :: Vertex -> VertNode
 vertNodeFromVertex v = VertNode {
