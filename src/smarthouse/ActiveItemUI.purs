@@ -1,8 +1,9 @@
 module SmartHouse.ActiveItemUI where
 
-import Prelude hiding (div)
+import Prelude hiding (div, degree)
 
 import Control.Alternative (empty)
+import Data.Compactable (compact)
 import Data.Default (class Default, def)
 import Data.Lens (Lens', view, (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
@@ -11,17 +12,20 @@ import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (class Newtype)
 import Editor.Common.Lenses (_roof, _shade, _shadeSelected)
 import Effect.Class (liftEffect)
-import FRP.Dynamic (Dynamic)
+import FRP.Dynamic (Dynamic, dynEvent)
 import FRP.Event (Event)
+import Math.Angle (Angle, degreeVal, fromString)
 import Models.SmartHouse.ActiveItem (ActiveItem(..))
 import SmartHouse.ShadeOption (ShadeOption)
 import SmartHouse.ShadeOptionUI (shadeSelector)
 import Specular.Dom.Browser (Attrs)
-import Specular.Dom.Element (attrsD, class_, classes, dynText)
+import Specular.Dom.Element (attr, attrsD, bindValueOnChange, bindValueOnInput, class_, classes, dynText, valueD)
+import Specular.Dom.Element.Class (el)
 import Specular.Dom.Widget (Widget)
 import Specular.Dom.Widgets.Button (buttonOnClick)
+import Specular.Ref (new, value)
 import Type.Proxy (Proxy(..))
-import UI.Bridge (fromUIEvent, toUIDyn)
+import UI.Bridge (fromUIDyn, fromUIEvent, toUIDyn)
 import UI.Utils (div, mkAttrs, mkStyle, (:~))
 
 
@@ -73,11 +77,41 @@ delButton actItemDyn =
         e <- buttonOnClick (pure $ mkAttrs ["class" :~ "uk-button uk-button-danger"]) $ dynText $ delBtnLabel <$> d
         fromUIEvent e
 
+houseSlopeUI :: Angle -> Widget (Event Angle)
+houseSlopeUI slope =
+    div [classes ["uk-flex"]] do
+        let slopeStr = show $ degreeVal slope
+        -- slope ref bind to the change value for each interaction
+        slopeRef    <- new slopeStr
+
+        -- slope ref bind to the change only when the value changes
+        slopeValRef <- new slopeStr
+
+        -- show the range slide to select the slope
+        el "input" [attr "type" "range",
+                    attr "min" "5",
+                    attr "max" "85",
+                    attr "step" "1",
+                    valueD $ pure slopeStr,
+                    bindValueOnInput slopeRef,
+                    bindValueOnChange slopeValRef
+                    ] $ pure unit
+
+        let newSlopeDyn = value slopeRef
+            newSlopeStrDyn = (flip (<>) "°") <$> newSlopeDyn
+
+        el "div" [ class_ "uk-margin-left"] $ dynText $ newSlopeStrDyn
+
+        slopeValDyn <- fromUIDyn $ fromString <$> value slopeValRef
+
+        pure $ compact $ dynEvent slopeValDyn
+
 activeItemUI :: Dynamic (Maybe ActiveItem) -> Widget ActiveItemUI
 activeItemUI actItemDyn = do
     styleD <- liftEffect $ toUIDyn $ activeItemUIStyle <<< isJust <$> actItemDyn
     div [classes ["uk-flex", "uk-flex-column", "uk-margin-top"],
          attrsD styleD] do
+        -- _ <- houseSlopeUI $ degree 30.0
         selEvt <- shadeSelector $ join <<< map getShadeOption <$> actItemDyn
         delEvt <- delButton actItemDyn
 

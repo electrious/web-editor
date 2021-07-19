@@ -1,9 +1,11 @@
 module Math.Angle where
 
-import Prelude
+import Prelude hiding (degree)
 
 import Data.Default (class Default)
+import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype)
+import Data.Number as N
 import Foreign.Generic (class Decode, class Encode, decode, encode)
 import Math as M
 
@@ -46,6 +48,9 @@ degreeVal (Angle deg) = deg
 
 radianVal :: Angle -> M.Radians
 radianVal (Angle deg) = deg * M.pi / 180.0
+
+fromString :: String -> Maybe Angle
+fromString = map degree <<< N.fromString
 
 sin :: Angle -> Number
 sin = M.sin <<< radianVal
