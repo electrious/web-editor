@@ -31,6 +31,9 @@ lineMat = unsafePerformEffect $ mkLineBasicMaterial 0xeeeeee 4.0
 renderLine :: forall e. LineSeg Vector3 -> Node e Unit
 renderLine l = renderLineWith l lineMat
 
+renderLineOnly :: forall e. LineSeg Vector3 -> Node e Unit
+renderLineOnly l = renderLineOnlyWith l lineMat
+
 renderLineOnlyWith :: forall e. LineSeg Vector3 -> LineBasicMaterial -> Node e Unit
 renderLineOnlyWith l = void <<< line (def # _name .~ "line") [l^. _start, l ^. _end]
 

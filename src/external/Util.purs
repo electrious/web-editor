@@ -6,8 +6,14 @@ import Control.Alt ((<|>))
 import Control.Plus (empty)
 import Data.Foldable (class Foldable, foldl)
 import Data.FunctorWithIndex (class FunctorWithIndex, mapWithIndex)
+import Data.Int (fromNumber)
+import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Time.Duration (Milliseconds(..))
 import Effect (Effect)
-import FRP.Dynamic (Dynamic, latestEvt)
+import Effect.Ref as Ref
+import Effect.Timer (clearTimeout, setTimeout)
+import Effect.Unsafe (unsafePerformEffect)
+import FRP.Dynamic (Dynamic, current, dynEvent, latestEvt, step)
 import FRP.Event (Event, create, makeEvent, subscribe)
 import FRP.Event.Extra (anyEvt)
 
@@ -33,3 +39,21 @@ latestAnyEvtWith f = latestEvt <<< map (anyEvt <<< map f)
 
 latestAnyEvtWithIdx :: forall a b f i. FunctorWithIndex i f => Foldable f => (i -> a -> Event b) -> Dynamic (f a) -> Event b
 latestAnyEvtWithIdx f = latestEvt <<< map (anyEvt <<< mapWithIndex f)
+
+debounceDyn :: forall a. Milliseconds -> Dynamic a -> Dynamic (Maybe a)
+debounceDyn t d = step (Just def) (debounceMaybe t $ dynEvent d)
+    where def = unsafePerformEffect $ current d
+
+-- a special debounce that will fire Nothing if not finished, and Just value when the last event fires
+debounceMaybe :: forall a. Milliseconds -> Event a -> Event (Maybe a)
+debounceMaybe (Milliseconds period) evt = makeEvent \k -> do
+    timer <- Ref.new Nothing
+    
+    subscribe evt \v -> do
+        k Nothing
+        tf <- Ref.read timer
+        case tf of
+            Just t -> clearTimeout t
+            Nothing -> pure unit
+        newT <- setTimeout (fromMaybe 1 $ fromNumber period) (k $ Just v)
+        Ref.write (Just newT) timer

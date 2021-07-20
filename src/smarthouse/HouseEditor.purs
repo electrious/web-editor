@@ -10,12 +10,13 @@ import Data.Foldable (traverse_)
 import Data.Lens (Lens', view, (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.List (List(..))
-import Data.Map (Map, lookup)
+import Data.List (List(..), concatMap)
+import Data.Map (Map, lookup, values)
 import Data.Map as M
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Meter (Meter, meterVal)
 import Data.Newtype (class Newtype)
+import Data.Time.Duration (Milliseconds(..))
 import Data.Traversable (class Traversable, traverse)
 import Data.Tuple (Tuple(..))
 import Data.UUID (UUID)
@@ -35,7 +36,7 @@ import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, dynEvent, gateDyn, latestEvt, sampleDyn, step)
 import FRP.Event (Event)
 import FRP.Event.Extra (delay, multicast, performEvent)
-import Math.LineSeg (mkLineSeg)
+import Math.LineSeg (LineSeg, mkLineSeg)
 import Model.ActiveMode (ActiveMode(..), fromBoolean, isActive)
 import Model.Polygon (Polygon, _polyVerts)
 import Model.Racking.OldRackingSystem (OldRoofRackingData, guessRackingType)
@@ -48,14 +49,14 @@ import Model.SmartHouse.Roof (Roof, RoofEvents, _flipped, renderActRoofOutline, 
 import Model.UUID (idLens)
 import Models.SmartHouse.ActiveItem (ActHouseRoof)
 import Rendering.DynamicNode (dynamic, dynamic_)
-import Rendering.Line (renderLine, renderLineWith)
+import Rendering.Line (renderLine, renderLineLength, renderLineOnly, renderLineWith)
 import Rendering.Node (Node, fixNodeDWith, getEnv, getParent, localEnv, node, tapMesh)
 import SmartHouse.Algorithm.Edge (_line)
 import SmartHouse.Algorithm.LAV (_edges)
 import SmartHouse.BuilderMode (BuilderMode(..))
 import SmartHouse.ShadeOption (ShadeOption)
 import SmartHouse.SlopeEditor (_maxHeightToEdge, slopeEditor)
-import Smarthouse.Algorithm.Subtree (Subtree, _sinks, _source, treeLines)
+import Smarthouse.Algorithm.Subtree (_sinks, _source, treeLines)
 import Smarthouse.HouseNode (HouseNode, HouseOp(..), _actHouseRoof, _activated)
 import Three.Core.Geometry (_bevelEnabled, _depth, mkExtrudeGeometry, mkShape)
 import Three.Core.Material (MeshPhongMaterial, mkLineBasicMaterial, mkMeshPhongMaterial)
@@ -63,7 +64,7 @@ import Three.Core.Object3D (add, remove)
 import Three.Math.Vector (Vector3, mkVec3, toVec2, vecX, vecY)
 import Type.Proxy (Proxy(..))
 import UI.RoofEditorUI (_mode)
-import Util (latestAnyEvtWith)
+import Util (debounceDyn, latestAnyEvtWith)
 
 
 -- how to render the House
@@ -162,9 +163,11 @@ editHouse houseCfg conf = do
                 node (def # _name .~ "roof-lines"
                           # _position .~ pure (mkVec3 0.0 0.0 0.02)) do
                     -- render ridge lines
-                    dynamic_ $ renderSubtrees <$> houseDyn <*> buildModeDyn
-                    -- render edge lines
-                    dynamic_ $ renderEdgeLines <$> houseDyn <*> buildModeDyn
+                    let linesDyn = getHouseLines <$> houseDyn
+                    dynamic_ $ traverse_ renderLineOnly <$> linesDyn
+                    -- render line length texts
+                    dynamic_ $ renderLengths <$> debounceDyn (Milliseconds 500.0) linesDyn
+
                     -- render roof outlines dynamically
                     dynamic_ $ renderActRoofOutline <$> buildModeDyn <*> actRDyn
 
@@ -233,20 +236,16 @@ renderWalls poly height = do
     m <- tapMesh (def # _name .~ "walls") geo wallMat
     pure $ const unit <$> m ^. _tapped
 
--- render all subtree lines with length text
-renderSubtrees :: forall e. House -> BuilderMode -> Node e Unit
-renderSubtrees h Building = traverse_ (renderSubtree h) (h ^. _trees)
-renderSubtrees _ Showing  = pure unit
 
-renderSubtree :: forall e. House -> Subtree -> Node e Unit
-renderSubtree h t = traverse_ renderLine ls
-    where ls = map (view _position <<< flip getVertNode h) <$> treeLines t
+getHouseLines :: House -> List (LineSeg Vector3)
+getHouseLines h = tLines <> eLines
+    where tls = concatMap treeLines (values $ h ^. _trees)
+          tLines = map (view _position <<< flip getVertNode h) <$> tls
+          eLines = view _line <$> h ^. _edges
 
-
--- render all house edge lines
-renderEdgeLines :: forall e. House -> BuilderMode -> Node e Unit
-renderEdgeLines h Building = traverse_ renderLine (view _line <$> h ^. _edges)
-renderEdgeLines _ Showing  = pure unit
+renderLengths :: forall e. Maybe (List (LineSeg Vector3)) -> Node e Unit
+renderLengths (Just ls) = traverse_ renderLineLength ls
+renderLengths Nothing   = pure unit
 
 renderBuilderRoofs :: forall f. Traversable f => Dynamic Boolean -> Dynamic (Maybe UUID) -> f Roof -> Node HouseTextureInfo (f RoofEvents)
 renderBuilderRoofs houseEditDyn actRoofDyn = traverse (renderRoof houseEditDyn actRoofDyn)
