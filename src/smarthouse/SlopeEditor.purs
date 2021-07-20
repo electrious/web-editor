@@ -11,7 +11,6 @@ import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Editor.Common.Lenses (_isActive, _modeDyn, _position, _rotation, _slope)
 import Editor.HeightEditor (_arrowMaterial, _max, _min)
-import Effect.Class.Console (log)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic)
 import FRP.Event (Event)
@@ -97,7 +96,7 @@ slopeEditor conf =
             tWrpCfg = def # _position .~ pure (mkVec3 (-0.8) 0.5 0.0)
             tProp = def # _fontSize  .~ 0.6
                         # _textAlign .~ "center"
-        log $ show h
+
         arrow <- node (def # _position .~ pure (moveUp 2.0 pos)
                            # _visible  .~ actDyn) $
                         createDraggableObjectWith cfg $
