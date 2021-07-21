@@ -1,23 +1,24 @@
 module Model.Polygon (Polygon(..), _polyVerts, newPolygon, polygonAround, numOfVerts,
                       addVertexAt, delVertexAt, updateVertAt, polyCenter, polyEdges, polyOutline, polyWindows,
-                      polyMidPoints, polygonBBox, counterClockPoly,
+                      polyMidPoints, polygonBBox, counterClockPoly, polyPlane,
                       renderPolygon, class IsPolygon, toPolygon, PolyOrient(..), polygonOrient) where
 
 import Prelude hiding (add)
 
+import Algorithm.Plane (Plane, mkPlane)
 import Control.Monad.Writer (tell)
 import Custom.Mesh (TapMouseMesh, TappableMesh, mkTappableMesh)
-import Data.Array (cons, deleteAt, fromFoldable, head, init, insertAt, last, length, mapWithIndex, reverse, snoc, tail, updateAt, zip, zipWith)
+import Data.Array (cons, deleteAt, fromFoldable, head, init, insertAt, last, length, mapWithIndex, reverse, snoc, tail, updateAt, zip, zipWith, (!!))
 import Data.Default (class Default, def)
 import Data.Filterable (filter)
 import Data.Foldable (class Foldable, foldl, maximum, minimum)
 import Data.Generic.Rep (class Generic)
-import Data.Show.Generic (genericShow)
 import Data.Int (toNumber)
 import Data.Lens (Lens', (^.), (.~))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Maybe (Maybe, fromMaybe)
 import Data.Newtype (class Newtype)
+import Data.Show.Generic (genericShow)
 import Data.Traversable (class Traversable)
 import Data.Triple (Triple(..))
 import Data.Tuple (Tuple(..), uncurry)
@@ -26,14 +27,14 @@ import Editor.Disposable (Disposee(..))
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic, current, subscribeDyn)
-import Math.LineSeg (LineSeg, mkLineSeg)
+import Math.LineSeg (LineSeg, lineVec, mkLineSeg)
 import RBush.RBush (BBox)
 import Rendering.Node (getEnv, tapMouseMesh)
 import Rendering.NodeRenderable (class NodeRenderable)
 import Three.Core.Geometry (mkShape, mkShapeGeometry)
 import Three.Core.Material (MeshBasicMaterial)
 import Three.Core.Mesh (setMaterial)
-import Three.Math.Vector (class Vector, dist, getVector, mkVec3, toVec2, updateVector, vecX, vecY, vecZ, (<**>), (<+>))
+import Three.Math.Vector (class Vector, cross, dist, getVector, mkVec3, normal, toVec2, updateVector, vecX, vecY, vecZ, (<**>), (<+>))
 
 newtype Polygon v = Polygon (Array v)
 
@@ -94,6 +95,15 @@ polyCenter poly = (foldl (<+>) def vs) <**> (1.0 / l)
     where l  = toNumber $ length vs
           vs = poly ^. _polyVerts
 
+
+-- | calculate plane for a polygon
+polyPlane :: forall v. Default v => Vector v => Polygon v -> Plane
+polyPlane poly = mkPlane (getVector $ polyCenter poly) n
+    where ls = polyOutline poly
+          f  = getVector <<< lineVec
+          l1 = f <$> ls !! 0
+          l2 = f <$> ls !! 1
+          n = fromMaybe def $ map normal $ cross <$> l1 <*> l2
 
 -- | get all edges of the polygon
 polyEdges :: forall v. Vector v => Polygon v -> Array (Tuple v v)

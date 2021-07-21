@@ -2,13 +2,14 @@ module Model.SmartHouse.Roof where
 
 import Prelude
 
+import Algorithm.Plane (Plane)
 import Control.Alternative (empty)
 import Custom.Mesh (TappableMesh)
 import Data.Compactable (compact)
 import Data.Default (class Default, def)
 import Data.Enum (fromEnum)
 import Data.Generic.Rep (class Generic)
-import Data.Lens (Lens', (.~), (^.))
+import Data.Lens (Lens', view, (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (List(..), (:))
@@ -32,7 +33,7 @@ import FRP.Event.Extra (multicast)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Model.ActiveMode (ActiveMode(..), fromBoolean, isActive)
-import Model.Polygon (Polygon, _polyVerts, polyOutline)
+import Model.Polygon (Polygon, _polyVerts, polyOutline, polyPlane)
 import Model.Roof.RoofPlate (Point, vec2Point)
 import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo, _size, _texture)
 import Model.UUID (class HasUUID, idLens)
@@ -93,6 +94,8 @@ subtreeIndex r = case M.values $ r ^. _subtrees of
     (t:Nil) -> Just $ t ^. idLens
     _       -> Nothing
 
+roofPlane :: Roof -> Plane
+roofPlane = polyPlane <<< view _polygon
 
 exportRoof :: Meter -> Roof -> JSRoof
 exportRoof h r = JSRoof { id: r ^. idLens, polygon: mkP <$> r ^. _polygon <<< _polyVerts, shade : fromEnum (r ^. _shade) }

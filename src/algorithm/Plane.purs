@@ -28,6 +28,9 @@ instance Show Plane where
     show = genericShow
 
 
+mkPlane :: Vector3 -> Vector3 -> Plane
+mkPlane p n = Plane { point : p, normal : n }
+
 -- | Line Plane intersection algorithm
 -- reference: https://en.wikipedia.org/wiki/Line–plane_intersection
 data InterRes = NoIntersection            -- line and plane is parallel to each other and no intersection point
