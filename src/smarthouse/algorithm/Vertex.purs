@@ -3,22 +3,23 @@ module SmartHouse.Algorithm.Vertex where
 import Prelude
 
 import Data.Generic.Rep (class Generic)
-import Data.Show.Generic (genericShow)
 import Data.Lens (Lens', (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype)
-import Type.Proxy (Proxy(..))
+import Data.Show.Generic (genericShow)
 import Data.Tuple (Tuple(..))
 import Data.UUID (UUID, genUUID)
 import Editor.Common.Lenses (_height, _id, _position)
 import Effect (Effect)
 import Model.UUID (class HasUUID, idLens)
-import SmartHouse.Algorithm.Edge (Edge, _line)
+import SmartHouse.Algorithm.Edge (Edge)
+import SmartHouse.Algorithm.EdgeInfo (_line)
 import SmartHouse.Algorithm.Ray (Ray)
 import SmartHouse.Algorithm.VertInfo (VertInfo, _bisector, _isReflex, _usable, vertInfoFrom)
 import Three.Math.Vector (Vector3)
+import Type.Proxy (Proxy(..))
 
     
 newtype Vertex = Vertex {
@@ -42,11 +43,6 @@ instance showVertex :: Show Vertex where
 instance hasUUID :: HasUUID Vertex where
     idLens = _id
 
-_leftEdge :: forall t a r. Newtype t { leftEdge :: a | r } => Lens' t a
-_leftEdge = _Newtype <<< prop (Proxy :: Proxy "leftEdge")
-
-_rightEdge :: forall t a r. Newtype t { rightEdge :: a | r } => Lens' t a
-_rightEdge = _Newtype <<< prop (Proxy :: Proxy "rightEdge")
 
 _lavId :: forall t a r. Newtype t { lavId :: a | r } => Lens' t a
 _lavId = _Newtype <<< prop (Proxy :: Proxy "lavId")

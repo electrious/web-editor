@@ -23,7 +23,7 @@ import Math.LineSeg (LineSeg, _start, direction)
 import Model.Polygon (newPolygon)
 import Model.SmartHouse.Roof (Roof, _subtrees, createRoofFrom)
 import Model.UUID (class HasUUID, idLens)
-import SmartHouse.Algorithm.Edge (Edge, _leftVertex, _line, _rightVertex)
+import SmartHouse.Algorithm.Edge (Edge, _leftVertex, _lineEdge, _rightVertex)
 import SmartHouse.Algorithm.VertNode (VertNode)
 import Smarthouse.Algorithm.Subtree (Subtree, SubtreeType(..), _source, _subtreeType, mergedEdge, normalSubtree)
 import Three.Math.Vector (Vector3, mkVec3, vecX, vecY, (<->), (<.>))
@@ -102,7 +102,7 @@ projNodeTo3D slope t = f (t ^. _source)
 
 sortedNodes :: Edge -> Angle -> List Subtree -> List VertNode
 sortedNodes e slope ts =
-    let edge    = e ^. _line
+    let edge    = e ^. _lineEdge
         g t1 t2 = comparing (flip distanceAlong edge <<< view _position) t2 t1
     in sortBy g $ projNodeTo3D slope <$> ts
 

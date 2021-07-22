@@ -3,24 +3,25 @@ module SmartHouse.Algorithm.Edge where
 import Prelude
 
 import Data.Generic.Rep (class Generic)
-import Data.Show.Generic (genericShow)
 import Data.Lens (Lens', view, (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
-import Type.Proxy (Proxy(..))
+import Data.Show.Generic (genericShow)
 import Data.UUID (UUID, genUUID)
-import Editor.Common.Lenses (_id, _position)
+import Editor.Common.Lenses (_id, _position, _rightEdge)
 import Effect (Effect)
-import Math.LineSeg (LineSeg, mkLineSeg)
+import Math.LineSeg (LineSeg)
 import Model.UUID (class HasUUID, idLens)
+import SmartHouse.Algorithm.EdgeInfo (EdgeInfo, _line)
 import SmartHouse.Algorithm.Ray (Ray)
 import SmartHouse.Algorithm.VertInfo (VertInfo, _bisector)
 import Three.Math.Vector (Vector3, mkVec3, normal, vecX, vecY)
+import Type.Proxy (Proxy(..))
 
 newtype Edge = Edge {
     id            :: UUID,
-    line          :: LineSeg Vector3,
+    line          :: EdgeInfo,
     leftVertex    :: Vector3,
     rightVertex   :: Vector3,
     leftBisector  :: Ray,
@@ -40,9 +41,6 @@ instance showEdge :: Show Edge where
 instance hasUUIDEdge :: HasUUID Edge where
     idLens = _id
 
-_line :: forall t a r. Newtype t { line :: a | r } => Lens' t a
-_line = _Newtype <<< prop (Proxy :: Proxy "line")
-
 _leftVertex :: forall t a r. Newtype t { leftVertex :: a | r } => Lens' t a
 _leftVertex = _Newtype <<< prop (Proxy :: Proxy "leftVertex")
 
@@ -54,6 +52,9 @@ _leftBisector = _Newtype <<< prop (Proxy :: Proxy "leftBisector")
 
 _rightBisector :: forall t a r. Newtype t { rightBisector :: a | r } => Lens' t a
 _rightBisector = _Newtype <<< prop (Proxy :: Proxy "rightBisector")
+
+_lineEdge :: Lens' Edge (LineSeg Vector3)
+_lineEdge = _line <<< _line
 
 edge :: VertInfo -> VertInfo -> Effect Edge
 edge lv rv = do
@@ -67,7 +68,7 @@ edge lv rv = do
         n = normal $ mkVec3 dy (-dx) 0.0
     pure $ Edge {
         id            : i,
-        line          : mkLineSeg lp rp,
+        line          : lv ^. _rightEdge,
         leftVertex    : lp,
         rightVertex   : rp,
         leftBisector  : lv ^. _bisector,

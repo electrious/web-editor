@@ -316,3 +316,9 @@ _vertices = _Newtype <<< prop (Proxy :: Proxy "vertices")
 
 _edges :: forall t a r. Newtype t { edges :: a | r } => Lens' t a
 _edges = _Newtype <<< prop (Proxy :: Proxy "edges")
+
+_leftEdge :: forall t a r. Newtype t { leftEdge :: a | r } => Lens' t a
+_leftEdge = _Newtype <<< prop (Proxy :: Proxy "leftEdge")
+
+_rightEdge :: forall t a r. Newtype t { rightEdge :: a | r } => Lens' t a
+_rightEdge = _Newtype <<< prop (Proxy :: Proxy "rightEdge")

@@ -19,7 +19,7 @@ import Data.Set as Set
 import Data.Traversable (traverse)
 import Data.Triple (Triple(..))
 import Data.Tuple (Tuple(..), snd)
-import Editor.Common.Lenses (_distance, _edges, _position, _vertices)
+import Editor.Common.Lenses (_distance, _edges, _leftEdge, _position, _rightEdge, _vertices)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import Math (abs)
@@ -28,14 +28,14 @@ import Math.LineSeg (LineSeg, _start, direction, distToLineSeg)
 import Math.LineSeg as S
 import Math.Utils (approxSame, epsilon)
 import Model.UUID (idLens)
-import SmartHouse.Algorithm.Edge (Edge, _leftBisector, _line, _rightBisector)
+import SmartHouse.Algorithm.Edge (Edge, _leftBisector, _lineEdge, _rightBisector)
 import SmartHouse.Algorithm.Event (EdgeE, EdgesE, PointEvent(..), SplitE, _intersection, _oppositeEdge, _vertexA, _vertexB, _vertexC, distance, edgeE, edgesE, intersectionPoint, splitE)
 import SmartHouse.Algorithm.HouseParam (HouseParam)
 import SmartHouse.Algorithm.LAV (LAV, SLAV, _lavs, addLav, delLav, emptySLAV, eventValid, getLav, invalidateVertex, lavFromVertices, length, nextVertex, prevVertex, runSLAV, unifyThreeVerts, unifyVerts, updateLav, verticesFromTo)
 import SmartHouse.Algorithm.Ray (ray)
 import SmartHouse.Algorithm.VertInfo (_bisector, _cross, _isReflex)
 import SmartHouse.Algorithm.VertNode (VertNode, mkVertNode, vertNodeFromVertex)
-import SmartHouse.Algorithm.Vertex (Vertex, _lavId, _leftEdge, _rightEdge, vertexFrom)
+import SmartHouse.Algorithm.Vertex (Vertex, _lavId, vertexFrom)
 import SmartHouse.HouseTracer (almostParallel)
 import Smarthouse.Algorithm.Subtree (Subtree, SubtreeType(..), subtree)
 import Three.Math.Vector (Vector3, dist, normal, (<**>), (<+>), (<->), (<.>))
@@ -46,16 +46,16 @@ import Three.Math.Vector as V
 -- angle between the tested edge and any one of our own edges.
 -- we choose the "less parallel" edge (in order to exclude a potentially parallel edge)
 intersectP :: LineSeg Vector3 -> LineSeg Vector3 -> Edge -> Maybe Vector3
-intersectP lEdge rEdge e = let eVec     = direction $ e ^. _line
+intersectP lEdge rEdge e = let eVec     = direction $ e ^. _lineEdge
                                leftdot  = abs $ direction lEdge <.> eVec
                                rightdot = abs $ direction rEdge <.> eVec
                                selfEdge = if leftdot < rightdot then lEdge else rEdge
-                           in S.intersection selfEdge (e ^. _line)
+                           in S.intersection selfEdge (e ^. _lineEdge)
 
 -- locate candidate b
 locateB :: Vertex -> Tuple Edge Vector3 -> Maybe (Tuple Edge Vector3)
 locateB v (Tuple e i) = let linVec   = normal $ v ^. _position <-> i
-                            edVec    = direction $ e ^. _line
+                            edVec    = direction $ e ^. _lineEdge
                             edVec2   = if linVec <.> edVec < 0.0 then edVec <**> (-1.0) else edVec
                             -- bisector of the tested edge e and self edge of v
                             bisecVec = edVec2 <+> linVec
@@ -72,18 +72,18 @@ validB (Tuple e b) = let lb = e ^. _leftBisector
                                         (normal $ b <-> lb ^. _origin) > (- epsilon)
                          xright = _cross (normal $ rb ^. _direction)
                                          (normal $ b <-> rb ^. _origin) < epsilon
-                         xedge = _cross (direction $ e ^. _line) (normal $ b <-> e ^. _line <<< _start) < epsilon
+                         xedge = _cross (direction $ e ^. _lineEdge) (normal $ b <-> e ^. _lineEdge <<< _start) < epsilon
                      in xleft && xright && xedge
 
 -- next event for a reflex vertex
 nextEvtForReflex :: Vertex -> SLAV (List PointEvent)
 nextEvtForReflex v = do
     originEdges <- view _edges <$> get
-    let lEdge = v ^. _leftEdge <<< _line
-        rEdge = v ^. _rightEdge <<< _line
+    let lEdge = v ^. _leftEdge <<< _lineEdge
+        rEdge = v ^. _rightEdge <<< _lineEdge
 
         -- check if an edge is the left/right edge of the vertex v
-        notNearby e = not $ e ^. _line == lEdge || e ^. _line == rEdge
+        notNearby e = not $ e ^. _lineEdge == lEdge || e ^. _lineEdge == rEdge
         -- all edges not connected to vertex v
         edges = fromFoldable $ filter notNearby originEdges
         
@@ -97,7 +97,7 @@ nextEvtForReflex v = do
         findValidB t = locateB v t >>= (\r -> if validB r then Just r else Nothing)
 
         mkSplitEvt :: Tuple Edge Vector3 -> PointEvent
-        mkSplitEvt (Tuple e b) = splitE (distToLineSeg b (e ^. _line)) b v e
+        mkSplitEvt (Tuple e b) = splitE (distToLineSeg b (e ^. _lineEdge)) b v e
 
     pure $ compact $ (validIntersectP >=> findValidB >>> map mkSplitEvt) <$> edges
 
@@ -125,12 +125,12 @@ nextEvent lav v = do
         nextRightE = view _rightEdge <$> nextV
 
         isSame = prevLeftE == nextRightE
-        isPara = fromMaybe false $ almostParallel <$> (view _line <$> prevLeftE) <*> (view _line <$> nextRightE)
+        isPara = fromMaybe false $ almostParallel <$> (view _lineEdge <$> prevLeftE) <*> (view _lineEdge <$> nextRightE)
     
         es = if closeEnough iPrev iNext && not isSame && isPara
-             then [mkEdgesEvt (v ^. _leftEdge <<< _line) (v ^. _rightEdge <<< _line) <$> prevV <*> nextV <*> iPrev]
-             else [mkPrevEdgeEvt (v ^. _leftEdge <<< _line) <$> prevV <*> iPrev,
-                   mkNextEdgeEvt (v ^. _rightEdge <<< _line) <$> nextV <*> iNext]
+             then [mkEdgesEvt (v ^. _leftEdge <<< _lineEdge) (v ^. _rightEdge <<< _lineEdge) <$> prevV <*> nextV <*> iPrev]
+             else [mkPrevEdgeEvt (v ^. _leftEdge <<< _lineEdge) <$> prevV <*> iPrev,
+                   mkNextEdgeEvt (v ^. _rightEdge <<< _lineEdge) <$> nextV <*> iNext]
                         
         allEvts = append (fromFoldable (compact es)) evts
         distF e = dist (v ^. _position) (intersectionPoint e)
@@ -306,7 +306,7 @@ processNewLAV lav nvs = if length lav > 2
 
 findXY :: SplitE -> SLAV (Maybe (Tuple Vertex Vertex))
 findXY e = get >>= getVS >>> foldM f Nothing
-    where opEdge  = e ^. _oppositeEdge ^. _line
+    where opEdge  = e ^. _oppositeEdge ^. _lineEdge
           opNorm  = direction opEdge
           opStart = opEdge ^. _start
 
@@ -325,9 +325,9 @@ testV eStart eNorm p v = do
                               xright = _cross (normal $ x ^. _bisector <<< _direction) (normal $ p <-> x ^. _position) <= epsilon
                           in if xleft && xright then Just t else Nothing
 
-    pure $ if eNorm == direction (v ^. _leftEdge <<< _line) && eStart == v ^. _leftEdge <<< _line <<< _start
+    pure $ if eNorm == direction (v ^. _leftEdge <<< _lineEdge) && eStart == v ^. _leftEdge <<< _lineEdge <<< _start
            then lav >>= prevVertex v >>= Tuple v >>> f
-           else if eNorm == direction (v ^. _rightEdge <<< _line) && eStart == v ^. _rightEdge <<< _line <<< _start
+           else if eNorm == direction (v ^. _rightEdge <<< _lineEdge) && eStart == v ^. _rightEdge <<< _lineEdge <<< _start
                 then lav >>= nextVertex v >>= flip Tuple v >>> f
                 else Nothing
 

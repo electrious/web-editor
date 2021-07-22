@@ -51,7 +51,7 @@ import Models.SmartHouse.ActiveItem (ActHouseRoof)
 import Rendering.DynamicNode (dynamic, dynamic_)
 import Rendering.Line (renderLine, renderLineLength, renderLineOnly, renderLineWith)
 import Rendering.Node (Node, fixNodeDWith, getEnv, getParent, localEnv, node, tapMesh)
-import SmartHouse.Algorithm.Edge (_line)
+import SmartHouse.Algorithm.Edge (_lineEdge)
 import SmartHouse.BuilderMode (BuilderMode(..))
 import SmartHouse.ShadeOption (ShadeOption)
 import SmartHouse.SlopeEditor (_maxHeightToEdge, slopeEditor)
@@ -240,7 +240,7 @@ getHouseLines :: House -> List (LineSeg Vector3)
 getHouseLines h = tLines <> eLines
     where tls = concatMap treeLines (values $ h ^. _trees)
           tLines = map (view _position <<< flip getVertNode h) <$> tls
-          eLines = view _line <$> h ^. _edges
+          eLines = view _lineEdge <$> h ^. _edges
 
 renderLengths :: forall e. Maybe (List (LineSeg Vector3)) -> Node e Unit
 renderLengths (Just ls) = traverse_ renderLineLength ls
@@ -252,7 +252,7 @@ renderBuilderRoofs houseEditDyn actRoofDyn = traverse (renderRoof houseEditDyn a
 -- render the house as 2D wireframe
 renderHouse :: House -> Node HouseTextureInfo HouseNode
 renderHouse house = do
-    traverse_ renderLine $ view _line <$> house ^. _edges
+    traverse_ renderLine $ view _lineEdge <$> house ^. _edges
 
     let mkLines t = mkLineSeg (t ^. _source <<< _position) <<< view _position <$> t ^. _sinks
         renderTree t = do

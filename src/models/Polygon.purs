@@ -20,7 +20,7 @@ import Data.Maybe (Maybe, fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
 import Data.Traversable (class Traversable)
-import Data.Triple (Triple(..))
+import Data.Triple (Triple(..), second)
 import Data.Tuple (Tuple(..), uncurry)
 import Editor.Common.Lenses (_maxX, _maxY, _mesh, _minX, _minY)
 import Editor.Disposable (Disposee(..))
@@ -127,10 +127,13 @@ polyWindows (Polygon vs) = if length vs < 3
           f p (Tuple v n) = Triple p v n
 
 -- delete duplicated vertices or connect two consecutive edges if they're in the same direction
-normalizeContour :: forall v. Eq v => Vector v => Polygon v -> Polygon v
-normalizeContour = newPolygon <<< map g <<< filter f <<< polyWindows
-    where f (Triple prev p next) = not $ p == next || normal (p <-> prev) == normal (next <-> p)
-          g (Triple _ p _) = p
+normalizeContour :: forall a v. Eq v => Vector v => (a -> v) -> Polygon a -> Polygon a
+normalizeContour vf = newPolygon <<< map second <<< filter f <<< polyWindows
+    where f (Triple prev p next) = 
+              let prevN = vf prev
+                  pN    = vf p
+                  nextN = vf next
+              in not $ pN == nextN || normal (pN <-> prevN) == normal (nextN <-> pN)
 
 -- | calculate all middle points on all edges of a polygon
 polyMidPoints :: forall v. Vector v => Polygon v -> Array (Tuple Int v)

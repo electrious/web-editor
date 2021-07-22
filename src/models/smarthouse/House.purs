@@ -33,6 +33,7 @@ import Model.UUID (class HasUUID, idLens)
 import SmartHouse.Algorithm.Edge (Edge)
 import SmartHouse.Algorithm.HouseParam (houseParamFrom)
 import SmartHouse.Algorithm.Skeleton (skeletonize)
+import SmartHouse.Algorithm.VertInfo (vertWithSlope)
 import SmartHouse.Algorithm.VertNode (VertNode)
 import SmartHouse.ShadeOption (ShadeOption)
 import Smarthouse.Algorithm.RoofGeneration (generateRoofs)
@@ -82,7 +83,8 @@ _peakPoint = _Newtype <<< prop (Proxy :: Proxy "peakPoint")
 createHouseFrom :: Angle -> Polygon Vector3 -> Effect House
 createHouseFrom slope poly = do
     i <- genUUID
-    hi <- houseParamFrom $ counterClockPoly poly
+    let mkVS v = vertWithSlope v slope
+    hi <- houseParamFrom $ mkVS <$> counterClockPoly poly
     Tuple trees edges <- skeletonize hi
     Tuple roofs nodes <- generateRoofs slope (S.fromFoldable trees) edges
 
