@@ -1,6 +1,6 @@
 module Model.Polygon (Polygon(..), _polyVerts, newPolygon, polygonAround, numOfVerts,
                       addVertexAt, delVertexAt, updateVertAt, polyCenter, polyEdges, polyOutline, polyWindows,
-                      polyMidPoints, polygonBBox, counterClockPoly, polyPlane,
+                      polyMidPoints, polygonBBox, counterClockPoly, polyPlane, normalizeContour,
                       renderPolygon, class IsPolygon, toPolygon, PolyOrient(..), polygonOrient) where
 
 import Prelude hiding (add)
@@ -34,7 +34,7 @@ import Rendering.NodeRenderable (class NodeRenderable)
 import Three.Core.Geometry (mkShape, mkShapeGeometry)
 import Three.Core.Material (MeshBasicMaterial)
 import Three.Core.Mesh (setMaterial)
-import Three.Math.Vector (class Vector, cross, dist, getVector, mkVec3, normal, toVec2, updateVector, vecX, vecY, vecZ, (<**>), (<+>))
+import Three.Math.Vector (class Vector, cross, dist, getVector, mkVec3, normal, toVec2, updateVector, vecX, vecY, vecZ, (<**>), (<+>), (<->))
 
 newtype Polygon v = Polygon (Array v)
 
@@ -126,6 +126,11 @@ polyWindows (Polygon vs) = if length vs < 3
 
           f p (Tuple v n) = Triple p v n
 
+-- delete duplicated vertices or connect two consecutive edges if they're in the same direction
+normalizeContour :: forall v. Eq v => Vector v => Polygon v -> Polygon v
+normalizeContour = newPolygon <<< map g <<< filter f <<< polyWindows
+    where f (Triple prev p next) = not $ p == next || normal (p <-> prev) == normal (next <-> p)
+          g (Triple _ p _) = p
 
 -- | calculate all middle points on all edges of a polygon
 polyMidPoints :: forall v. Vector v => Polygon v -> Array (Tuple Int v)
