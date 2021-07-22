@@ -11,13 +11,12 @@ import Data.Map as M
 import Data.Newtype (class Newtype)
 import Data.Set (Set)
 import Data.Set as S
-import Type.Proxy (Proxy(..))
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..), fst, snd)
 import Data.UUID (UUID)
 import Data.UUIDMap (UUIDMap)
 import Data.UUIDMap as UM
-import Editor.Common.Lenses (_height, _id, _normal, _position)
+import Editor.Common.Lenses (_edges, _height, _id, _normal, _position)
 import Effect (Effect)
 import Math.Angle (Angle, degreeVal, tan)
 import Math.LineSeg (LineSeg, _start, direction)
@@ -25,10 +24,10 @@ import Model.Polygon (newPolygon)
 import Model.SmartHouse.Roof (Roof, _subtrees, createRoofFrom)
 import Model.UUID (class HasUUID, idLens)
 import SmartHouse.Algorithm.Edge (Edge, _leftVertex, _line, _rightVertex)
-import SmartHouse.Algorithm.LAV (_edges)
 import SmartHouse.Algorithm.VertNode (VertNode)
 import Smarthouse.Algorithm.Subtree (Subtree, SubtreeType(..), _source, _subtreeType, mergedEdge, normalSubtree)
 import Three.Math.Vector (Vector3, mkVec3, vecX, vecY, (<->), (<.>))
+import Type.Proxy (Proxy(..))
 
 
 scaleFactor :: Angle -> Number

@@ -50,7 +50,7 @@ intersectLinePlane l p =
        then if a == 0.0
             then InPlane
             else NoIntersection
-        else IntersectPoint $ l0 <+> lv <**> (a / b)
+       else IntersectPoint $ l0 <+> lv <**> (a / b)
 
 
 -- | Plane-Plane intersection algorithm

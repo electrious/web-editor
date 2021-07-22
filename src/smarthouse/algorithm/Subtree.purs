@@ -4,24 +4,23 @@ import Prelude
 
 import Data.Foldable (foldl)
 import Data.Generic.Rep (class Generic)
-import Data.Show.Generic (genericShow)
 import Data.Lens (Lens', set, view, (%~), (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (List(..), elem, (:))
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
-import Type.Proxy (Proxy(..))
+import Data.Show.Generic (genericShow)
 import Data.Tuple (Tuple(..))
 import Data.UUID (UUID, genUUID)
-import Editor.Common.Lenses (_id, _position)
+import Editor.Common.Lenses (_edges, _id, _position)
 import Effect (Effect)
 import Math.LineSeg (LineSeg, mkLineSeg)
 import Model.UUID (class HasUUID, idLens)
 import SmartHouse.Algorithm.Edge (Edge)
-import SmartHouse.Algorithm.LAV (_edges)
 import SmartHouse.Algorithm.VertNode (VertNode)
 import Three.Math.Vector (Vector3, (<**>), (<+>))
+import Type.Proxy (Proxy(..))
 
 data SubtreeType = NormalNode
                  | MergedNode Edge Edge

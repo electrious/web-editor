@@ -21,7 +21,7 @@ import Data.Tuple (Tuple(..))
 import Data.UUID (UUID, emptyUUID, genUUID)
 import Data.UUIDMap (UUIDMap)
 import Data.UUIDMap as UM
-import Editor.Common.Lenses (_floor, _height, _id, _roofs, _shade, _slope)
+import Editor.Common.Lenses (_edges, _floor, _height, _id, _roofs, _shade, _slope, _vertices)
 import Effect (Effect)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
@@ -31,7 +31,7 @@ import Model.Roof.RoofPlate (Point, vec2Point)
 import Model.SmartHouse.Roof (JSRoof, Roof, exportRoof)
 import Model.UUID (class HasUUID, idLens)
 import SmartHouse.Algorithm.Edge (Edge)
-import SmartHouse.Algorithm.LAV (_edges, _vertices)
+import SmartHouse.Algorithm.HouseParam (houseParamFrom)
 import SmartHouse.Algorithm.Skeleton (skeletonize)
 import SmartHouse.Algorithm.VertNode (VertNode)
 import SmartHouse.ShadeOption (ShadeOption)
@@ -82,7 +82,8 @@ _peakPoint = _Newtype <<< prop (Proxy :: Proxy "peakPoint")
 createHouseFrom :: Angle -> Polygon Vector3 -> Effect House
 createHouseFrom slope poly = do
     i <- genUUID
-    Tuple trees edges <- skeletonize $ counterClockPoly poly
+    hi <- houseParamFrom $ counterClockPoly poly
+    Tuple trees edges <- skeletonize hi
     Tuple roofs nodes <- generateRoofs slope (S.fromFoldable trees) edges
 
     let n = findPeakPoint nodes

@@ -310,3 +310,9 @@ _tree = _Newtype <<< prop (Proxy :: Proxy "tree")
 
 _color :: forall t a r. Newtype t { color :: a | r } => Lens' t a
 _color = _Newtype <<< prop (Proxy :: Proxy "color")
+
+_vertices :: forall t a r. Newtype t { vertices :: a | r } => Lens' t a
+_vertices = _Newtype <<< prop (Proxy :: Proxy "vertices")
+
+_edges :: forall t a r. Newtype t { edges :: a | r } => Lens' t a
+_edges = _Newtype <<< prop (Proxy :: Proxy "edges")

@@ -5,13 +5,12 @@ import Prelude hiding (degree)
 import Algorithm.MeshFlatten (_vertex)
 import Control.Monad.RWS (get, modify)
 import Control.Monad.State (StateT, evalStateT)
-import Data.Array (deleteAt, filter, index, last, updateAt, zip, zipWith)
+import Data.Array (deleteAt, index, last, updateAt, zip, zipWith)
 import Data.Array as Arr
 import Data.Default (class Default, def)
 import Data.Foldable (class Foldable, foldl)
 import Data.FunctorWithIndex (class FunctorWithIndex, mapWithIndex)
 import Data.Generic.Rep (class Generic)
-import Data.Show.Generic (genericShow)
 import Data.Lens (Lens', over, set, view, (%~), (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
@@ -20,23 +19,23 @@ import Data.Map (lookup, update)
 import Data.Map as M
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
-import Type.Proxy (Proxy(..))
+import Data.Show.Generic (genericShow)
 import Data.Traversable (sequence)
 import Data.Triple (Triple(..))
 import Data.Tuple (Tuple(..))
 import Data.UUID (UUID, emptyUUID, genUUID)
 import Data.UUIDMap (UUIDMap)
-import Editor.Common.Lenses (_id, _indices)
+import Editor.Common.Lenses (_edges, _id, _indices, _vertices)
 import Effect (Effect)
 import Math.Line (_direction)
-import Math.LineSeg (mkLineSeg)
-import Model.Polygon (Polygon, newPolygon, polyWindows)
 import Model.UUID (class HasUUID, idLens)
-import SmartHouse.Algorithm.Edge (Edge, edge)
+import SmartHouse.Algorithm.Edge (Edge)
 import SmartHouse.Algorithm.Event (PointEvent(..), _vertexA, _vertexB, _vertexC)
-import SmartHouse.Algorithm.VertInfo (VertInfo, _bisector, _usable, vertInfoFrom)
+import SmartHouse.Algorithm.HouseParam (HouseParam)
+import SmartHouse.Algorithm.VertInfo (VertInfo, _bisector, _usable)
 import SmartHouse.Algorithm.Vertex (Vertex, _lavId, _leftEdge, _rightEdge, vertexFrom, vertexFromVertInfo)
-import Three.Math.Vector (class Vector, Vector3, getVector, normal, (<->))
+import Three.Math.Vector (Vector3)
+import Type.Proxy (Proxy(..))
 
 newtype LAV = LAV {
     id       :: UUID,
@@ -191,33 +190,17 @@ instance defaultSLAV :: Default SLAVState where
 _lavs :: forall t a r. Newtype t { lavs :: a | r } => Lens' t a
 _lavs = _Newtype <<< prop (Proxy :: Proxy "lavs")
 
-_vertices :: forall t a r. Newtype t { vertices :: a | r } => Lens' t a
-_vertices = _Newtype <<< prop (Proxy :: Proxy "vertices")
-
-_edges :: forall t a r. Newtype t { edges :: a | r } => Lens' t a
-_edges = _Newtype <<< prop (Proxy :: Proxy "edges")
-
 _validStates :: forall t a r. Newtype t { validStates :: a | r } => Lens' t a
 _validStates = _Newtype <<< prop (Proxy :: Proxy "validStates")
 
 
 type SLAV = StateT SLAVState Effect
 
--- delete duplicated vertices or connect two consecutive edges if they're in the same direction
-normalizeContour :: forall v. Eq v => Vector v => Polygon v -> Polygon v
-normalizeContour = newPolygon <<< map g <<< filter f <<< polyWindows
-    where f (Triple prev p next) = not $ p == next || normal (p <-> prev) == normal (next <-> p)
-          g (Triple _ p _) = p
 
-
-slavFromPolygon :: forall v. Eq v => Vector v => Polygon v -> Effect SLAVState
-slavFromPolygon poly = do
-    let mkVi (Triple prev p next) = vertInfoFrom p 0.0 (mkLineSeg prev p) (mkLineSeg p next) Nothing Nothing
-        vis = mkVi <$> polyWindows (getVector <$> normalizeContour poly)
-        ns  = fromMaybe vis $ Arr.snoc <$> Arr.tail vis <*> Arr.head vis
-
-    edges <- sequence $ zipWith edge vis ns
-    
+slavFrom :: HouseParam -> Effect SLAVState
+slavFrom hi = do
+    let vis   = hi ^. _vertices
+        edges = hi ^. _edges
     lav <- lavFromPolygon vis edges
 
     let vs = lav ^. _vertices
@@ -227,8 +210,8 @@ slavFromPolygon poly = do
                # _validStates .~ M.fromFoldable (flip Tuple true <<< view idLens <$> vs)
 
 -- run a SLAV action with a list of polygons
-runSLAV :: forall a v. Eq v => Vector v => SLAV a -> Polygon v -> Effect a
-runSLAV slav poly = slavFromPolygon poly >>= evalStateT slav
+runSLAV :: forall a. SLAV a -> HouseParam -> Effect a
+runSLAV slav hi = slavFrom hi >>= evalStateT slav
 
 emptySLAV :: SLAV Boolean
 emptySLAV = M.isEmpty <<< view _lavs <$> get
