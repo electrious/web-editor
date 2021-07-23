@@ -143,3 +143,7 @@ exports.jsEnableLayer = l => o => _ => {
 exports.jsDisableLayer = l => o => _ => {
     o.layers.disable(l);
 }
+
+exports.jsSetExportable = o => _ => {
+    o.exportable = true
+}

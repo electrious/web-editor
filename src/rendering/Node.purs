@@ -12,7 +12,6 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
-import Type.Proxy (Proxy(..))
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Editor.Common.Lenses (_color, _name, _parent, _position, _rotation, _scale)
@@ -25,10 +24,11 @@ import FRP.Event (Event, create, subscribe)
 import Three.Core.Geometry (class IsGeometry, mkLineGeometry)
 import Three.Core.Material (class IsLineMaterial, class IsMaterial)
 import Three.Core.Mesh (Line, Mesh, computeLineDistances, mkLine, mkMesh)
-import Three.Core.Object3D (class IsObject3D, Object3D, add, lookAt, mkObject3D, remove, setCastShadow, setName, setPosition, setReceiveShadow, setRenderOrder, setRotation, setScale, setVisible, toObject3D)
+import Three.Core.Object3D (class IsObject3D, Object3D, add, lookAt, mkObject3D, remove, setCastShadow, setExportable, setName, setPosition, setReceiveShadow, setRenderOrder, setRotation, setScale, setVisible, toObject3D)
 import Three.Math.Euler (Euler)
 import Three.Math.Vector (Vector3, mkVec3)
 import Troika.Text (Text, mkText, setColor, setFontSize, setText, setTextAlign, sync)
+import Type.Proxy (Proxy(..))
 
 newtype NodeEnv e = NodeEnv {
     parent :: Object3D,
@@ -94,7 +94,8 @@ newtype Props = Props {
     scale         :: Dynamic Vector3,
     target        :: Dynamic (Maybe Vector3),
     visible       :: Dynamic Boolean,
-    raycastable   :: Dynamic Boolean
+    raycastable   :: Dynamic Boolean,
+    exportable    :: Boolean
     }
 
 derive instance newtypeProps :: Newtype Props _
@@ -110,7 +111,8 @@ instance defaultProps :: Default Props where
         scale         : pure (mkVec3 1.0 1.0 1.0),
         target        : pure Nothing,
         visible       : pure true,
-        raycastable   : pure true
+        raycastable   : pure true,
+        exportable    : false
         }
 
 _castShadow :: forall t a r. Newtype t { castShadow :: a | r } => Lens' t a
@@ -131,6 +133,9 @@ _raycastable = _Newtype <<< prop (Proxy :: Proxy "raycastable")
 _renderOrder :: forall t a r. Newtype t { renderOrder :: a | r } => Lens' t a
 _renderOrder = _Newtype <<< prop (Proxy :: Proxy "renderOrder")
 
+_exportable :: forall t a r. Newtype t { exportable :: a | r } => Lens' t a
+_exportable = _Newtype <<< prop (Proxy :: Proxy "exportable")
+
 setupProps :: forall o. IsObject3D o => Props -> o -> Effect (Effect Unit)
 setupProps prop o = do
     setName          (prop ^. _name) o
@@ -138,6 +143,7 @@ setupProps prop o = do
     setReceiveShadow (prop ^. _receiveShadow) o
     setRenderOrder   (prop ^. _renderOrder) o
 
+    when (prop ^. _exportable) $ setExportable o
     
     d1 <- subscribeDyn (prop ^. _position) (flip setPosition o)
     d2 <- subscribeDyn (prop ^. _rotation) (flip setRotation o)

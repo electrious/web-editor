@@ -38,8 +38,7 @@ import Model.Roof.RoofPlate (Point, vec2Point)
 import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo, _size, _texture)
 import Model.UUID (class HasUUID, idLens)
 import Rendering.Line (renderLineOnlyWith)
-import Rendering.Node (Node, getEnv, tapMesh)
-import SmartHouse.BuilderMode (BuilderMode(..))
+import Rendering.Node (Node, _exportable, getEnv, tapMesh)
 import SmartHouse.PolyGeometry (mkPolyGeometry, mkPolyGeometryWithUV)
 import SmartHouse.ShadeOption (ShadeOption(..))
 import Smarthouse.Algorithm.Subtree (Subtree, _isGable)
@@ -144,10 +143,9 @@ getRoofActive _ Nothing  = Inactive
 renderRoofOutline :: forall e. Roof -> Node e Unit
 renderRoofOutline r = traverse_ (flip renderLineOnlyWith actLineMat) (polyOutline $ r ^. _polygon)
 
-renderActRoofOutline :: forall e. BuilderMode -> Maybe Roof -> Node e Unit
-renderActRoofOutline Building (Just r) = renderRoofOutline r
-renderActRoofOutline _ Nothing         = pure unit
-renderActRoofOutline Showing    _      = pure unit
+renderActRoofOutline :: forall e. Maybe Roof -> Node e Unit
+renderActRoofOutline (Just r) = renderRoofOutline r
+renderActRoofOutline Nothing  = pure unit
 
 renderRoof :: Dynamic Boolean -> Dynamic (Maybe UUID) -> Roof -> Node HouseTextureInfo RoofEvents
 renderRoof enableDyn actIdDyn roof = do
@@ -174,11 +172,13 @@ gableMat = unsafePerformEffect $ mkMeshPhongMaterial 0x999999
 renderGableRoof :: forall e. Polygon Vector3 -> Vector3 -> Node e TappableMesh
 renderGableRoof poly norm = do
     geo <- liftEffect $ mkPolyGeometry poly norm
-    tapMesh (def # _name .~ "roof") geo gableMat
+    tapMesh (def # _name       .~ "roof"
+                 # _exportable .~ true) geo gableMat
 
 renderSlopeRoof :: Polygon Vector3 -> Node HouseTextureInfo TappableMesh
 renderSlopeRoof poly = do
     info <- getEnv
     geo <- liftEffect $ mkPolyGeometryWithUV (info ^. _size) poly
     mat <- liftEffect $ mkMeshBasicMaterialWithTexture (info ^. _texture)
-    tapMesh (def # _name .~ "roof") geo mat
+    tapMesh (def # _name       .~ "roof"
+                 # _exportable .~ true) geo mat
