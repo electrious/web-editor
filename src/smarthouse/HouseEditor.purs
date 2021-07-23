@@ -50,10 +50,9 @@ import Model.UUID (idLens)
 import Models.SmartHouse.ActiveItem (ActHouseRoof)
 import Rendering.DynamicNode (dynamic, dynamic_)
 import Rendering.Line (renderLine, renderLineLength, renderLineOnly, renderLineWith)
-import Rendering.Node (Node, fixNodeDWith, getEnv, getParent, localEnv, node, tapMesh)
+import Rendering.Node (Node, _exportable, fixNodeDWith, getEnv, getParent, localEnv, node, tapMesh)
 import SmartHouse.Algorithm.Edge (_line)
 import SmartHouse.Algorithm.LAV (_edges)
-import SmartHouse.BuilderMode (BuilderMode(..))
 import SmartHouse.ShadeOption (ShadeOption)
 import SmartHouse.SlopeEditor (_maxHeightToEdge, slopeEditor)
 import Smarthouse.Algorithm.Subtree (_sinks, _source, treeLines)
@@ -75,7 +74,6 @@ derive instance eqHouseRenderMode :: Eq HouseRenderMode
 
 newtype HouseEditorConf = HouseEditorConf {
     modeDyn        :: Dynamic ActiveMode,
-    builderModeDyn :: Dynamic BuilderMode,
     house          :: House,
 
     shadeSelected  :: Event ShadeOption,
@@ -88,7 +86,6 @@ derive instance newtypeHouseEditorConf :: Newtype HouseEditorConf _
 instance defaultHouseEditorConf :: Default HouseEditorConf where
     def = HouseEditorConf {
         modeDyn        : pure Inactive,
-        builderModeDyn : pure Building,
         house          : def,
         shadeSelected  : empty,
         
@@ -159,7 +156,6 @@ editHouse houseCfg conf = do
                                                 # _name     .~ "roofs") do
                 let roofsDyn = view _roofs <$> houseDyn
                     actRDyn = g <$> actRoofDyn <*> roofsDyn
-                    buildModeDyn = conf ^. _builderModeDyn
                 node (def # _name .~ "roof-lines"
                           # _position .~ pure (mkVec3 0.0 0.0 0.02)) do
                     -- render ridge lines
@@ -169,7 +165,7 @@ editHouse houseCfg conf = do
                     dynamic_ $ renderLengths <$> debounceDyn (Milliseconds 500.0) linesDyn
 
                     -- render roof outlines dynamically
-                    dynamic_ $ renderActRoofOutline <$> buildModeDyn <*> actRDyn
+                    dynamic_ $ renderActRoofOutline <$> actRDyn
 
                 -- render roofs dynamically
                 roofEvts <- dynamic $ renderBuilderRoofs houseEditDyn actRoofDyn <$> roofsDyn
@@ -233,7 +229,8 @@ renderWalls poly height = do
     shp <- liftEffect $ mkShape $ (toVec2 <$> poly) ^. _polyVerts
     geo <- liftEffect $ mkExtrudeGeometry shp $ def # _depth .~ meterVal height
                                                     # _bevelEnabled .~ false
-    m <- tapMesh (def # _name .~ "walls") geo wallMat
+    m <- tapMesh (def # _name       .~ "walls"
+                      # _exportable .~ true) geo wallMat
     pure $ const unit <$> m ^. _tapped
 
 

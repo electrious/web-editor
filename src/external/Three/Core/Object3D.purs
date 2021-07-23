@@ -181,3 +181,9 @@ enableLayer l o = jsEnableLayer l (toObject3D o)
 
 disableLayer :: forall o. IsObject3D o => Int -> o -> Effect Unit
 disableLayer l o = jsDisableLayer l (toObject3D o)
+
+
+foreign import jsSetExportable :: Object3D -> Effect Unit
+
+setExportable :: forall o. IsObject3D o => o -> Effect Unit
+setExportable = jsSetExportable <<< toObject3D

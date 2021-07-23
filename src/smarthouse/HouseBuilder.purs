@@ -50,11 +50,10 @@ import Model.UUID (idLens)
 import Models.SmartHouse.ActiveItem (ActHouseRoof, ActiveItem(..))
 import OBJExporter (MeshFiles, exportObject)
 import Rendering.DynamicNode (eventNode)
-import Rendering.Node (Node, fixNodeDWith, fixNodeE, fixNodeEWith, getEnv, getParent, localEnv, mkNodeEnv, node, runNode, tapMouseMesh)
+import Rendering.Node (Node, _exportable, fixNodeDWith, fixNodeE, fixNodeEWith, getEnv, getParent, localEnv, mkNodeEnv, node, runNode, tapMouseMesh)
 import Rendering.TextureLoader (textureFromUrl)
 import SmartHouse.ActiveItemUI (_deleteHouse)
-import SmartHouse.BuilderMode (BuilderMode(..))
-import SmartHouse.HouseEditor (HouseRenderMode(..), _arrayEditParam, _builderModeDyn, _house, _roofsData, editHouse, renderHouse)
+import SmartHouse.HouseEditor (HouseRenderMode(..), _arrayEditParam, _house, _roofsData, editHouse, renderHouse)
 import SmartHouse.HouseTracer (TracerMode(..), _stopTracing, _tracedPolygon, _tracerMode, _undoTracing, traceHouse)
 import SmartHouse.ShadeOption (ShadeOption)
 import SmartHouse.TreeBuilder (buildTree, editTree)
@@ -157,7 +156,8 @@ mkHelperPlane t = do
     geo <- liftEffect $ mkPlaneGeometry w h 10 10
     mat <- liftEffect $ mkMeshBasicMaterialWithTexture $ t ^. _texture
 
-    tapMouseMesh (def # _name .~ "helper-plane") geo mat
+    tapMouseMesh (def # _name       .~ "helper-plane"
+                      # _exportable .~ true) geo mat
 
 -- internal data structure to manage houses and trees
 type HouseDict = UUIDMap House
@@ -248,18 +248,16 @@ getActiveTree tid hd = M.lookup tid (hd ^. _trees)
 getTreeUpd :: forall f. Foldable f => Functor f => f TreeNode -> Event TreeOp
 getTreeUpd = foldEvtWith (view _updated)
 
-renderHouseDict :: Dynamic (Maybe UUID) -> Dynamic BuilderMode -> HouseConfig -> ArrayEditParam -> Event ShadeOption -> Event RoofsData -> HouseDict -> Node HouseTextureInfo (UUIDMap HouseNode)
-renderHouseDict actIdDyn modeDyn houseCfg arrParam shadeEvt roofsDatEvt houses = traverse render houses
-    where getMode _ _ Showing                            = Inactive
-          getMode h (Just i) Building | h ^. idLens == i = Active
-                                      | otherwise        = Inactive
-          getMode _ Nothing Building                     = Inactive
+renderHouseDict :: Dynamic (Maybe UUID) -> HouseConfig -> ArrayEditParam -> Event ShadeOption -> Event RoofsData -> HouseDict -> Node HouseTextureInfo (UUIDMap HouseNode)
+renderHouseDict actIdDyn houseCfg arrParam shadeEvt roofsDatEvt houses = traverse render houses
+    where getMode h (Just i) | h ^. idLens == i = Active
+                             | otherwise        = Inactive
+          getMode _ Nothing                     = Inactive
           
           render h = if houseRenderMode == EditHouseMode
                      then do
-                         let md = getMode h <$> actIdDyn <*> modeDyn
+                         let md = getMode h <$> actIdDyn
                          editHouse houseCfg $ def # _modeDyn        .~ md
-                                                  # _builderModeDyn .~ modeDyn
                                                   # _house          .~ h
                                                   # _shadeSelected  .~ gateDyn (isActive <$> md) shadeEvt
                                                   # _roofsData      .~ roofsDatEvt
@@ -267,23 +265,20 @@ renderHouseDict actIdDyn modeDyn houseCfg arrParam shadeEvt roofsDatEvt houses =
                      else renderHouse h
 
 
-renderTrees :: forall e. Dynamic (Maybe UUID) -> Dynamic BuilderMode -> TreeDict -> Node e (UUIDMap TreeNode)
-renderTrees actIdDyn modeDyn trees = traverse render trees
-    where getMode _ _ Showing                            = Inactive
-          getMode t (Just i) Building | t ^. idLens == i = Active
-                                      | otherwise        = Inactive
-          getMode _ Nothing Building                     = Inactive
+renderTrees :: forall e. Dynamic (Maybe UUID) -> TreeDict -> Node e (UUIDMap TreeNode)
+renderTrees actIdDyn trees = traverse render trees
+    where getMode t (Just i) | t ^. idLens == i = Active
+                             | otherwise        = Inactive
+          getMode _ Nothing                     = Inactive
           
-          render t = editTree t (getMode t <$> actIdDyn <*> modeDyn)
+          render t = editTree t (getMode t <$> actIdDyn)
 
 
-tracerMode :: Maybe UUID -> BuilderMode -> Boolean -> ActiveMode
-tracerMode _ Showing  _ = Inactive
-tracerMode h Building t = fromBoolean $ isNothing h && not t
+tracerMode :: Maybe UUID -> Boolean -> ActiveMode
+tracerMode h t = fromBoolean $ isNothing h && not t
 
-treeBuilderMode :: Maybe UUID -> BuilderMode -> Boolean -> ActiveMode
-treeBuilderMode _ Showing _  = Inactive
-treeBuilderMode h Building t = fromBoolean $ isNothing h && t
+treeBuilderMode :: Maybe UUID -> Boolean -> ActiveMode
+treeBuilderMode h t = fromBoolean $ isNothing h && t
 
 newtype BuilderInputEvts = BuilderInputEvts {
     export        :: Event Unit,
@@ -338,7 +333,6 @@ builderForHouse :: BuilderInputEvts -> HouseTextureInfo -> Node HouseBuilderConf
 builderForHouse evts tInfo =
     fixNodeEWith def \hdEvt ->
         fixNodeDWith Nothing \actIdDyn ->
-            fixNodeDWith Building \modeDyn ->
                 fixNodeE \roofsDatEvt -> do
                     pNode <- getParent
                     cfg   <- getEnv
@@ -355,8 +349,8 @@ builderForHouse evts tInfo =
                         arrParam = def
                     
                     -- render houses and trees
-                    nodesEvt <- localEnv (const tInfo) $ eventNode (renderHouseDict actIdDyn modeDyn houseCfg arrParam shadeEvt roofsDatEvt <$> houseToRenderEvt)
-                    treesEvt <- eventNode (renderTrees actIdDyn modeDyn <$> treesToRenderEvt)
+                    nodesEvt <- localEnv (const tInfo) $ eventNode (renderHouseDict actIdDyn houseCfg arrParam shadeEvt roofsDatEvt <$> houseToRenderEvt)
+                    treesEvt <- eventNode (renderTrees actIdDyn <$> treesToRenderEvt)
 
                     let deactEvt    = multicast $ const Nothing <$> helper ^. _tapped
 
@@ -374,12 +368,12 @@ builderForHouse evts tInfo =
                         buildTreeDyn = step false $ evts ^. _buildTree
 
                     -- trace new house
-                    traceRes <- traceHouse $ def # _modeDyn     .~ (tracerMode <$> actIdDyn <*> modeDyn <*> buildTreeDyn)
+                    traceRes <- traceHouse $ def # _modeDyn     .~ (tracerMode <$> actIdDyn <*> buildTreeDyn)
                                                  # _mouseMove   .~ mouseEvt
                                                  # _undoTracing .~ (evts ^. _undoTracing)
                                                  # _stopTracing .~ (evts ^. _stopTracing)
 
-                    newTreeEvt <- buildTree (treeBuilderMode <$> actIdDyn <*> modeDyn <*> buildTreeDyn) mouseEvt
+                    newTreeEvt <- buildTree (treeBuilderMode <$> actIdDyn <*> buildTreeDyn) mouseEvt
 
                     -- create house from the traced polygon
                     let slopeDyn  = step (degree 30.0) (evts ^. _slope)
@@ -426,10 +420,7 @@ builderForHouse evts tInfo =
                         newHouseIdEvt = compact $ savedHouseId <$> finishSavingEvt
                             
                         newRoofsDatEvt = keepLatest $ performEvent $ loadRoofAndPanels cfg <$> newHouseIdEvt
-                    
-                        modeEvt = (const Showing <$> exportEvt) <|> 
-                                  (const Building <$> finishSavingEvt)
-                    
+
                         res = def # _hasHouse    .~ (hasHouse <$> hdEvt)
                                   # _tracerMode  .~ (traceRes ^. _tracerMode)
                                   # _saveStepEvt .~ stepEvt
@@ -438,7 +429,7 @@ builderForHouse evts tInfo =
                                                      const Nothing <$> delHouseEvt <|>
                                                      const Nothing <$> deactEvt)
 
-                    pure { input: newRoofsDatEvt, output : { input: modeEvt, output: { input: newActIdEvt, output : { input: newHdEvt, output : res } } } }
+                    pure { input: newRoofsDatEvt, output: { input: newActIdEvt, output : { input: newHdEvt, output : res } } }
 
 
 runAPIEvent :: forall a. APIConfig -> Event (API (Event a)) -> Event a
