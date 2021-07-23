@@ -13,7 +13,6 @@ import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..))
 import Data.Meter (Meter, feetInchStr, meter, meterVal)
 import Data.Newtype (class Newtype)
-import Type.Proxy (Proxy(..))
 import Editor.Common.Lenses (_face, _height, _isActive, _name, _parent, _point, _position, _rotation, _tapped, _updated)
 import Editor.ObjectAdder (AdderType(..), createObjectAdder, mkCandidatePoint)
 import Editor.SceneEvent (SceneMouseMoveEvent)
@@ -28,13 +27,14 @@ import Model.ActiveMode (ActiveMode, isActive)
 import Model.SmartHouse.Tree (Tree, TreeNode, TreeOp(..), TreePart, _barrel, _canopy, _crown, _dia, mkTree)
 import Model.UUID (idLens)
 import Rendering.DynamicNode (dynamic)
-import Rendering.Node (Node, Props, TextProps, _fontSize, _renderOrder, _textAlign, _visible, dynText3D, fixNodeDWith, mesh, node, tapMesh)
+import Rendering.Node (Node, Props, TextProps, _exportable, _fontSize, _renderOrder, _textAlign, _visible, dynText3D, fixNodeDWith, mesh, node, tapMesh)
 import Three.Core.Face3 (normal)
 import Three.Core.Geometry (BufferGeometry, CircleGeometry, mkCircleGeometry, mkCylinderGeometry)
 import Three.Core.Material (MeshPhongMaterial, mkMeshPhongMaterial)
 import Three.Core.Object3D (worldToLocal)
 import Three.Math.Euler (mkEuler)
 import Three.Math.Vector (Vector3, mkVec3, vecX, vecY, vecZ)
+import Type.Proxy (Proxy(..))
 import UI.DraggableObject (DragObjCfg, _customGeo, _deltaTransform, _validator, createDraggableObject, createDraggableObjectWith)
 
 
@@ -57,6 +57,7 @@ buildTrunk = map latestEvt <<< dynamic <<< map mkT
                                                 # _position    .~ pure (mkVec3 0.0 0.0 (ht / 2.0))
                                                 # _rotation    .~ pure (mkEuler (pi / 2.0) 0.0 0.0)
                                                 # _renderOrder .~ 6
+                                                # _exportable  .~ true
                                            ) geo trunkMat
 
 
@@ -76,6 +77,7 @@ buildCrown hDyn crownDyn = latestEvt <$> dynamic (mkC <$> hDyn <*> crownDyn)
                                          # _position    .~ pure pos
                                          # _rotation    .~ pure (mkEuler (pi / 2.0) 0.0 0.0)
                                          # _renderOrder .~ 9
+                                         # _exportable  .~ true
                                     ) geo leafMat
 
 
@@ -97,6 +99,7 @@ buildBarrel crownDyn barrelDyn = latestEvt <$> dynamic (mkB <$> crownDyn <*> bar
                                          # _position    .~ pure pos
                                          # _rotation    .~ pure (mkEuler (pi / 2.0) 0.0 0.0)
                                          # _renderOrder .~ 8
+                                         # _exportable  .~ true
                                     ) geo leafMat
 
 
@@ -124,6 +127,7 @@ buildCanopy barrelDyn canopyDyn = latestEvt <$> dynamic (mkC <$> barrelDyn <*> c
                                          # _position    .~ pure pos
                                          # _rotation    .~ pure (mkEuler (pi / 2.0) 0.0 0.0)
                                          # _renderOrder .~ 7
+                                         # _exportable  .~ true
                                     ) geo leafMat
 
 
