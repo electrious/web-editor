@@ -2,18 +2,19 @@ module SmartHouse.Algorithm.VertInfo where
 
 import Prelude
 
-import Data.Default (def)
 import Data.Lens (Lens', (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe, fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Tuple (Tuple(..))
-import Math.Angle (Angle)
+import Editor.Common.Lenses (_slope)
+import Math (abs)
+import Math.Angle (Angle, acos, degreeVal, tan)
 import Math.LineSeg (direction)
 import SmartHouse.Algorithm.EdgeInfo (EdgeInfo, _line)
 import SmartHouse.Algorithm.Ray (Ray, ray)
-import Three.Math.Vector (class Vector, Vector3, length, normal, vecX, vecY, (<**>), (<+>))
+import Three.Math.Vector (class Vector, Vector3, normal, vecX, vecY, (<**>), (<+>), (<.>))
 import Type.Proxy (Proxy(..))
 
 
@@ -55,6 +56,19 @@ _cross :: forall v. Vector v => v -> v -> Number
 _cross v1 v2 = vecX v1 * vecY v2 - vecX v2 * vecY v1
 
 
+-- | calculate the bisector vector of two edges with their slopes
+calcDir :: Vector3 -> Angle -> Vector3 -> Angle -> Boolean -> Tuple Vector3 Boolean
+calcDir leftV leftSlope rightV rightSlope isReflex =
+    let lt = tan leftSlope
+        rt = tan rightSlope
+    
+        dir = (leftV <**> lt <+> rightV <**> rt) <**> (if isReflex then -1.0 else 1.0)
+        a = acos $ leftV <.> rightV
+        -- the bisector is usable only if the two edges are not parallel
+        -- based on the angle between the edges are not smaller than 2 degrees
+        usable = abs (degreeVal a - 90.0) < 2.0
+    in Tuple dir usable
+
 vertInfoFrom :: Vector3 -> Number -> EdgeInfo -> EdgeInfo-> Maybe Vector3 -> Maybe Vector3 -> VertInfo
 vertInfoFrom p h leftEdge rightEdge vecL vecR =
     let leftVec  = direction (leftEdge ^. _line) <**> (-1.0)
@@ -62,7 +76,11 @@ vertInfoFrom p h leftEdge rightEdge vecL vecR =
         lv       = fromMaybe leftVec $ normal <$> vecL
         rv       = fromMaybe rightVec $ normal <$> vecR
         isReflex = _cross lv rv < 0.0
-        Tuple dir usable = checkLength $ (leftVec <+> rightVec) <**> (if isReflex then -1.0 else 1.0)
+
+        lSlope   = leftEdge  ^. _slope
+        rSlope   = rightEdge ^. _slope
+
+        Tuple dir usable = calcDir lv lSlope rv rSlope isReflex
     in VertInfo {
         position  : p,
         height    : h,
@@ -73,8 +91,3 @@ vertInfoFrom p h leftEdge rightEdge vecL vecR =
         leftEdge  : leftEdge,
         rightEdge : rightEdge
         }
-
-
-
-checkLength :: Vector3 -> Tuple Vector3 Boolean
-checkLength v = if length v < 0.1 then Tuple def false else Tuple v true
