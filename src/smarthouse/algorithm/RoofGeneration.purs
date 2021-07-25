@@ -16,7 +16,7 @@ import Data.Tuple (Tuple(..), fst, snd)
 import Data.UUID (UUID)
 import Data.UUIDMap (UUIDMap)
 import Data.UUIDMap as UM
-import Editor.Common.Lenses (_edges, _height, _id, _normal, _position)
+import Editor.Common.Lenses (_edges, _height, _id, _normal, _position, _slope)
 import Effect (Effect)
 import Math.Angle (Angle, degreeVal, tan)
 import Math.LineSeg (LineSeg, _start, direction)
@@ -24,6 +24,7 @@ import Model.Polygon (newPolygon)
 import Model.SmartHouse.Roof (Roof, _subtrees, createRoofFrom)
 import Model.UUID (class HasUUID, idLens)
 import SmartHouse.Algorithm.Edge (Edge, _leftVertex, _lineEdge, _rightVertex)
+import SmartHouse.Algorithm.EdgeInfo (_line)
 import SmartHouse.Algorithm.VertNode (VertNode)
 import Smarthouse.Algorithm.Subtree (Subtree, SubtreeType(..), _source, _subtreeType, mergedEdge, normalSubtree)
 import Three.Math.Vector (Vector3, mkVec3, vecX, vecY, (<->), (<.>))
@@ -111,7 +112,7 @@ roofForEdge :: Angle -> RoofData -> Effect (Tuple Roof (List VertNode))
 roofForEdge slope rd = do
     let sorted = sortedNodes (rd ^. _edge) slope $ S.toUnfoldable $ rd ^. _subtrees
         nodes  = (view _position <$> sorted) <> rd ^. _edgeNodes
-    roof <- createRoofFrom (newPolygon nodes) (rd ^. _subtrees) (rd ^. _edge <<< _normal)
+    roof <- createRoofFrom (newPolygon nodes) (rd ^. _subtrees) (rd ^. _edge <<< _normal) (rd ^. _edge <<< _line <<< _slope)
     pure $ Tuple roof sorted
 
 

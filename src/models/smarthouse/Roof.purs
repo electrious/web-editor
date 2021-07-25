@@ -32,6 +32,7 @@ import FRP.Event (Event)
 import FRP.Event.Extra (multicast)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
+import Math.Angle (Angle)
 import Model.ActiveMode (ActiveMode(..), fromBoolean, isActive)
 import Model.Polygon (Polygon, _polyVerts, polyOutline, polyPlane)
 import Model.Roof.RoofPlate (Point, vec2Point)
@@ -57,6 +58,7 @@ newtype Roof = Roof {
     subtrees :: UUIDMap Subtree,
 
     shade    :: ShadeOption,
+    slope    :: Angle,
 
     normal   :: Vector3
     }
@@ -73,10 +75,10 @@ instance HasUUID Roof where
 _subtrees :: forall t a r. Newtype t { subtrees :: a | r } => Lens' t a
 _subtrees = _Newtype <<< prop (Proxy :: Proxy "subtrees")
 
-createRoofFrom :: Polygon Vector3 -> Set Subtree -> Vector3 -> Effect Roof
-createRoofFrom p ts n = do
+createRoofFrom :: Polygon Vector3 -> Set Subtree -> Vector3 -> Angle -> Effect Roof
+createRoofFrom p ts n s = do
     i <- genUUID
-    pure $ Roof { id : i, polygon : p, subtrees : UM.fromSet ts, shade : NoShade, normal : n }
+    pure $ Roof { id : i, polygon : p, subtrees : UM.fromSet ts, shade : NoShade, slope: s, normal : n }
 
 -- check if a roof can be gable
 canBeGable :: Roof -> Boolean
