@@ -14,7 +14,7 @@ import Math.Angle (Angle, acos, degreeVal, tan)
 import Math.LineSeg (direction)
 import SmartHouse.Algorithm.EdgeInfo (EdgeInfo, _line)
 import SmartHouse.Algorithm.Ray (Ray, ray)
-import Three.Math.Vector (class Vector, Vector3, normal, vecX, vecY, (<**>), (<+>), (<.>))
+import Three.Math.Vector (class Vector, Vector3, mkVec3, normal, vecX, vecY, (<**>), (<+>), (<.>))
 import Type.Proxy (Proxy(..))
 
 
@@ -56,18 +56,25 @@ _cross :: forall v. Vector v => v -> v -> Number
 _cross v1 v2 = vecX v1 * vecY v2 - vecX v2 * vecY v1
 
 
+is90 :: Angle -> Boolean
+is90 a = abs (degreeVal a - 90.0) < 0.1
+
 -- | calculate the bisector vector of two edges with their slopes
 calcDir :: Vector3 -> Angle -> Vector3 -> Angle -> Boolean -> Tuple Vector3 Boolean
-calcDir leftV leftSlope rightV rightSlope isReflex =
-    let lt = tan leftSlope
-        rt = tan rightSlope
-    
-        dir = (leftV <**> lt <+> rightV <**> rt) <**> (if isReflex then -1.0 else 1.0)
-        a = acos $ leftV <.> rightV
-        -- the bisector is usable only if the two edges are not parallel
-        -- based on the angle between the edges are not smaller than 2 degrees
-        usable = abs (degreeVal a - 90.0) < 2.0
-    in Tuple dir usable
+calcDir leftV leftSlope rightV rightSlope isReflex
+    | is90 leftSlope && is90 rightSlope = Tuple (mkVec3 0.0 0.0 1.0) true
+    | is90 leftSlope  = Tuple (leftV <**> if isReflex then -1.0 else 1.0) true
+    | is90 rightSlope = Tuple (rightV <**> if isReflex then -1.0 else 1.0) true
+    | otherwise =
+        let lt = tan leftSlope
+            rt = tan rightSlope
+        
+            dir = (leftV <**> lt <+> rightV <**> rt) <**> (if isReflex then -1.0 else 1.0)
+            a = acos $ leftV <.> rightV
+            -- the bisector is usable only if the two edges are not parallel
+            -- based on the angle between the edges are not smaller than 2 degrees
+            usable = abs (degreeVal a - 90.0) < 2.0
+        in Tuple dir usable
 
 vertInfoFrom :: Vector3 -> Number -> EdgeInfo -> EdgeInfo-> Maybe Vector3 -> Maybe Vector3 -> VertInfo
 vertInfoFrom p h leftEdge rightEdge vecL vecR =
