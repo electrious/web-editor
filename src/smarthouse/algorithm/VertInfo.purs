@@ -80,7 +80,7 @@ vertInfoFrom p h leftEdge rightEdge vecL vecR =
         lSlope   = leftEdge  ^. _slope
         rSlope   = rightEdge ^. _slope
 
-        Tuple dir usable = calcDir lv lSlope rv rSlope isReflex
+        Tuple dir usable = calcDir leftVec lSlope rightVec rSlope isReflex
     in VertInfo {
         position  : p,
         height    : h,
