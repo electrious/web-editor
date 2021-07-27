@@ -5,6 +5,7 @@ import Prelude hiding (degree)
 import Control.Alternative (empty)
 import Data.Array as Arr
 import Data.Default (class Default, def)
+import Data.Filterable (filter)
 import Data.Foldable (class Foldable, foldl)
 import Data.Generic.Rep (class Generic)
 import Data.Lens (Lens', set, (%~), (.~), (^.))
@@ -28,7 +29,7 @@ import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Math.Angle (Angle, degree)
 import Model.Polygon (Polygon, _polyVerts, counterClockPoly)
 import Model.Roof.RoofPlate (Point, vec2Point)
-import Model.SmartHouse.Roof (JSRoof, Roof, exportRoof)
+import Model.SmartHouse.Roof (JSRoof, Roof, RoofState(..), exportRoof, roofState)
 import Model.UUID (class HasUUID, idLens)
 import SmartHouse.Algorithm.Edge (Edge)
 import SmartHouse.Algorithm.HouseParam (houseParamFrom)
@@ -146,7 +147,7 @@ updateActiveRoofShade s (Just ai) h = h # _roofs %~ M.update f ai
 exportHouse :: House -> JSHouse
 exportHouse h = JSHouse { id: h ^. idLens, floor: floor, height: meterVal $ h ^. _height, roofs: roofs }
     where floor = vec2Point <$> h ^. _floor <<< _polyVerts
-          roofs = Arr.fromFoldable $ exportRoof (h ^. _height) <$> h ^. _roofs
+          roofs = Arr.fromFoldable $ exportRoof (h ^. _height) <$> filter ((==) SlopeRoof <<< roofState) (h ^. _roofs)
 
 -- House data exported to JSON and saved to server
 newtype JSHouse = JSHouse {
