@@ -8,7 +8,7 @@ import Data.Default (class Default, def)
 import Data.Filterable (filter)
 import Data.Foldable (class Foldable, foldl)
 import Data.Generic.Rep (class Generic)
-import Data.Lens (Lens', set, (%~), (.~), (^.))
+import Data.Lens (Lens', set, view, (%~), (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (List, fromFoldable)
@@ -22,7 +22,7 @@ import Data.Tuple (Tuple(..))
 import Data.UUID (UUID, emptyUUID, genUUID)
 import Data.UUIDMap (UUIDMap)
 import Data.UUIDMap as UM
-import Editor.Common.Lenses (_edges, _floor, _height, _id, _roofs, _shade, _slope, _vertices)
+import Editor.Common.Lenses (_edges, _floor, _height, _id, _position, _roofs, _shade, _slope, _vertices)
 import Effect (Effect)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
@@ -34,7 +34,7 @@ import Model.UUID (class HasUUID, idLens)
 import SmartHouse.Algorithm.Edge (Edge)
 import SmartHouse.Algorithm.HouseParam (houseParamFrom)
 import SmartHouse.Algorithm.Skeleton (skeletonize)
-import SmartHouse.Algorithm.VertInfo (vertWithSlope)
+import SmartHouse.Algorithm.VertInfo (VertWithSlope, updateSlope, vertWithSlope)
 import SmartHouse.Algorithm.VertNode (VertNode)
 import SmartHouse.ShadeOption (ShadeOption)
 import Smarthouse.Algorithm.RoofGeneration (generateRoofs)
@@ -44,7 +44,7 @@ import Type.Proxy (Proxy(..))
 
 newtype House = House {
     id        :: UUID,
-    floor     :: Polygon Vector3,
+    floor     :: Polygon VertWithSlope,
     height    :: Meter,
     slope     :: Angle,
     trees     :: UUIDMap Subtree,
@@ -84,16 +84,16 @@ _peakPoint = _Newtype <<< prop (Proxy :: Proxy "peakPoint")
 createHouseFrom :: Angle -> Polygon Vector3 -> Effect House
 createHouseFrom slope poly = do
     i <- genUUID
-    let mkVS v = vertWithSlope v slope
-    hi <- houseParamFrom $ mkVS <$> counterClockPoly poly
+    let floor = flip vertWithSlope slope <$> counterClockPoly poly
+    hi <- houseParamFrom floor
     Tuple trees edges <- skeletonize hi
-    Tuple roofs nodes <- generateRoofs slope (S.fromFoldable trees) edges
+    Tuple roofs nodes <- generateRoofs (S.fromFoldable trees) edges
 
     let n = findPeakPoint nodes
     
     pure $ House {
         id        : i,
-        floor     : poly,
+        floor     : floor,
         height    : meter 3.5,   -- default height
         slope     : slope,
         trees     : UM.fromFoldable trees,
@@ -114,8 +114,12 @@ updateHeight height h = h # _height .~ height
 
 updateSlopes :: Angle -> House -> Effect House
 updateSlopes slope h = do
-    Tuple roofs nodes <- generateRoofs slope (S.fromFoldable (h ^. _trees)) (h ^. _edges)
+    hi <- houseParamFrom $ updateSlope slope <$> h ^. _floor
+    Tuple trees edges <- skeletonize hi
+    Tuple roofs nodes <- generateRoofs (S.fromFoldable trees) edges
     pure $ h # _slope    .~ slope
+             # _trees    .~ UM.fromFoldable trees
+             # _edges    .~ edges
              # _roofs    .~ UM.fromFoldable roofs
              # _vertices .~ nodes
 
@@ -127,12 +131,12 @@ getVertNode v h = fromMaybe v $ M.lookup (v ^. idLens) (h ^. _vertices)
 -- flip a roof to/from gable
 flipRoof :: UUID -> House -> Effect House
 flipRoof i h = do
-    let vs  = fromFoldable $ h ^. _floor <<< _polyVerts
+    let vs  = fromFoldable $ view _position <$> h ^. _floor <<< _polyVerts
         ts  = h ^. _trees
         -- flip the subtree at idx
         nts = M.update (Just <<< flip flipSubtree vs) i ts
     -- generate new roofs
-    Tuple roofs nodes <- generateRoofs (h ^. _slope) (S.fromFoldable nts) (h ^. _edges)
+    Tuple roofs nodes <- generateRoofs (S.fromFoldable nts) (h ^. _edges)
 
     pure $ h # _roofs .~ UM.fromFoldable roofs
              # _trees .~ nts
@@ -146,7 +150,7 @@ updateActiveRoofShade s (Just ai) h = h # _roofs %~ M.update f ai
 
 exportHouse :: House -> JSHouse
 exportHouse h = JSHouse { id: h ^. idLens, floor: floor, height: meterVal $ h ^. _height, roofs: roofs }
-    where floor = vec2Point <$> h ^. _floor <<< _polyVerts
+    where floor = vec2Point <<< view _position <$> h ^. _floor <<< _polyVerts
           roofs = Arr.fromFoldable $ exportRoof (h ^. _height) <$> filter ((==) SlopeRoof <<< roofState) (h ^. _roofs)
 
 -- House data exported to JSON and saved to server

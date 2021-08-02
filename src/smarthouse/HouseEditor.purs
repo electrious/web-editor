@@ -124,7 +124,7 @@ editHouse houseCfg conf = do
         actDyn = conf ^. _modeDyn
         
         h      = house ^. _height
-        floor  = house ^. _floor
+        floor  = view _position <$> house ^. _floor
 
         -- house editor mode
         modeDyn = step EditingHouse $ const EditingArrays <$> conf ^. _roofsData
@@ -182,7 +182,7 @@ editHouse houseCfg conf = do
 
             let flipEvt = latestAnyEvtWith (view _flipped) roofEvtsDyn
                 -- height editor arrow position
-                hPos2D = dragArrowPos $ house ^. _floor <<< _polyVerts
+                hPos2D = dragArrowPos $ floor ^. _polyVerts
                 hPos   = mkVec3 (vecX hPos2D) (vecY hPos2D) (meterVal h)
 
             -- setup height editor and get the height event

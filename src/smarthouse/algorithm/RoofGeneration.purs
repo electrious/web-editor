@@ -81,10 +81,11 @@ roofDataForEdge ts e =
         }
 
 -- merge roofdata of two edges with the MergedNode position
-mergeRoofDataWith :: Angle -> Subtree -> RoofData -> RoofData -> RoofData
-mergeRoofDataWith slope t lr rr =
+mergeRoofDataWith :: Subtree -> RoofData -> RoofData -> RoofData
+mergeRoofDataWith t lr rr =
     let lns = lr ^. _edgeNodes
         rns = rr ^. _edgeNodes
+        slope = lr ^. _edge <<< _line <<< _slope
     in RoofData {
         id        : lr ^. idLens,
         subtrees  : S.union (lr ^. _subtrees) (rr ^. _subtrees),
@@ -108,16 +109,17 @@ sortedNodes e slope ts =
     in sortBy g $ projNodeTo3D slope <$> ts
 
 -- find polygon for an edge
-roofForEdge :: Angle -> RoofData -> Effect (Tuple Roof (List VertNode))
-roofForEdge slope rd = do
-    let sorted = sortedNodes (rd ^. _edge) slope $ S.toUnfoldable $ rd ^. _subtrees
+roofForEdge :: RoofData -> Effect (Tuple Roof (List VertNode))
+roofForEdge rd = do
+    let slope  = rd ^. _edge <<< _line <<< _slope
+        sorted = sortedNodes (rd ^. _edge) slope $ S.toUnfoldable $ rd ^. _subtrees
         nodes  = (view _position <$> sorted) <> rd ^. _edgeNodes
-    roof <- createRoofFrom (newPolygon nodes) (rd ^. _subtrees) (rd ^. _edge <<< _normal) (rd ^. _edge <<< _line <<< _slope)
+    roof <- createRoofFrom (newPolygon nodes) (rd ^. _subtrees) (rd ^. _edge <<< _normal) slope
     pure $ Tuple roof sorted
 
 
-procMerge :: Angle -> UUIDMap RoofData -> Subtree -> UUIDMap RoofData
-procMerge slope m t = case t ^. _subtreeType of
+procMerge :: UUIDMap RoofData -> Subtree -> UUIDMap RoofData
+procMerge m t = case t ^. _subtreeType of
     NormalNode -> m
     MergedNode le re ->
         let li = le ^. idLens
@@ -125,24 +127,24 @@ procMerge slope m t = case t ^. _subtreeType of
             lrd = M.lookup li m
             rrd = M.lookup ri m
 
-            newrd = mergeRoofDataWith slope t <$> lrd <*> rrd
+            newrd = mergeRoofDataWith t <$> lrd <*> rrd
 
         in M.update (const newrd) li $ M.update (const newrd) ri m
         
 -- generate a list of Roofs and update Subtree node to 3D
-generateRoofs :: Angle -> Set Subtree -> List Edge -> Effect (Tuple (List Roof) (UUIDMap VertNode))
-generateRoofs slope ts edges = do
+generateRoofs :: Set Subtree -> List Edge -> Effect (Tuple (List Roof) (UUIDMap VertNode))
+generateRoofs ts edges = do
     let -- MergedNode subtrees
         mts = S.filter (not <<< normalSubtree) ts
 
         -- map from edge id to roof data
         rdm = UM.fromFoldable $ roofDataForEdge ts <$> edges
 
-        newRDM = foldl (procMerge slope) rdm mts
+        newRDM = foldl procMerge rdm mts
 
         newRds = S.toUnfoldable $ S.fromFoldable $ M.values newRDM
 
-    res <- traverse (roofForEdge slope) newRds
+    res <- traverse roofForEdge newRds
     let roofs = fst <$> res
         trees = UM.fromFoldable $ join $ snd <$> res
     pure $ Tuple roofs trees

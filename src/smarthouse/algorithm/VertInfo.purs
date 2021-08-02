@@ -2,11 +2,13 @@ module SmartHouse.Algorithm.VertInfo where
 
 import Prelude
 
-import Data.Lens (Lens', (^.))
+import Data.Generic.Rep (class Generic)
+import Data.Lens (Lens', set, (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe, fromMaybe)
 import Data.Newtype (class Newtype)
+import Data.Show.Generic (genericShow)
 import Data.Tuple (Tuple(..))
 import Editor.Common.Lenses (_slope)
 import Math (abs)
@@ -25,9 +27,15 @@ newtype VertWithSlope = VertWithSlope {
 }
 
 derive instance Newtype VertWithSlope _
+derive instance Generic VertWithSlope _
+instance Show VertWithSlope where
+    show = genericShow
 
 vertWithSlope :: Vector3 -> Angle -> VertWithSlope
 vertWithSlope v slope = VertWithSlope { position : v, slope : slope }
+
+updateSlope :: Angle -> VertWithSlope -> VertWithSlope
+updateSlope = set _slope
 
 -- intermediete data structure for constructing initial vertices and edges
 newtype VertInfo = VertInfo {
@@ -76,7 +84,7 @@ calcDir leftV leftSlope rightV rightSlope isReflex
             usable = abs (degreeVal a - 90.0) < 2.0
         in Tuple dir usable
 
-vertInfoFrom :: Vector3 -> Number -> EdgeInfo -> EdgeInfo-> Maybe Vector3 -> Maybe Vector3 -> VertInfo
+vertInfoFrom :: Vector3 -> Number -> EdgeInfo -> EdgeInfo -> Maybe Vector3 -> Maybe Vector3 -> VertInfo
 vertInfoFrom p h leftEdge rightEdge vecL vecR =
     let leftVec  = direction (leftEdge ^. _line) <**> (-1.0)
         rightVec = direction $ rightEdge ^. _line
