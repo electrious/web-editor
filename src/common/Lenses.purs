@@ -296,6 +296,9 @@ _floor = _Newtype <<< prop (Proxy :: Proxy "floor")
 _buttons :: forall t a r. Newtype t { buttons :: a | r } => Lens' t a
 _buttons = _Newtype <<< prop (Proxy :: Proxy "buttons")
 
+_slopeSelected :: forall t a r. Newtype t { slopeSelected :: a | r } => Lens' t a
+_slopeSelected = _Newtype <<< prop (Proxy :: Proxy "slopeSelected")
+
 _shadeSelected :: forall t a r. Newtype t { shadeSelected :: a | r } => Lens' t a
 _shadeSelected = _Newtype <<< prop (Proxy :: Proxy "shadeSelected")
 

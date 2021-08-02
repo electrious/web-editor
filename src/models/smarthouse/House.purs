@@ -18,6 +18,7 @@ import Data.Meter (Meter, meter, meterVal)
 import Data.Newtype (class Newtype)
 import Data.Set as S
 import Data.Show.Generic (genericShow)
+import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Data.UUID (UUID, emptyUUID, genUUID)
 import Data.UUIDMap (UUIDMap)
@@ -162,6 +163,14 @@ updateActiveRoofShade :: ShadeOption -> Maybe UUID -> House -> House
 updateActiveRoofShade _ Nothing   h = h
 updateActiveRoofShade s (Just ai) h = h # _roofs %~ M.update f ai
     where f r = Just $ set _shade s r
+
+updateActiveRoofSlope :: Angle -> Maybe UUID -> House -> Effect House
+updateActiveRoofSlope _ Nothing   h = pure h
+updateActiveRoofSlope a (Just ai) h = do
+    let roof = M.lookup ai (h ^. _roofs)
+        f r = updateSlopeForRoof r a h
+    nh <- traverse f roof
+    pure $ fromMaybe h nh
 
 exportHouse :: House -> JSHouse
 exportHouse h = JSHouse { id: h ^. idLens, floor: floor, height: meterVal $ h ^. _height, roofs: roofs }

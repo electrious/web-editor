@@ -28,7 +28,7 @@ import Data.Traversable (traverse)
 import Data.Tuple (fst)
 import Data.UUID (UUID)
 import Data.UUIDMap (UUIDMap)
-import Editor.Common.Lenses (_apiConfig, _buttons, _height, _houseId, _leadId, _modeDyn, _mouseMove, _name, _panelType, _panels, _parent, _roofs, _shadeSelected, _slope, _tapped, _textureInfo, _updated, _width)
+import Editor.Common.Lenses (_apiConfig, _buttons, _height, _houseId, _leadId, _modeDyn, _mouseMove, _name, _panelType, _panels, _parent, _roofs, _shadeSelected, _slope, _slopeSelected, _tapped, _textureInfo, _updated, _width)
 import Editor.Editor (Editor, _sizeDyn, setMode)
 import Editor.EditorMode as EditorMode
 import Editor.HouseEditor (ArrayEditParam, HouseConfig, _dataServer, _heatmapTexture, _rotBtnTexture)
@@ -248,8 +248,8 @@ getActiveTree tid hd = M.lookup tid (hd ^. _trees)
 getTreeUpd :: forall f. Foldable f => Functor f => f TreeNode -> Event TreeOp
 getTreeUpd = foldEvtWith (view _updated)
 
-renderHouseDict :: Dynamic (Maybe UUID) -> HouseConfig -> ArrayEditParam -> Event ShadeOption -> Event RoofsData -> HouseDict -> Node HouseTextureInfo (UUIDMap HouseNode)
-renderHouseDict actIdDyn houseCfg arrParam shadeEvt roofsDatEvt houses = traverse render houses
+renderHouseDict :: Dynamic (Maybe UUID) -> HouseConfig -> ArrayEditParam -> Event Angle -> Event ShadeOption -> Event RoofsData -> HouseDict -> Node HouseTextureInfo (UUIDMap HouseNode)
+renderHouseDict actIdDyn houseCfg arrParam slopeEvt shadeEvt roofsDatEvt houses = traverse render houses
     where getMode h (Just i) | h ^. idLens == i = Active
                              | otherwise        = Inactive
           getMode _ Nothing                     = Inactive
@@ -259,6 +259,7 @@ renderHouseDict actIdDyn houseCfg arrParam shadeEvt roofsDatEvt houses = travers
                          let md = getMode h <$> actIdDyn
                          editHouse houseCfg $ def # _modeDyn        .~ md
                                                   # _house          .~ h
+                                                  # _slopeSelected  .~ slopeEvt
                                                   # _shadeSelected  .~ gateDyn (isActive <$> md) shadeEvt
                                                   # _roofsData      .~ roofsDatEvt
                                                   # _arrayEditParam .~ arrParam
@@ -346,10 +347,11 @@ builderForHouse evts tInfo =
                     houseCfg = houseCfgFromBuilderCfg cfg
 
                     shadeEvt = evts ^. _shadeSelected
+                    slopeEvt = evts ^. _slope
                     arrParam = def
                 
                 -- render houses and trees
-                nodesEvt <- localEnv (const tInfo) $ eventNode (renderHouseDict actIdDyn houseCfg arrParam shadeEvt roofsDatEvt <$> houseToRenderEvt)
+                nodesEvt <- localEnv (const tInfo) $ eventNode (renderHouseDict actIdDyn houseCfg arrParam slopeEvt shadeEvt roofsDatEvt <$> houseToRenderEvt)
                 treesEvt <- eventNode (renderTrees actIdDyn <$> treesToRenderEvt)
 
                 let deactEvt    = multicast $ const Nothing <$> helper ^. _tapped
@@ -476,6 +478,7 @@ buildHouse editor cfg = do
     { event: undoTracingEvt, push: toUndoTracing } <- create
     { event: stopTracingEvt, push: toStopTracing } <- create
     { event: shadeEvt, push: selectShade } <- create
+    { event: slopeEvt, push: selectSlope } <- create
     { event: delHouseEvt, push: delHouse } <- create
     { event: treeEvt, push: buildTree } <- create
 
@@ -483,6 +486,7 @@ buildHouse editor cfg = do
                         # _undoTracing   .~ undoTracingEvt
                         # _stopTracing   .~ stopTracingEvt
                         # _shadeSelected .~ shadeEvt
+                        # _slope         .~ slopeEvt
                         # _deleteHouse   .~ delHouseEvt
                         # _buildTree     .~ treeEvt
 
@@ -500,6 +504,7 @@ buildHouse editor cfg = do
     void $ subscribe (const unit <$> uiEvts ^. _buttons <<< _reset) toStopTracing
     void $ subscribe (const unit <$> uiEvts ^. _buttons <<< _undo) toUndoTracing
     void $ subscribe (uiEvts ^. _shadeSelected) selectShade
+    void $ subscribe (uiEvts ^. _slopeSelected) selectSlope
     void $ subscribe (uiEvts ^. _deleteHouse) delHouse
     void $ subscribe (uiEvts ^. _buildTree) buildTree
 

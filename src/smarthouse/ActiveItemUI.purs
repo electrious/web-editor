@@ -10,12 +10,13 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (class Newtype)
-import Editor.Common.Lenses (_roof, _shade, _shadeSelected)
+import Editor.Common.Lenses (_roof, _shade, _shadeSelected, _slope, _slopeSelected)
 import Effect.Class (liftEffect)
-import FRP.Dynamic (Dynamic, dynEvent)
+import FRP.Dynamic (Dynamic, dynEvent, latestEvt)
 import FRP.Event (Event)
 import Math.Angle (Angle, degreeVal, fromString)
-import Models.SmartHouse.ActiveItem (ActiveItem(..))
+import Model.SmartHouse.Roof (Roof)
+import Models.SmartHouse.ActiveItem (ActiveItem(..), activeRoof)
 import SmartHouse.ShadeOption (ShadeOption)
 import SmartHouse.ShadeOptionUI (shadeSelector)
 import Specular.Dom.Browser (Attrs)
@@ -23,6 +24,7 @@ import Specular.Dom.Element (attr, attrsD, bindValueOnChange, bindValueOnInput, 
 import Specular.Dom.Element.Class (el)
 import Specular.Dom.Widget (Widget)
 import Specular.Dom.Widgets.Button (buttonOnClick)
+import Specular.FRP (dynamic)
 import Specular.Ref (new, value)
 import Type.Proxy (Proxy(..))
 import UI.Bridge (fromUIDyn, fromUIEvent, toUIDyn)
@@ -31,6 +33,7 @@ import UI.Utils (div, mkAttrs, mkStyle, (:~))
 
 newtype ActiveItemUI = ActiveItemUI {
     deleteHouse   :: Event Unit,
+    slopeSelected :: Event Angle,
     shadeSelected :: Event ShadeOption
     }
 
@@ -38,6 +41,7 @@ derive instance Newtype ActiveItemUI _
 instance Default ActiveItemUI where
     def = ActiveItemUI {
         deleteHouse   : empty,
+        slopeSelected : empty,
         shadeSelected : empty
         }
 
@@ -106,14 +110,27 @@ houseSlopeUI slope =
 
         pure $ compact $ dynEvent slopeValDyn
 
+
+dynSlopeUI :: Dynamic (Maybe Roof) -> Widget (Event Angle)
+dynSlopeUI roofDyn = do
+    let f (Just r) = houseSlopeUI $ r ^. _slope
+        f Nothing  = pure empty
+    
+    rDyn <- liftEffect $ toUIDyn roofDyn
+    resDyn <- fromUIDyn =<< dynamic (f <$> rDyn)
+    pure $ latestEvt resDyn
+
 activeItemUI :: Dynamic (Maybe ActiveItem) -> Widget ActiveItemUI
 activeItemUI actItemDyn = do
     styleD <- liftEffect $ toUIDyn $ activeItemUIStyle <<< isJust <$> actItemDyn
     div [classes ["uk-flex", "uk-flex-column", "uk-margin-top"],
          attrsD styleD] do
-        -- _ <- houseSlopeUI $ degree 30.0
+        
+        slopeEvt <- dynSlopeUI $ join <<< map activeRoof <$> actItemDyn
+
         selEvt <- shadeSelector $ join <<< map getShadeOption <$> actItemDyn
         delEvt <- delButton actItemDyn
 
         pure $ def # _shadeSelected .~ selEvt
+                   # _slopeSelected .~ slopeEvt
                    # _deleteHouse   .~ delEvt

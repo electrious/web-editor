@@ -21,7 +21,7 @@ import Data.Traversable (class Traversable, traverse)
 import Data.Tuple (Tuple(..))
 import Data.UUID (UUID)
 import Editor.ArrayBuilder (runArrayBuilder)
-import Editor.Common.Lenses (_alignment, _edges, _floor, _height, _houseId, _id, _modeDyn, _name, _orientation, _panelType, _panels, _position, _roof, _roofs, _shadeSelected, _slope, _tapped, _updated)
+import Editor.Common.Lenses (_alignment, _edges, _floor, _height, _houseId, _id, _modeDyn, _name, _orientation, _panelType, _panels, _position, _roof, _roofs, _shadeSelected, _slope, _slopeSelected, _tapped, _updated)
 import Editor.Disposable (Disposee(..))
 import Editor.HeightEditor (_min, dragArrowPos, setupHeightEditor)
 import Editor.HouseEditor (ArrayEditParam, HouseConfig, _heatmap, runHouseEditor)
@@ -36,6 +36,7 @@ import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, dynEvent, gateDyn, latestEvt, sampleDyn, step)
 import FRP.Event (Event)
 import FRP.Event.Extra (delay, multicast, performEvent)
+import Math.Angle (Angle)
 import Math.LineSeg (LineSeg, mkLineSeg)
 import Model.ActiveMode (ActiveMode(..), fromBoolean, isActive)
 import Model.Polygon (Polygon, _polyVerts)
@@ -43,7 +44,7 @@ import Model.Racking.OldRackingSystem (OldRoofRackingData, guessRackingType)
 import Model.Racking.RackingType (RackingType(..))
 import Model.Roof.Panel (Alignment(..), Orientation(..), PanelsDict, panelsDict)
 import Model.Roof.RoofPlate (RoofPlate, _roofIntId)
-import Model.SmartHouse.House (House, _peakPoint, _trees, flipRoof, getVertNode, updateActiveRoofShade, updateHeight, updateSlopes)
+import Model.SmartHouse.House (House, _peakPoint, _trees, flipRoof, getVertNode, updateActiveRoofShade, updateActiveRoofSlope, updateHeight, updateSlopes)
 import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo)
 import Model.SmartHouse.Roof (Roof, RoofEvents, _flipped, renderActRoofOutline, renderRoof)
 import Model.UUID (idLens)
@@ -75,6 +76,7 @@ newtype HouseEditorConf = HouseEditorConf {
     modeDyn        :: Dynamic ActiveMode,
     house          :: House,
 
+    slopeSelected  :: Event Angle,
     shadeSelected  :: Event ShadeOption,
     
     roofsData      :: Event RoofsData,
@@ -86,6 +88,7 @@ instance defaultHouseEditorConf :: Default HouseEditorConf where
     def = HouseEditorConf {
         modeDyn        : pure Inactive,
         house          : def,
+        slopeSelected  : empty,
         shadeSelected  : empty,
         
         roofsData      : empty,
@@ -197,8 +200,9 @@ editHouse houseCfg conf = do
                 newHouseEvt2 = performEvent $ sampleDyn houseDyn $ updateSlopes <$> sEvt
                 newHouseEvt3 = performEvent $ sampleDyn houseDyn $ flipRoof <$> flipEvt
                 newHouseEvt4 = sampleDyn houseDyn $ sampleDyn actRoofIdDyn $ updateActiveRoofShade <$> conf ^. _shadeSelected
-                
-                newHouseEvt  = multicast $ newHouseEvt1 <|> newHouseEvt2 <|> newHouseEvt3 <|> newHouseEvt4
+                newHouseEvt5 = performEvent $ sampleDyn houseDyn $ sampleDyn actRoofIdDyn $ updateActiveRoofSlope <$> conf ^. _slopeSelected
+
+                newHouseEvt  = multicast $ newHouseEvt1 <|> newHouseEvt2 <|> newHouseEvt3 <|> newHouseEvt4 <|> newHouseEvt5
 
                 roofTappedEvt = multicast $ latestAnyEvtWith (view _tapped) roofEvtsDyn
 
