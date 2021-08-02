@@ -40,6 +40,7 @@ import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo, _size, _texture)
 import Model.UUID (class HasUUID, idLens)
 import Rendering.Line (renderLineOnlyWith)
 import Rendering.Node (Node, _exportable, getEnv, tapMesh)
+import SmartHouse.Algorithm.Edge (Edge)
 import SmartHouse.PolyGeometry (mkPolyGeometry, mkPolyGeometryWithUV)
 import SmartHouse.ShadeOption (ShadeOption(..))
 import Smarthouse.Algorithm.Subtree (Subtree, _isGable)
@@ -58,6 +59,7 @@ newtype Roof = Roof {
     subtrees :: UUIDMap Subtree,
 
     shade    :: ShadeOption,
+    edge     :: Edge,
     slope    :: Angle,
 
     normal   :: Vector3
@@ -75,10 +77,10 @@ instance HasUUID Roof where
 _subtrees :: forall t a r. Newtype t { subtrees :: a | r } => Lens' t a
 _subtrees = _Newtype <<< prop (Proxy :: Proxy "subtrees")
 
-createRoofFrom :: Polygon Vector3 -> Set Subtree -> Vector3 -> Angle -> Effect Roof
-createRoofFrom p ts n s = do
+createRoofFrom :: Polygon Vector3 -> Set Subtree -> Edge -> Vector3 -> Angle -> Effect Roof
+createRoofFrom p ts e n s = do
     i <- genUUID
-    pure $ Roof { id : i, polygon : p, subtrees : UM.fromSet ts, shade : NoShade, slope: s, normal : n }
+    pure $ Roof { id : i, polygon : p, subtrees : UM.fromSet ts, shade : NoShade, edge : e, slope: s, normal : n }
 
 -- check if a roof can be gable
 canBeGable :: Roof -> Boolean

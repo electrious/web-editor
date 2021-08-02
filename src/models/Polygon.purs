@@ -1,5 +1,5 @@
 module Model.Polygon (Polygon(..), _polyVerts, newPolygon, polygonAround, numOfVerts,
-                      addVertexAt, delVertexAt, updateVertAt, polyCenter, polyEdges, polyOutline, polyWindows,
+                      addVertexAt, delVertexAt, updateVertAt, modifyVertAt, polyCenter, polyEdges, polyOutline, polyWindows,
                       polyMidPoints, polygonBBox, counterClockPoly, polyPlane, normalizeContour,
                       renderPolygon, class IsPolygon, toPolygon, PolyOrient(..), polygonOrient) where
 
@@ -8,7 +8,7 @@ import Prelude hiding (add)
 import Algorithm.Plane (Plane, mkPlane)
 import Control.Monad.Writer (tell)
 import Custom.Mesh (TapMouseMesh, TappableMesh, mkTappableMesh)
-import Data.Array (cons, deleteAt, fromFoldable, head, init, insertAt, last, length, mapWithIndex, reverse, snoc, tail, updateAt, zip, zipWith, (!!))
+import Data.Array (cons, deleteAt, fromFoldable, head, init, insertAt, last, length, mapWithIndex, modifyAt, reverse, snoc, tail, updateAt, zip, zipWith, (!!))
 import Data.Default (class Default, def)
 import Data.Filterable (filter)
 import Data.Foldable (class Foldable, foldl, maximum, minimum)
@@ -88,7 +88,10 @@ delVertexAt idx poly = if numOfVerts poly > 3
 
 updateVertAt :: forall v. Int -> v -> Polygon v -> Polygon v
 updateVertAt idx p poly@(Polygon pns) = fromMaybe poly $ Polygon <$> updateAt idx p pns
-    
+
+modifyVertAt :: forall v. Int -> (v -> v) -> Polygon v -> Polygon v
+modifyVertAt idx f poly@(Polygon pns) = fromMaybe poly $ Polygon <$> modifyAt idx f pns
+
 -- | calculate the center based on polygon
 polyCenter :: forall v. Default v => Vector v => Polygon v -> v
 polyCenter poly = (foldl (<+>) def vs) <**> (1.0 / l)

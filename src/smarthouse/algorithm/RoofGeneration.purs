@@ -114,7 +114,7 @@ roofForEdge rd = do
     let slope  = rd ^. _edge <<< _line <<< _slope
         sorted = sortedNodes (rd ^. _edge) slope $ S.toUnfoldable $ rd ^. _subtrees
         nodes  = (view _position <$> sorted) <> rd ^. _edgeNodes
-    roof <- createRoofFrom (newPolygon nodes) (rd ^. _subtrees) (rd ^. _edge <<< _normal) slope
+    roof <- createRoofFrom (newPolygon nodes) (rd ^. _subtrees) (rd ^. _edge) (rd ^. _edge <<< _normal) slope
     pure $ Tuple roof sorted
 
 

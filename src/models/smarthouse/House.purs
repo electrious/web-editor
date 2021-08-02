@@ -11,7 +11,7 @@ import Data.Generic.Rep (class Generic)
 import Data.Lens (Lens', set, view, (%~), (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.List (List, fromFoldable)
+import Data.List (List, findIndex, fromFoldable)
 import Data.Map as M
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Meter (Meter, meter, meterVal)
@@ -27,7 +27,7 @@ import Effect (Effect)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Math.Angle (Angle, degree)
-import Model.Polygon (Polygon, _polyVerts, counterClockPoly)
+import Model.Polygon (Polygon, _polyVerts, counterClockPoly, modifyVertAt)
 import Model.Roof.RoofPlate (Point, vec2Point)
 import Model.SmartHouse.Roof (JSRoof, Roof, RoofState(..), exportRoof, roofState)
 import Model.UUID (class HasUUID, idLens)
@@ -37,7 +37,7 @@ import SmartHouse.Algorithm.Skeleton (skeletonize)
 import SmartHouse.Algorithm.VertInfo (VertWithSlope, updateSlope, vertWithSlope)
 import SmartHouse.Algorithm.VertNode (VertNode)
 import SmartHouse.ShadeOption (ShadeOption)
-import Smarthouse.Algorithm.RoofGeneration (generateRoofs)
+import Smarthouse.Algorithm.RoofGeneration (_edge, generateRoofs)
 import Smarthouse.Algorithm.Subtree (Subtree, flipSubtree)
 import Three.Math.Vector (Vector3)
 import Type.Proxy (Proxy(..))
@@ -114,14 +114,29 @@ updateHeight height h = h # _height .~ height
 
 updateSlopes :: Angle -> House -> Effect House
 updateSlopes slope h = do
-    hi <- houseParamFrom $ updateSlope slope <$> h ^. _floor
+    nh <- updateHouseWith (updateSlope slope <$> h ^. _floor) h
+    pure $ nh # _slope .~ slope
+
+updateSlopeForRoof :: Roof -> Angle -> House -> Effect House
+updateSlopeForRoof roof slope h = updateHouseWith floor h
+    where e     = roof ^. _edge
+          idx   = fromMaybe 0 $ findIndex ((==) e) $ h ^. _edges
+          floor = modifyVertAt idx (updateSlope slope) (h ^. _floor)
+
+
+-- rerun the skeletonization algorithm and roof generation on the house with
+-- new floor polygon
+updateHouseWith :: Polygon VertWithSlope -> House -> Effect House
+updateHouseWith floor h = do
+    hi <- houseParamFrom floor
     Tuple trees edges <- skeletonize hi
     Tuple roofs nodes <- generateRoofs (S.fromFoldable trees) edges
-    pure $ h # _slope    .~ slope
+    pure $ h # _floor    .~ floor
              # _trees    .~ UM.fromFoldable trees
              # _edges    .~ edges
              # _roofs    .~ UM.fromFoldable roofs
              # _vertices .~ nodes
+             # _peakPoint .~ findPeakPoint nodes
 
 -- load up to date VertNode
 getVertNode :: VertNode -> House -> VertNode
