@@ -286,7 +286,8 @@ newtype BuilderInputEvts = BuilderInputEvts {
     undoTracing   :: Event Unit,
     stopTracing   :: Event Unit,
     shadeSelected :: Event ShadeOption,
-    slope         :: Event Angle,
+    slope         :: Event Angle,       -- slope event for all roofs
+    slopeSelected :: Event Angle,       -- slope event for active roof
     deleteHouse   :: Event Unit,
     buildTree     :: Event Boolean
     }
@@ -299,6 +300,7 @@ instance Default BuilderInputEvts where
         stopTracing   : empty,
         shadeSelected : empty,
         slope         : empty,
+        slopeSelected : empty,
         deleteHouse   : empty,
         buildTree     : empty
         }
@@ -347,7 +349,7 @@ builderForHouse evts tInfo =
                     houseCfg = houseCfgFromBuilderCfg cfg
 
                     shadeEvt = evts ^. _shadeSelected
-                    slopeEvt = evts ^. _slope
+                    slopeEvt = evts ^. _slopeSelected
                     arrParam = def
                 
                 -- render houses and trees
@@ -486,7 +488,7 @@ buildHouse editor cfg = do
                         # _undoTracing   .~ undoTracingEvt
                         # _stopTracing   .~ stopTracingEvt
                         # _shadeSelected .~ shadeEvt
-                        # _slope         .~ slopeEvt
+                        # _slopeSelected .~ slopeEvt
                         # _deleteHouse   .~ delHouseEvt
                         # _buildTree     .~ treeEvt
 
