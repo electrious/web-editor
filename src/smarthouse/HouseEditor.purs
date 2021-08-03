@@ -44,7 +44,7 @@ import Model.Racking.OldRackingSystem (OldRoofRackingData, guessRackingType)
 import Model.Racking.RackingType (RackingType(..))
 import Model.Roof.Panel (Alignment(..), Orientation(..), PanelsDict, panelsDict)
 import Model.Roof.RoofPlate (RoofPlate, _roofIntId)
-import Model.SmartHouse.House (House, _peakPoint, _trees, flipRoof, getVertNode, updateActiveRoofShade, updateActiveRoofSlope, updateHeight, updateSlopes)
+import Model.SmartHouse.House (House, _peakPoint, _trees, flipRoof, updateActiveRoofShade, updateActiveRoofSlope, updateHeight, updateSlopes)
 import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo)
 import Model.SmartHouse.Roof (Roof, RoofEvents, _flipped, renderActRoofOutline, renderRoof)
 import Model.UUID (idLens)
@@ -174,9 +174,8 @@ editHouse houseCfg conf = do
                 
                 -- setup slope editor and get the new slope event
                 -- enable slope editor only in EditingHouse mode and actDyn is active
-                let peak = getVertNode (house ^. _peakPoint) house
                 sEvt <- slopeEditor $ def # _modeDyn  .~ canEditDyn
-                                          # _position .~ peak ^. _position
+                                          # _position .~ (view (_peakPoint <<< _position) <$> houseDyn)
                                           # _slope    .~ house ^. _slope
                                           # _maxHeightToEdge .~ (house ^. _peakPoint <<< _height)
 
@@ -240,7 +239,7 @@ renderWalls poly height = do
 getHouseLines :: House -> List (LineSeg Vector3)
 getHouseLines h = tLines <> eLines
     where tls = concatMap treeLines (values $ h ^. _trees)
-          tLines = map (view _position <<< flip getVertNode h) <$> tls
+          tLines = map (view _position) <$> tls
           eLines = view _lineEdge <$> h ^. _edges
 
 renderLengths :: forall e. Maybe (List (LineSeg Vector3)) -> Node e Unit

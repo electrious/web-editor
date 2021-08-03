@@ -30,7 +30,7 @@ import UI.DraggableObject (_customGeo, _customMat, _deltaTransform, _validator, 
 -- slope editor config
 newtype SlopeEditorConfig = SlopeEditorConfig {
     modeDyn         :: Dynamic ActiveMode,
-    position        :: Vector3,
+    position        :: Dynamic Vector3,
     height          :: Dynamic Number,
     slope           :: Angle,
     maxHeightToEdge :: Number,
@@ -43,7 +43,7 @@ derive instance Newtype SlopeEditorConfig _
 instance Default SlopeEditorConfig where
     def = SlopeEditorConfig {
         modeDyn         : pure Inactive,
-        position        : def,
+        position        : pure def,
         height          : pure 0.0,
         slope           : def,
         maxHeightToEdge : 0.0,
@@ -72,7 +72,7 @@ slopeEditor :: forall e. SlopeEditorConfig -> Node e (Event Angle)
 slopeEditor conf =
     fixNodeDWith (conf ^. _slope) \slopeDyn -> do
         let actDyn = isActive <$> conf ^. _modeDyn
-            pos = conf ^. _position
+            posDyn = conf ^. _position
             min = conf ^. _min
             max = conf ^. _max
             mat = conf ^. _arrowMaterial
@@ -97,7 +97,7 @@ slopeEditor conf =
             tProp = def # _fontSize  .~ 0.6
                         # _textAlign .~ "center"
 
-        arrow <- node (def # _position .~ pure (moveUp 2.0 pos)
+        arrow <- node (def # _position .~ (moveUp 2.0 <$> posDyn)
                            # _visible  .~ actDyn) $
                         createDraggableObjectWith cfg $
                             void $ node tWrpCfg $ dynText3D tProp slopeStrDyn

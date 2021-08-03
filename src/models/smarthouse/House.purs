@@ -23,7 +23,7 @@ import Data.Tuple (Tuple(..))
 import Data.UUID (UUID, emptyUUID, genUUID)
 import Data.UUIDMap (UUIDMap)
 import Data.UUIDMap as UM
-import Editor.Common.Lenses (_edge, _edges, _floor, _height, _id, _position, _roofs, _shade, _slope, _vertices)
+import Editor.Common.Lenses (_edge, _edges, _floor, _height, _id, _position, _roofs, _shade, _slope)
 import Effect (Effect)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
@@ -39,7 +39,7 @@ import SmartHouse.Algorithm.VertInfo (VertWithSlope, updateSlope, vertWithSlope)
 import SmartHouse.Algorithm.VertNode (VertNode)
 import SmartHouse.ShadeOption (ShadeOption)
 import Smarthouse.Algorithm.RoofGeneration (generateRoofs)
-import Smarthouse.Algorithm.Subtree (Subtree, flipSubtree)
+import Smarthouse.Algorithm.Subtree (Subtree, _source, flipSubtree)
 import Three.Math.Vector (Vector3)
 import Type.Proxy (Proxy(..))
 
@@ -49,7 +49,6 @@ newtype House = House {
     height    :: Meter,
     slope     :: Angle,
     trees     :: UUIDMap Subtree,
-    vertices  :: UUIDMap VertNode,
     edges     :: List Edge,
     roofs     :: UUIDMap Roof,
     peakPoint :: VertNode
@@ -64,7 +63,6 @@ instance Default House where
         height    : meter 0.0,
         slope     : degree 20.0,
         trees     : M.empty,
-        vertices  : M.empty,
         edges     : empty,
         roofs     : M.empty,
         peakPoint : def
@@ -88,9 +86,9 @@ createHouseFrom slope poly = do
     let floor = flip vertWithSlope slope <$> counterClockPoly poly
     hi <- houseParamFrom floor
     Tuple trees edges <- skeletonize hi
-    Tuple roofs nodes <- generateRoofs (S.fromFoldable trees) edges
+    roofs <- generateRoofs (S.fromFoldable trees) edges
 
-    let n = findPeakPoint nodes
+    let n = findPeakPoint trees
     
     pure $ House {
         id        : i,
@@ -98,7 +96,6 @@ createHouseFrom slope poly = do
         height    : meter 3.5,   -- default height
         slope     : slope,
         trees     : UM.fromFoldable trees,
-        vertices  : nodes,
         edges     : edges,
         roofs     : UM.fromFoldable roofs,
         peakPoint : n
@@ -106,8 +103,8 @@ createHouseFrom slope poly = do
 
 
 -- find the peak point of all subtrees in a house
-findPeakPoint :: forall f. Foldable f => f VertNode -> VertNode
-findPeakPoint = foldl (\o n -> if n ^. _height > o ^. _height then n else o) def
+findPeakPoint :: forall f. Foldable f => f Subtree -> VertNode
+findPeakPoint = foldl (\o t -> if t ^. _source <<< _height > o ^. _height then t ^. _source else o) def
 
 updateHeight :: Meter -> House -> House
 updateHeight height h = h # _height .~ height
@@ -131,18 +128,13 @@ updateHouseWith :: Polygon VertWithSlope -> House -> Effect House
 updateHouseWith floor h = do
     hi <- houseParamFrom floor
     Tuple trees edges <- skeletonize hi
-    Tuple roofs nodes <- generateRoofs (S.fromFoldable trees) edges
+    roofs <- generateRoofs (S.fromFoldable trees) edges
+
     pure $ h # _floor    .~ floor
              # _trees    .~ UM.fromFoldable trees
              # _edges    .~ edges
              # _roofs    .~ UM.fromFoldable roofs
-             # _vertices .~ nodes
-             # _peakPoint .~ findPeakPoint nodes
-
--- load up to date VertNode
-getVertNode :: VertNode -> House -> VertNode
-getVertNode v h = fromMaybe v $ M.lookup (v ^. idLens) (h ^. _vertices)
-
+             # _peakPoint .~ findPeakPoint trees
 
 -- flip a roof to/from gable
 flipRoof :: UUID -> House -> Effect House
@@ -152,12 +144,10 @@ flipRoof i h = do
         -- flip the subtree at idx
         nts = M.update (Just <<< flip flipSubtree vs) i ts
     -- generate new roofs
-    Tuple roofs nodes <- generateRoofs (S.fromFoldable nts) (h ^. _edges)
+    roofs <- generateRoofs (S.fromFoldable nts) (h ^. _edges)
 
     pure $ h # _roofs .~ UM.fromFoldable roofs
              # _trees .~ nts
-             # _vertices .~ nodes
-
 
 updateActiveRoofShade :: ShadeOption -> Maybe UUID -> House -> House
 updateActiveRoofShade _ Nothing   h = h

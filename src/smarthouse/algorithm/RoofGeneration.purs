@@ -12,7 +12,6 @@ import Data.Newtype (class Newtype)
 import Data.Set (Set)
 import Data.Set as S
 import Data.Traversable (traverse)
-import Data.Tuple (Tuple(..), fst, snd)
 import Data.UUID (UUID)
 import Data.UUIDMap (UUIDMap)
 import Data.UUIDMap as UM
@@ -90,14 +89,11 @@ sortedNodes e ts =
     in sortBy g $ view _source <$> ts
 
 -- find polygon for an edge
-roofForEdge :: RoofData -> Effect (Tuple Roof (List VertNode))
-roofForEdge rd = do
-    let slope  = rd ^. _edge <<< _line <<< _slope
-        sorted = sortedNodes (rd ^. _edge) $ S.toUnfoldable $ rd ^. _subtrees
-        nodes  = (view _position <$> sorted) <> rd ^. _edgeNodes
-    roof <- createRoofFrom (newPolygon nodes) (rd ^. _subtrees) (rd ^. _edge) (rd ^. _edge <<< _normal) slope
-    pure $ Tuple roof sorted
-
+roofForEdge :: RoofData -> Effect Roof
+roofForEdge rd = createRoofFrom (newPolygon nodes) (rd ^. _subtrees) (rd ^. _edge) (rd ^. _edge <<< _normal) slope
+    where slope  = rd ^. _edge <<< _line <<< _slope
+          sorted = sortedNodes (rd ^. _edge) $ S.toUnfoldable $ rd ^. _subtrees
+          nodes  = (view _position <$> sorted) <> rd ^. _edgeNodes
 
 procMerge :: UUIDMap RoofData -> Subtree -> UUIDMap RoofData
 procMerge m t = case t ^. _subtreeType of
@@ -113,19 +109,14 @@ procMerge m t = case t ^. _subtreeType of
         in M.update (const newrd) li $ M.update (const newrd) ri m
         
 -- generate a list of Roofs and update Subtree node to 3D
-generateRoofs :: Set Subtree -> List Edge -> Effect (Tuple (List Roof) (UUIDMap VertNode))
-generateRoofs ts edges = do
-    let -- MergedNode subtrees
-        mts = S.filter (not <<< normalSubtree) ts
+generateRoofs :: Set Subtree -> List Edge -> Effect (List Roof)
+generateRoofs ts edges = traverse roofForEdge newRds
+    where -- MergedNode subtrees
+          mts = S.filter (not <<< normalSubtree) ts
 
-        -- map from edge id to roof data
-        rdm = UM.fromFoldable $ roofDataForEdge ts <$> edges
+          -- map from edge id to roof data
+          rdm = UM.fromFoldable $ roofDataForEdge ts <$> edges
 
-        newRDM = foldl procMerge rdm mts
+          newRDM = foldl procMerge rdm mts
 
-        newRds = S.toUnfoldable $ S.fromFoldable $ M.values newRDM
-
-    res <- traverse roofForEdge newRds
-    let roofs = fst <$> res
-        trees = UM.fromFoldable $ join $ snd <$> res
-    pure $ Tuple roofs trees
+          newRds = S.toUnfoldable $ S.fromFoldable $ M.values newRDM
