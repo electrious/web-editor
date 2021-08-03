@@ -14,6 +14,7 @@ import Editor.Common.Lenses (_slope)
 import Math (abs)
 import Math.Angle (Angle, acos, degreeVal, tan)
 import Math.LineSeg (direction)
+import SmartHouse.Algorithm.Edge (Edge)
 import SmartHouse.Algorithm.EdgeInfo (EdgeInfo, _line)
 import SmartHouse.Algorithm.Ray (Ray, ray)
 import Three.Math.Vector (class Vector, Vector3, mkVec3, normal, vecX, vecY, (<**>), (<+>), (<.>))
@@ -40,7 +41,10 @@ updateSlope = set _slope
 -- intermediete data structure for constructing initial vertices and edges
 newtype VertInfo = VertInfo {
     position  :: Vector3,
+
+    edge      :: Maybe Edge,
     height    :: Number,
+
     isReflex  :: Boolean,
     bisector  :: Ray,
     usable    :: Boolean,
@@ -84,8 +88,8 @@ calcDir leftV leftSlope rightV rightSlope isReflex
             usable = abs (degreeVal a - 90.0) < 2.0
         in Tuple dir usable
 
-vertInfoFrom :: Vector3 -> Number -> EdgeInfo -> EdgeInfo -> Maybe Vector3 -> Maybe Vector3 -> VertInfo
-vertInfoFrom p h leftEdge rightEdge vecL vecR =
+vertInfoFrom :: Vector3 -> Maybe Edge -> Number -> EdgeInfo -> EdgeInfo -> Maybe Vector3 -> Maybe Vector3 -> VertInfo
+vertInfoFrom p e h leftEdge rightEdge vecL vecR =
     let leftVec  = direction (leftEdge ^. _line) <**> (-1.0)
         rightVec = direction $ rightEdge ^. _line
         lv       = fromMaybe leftVec $ normal <$> vecL
@@ -98,7 +102,10 @@ vertInfoFrom p h leftEdge rightEdge vecL vecR =
         Tuple dir usable = calcDir leftVec lSlope rightVec rSlope isReflex
     in VertInfo {
         position  : p,
+
+        edge      : e,
         height    : h,
+
         isReflex  : isReflex,
         bisector  : ray p dir,
         usable    : usable,

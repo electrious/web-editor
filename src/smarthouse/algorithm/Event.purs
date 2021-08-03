@@ -3,19 +3,20 @@ module SmartHouse.Algorithm.Event where
 import Prelude
 
 import Data.Generic.Rep (class Generic)
-import Data.Show.Generic (genericShow)
 import Data.Lens (Lens', (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
-import Type.Proxy (Proxy(..))
+import Data.Show.Generic (genericShow)
 import Editor.Common.Lenses (_distance)
 import SmartHouse.Algorithm.Edge (Edge)
 import SmartHouse.Algorithm.Vertex (Vertex)
 import Three.Math.Vector (Vector3)
+import Type.Proxy (Proxy(..))
 
 -- event to merge two consecutive bisector and shrink an edge to zero
 newtype EdgeE = EdgeE {
+    edge         :: Edge,
     distance     :: Number,
     intersection :: Vector3,
     vertexA      :: Vertex,
@@ -39,6 +40,7 @@ _vertexB = _Newtype <<< prop (Proxy :: Proxy "vertexB")
 
 -- event to merge three consecutive bisectors at one intersection point
 newtype EdgesE = EdgesE {
+    edge         :: Edge,
     distance     :: Number,
     intersection :: Vector3,
     vertexA      :: Vertex,
@@ -56,6 +58,7 @@ _vertexC = _Newtype <<< prop (Proxy :: Proxy "vertexC")
 
 
 newtype SplitE = SplitE {
+    edge         :: Edge,
     distance     :: Number,
     intersection :: Vector3,
     vertex       :: Vertex,
@@ -81,16 +84,18 @@ instance showPointEvent :: Show PointEvent where
     show = genericShow
 
 
-edgeE :: Number -> Vector3 -> Vertex -> Vertex -> PointEvent
-edgeE dist p va vb = EdgeEvent $ EdgeE {
+edgeE :: Edge -> Number -> Vector3 -> Vertex -> Vertex -> PointEvent
+edgeE e dist p va vb = EdgeEvent $ EdgeE {
+    edge         : e,
     distance     : dist,
     intersection : p,
     vertexA      : va,
     vertexB      : vb
     }
 
-edgesE :: Number -> Vector3 -> Vertex -> Vertex -> Vertex -> PointEvent
-edgesE dist p va vb vc = EdgesEvent $ EdgesE {
+edgesE :: Edge -> Number -> Vector3 -> Vertex -> Vertex -> Vertex -> PointEvent
+edgesE e dist p va vb vc = EdgesEvent $ EdgesE {
+    edge         : e,
     distance     : dist,
     intersection : p,
     vertexA      : va,
@@ -100,6 +105,7 @@ edgesE dist p va vb vc = EdgesEvent $ EdgesE {
 
 splitE :: Number -> Vector3 -> Vertex -> Edge -> PointEvent
 splitE dist p v e = SplitEvent $ SplitE {
+    edge         : e,
     distance     : dist,
     intersection : p,
     vertex       : v,

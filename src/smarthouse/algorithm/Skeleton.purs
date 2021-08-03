@@ -19,7 +19,7 @@ import Data.Set as Set
 import Data.Traversable (traverse)
 import Data.Triple (Triple(..))
 import Data.Tuple (Tuple(..), snd)
-import Editor.Common.Lenses (_distance, _edges, _leftEdge, _position, _rightEdge, _vertices)
+import Editor.Common.Lenses (_distance, _edge, _edges, _leftEdge, _position, _rightEdge, _vertices)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import Math (abs)
@@ -112,11 +112,12 @@ nextEvent lav v = do
         iPrev = prevV >>= intersectWith
         iNext = nextV >>= intersectWith
 
-        mkPrevEdgeEvt e pv pi = edgeE (distToLineSeg pi e) pi pv v
-        mkNextEdgeEvt e nv ni = edgeE (distToLineSeg ni e) ni v nv
-        mkEdgesEvt le re pv nv i = let ld = distToLineSeg i le
-                                       rd = distToLineSeg i re
-                                   in edgesE (min ld rd) i pv v nv
+        mkPrevEdgeEvt e pv pi = edgeE e (distToLineSeg pi (e ^. _lineEdge)) pi pv v
+        mkNextEdgeEvt e nv ni = edgeE e (distToLineSeg ni (e ^. _lineEdge)) ni v nv
+        mkEdgesEvt le re pv nv i = let ld = distToLineSeg i $ le ^. _lineEdge
+                                       rd = distToLineSeg i $ re ^. _lineEdge
+                                       e  = if ld < rd then le else re
+                                   in edgesE e (min ld rd) i pv v nv
 
         -- if prev and next intersection is very close, and left edge of prev vert
         -- is almost parallel to the right edge of next vert, BUT NOT the same,
@@ -128,9 +129,9 @@ nextEvent lav v = do
         isPara = fromMaybe false $ almostParallel <$> (view _lineEdge <$> prevLeftE) <*> (view _lineEdge <$> nextRightE)
     
         es = if closeEnough iPrev iNext && not isSame && isPara
-             then [mkEdgesEvt (v ^. _leftEdge <<< _lineEdge) (v ^. _rightEdge <<< _lineEdge) <$> prevV <*> nextV <*> iPrev]
-             else [mkPrevEdgeEvt (v ^. _leftEdge <<< _lineEdge) <$> prevV <*> iPrev,
-                   mkNextEdgeEvt (v ^. _rightEdge <<< _lineEdge) <$> nextV <*> iNext]
+             then [mkEdgesEvt (v ^. _leftEdge) (v ^. _rightEdge) <$> prevV <*> nextV <*> iPrev]
+             else [mkPrevEdgeEvt (v ^. _leftEdge) <$> prevV <*> iPrev,
+                   mkNextEdgeEvt (v ^. _rightEdge) <$> nextV <*> iNext]
                         
         allEvts = append (fromFoldable (compact es)) evts
         distF e = dist (v ^. _position) (intersectionPoint e)
@@ -172,7 +173,7 @@ handleEdgeEvent' e lav =
                     edges = Set.fromFoldable $ Arr.concatMap (\v -> [v ^. _leftEdge, v ^. _rightEdge]) vs
                     
                 -- this new Vertex is only used in the final subtree. only position and height is used.
-                newV <- liftEffect $ mkVertNode (e ^. _intersection) (e ^. _distance)
+                newV <- liftEffect $ mkVertNode (e ^. _intersection) (e ^. _edge) (e ^. _distance)
 
                 -- delete this LAV and invalidate all vertices in it
                 delLav (lav ^. idLens)
@@ -183,7 +184,7 @@ handleEdgeEvent' e lav =
                 pure $ Tuple t Nil
         else do let va = e ^. _vertexA
                     vb = e ^. _vertexB
-                Tuple newLav newV <- liftEffect $ unifyVerts va vb (e ^. _intersection) (e ^. _distance) lav
+                Tuple newLav newV <- liftEffect $ unifyVerts va vb (e ^. _intersection) (e ^. _edge) (e ^. _distance) lav
                 invalidateVertex va
                 invalidateVertex vb
 
@@ -209,7 +210,7 @@ handleEdgesEvent' e lav =
                     edges = Set.fromFoldable $ Arr.concatMap (\v -> [v ^. _leftEdge, v ^. _rightEdge]) vs
 
                 -- this new Vertex is only used in the final subtree. only position and height is used.
-                newV <- liftEffect $ mkVertNode (e ^. _intersection) (e ^. _distance)
+                newV <- liftEffect $ mkVertNode (e ^. _intersection) (e ^. _edge) (e ^. _distance)
 
                 -- delete this LAV and invalidate all vertices in it
                 delLav (lav ^. idLens)
@@ -220,7 +221,7 @@ handleEdgesEvent' e lav =
         else do let va = e ^. _vertexA
                     vb = e ^. _vertexB
                     vc = e ^. _vertexC
-                Triple newLav newV canHaveNewEvts <- liftEffect $ unifyThreeVerts va vb vc (e ^. _intersection) (e ^. _distance) lav
+                Triple newLav newV canHaveNewEvts <- liftEffect $ unifyThreeVerts va vb vc (e ^. _intersection) (e ^. _edge) (e ^. _distance) lav
                 invalidateVertex va
                 invalidateVertex vb
                 invalidateVertex vc
@@ -249,10 +250,11 @@ handleSplitEvent' :: SplitE -> Tuple Vertex Vertex -> SLAV (Tuple Subtree (List 
 handleSplitEvent' e (Tuple x y) = do
     let lavId  = e ^. _vertex <<< _lavId
         intPos = e ^. _intersection
+        edge   = e ^. _edge
         h      = e ^. _distance
         v      = e ^. _vertex
-    v1 <- liftEffect $ vertexFrom lavId intPos h (v ^. _leftEdge) (e ^. _oppositeEdge) Nothing Nothing
-    v2 <- liftEffect $ vertexFrom lavId intPos h (e ^. _oppositeEdge) (v ^. _rightEdge) Nothing Nothing
+    v1 <- liftEffect $ vertexFrom lavId intPos (Just edge) h (v ^. _leftEdge) (e ^. _oppositeEdge) Nothing Nothing
+    v2 <- liftEffect $ vertexFrom lavId intPos (Just edge) h (e ^. _oppositeEdge) (v ^. _rightEdge) Nothing Nothing
 
     lav <- getLav lavId
     let edges = Set.fromFoldable [v ^. _leftEdge, v ^. _rightEdge]

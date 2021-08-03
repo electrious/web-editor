@@ -317,6 +317,9 @@ _color = _Newtype <<< prop (Proxy :: Proxy "color")
 _vertices :: forall t a r. Newtype t { vertices :: a | r } => Lens' t a
 _vertices = _Newtype <<< prop (Proxy :: Proxy "vertices")
 
+_edge :: forall t a r. Newtype t { edge :: a | r } => Lens' t a
+_edge = _Newtype <<< prop (Proxy :: Proxy "edge")
+
 _edges :: forall t a r. Newtype t { edges :: a | r } => Lens' t a
 _edges = _Newtype <<< prop (Proxy :: Proxy "edges")
 

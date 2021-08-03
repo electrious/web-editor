@@ -8,15 +8,13 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
-import Data.UUID (UUID, genUUID)
-import Editor.Common.Lenses (_id, _position, _rightEdge)
-import Effect (Effect)
+import Data.UUID (UUID)
+import Editor.Common.Lenses (_id)
 import Math.LineSeg (LineSeg)
 import Model.UUID (class HasUUID, idLens)
 import SmartHouse.Algorithm.EdgeInfo (EdgeInfo, _line)
 import SmartHouse.Algorithm.Ray (Ray)
-import SmartHouse.Algorithm.VertInfo (VertInfo, _bisector)
-import Three.Math.Vector (Vector3, mkVec3, normal, vecX, vecY)
+import Three.Math.Vector (Vector3)
 import Type.Proxy (Proxy(..))
 
 newtype Edge = Edge {
@@ -55,23 +53,3 @@ _rightBisector = _Newtype <<< prop (Proxy :: Proxy "rightBisector")
 
 _lineEdge :: Lens' Edge (LineSeg Vector3)
 _lineEdge = _line <<< _line
-
-edge :: VertInfo -> VertInfo -> Effect Edge
-edge lv rv = do
-    i <- genUUID
-    let lp = lv ^. _position
-        rp = rv ^. _position
-
-        dx = vecX rp - vecX lp
-        dy = vecY rp - vecY lp
-
-        n = normal $ mkVec3 dy (-dx) 0.0
-    pure $ Edge {
-        id            : i,
-        line          : lv ^. _rightEdge,
-        leftVertex    : lp,
-        rightVertex   : rp,
-        leftBisector  : lv ^. _bisector,
-        rightBisector : rv ^. _bisector,
-        normal        : n
-        }
