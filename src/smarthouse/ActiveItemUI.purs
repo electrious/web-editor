@@ -106,7 +106,7 @@ houseSlopeUI slope =
 
         el "div" [ class_ "uk-margin-left"] $ dynText $ newSlopeStrDyn
 
-        slopeValDyn <- fromUIDyn $ fromString <$> value slopeValRef
+        slopeValDyn <- fromUIDyn $ fromString <$> value slopeRef
 
         pure $ compact $ dynEvent slopeValDyn
 

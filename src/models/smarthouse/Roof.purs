@@ -20,11 +20,10 @@ import Data.Newtype (class Newtype)
 import Data.Set (Set)
 import Data.Show.Generic (genericShow)
 import Data.Traversable (traverse_)
-import Data.UUID (UUID, genUUID)
+import Data.UUID (UUID)
 import Data.UUIDMap (UUIDMap)
 import Data.UUIDMap as UM
 import Editor.Common.Lenses (_id, _name, _normal, _polygon, _shade, _tapped)
-import Effect (Effect)
 import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, gateDyn)
@@ -77,10 +76,8 @@ instance HasUUID Roof where
 _subtrees :: forall t a r. Newtype t { subtrees :: a | r } => Lens' t a
 _subtrees = _Newtype <<< prop (Proxy :: Proxy "subtrees")
 
-createRoofFrom :: Polygon Vector3 -> Set Subtree -> Edge -> Vector3 -> Angle -> Effect Roof
-createRoofFrom p ts e n s = do
-    i <- genUUID
-    pure $ Roof { id : i, polygon : p, subtrees : UM.fromSet ts, shade : NoShade, edge : e, slope: s, normal : n }
+createRoofFrom :: UUID -> Polygon Vector3 -> Set Subtree -> Edge -> Vector3 -> Angle -> Roof
+createRoofFrom i p ts e n s = Roof { id : i, polygon : p, subtrees : UM.fromSet ts, shade : NoShade, edge : e, slope: s, normal : n }
 
 -- check if a roof can be gable
 canBeGable :: Roof -> Boolean

@@ -20,7 +20,6 @@ import Data.Map as M
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
-import Data.Traversable (sequence)
 import Data.Triple (Triple(..))
 import Data.Tuple (Tuple(..))
 import Data.UUID (UUID, emptyUUID, genUUID)
@@ -65,9 +64,9 @@ lavFromPolygon vis es = do
     let pes = fromMaybe es $ Arr.cons <$> Arr.last es <*> Arr.init es
 
         mkV vi (Tuple le re) = vertexFromVertInfo i le re vi
-    vs <- sequence $ zipWith mkV vis $ zip pes es
+        vs = zipWith mkV vis $ zip pes es
     
-    let idxMap = M.fromFoldable $ mapWithIndex (\idx v -> Tuple (v ^. idLens) idx) vs
+        idxMap = M.fromFoldable $ mapWithIndex (\idx v -> Tuple (v ^. idLens) idx) vs
     pure $ def # _id       .~ i
                # _vertices .~ vs
                # _indices  .~ idxMap

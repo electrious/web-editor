@@ -11,12 +11,10 @@ import Data.Map as M
 import Data.Newtype (class Newtype)
 import Data.Set (Set)
 import Data.Set as S
-import Data.Traversable (traverse)
 import Data.UUID (UUID)
 import Data.UUIDMap (UUIDMap)
 import Data.UUIDMap as UM
 import Editor.Common.Lenses (_edge, _edges, _id, _normal, _position, _slope)
-import Effect (Effect)
 import Math.LineSeg (LineSeg, _start, direction)
 import Model.Polygon (newPolygon)
 import Model.SmartHouse.Roof (Roof, _subtrees, createRoofFrom)
@@ -89,8 +87,8 @@ sortedNodes e ts =
     in sortBy g $ view _source <$> ts
 
 -- find polygon for an edge
-roofForEdge :: RoofData -> Effect Roof
-roofForEdge rd = createRoofFrom (newPolygon nodes) (rd ^. _subtrees) (rd ^. _edge) (rd ^. _edge <<< _normal) slope
+roofForEdge :: RoofData -> Roof
+roofForEdge rd = createRoofFrom (rd ^. idLens) (newPolygon nodes) (rd ^. _subtrees) (rd ^. _edge) (rd ^. _edge <<< _normal) slope
     where slope  = rd ^. _edge <<< _line <<< _slope
           sorted = sortedNodes (rd ^. _edge) $ S.toUnfoldable $ rd ^. _subtrees
           nodes  = (view _position <$> sorted) <> rd ^. _edgeNodes
@@ -109,8 +107,8 @@ procMerge m t = case t ^. _subtreeType of
         in M.update (const newrd) li $ M.update (const newrd) ri m
         
 -- generate a list of Roofs and update Subtree node to 3D
-generateRoofs :: Set Subtree -> List Edge -> Effect (List Roof)
-generateRoofs ts edges = traverse roofForEdge newRds
+generateRoofs :: Set Subtree -> List Edge -> List Roof
+generateRoofs ts edges = roofForEdge <$> newRds
     where -- MergedNode subtrees
           mts = S.filter (not <<< normalSubtree) ts
 

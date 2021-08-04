@@ -10,10 +10,13 @@ import Data.Maybe (Maybe, fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
 import Data.Tuple (Tuple(..))
-import Editor.Common.Lenses (_slope)
+import Data.UUID (UUID, genUUID)
+import Editor.Common.Lenses (_id, _slope)
+import Effect (Effect)
 import Math (abs)
 import Math.Angle (Angle, acos, degreeVal, tan)
 import Math.LineSeg (direction)
+import Model.UUID (class HasUUID)
 import SmartHouse.Algorithm.Edge (Edge)
 import SmartHouse.Algorithm.EdgeInfo (EdgeInfo, _line)
 import SmartHouse.Algorithm.Ray (Ray, ray)
@@ -23,6 +26,7 @@ import Type.Proxy (Proxy(..))
 
 -- | data value used to pass vertice and edge slope info to the skeleton algorithm.
 newtype VertWithSlope = VertWithSlope {
+    id       :: UUID,
     position :: Vector3,
     slope    :: Angle
 }
@@ -31,15 +35,21 @@ derive instance Newtype VertWithSlope _
 derive instance Generic VertWithSlope _
 instance Show VertWithSlope where
     show = genericShow
+instance HasUUID VertWithSlope where
+    idLens = _id
 
-vertWithSlope :: Vector3 -> Angle -> VertWithSlope
-vertWithSlope v slope = VertWithSlope { position : v, slope : slope }
+vertWithSlope :: Vector3 -> Angle -> Effect VertWithSlope
+vertWithSlope v slope = do
+    i <- genUUID
+    pure $ VertWithSlope { id : i, position : v, slope : slope }
 
 updateSlope :: Angle -> VertWithSlope -> VertWithSlope
 updateSlope = set _slope
 
 -- intermediete data structure for constructing initial vertices and edges
 newtype VertInfo = VertInfo {
+    id        :: UUID,
+
     position  :: Vector3,
 
     edge      :: Maybe Edge,
@@ -54,6 +64,8 @@ newtype VertInfo = VertInfo {
     }
 
 derive instance newtypeVertInfo :: Newtype VertInfo _
+instance HasUUID VertInfo where
+    idLens = _id
 
 _isReflex :: forall t a r. Newtype t { isReflex :: a | r } => Lens' t a
 _isReflex = _Newtype <<< prop (Proxy :: Proxy "isReflex")
@@ -88,8 +100,8 @@ calcDir leftV leftSlope rightV rightSlope isReflex
             usable = abs (degreeVal a - 90.0) < 2.0
         in Tuple dir usable
 
-vertInfoFrom :: Vector3 -> Maybe Edge -> Number -> EdgeInfo -> EdgeInfo -> Maybe Vector3 -> Maybe Vector3 -> VertInfo
-vertInfoFrom p e h leftEdge rightEdge vecL vecR =
+vertInfoFrom :: UUID -> Vector3 -> Maybe Edge -> Number -> EdgeInfo -> EdgeInfo -> Maybe Vector3 -> Maybe Vector3 -> VertInfo
+vertInfoFrom i p e h leftEdge rightEdge vecL vecR =
     let leftVec  = direction (leftEdge ^. _line) <**> (-1.0)
         rightVec = direction $ rightEdge ^. _line
         lv       = fromMaybe leftVec $ normal <$> vecL
@@ -101,6 +113,7 @@ vertInfoFrom p e h leftEdge rightEdge vecL vecR =
 
         Tuple dir usable = calcDir leftVec lSlope rightVec rSlope isReflex
     in VertInfo {
+        id        : i,
         position  : p,
 
         edge      : e,

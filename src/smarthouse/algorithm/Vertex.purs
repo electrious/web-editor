@@ -56,15 +56,15 @@ vertToSink v = Tuple (v ^. _position) (v ^. _height)
 
 -- create a Vectex from a point and edges it connects to
 vertexFrom :: UUID -> Vector3 -> Maybe Edge -> Number -> Edge -> Edge -> Maybe Vector3 -> Maybe Vector3 -> Effect Vertex
-vertexFrom lavId p e h leftEdge rightEdge vecL vecR = vertexFromVertInfo lavId leftEdge rightEdge vi
-    where vi = vertInfoFrom p e h (leftEdge ^. _line) (rightEdge ^. _line) vecL vecR
+vertexFrom lavId p e h leftEdge rightEdge vecL vecR = do
+    i <- genUUID
+    let vi = vertInfoFrom i p e h (leftEdge ^. _line) (rightEdge ^. _line) vecL vecR
+    pure $ vertexFromVertInfo lavId leftEdge rightEdge vi
 
 -- create vertex from edges and VertInfo data
-vertexFromVertInfo :: UUID -> Edge -> Edge -> VertInfo -> Effect Vertex
-vertexFromVertInfo lavId leftEdge rightEdge vi = do
-    i <- genUUID
-    pure $ Vertex {
-        id        : i,
+vertexFromVertInfo :: UUID -> Edge -> Edge -> VertInfo -> Vertex
+vertexFromVertInfo lavId leftEdge rightEdge vi = Vertex {
+        id        : vi ^. idLens,
         position  : vi ^. _position,
 
         edge      : vi ^. _edge,

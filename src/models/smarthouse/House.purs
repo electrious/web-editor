@@ -83,12 +83,11 @@ _peakPoint = _Newtype <<< prop (Proxy :: Proxy "peakPoint")
 createHouseFrom :: Angle -> Polygon Vector3 -> Effect House
 createHouseFrom slope poly = do
     i <- genUUID
-    let floor = flip vertWithSlope slope <$> counterClockPoly poly
-    hi <- houseParamFrom floor
+    floor <- traverse (flip vertWithSlope slope) (counterClockPoly poly)
+    let hi = houseParamFrom floor
     Tuple trees edges <- skeletonize hi
-    roofs <- generateRoofs (S.fromFoldable trees) edges
-
-    let n = findPeakPoint trees
+    let roofs = generateRoofs (S.fromFoldable trees) edges
+        n = findPeakPoint trees
     
     pure $ House {
         id        : i,
@@ -126,9 +125,9 @@ updateSlopeForRoof roof slope h = updateHouseWith floor h
 -- new floor polygon
 updateHouseWith :: Polygon VertWithSlope -> House -> Effect House
 updateHouseWith floor h = do
-    hi <- houseParamFrom floor
+    let hi = houseParamFrom floor
     Tuple trees edges <- skeletonize hi
-    roofs <- generateRoofs (S.fromFoldable trees) edges
+    let roofs = generateRoofs (S.fromFoldable trees) edges
 
     pure $ h # _floor    .~ floor
              # _trees    .~ UM.fromFoldable trees
@@ -143,8 +142,8 @@ flipRoof i h = do
         ts  = h ^. _trees
         -- flip the subtree at idx
         nts = M.update (Just <<< flip flipSubtree vs) i ts
-    -- generate new roofs
-    roofs <- generateRoofs (S.fromFoldable nts) (h ^. _edges)
+        -- generate new roofs
+        roofs = generateRoofs (S.fromFoldable nts) (h ^. _edges)
 
     pure $ h # _roofs .~ UM.fromFoldable roofs
              # _trees .~ nts
