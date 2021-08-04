@@ -11,7 +11,8 @@ import Data.Generic.Rep (class Generic)
 import Data.Lens (Lens', set, view, (%~), (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.List (List, findIndex, fromFoldable)
+import Data.List (List, concatMap, findIndex, fromFoldable)
+import Data.Map (values)
 import Data.Map as M
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Meter (Meter, meter, meterVal)
@@ -28,18 +29,19 @@ import Effect (Effect)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Math.Angle (Angle, degree)
+import Math.LineSeg (LineSeg)
 import Model.Polygon (Polygon, _polyVerts, counterClockPoly, modifyVertAt)
 import Model.Roof.RoofPlate (Point, vec2Point)
 import Model.SmartHouse.Roof (JSRoof, Roof, RoofState(..), exportRoof, roofState)
 import Model.UUID (class HasUUID, idLens)
-import SmartHouse.Algorithm.Edge (Edge)
+import SmartHouse.Algorithm.Edge (Edge, _lineEdge)
 import SmartHouse.Algorithm.HouseParam (houseParamFrom)
 import SmartHouse.Algorithm.Skeleton (skeletonize)
 import SmartHouse.Algorithm.VertInfo (VertWithSlope, updateSlope, vertWithSlope)
 import SmartHouse.Algorithm.VertNode (VertNode)
 import SmartHouse.ShadeOption (ShadeOption)
 import Smarthouse.Algorithm.RoofGeneration (generateRoofs)
-import Smarthouse.Algorithm.Subtree (Subtree, _source, flipSubtree)
+import Smarthouse.Algorithm.Subtree (Subtree, _source, flipSubtree, treeLines)
 import Three.Math.Vector (Vector3)
 import Type.Proxy (Proxy(..))
 
@@ -158,6 +160,22 @@ updateActiveRoofSlope a (Just ai) h = do
         f r = updateSlopeForRoof r a h
     nh <- traverse f roof
     pure $ fromMaybe h nh
+
+
+getHouseLines :: House -> List (LineSeg Vector3)
+getHouseLines h = tLines <> eLines
+    where -- all source VertNodes from all trees
+          allNodes = UM.fromFoldable $ view _source <$> h ^. _trees
+          -- get latest VertNode from allNodes
+          getN n = fromMaybe n $ M.lookup (n ^. idLens) allNodes
+          
+          tls = concatMap treeLines (values $ h ^. _trees)
+
+          -- NOTE: some sink VertNode in a subtree might not be up to date
+          -- due to Gable roof toggling. Get the node with getN to make
+          -- sure it's used correctly.
+          tLines = map (view _position <<< getN) <$> tls
+          eLines = view _lineEdge <$> h ^. _edges
 
 exportHouse :: House -> JSHouse
 exportHouse h = JSHouse { id: h ^. idLens, floor: floor, height: meterVal $ h ^. _height, roofs: roofs }

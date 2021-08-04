@@ -10,8 +10,8 @@ import Data.Foldable (traverse_)
 import Data.Lens (Lens', view, (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.List (List(..), concatMap)
-import Data.Map (Map, lookup, values)
+import Data.List (List(..))
+import Data.Map (Map, lookup)
 import Data.Map as M
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Meter (Meter, meterVal)
@@ -44,7 +44,7 @@ import Model.Racking.OldRackingSystem (OldRoofRackingData, guessRackingType)
 import Model.Racking.RackingType (RackingType(..))
 import Model.Roof.Panel (Alignment(..), Orientation(..), PanelsDict, panelsDict)
 import Model.Roof.RoofPlate (RoofPlate, _roofIntId)
-import Model.SmartHouse.House (House, _peakPoint, _trees, flipRoof, updateActiveRoofShade, updateActiveRoofSlope, updateHeight, updateSlopes)
+import Model.SmartHouse.House (House, _peakPoint, _trees, flipRoof, getHouseLines, updateActiveRoofShade, updateActiveRoofSlope, updateHeight, updateSlopes)
 import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo)
 import Model.SmartHouse.Roof (Roof, RoofEvents, _flipped, renderActRoofOutline, renderRoof)
 import Model.UUID (idLens)
@@ -55,7 +55,7 @@ import Rendering.Node (Node, _exportable, fixNodeDWith, getEnv, getParent, local
 import SmartHouse.Algorithm.Edge (_lineEdge)
 import SmartHouse.ShadeOption (ShadeOption)
 import SmartHouse.SlopeEditor (_maxHeightToEdge, slopeEditor)
-import Smarthouse.Algorithm.Subtree (_sinks, _source, treeLines)
+import Smarthouse.Algorithm.Subtree (_sinks, _source)
 import Smarthouse.HouseNode (HouseNode, HouseOp(..), _actHouseRoof, _activated)
 import Three.Core.Geometry (_bevelEnabled, _depth, mkExtrudeGeometry, mkShape)
 import Three.Core.Material (MeshPhongMaterial, mkLineBasicMaterial, mkMeshPhongMaterial)
@@ -235,12 +235,6 @@ renderWalls poly height = do
                       # _exportable .~ true) geo wallMat
     pure $ const unit <$> m ^. _tapped
 
-
-getHouseLines :: House -> List (LineSeg Vector3)
-getHouseLines h = tLines <> eLines
-    where tls = concatMap treeLines (values $ h ^. _trees)
-          tLines = map (view _position) <$> tls
-          eLines = view _lineEdge <$> h ^. _edges
 
 renderLengths :: forall e. Maybe (List (LineSeg Vector3)) -> Node e Unit
 renderLengths (Just ls) = traverse_ renderLineLength ls
