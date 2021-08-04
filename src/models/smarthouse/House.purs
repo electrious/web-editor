@@ -136,17 +136,15 @@ updateHouseWith floor h = do
              # _peakPoint .~ findPeakPoint trees
 
 -- flip a roof to/from gable
-flipRoof :: UUID -> House -> Effect House
-flipRoof i h = do
-    let vs  = fromFoldable $ view _position <$> h ^. _floor <<< _polyVerts
-        ts  = h ^. _trees
-        -- flip the subtree at idx
-        nts = M.update (Just <<< flip flipSubtree vs) i ts
-        -- generate new roofs
-        roofs = generateRoofs (S.fromFoldable nts) (h ^. _edges)
-
-    pure $ h # _roofs .~ UM.fromFoldable roofs
-             # _trees .~ nts
+flipRoof :: UUID -> House -> House
+flipRoof i h = h # _roofs .~ UM.fromFoldable roofs
+                 # _trees .~ nts
+    where vs  = fromFoldable $ view _position <$> h ^. _floor <<< _polyVerts
+          ts  = h ^. _trees
+          -- flip the subtree at idx
+          nts = M.update (Just <<< flip flipSubtree vs) i ts
+          -- generate new roofs
+          roofs = generateRoofs (S.fromFoldable nts) (h ^. _edges)
 
 updateActiveRoofShade :: ShadeOption -> Maybe UUID -> House -> House
 updateActiveRoofShade _ Nothing   h = h

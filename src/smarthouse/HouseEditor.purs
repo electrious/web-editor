@@ -197,7 +197,7 @@ editHouse houseCfg conf = do
     
             let newHouseEvt1 = sampleDyn houseDyn $ updateHeight <$> hEvt
                 newHouseEvt2 = performEvent $ sampleDyn houseDyn $ updateSlopes <$> sEvt
-                newHouseEvt3 = performEvent $ sampleDyn houseDyn $ flipRoof <$> flipEvt
+                newHouseEvt3 = sampleDyn houseDyn $ flipRoof <$> flipEvt
                 newHouseEvt4 = sampleDyn houseDyn $ sampleDyn actRoofIdDyn $ updateActiveRoofShade <$> conf ^. _shadeSelected
                 newHouseEvt5 = performEvent $ sampleDyn houseDyn $ sampleDyn actRoofIdDyn $ updateActiveRoofSlope <$> conf ^. _slopeSelected
 

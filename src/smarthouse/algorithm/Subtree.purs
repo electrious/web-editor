@@ -11,15 +11,14 @@ import Data.List (List(..), elem, (:))
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
-import Data.Tuple (Tuple(..))
 import Data.UUID (UUID, genUUID)
 import Editor.Common.Lenses (_edges, _id, _position)
 import Effect (Effect)
 import Math.LineSeg (LineSeg, mkLineSeg)
 import Model.UUID (class HasUUID, idLens)
 import SmartHouse.Algorithm.Edge (Edge)
-import SmartHouse.Algorithm.VertNode (VertNode)
-import Three.Math.Vector (Vector3, (<**>), (<+>))
+import SmartHouse.Algorithm.VertNode (VertNode, setZ)
+import Three.Math.Vector (Vector3, vecZ, (<**>), (<+>))
 import Type.Proxy (Proxy(..))
 
 data SubtreeType = NormalNode
@@ -101,12 +100,13 @@ treeLines t = mkLineSeg s <$> t ^. _sinks
     where s = t ^. _source
 
 gableSubtree :: Subtree -> List Vector3 -> Subtree
-gableSubtree t vs = mkT $ foldl f (Tuple 0 Nil) (view _position <$> t ^. _sinks)
-    where f (Tuple n ls) v = if elem v vs
-                             then Tuple (n + 1) (Cons v ls)
-                             else Tuple n ls
-          mkT (Tuple _ ls) = case ls of
-              (v1:v2:_) -> let np = (v1 <+> v2) <**> 0.5
+gableSubtree t vs = mkT $ foldl f Nil (view _position <$> t ^. _sinks)
+    where f ls v = if elem v vs
+                   then Cons v ls
+                   else ls
+          mkT ls = case ls of
+              (v1:v2:_) -> let op = t ^. _source <<< _position
+                               np = setZ (vecZ op) ((v1 <+> v2) <**> 0.5)
                            in t # _source          %~ set _position np
                                 # _isGable         .~ true
                                 # _originalSubtree .~ Just t
