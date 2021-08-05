@@ -8,7 +8,7 @@ import Data.Default (class Default, def)
 import Data.Filterable (filter)
 import Data.Foldable (class Foldable, foldl)
 import Data.Generic.Rep (class Generic)
-import Data.Lens (Lens', set, view, (%~), (.~), (^.))
+import Data.Lens (Lens', view, (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (List, concatMap, findIndex, fromFoldable)
@@ -24,7 +24,7 @@ import Data.Tuple (Tuple(..))
 import Data.UUID (UUID, emptyUUID, genUUID)
 import Data.UUIDMap (UUIDMap)
 import Data.UUIDMap as UM
-import Editor.Common.Lenses (_edge, _edges, _floor, _height, _id, _position, _roofs, _shade, _slope)
+import Editor.Common.Lenses (_edge, _edges, _floor, _height, _id, _position, _roofs, _slope)
 import Effect (Effect)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
@@ -39,7 +39,6 @@ import SmartHouse.Algorithm.HouseParam (houseParamFrom)
 import SmartHouse.Algorithm.Skeleton (skeletonize)
 import SmartHouse.Algorithm.VertInfo (VertWithSlope, updateSlope, vertWithSlope)
 import SmartHouse.Algorithm.VertNode (VertNode)
-import SmartHouse.ShadeOption (ShadeOption)
 import Smarthouse.Algorithm.RoofGeneration (generateRoofs)
 import Smarthouse.Algorithm.Subtree (Subtree, _source, flipSubtree, treeLines)
 import Three.Math.Vector (Vector3)
@@ -147,11 +146,6 @@ flipRoof i h = h # _roofs .~ UM.fromFoldable roofs
           nts = M.update (Just <<< flip flipSubtree vs) i ts
           -- generate new roofs
           roofs = generateRoofs (S.fromFoldable nts) (h ^. _edges)
-
-updateActiveRoofShade :: ShadeOption -> Maybe UUID -> House -> House
-updateActiveRoofShade _ Nothing   h = h
-updateActiveRoofShade s (Just ai) h = h # _roofs %~ M.update f ai
-    where f r = Just $ set _shade s r
 
 updateActiveRoofSlope :: Angle -> Maybe UUID -> House -> Effect House
 updateActiveRoofSlope _ Nothing   h = pure h

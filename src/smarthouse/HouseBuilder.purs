@@ -28,7 +28,7 @@ import Data.Traversable (traverse)
 import Data.Tuple (fst)
 import Data.UUID (UUID)
 import Data.UUIDMap (UUIDMap)
-import Editor.Common.Lenses (_apiConfig, _buttons, _height, _houseId, _leadId, _modeDyn, _mouseMove, _name, _panelType, _panels, _parent, _roofs, _shadeSelected, _slope, _slopeSelected, _tapped, _textureInfo, _updated, _width)
+import Editor.Common.Lenses (_apiConfig, _buttons, _height, _houseId, _leadId, _modeDyn, _mouseMove, _name, _panelType, _panels, _parent, _roofs, _slope, _slopeSelected, _tapped, _textureInfo, _updated, _width)
 import Editor.Editor (Editor, _sizeDyn, setMode)
 import Editor.EditorMode as EditorMode
 import Editor.HouseEditor (ArrayEditParam, HouseConfig, _dataServer, _heatmapTexture, _rotBtnTexture)
@@ -36,11 +36,11 @@ import Editor.RoofManager (RoofsData)
 import Editor.SceneEvent (size)
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import FRP.Dynamic (Dynamic, dynEvent, gateDyn, performDynamic, sampleDyn, step)
+import FRP.Dynamic (Dynamic, dynEvent, performDynamic, sampleDyn, step)
 import FRP.Event (Event, create, keepLatest, sampleOn, sampleOn_, subscribe)
 import FRP.Event.Extra (delay, multicast, performEvent)
 import Math.Angle (Angle, degree)
-import Model.ActiveMode (ActiveMode(..), fromBoolean, isActive)
+import Model.ActiveMode (ActiveMode(..), fromBoolean)
 import Model.Hardware.PanelTextureInfo (PanelTextureInfo)
 import Model.Hardware.PanelType (PanelType(..))
 import Model.SmartHouse.House (House, JSHouses(..), _trees, createHouseFrom, exportHouse)
@@ -55,7 +55,6 @@ import Rendering.TextureLoader (textureFromUrl)
 import SmartHouse.ActiveItemUI (_deleteHouse)
 import SmartHouse.HouseEditor (HouseRenderMode(..), _arrayEditParam, _house, _roofsData, editHouse, renderHouse)
 import SmartHouse.HouseTracer (TracerMode(..), _stopTracing, _tracedPolygon, _tracerMode, _undoTracing, traceHouse)
-import SmartHouse.ShadeOption (ShadeOption)
 import SmartHouse.TreeBuilder (buildTree, editTree)
 import SmartHouse.UI (_activeItemDyn, _savingStepDyn, houseBuilderUI)
 import Smarthouse.HouseNode (HouseNode, HouseOp(..), _actHouseRoof, _activated)
@@ -248,8 +247,8 @@ getActiveTree tid hd = M.lookup tid (hd ^. _trees)
 getTreeUpd :: forall f. Foldable f => Functor f => f TreeNode -> Event TreeOp
 getTreeUpd = foldEvtWith (view _updated)
 
-renderHouseDict :: Dynamic (Maybe UUID) -> HouseConfig -> ArrayEditParam -> Event Angle -> Event ShadeOption -> Event RoofsData -> HouseDict -> Node HouseTextureInfo (UUIDMap HouseNode)
-renderHouseDict actIdDyn houseCfg arrParam slopeEvt shadeEvt roofsDatEvt houses = traverse render houses
+renderHouseDict :: Dynamic (Maybe UUID) -> HouseConfig -> ArrayEditParam -> Event Angle -> Event RoofsData -> HouseDict -> Node HouseTextureInfo (UUIDMap HouseNode)
+renderHouseDict actIdDyn houseCfg arrParam slopeEvt roofsDatEvt houses = traverse render houses
     where getMode h (Just i) | h ^. idLens == i = Active
                              | otherwise        = Inactive
           getMode _ Nothing                     = Inactive
@@ -260,7 +259,6 @@ renderHouseDict actIdDyn houseCfg arrParam slopeEvt shadeEvt roofsDatEvt houses 
                          editHouse houseCfg $ def # _modeDyn        .~ md
                                                   # _house          .~ h
                                                   # _slopeSelected  .~ slopeEvt
-                                                  # _shadeSelected  .~ gateDyn (isActive <$> md) shadeEvt
                                                   # _roofsData      .~ roofsDatEvt
                                                   # _arrayEditParam .~ arrParam
                      else renderHouse h
@@ -285,7 +283,6 @@ newtype BuilderInputEvts = BuilderInputEvts {
     export        :: Event Unit,
     undoTracing   :: Event Unit,
     stopTracing   :: Event Unit,
-    shadeSelected :: Event ShadeOption,
     slope         :: Event Angle,       -- slope event for all roofs
     slopeSelected :: Event Angle,       -- slope event for active roof
     deleteHouse   :: Event Unit,
@@ -298,7 +295,6 @@ instance Default BuilderInputEvts where
         export        : empty,
         undoTracing   : empty,
         stopTracing   : empty,
-        shadeSelected : empty,
         slope         : empty,
         slopeSelected : empty,
         deleteHouse   : empty,
@@ -348,12 +344,11 @@ builderForHouse evts tInfo =
                     treesToRenderEvt = compact $ view _treesToRender <$> hdEvt
                     houseCfg = houseCfgFromBuilderCfg cfg
 
-                    shadeEvt = evts ^. _shadeSelected
                     slopeEvt = evts ^. _slopeSelected
                     arrParam = def
                 
                 -- render houses and trees
-                nodesEvt <- localEnv (const tInfo) $ eventNode (renderHouseDict actIdDyn houseCfg arrParam slopeEvt shadeEvt roofsDatEvt <$> houseToRenderEvt)
+                nodesEvt <- localEnv (const tInfo) $ eventNode (renderHouseDict actIdDyn houseCfg arrParam slopeEvt roofsDatEvt <$> houseToRenderEvt)
                 treesEvt <- eventNode (renderTrees actIdDyn <$> treesToRenderEvt)
 
                 let deactEvt    = multicast $ const Nothing <$> helper ^. _tapped
@@ -479,7 +474,6 @@ buildHouse editor cfg = do
     { event: expEvt, push: toExp } <- create
     { event: undoTracingEvt, push: toUndoTracing } <- create
     { event: stopTracingEvt, push: toStopTracing } <- create
-    { event: shadeEvt, push: selectShade } <- create
     { event: slopeEvt, push: selectSlope } <- create
     { event: delHouseEvt, push: delHouse } <- create
     { event: treeEvt, push: buildTree } <- create
@@ -487,7 +481,6 @@ buildHouse editor cfg = do
     let inputEvts = def # _export        .~ expEvt
                         # _undoTracing   .~ undoTracingEvt
                         # _stopTracing   .~ stopTracingEvt
-                        # _shadeSelected .~ shadeEvt
                         # _slopeSelected .~ slopeEvt
                         # _deleteHouse   .~ delHouseEvt
                         # _buildTree     .~ treeEvt
@@ -505,7 +498,6 @@ buildHouse editor cfg = do
     void $ subscribe (const unit <$> uiEvts ^. _buttons <<< _save) toExp
     void $ subscribe (const unit <$> uiEvts ^. _buttons <<< _reset) toStopTracing
     void $ subscribe (const unit <$> uiEvts ^. _buttons <<< _undo) toUndoTracing
-    void $ subscribe (uiEvts ^. _shadeSelected) selectShade
     void $ subscribe (uiEvts ^. _slopeSelected) selectSlope
     void $ subscribe (uiEvts ^. _deleteHouse) delHouse
     void $ subscribe (uiEvts ^. _buildTree) buildTree

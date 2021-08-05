@@ -7,7 +7,6 @@ import Control.Alternative (empty)
 import Custom.Mesh (TappableMesh)
 import Data.Compactable (compact)
 import Data.Default (class Default, def)
-import Data.Enum (fromEnum)
 import Data.Generic.Rep (class Generic)
 import Data.Lens (Lens', view, (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
@@ -23,7 +22,7 @@ import Data.Traversable (traverse_)
 import Data.UUID (UUID)
 import Data.UUIDMap (UUIDMap)
 import Data.UUIDMap as UM
-import Editor.Common.Lenses (_id, _name, _normal, _polygon, _shade, _tapped)
+import Editor.Common.Lenses (_id, _name, _normal, _polygon, _tapped)
 import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, gateDyn)
@@ -41,7 +40,6 @@ import Rendering.Line (renderLineOnlyWith)
 import Rendering.Node (Node, _exportable, getEnv, tapMesh)
 import SmartHouse.Algorithm.Edge (Edge)
 import SmartHouse.PolyGeometry (mkPolyGeometry, mkPolyGeometryWithUV)
-import SmartHouse.ShadeOption (ShadeOption(..))
 import Smarthouse.Algorithm.Subtree (Subtree, _isGable)
 import Three.Core.Material (LineBasicMaterial, MeshPhongMaterial, mkLineBasicMaterial, mkMeshBasicMaterialWithTexture, mkMeshPhongMaterial)
 import Three.Math.Vector (Vector3, mkVec3, vecX, vecY, vecZ)
@@ -57,7 +55,6 @@ newtype Roof = Roof {
     polygon  :: Polygon Vector3,
     subtrees :: UUIDMap Subtree,
 
-    shade    :: ShadeOption,
     edge     :: Edge,
     slope    :: Angle,
 
@@ -77,7 +74,7 @@ _subtrees :: forall t a r. Newtype t { subtrees :: a | r } => Lens' t a
 _subtrees = _Newtype <<< prop (Proxy :: Proxy "subtrees")
 
 createRoofFrom :: UUID -> Polygon Vector3 -> Set Subtree -> Edge -> Vector3 -> Angle -> Roof
-createRoofFrom i p ts e n s = Roof { id : i, polygon : p, subtrees : UM.fromSet ts, shade : NoShade, edge : e, slope: s, normal : n }
+createRoofFrom i p ts e n s = Roof { id : i, polygon : p, subtrees : UM.fromSet ts, edge : e, slope: s, normal : n }
 
 -- check if a roof can be gable
 canBeGable :: Roof -> Boolean
@@ -98,7 +95,7 @@ roofPlane :: Roof -> Plane
 roofPlane = polyPlane <<< view _polygon
 
 exportRoof :: Meter -> Roof -> JSRoof
-exportRoof h r = JSRoof { id: r ^. idLens, polygon: mkP <$> r ^. _polygon <<< _polyVerts, shade : fromEnum (r ^. _shade) }
+exportRoof h r = JSRoof { id: r ^. idLens, polygon: mkP <$> r ^. _polygon <<< _polyVerts }
     where hv = meterVal h
           mkP v = vec2Point $ mkVec3 (vecX v) (vecY v) (vecZ v + hv)
 
@@ -106,8 +103,7 @@ exportRoof h r = JSRoof { id: r ^. idLens, polygon: mkP <$> r ^. _polygon <<< _p
 -- The Roof data structure saved to server
 newtype JSRoof = JSRoof {
     id      :: UUID,
-    polygon :: Array Point,
-    shade   :: Int
+    polygon :: Array Point
     }
 
 derive instance Generic JSRoof _

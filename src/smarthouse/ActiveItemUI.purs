@@ -5,12 +5,12 @@ import Prelude hiding (div, degree)
 import Control.Alternative (empty)
 import Data.Default (class Default, def)
 import Data.Int (round)
-import Data.Lens (Lens', view, (.~), (^.))
+import Data.Lens (Lens', view, (.~))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (class Newtype)
-import Editor.Common.Lenses (_roof, _shade, _shadeSelected, _slope, _slopeSelected)
+import Editor.Common.Lenses (_slope, _slopeSelected)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic)
@@ -18,8 +18,6 @@ import FRP.Event (Event, create)
 import Math.Angle (Angle, degreeVal, fromString)
 import Model.SmartHouse.Roof (Roof)
 import Models.SmartHouse.ActiveItem (ActiveItem(..), activeRoof)
-import SmartHouse.ShadeOption (ShadeOption)
-import SmartHouse.ShadeOptionUI (shadeSelector)
 import Specular.Dom.Browser (Attrs)
 import Specular.Dom.Browser as DOM
 import Specular.Dom.Element (attr, attrsD, class_, classes, dynText, on, valueD)
@@ -36,16 +34,14 @@ import Unsafe.Coerce (unsafeCoerce)
 
 newtype ActiveItemUI = ActiveItemUI {
     deleteHouse   :: Event Unit,
-    slopeSelected :: Event Angle,
-    shadeSelected :: Event ShadeOption
+    slopeSelected :: Event Angle
     }
 
 derive instance Newtype ActiveItemUI _
 instance Default ActiveItemUI where
     def = ActiveItemUI {
         deleteHouse   : empty,
-        slopeSelected : empty,
-        shadeSelected : empty
+        slopeSelected : empty
         }
 
 _deleteHouse :: forall t a r. Newtype t { deleteHouse :: a | r } => Lens' t a
@@ -57,11 +53,6 @@ activeItemUIStyle :: Boolean -> Attrs
 activeItemUIStyle d = mkStyle [
     "display" :~ if d then "flex" else "none"
     ]
-
-
-getShadeOption :: ActiveItem -> Maybe ShadeOption
-getShadeOption (ActiveHouse r) = view _shade <$> r ^. _roof
-getShadeOption (ActiveTree _) = Nothing
 
 
 subtitle :: Maybe ActiveItem -> String
@@ -140,9 +131,7 @@ activeItemUI actItemDyn = do
         
         slopeEvt <- dynSlopeUI $ join <<< map activeRoof <$> actItemDyn
 
-        selEvt <- shadeSelector $ join <<< map getShadeOption <$> actItemDyn
         delEvt <- delButton actItemDyn
 
-        pure $ def # _shadeSelected .~ selEvt
-                   # _slopeSelected .~ slopeEvt
+        pure $ def # _slopeSelected .~ slopeEvt
                    # _deleteHouse   .~ delEvt
