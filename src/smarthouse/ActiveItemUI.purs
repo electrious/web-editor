@@ -3,32 +3,35 @@ module SmartHouse.ActiveItemUI where
 import Prelude hiding (div, degree)
 
 import Control.Alternative (empty)
-import Data.Compactable (compact)
 import Data.Default (class Default, def)
+import Data.Int (round)
 import Data.Lens (Lens', view, (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (class Newtype)
 import Editor.Common.Lenses (_roof, _shade, _shadeSelected, _slope, _slopeSelected)
+import Effect (Effect)
 import Effect.Class (liftEffect)
-import FRP.Dynamic (Dynamic, dynEvent, latestEvt)
-import FRP.Event (Event)
+import FRP.Dynamic (Dynamic)
+import FRP.Event (Event, create)
 import Math.Angle (Angle, degreeVal, fromString)
 import Model.SmartHouse.Roof (Roof)
 import Models.SmartHouse.ActiveItem (ActiveItem(..), activeRoof)
 import SmartHouse.ShadeOption (ShadeOption)
 import SmartHouse.ShadeOptionUI (shadeSelector)
 import Specular.Dom.Browser (Attrs)
-import Specular.Dom.Element (attr, attrsD, bindValueOnChange, bindValueOnInput, class_, classes, dynText, valueD)
+import Specular.Dom.Browser as DOM
+import Specular.Dom.Element (attr, attrsD, class_, classes, dynText, on, valueD)
 import Specular.Dom.Element.Class (el)
+import Specular.Dom.Node.Class (Node)
 import Specular.Dom.Widget (Widget)
 import Specular.Dom.Widgets.Button (buttonOnClick)
-import Specular.FRP (dynamic)
-import Specular.Ref (new, value)
+import Specular.Dom.Widgets.Input (getTextInputValue)
 import Type.Proxy (Proxy(..))
-import UI.Bridge (fromUIDyn, fromUIEvent, toUIDyn)
-import UI.Utils (div, mkAttrs, mkStyle, (:~))
+import UI.Bridge (fromUIEvent, toUIDyn)
+import UI.Utils (div, mkAttrs, mkStyle, visible, (:~))
+import Unsafe.Coerce (unsafeCoerce)
 
 
 newtype ActiveItemUI = ActiveItemUI {
@@ -81,44 +84,53 @@ delButton actItemDyn =
         e <- buttonOnClick (pure $ mkAttrs ["class" :~ "uk-button uk-button-danger"]) $ dynText $ delBtnLabel <$> d
         fromUIEvent e
 
-houseSlopeUI :: Angle -> Widget (Event Angle)
-houseSlopeUI slope =
-    div [classes ["uk-flex"]] do
-        let slopeStr = show $ degreeVal slope
-        -- slope ref bind to the change value for each interaction
-        slopeRef    <- new slopeStr
+showAngle :: Angle -> String
+showAngle a = show (round $ degreeVal a)
 
-        -- slope ref bind to the change only when the value changes
-        slopeValRef <- new slopeStr
+showMaybeAngle :: Maybe Angle -> String
+showMaybeAngle Nothing  = "0°"
+showMaybeAngle (Just a) = showAngle a
+
+appendDegSym :: String -> String
+appendDegSym s = s <> "°"
+
+withTargetValue :: (String -> Effect Unit) -> (DOM.Event -> Effect Unit)
+withTargetValue cb = \event -> do
+  value <- getTextInputValue (unsafeEventTarget event)
+  cb value
+
+unsafeEventTarget :: DOM.Event -> Node
+unsafeEventTarget e = (unsafeCoerce e).target
+
+houseSlopeUI :: Dynamic (Maybe Angle) -> Widget (Event Angle)
+houseSlopeUI slopeDyn = do
+    slopeDynU <- liftEffect $ toUIDyn slopeDyn
+    div [class_ "uk-flex", visible (isJust <$> slopeDynU)] do
+        let slopeStrDyn = showMaybeAngle <$> slopeDynU
+
+        -- create new slope event for user interaction
+        { event: slopeEvt, push: slopePush } <- liftEffect create
+        -- convert value string to slope angle and push it to the event
+        let pushNewVal v = case fromString v of
+                Just a -> slopePush a
+                Nothing -> pure unit
 
         -- show the range slide to select the slope
         el "input" [attr "type" "range",
                     attr "min" "5",
                     attr "max" "85",
                     attr "step" "1",
-                    valueD $ pure slopeStr,
-                    bindValueOnInput slopeRef,
-                    bindValueOnChange slopeValRef
+                    valueD slopeStrDyn,
+                    on "input" (withTargetValue pushNewVal)
                     ] $ pure unit
 
-        let newSlopeDyn = value slopeRef
-            newSlopeStrDyn = (flip (<>) "°") <$> newSlopeDyn
+        el "div" [ class_ "uk-margin-left"] $ dynText $ appendDegSym <$> slopeStrDyn
 
-        el "div" [ class_ "uk-margin-left"] $ dynText $ newSlopeStrDyn
-
-        slopeValDyn <- fromUIDyn $ fromString <$> value slopeRef
-
-        pure $ compact $ dynEvent slopeValDyn
+        pure slopeEvt
 
 
 dynSlopeUI :: Dynamic (Maybe Roof) -> Widget (Event Angle)
-dynSlopeUI roofDyn = do
-    let f (Just r) = houseSlopeUI $ r ^. _slope
-        f Nothing  = pure empty
-    
-    rDyn <- liftEffect $ toUIDyn roofDyn
-    resDyn <- fromUIDyn =<< dynamic (f <$> rDyn)
-    pure $ latestEvt resDyn
+dynSlopeUI roofDyn = houseSlopeUI (map (view _slope) <$> roofDyn)
 
 activeItemUI :: Dynamic (Maybe ActiveItem) -> Widget ActiveItemUI
 activeItemUI actItemDyn = do

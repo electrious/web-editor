@@ -67,3 +67,8 @@ disable :: Dynamic Boolean -> Prop
 disable = attrsD <<< map f
     where f true  = "disabled" := ""
           f false = empty
+
+visible :: Dynamic Boolean -> Prop
+visible = attrsD <<< map f
+    where f true  = empty
+          f false = "hidden" := ""
