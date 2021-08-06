@@ -28,7 +28,7 @@ import Editor.Common.Lenses (_edge, _edges, _floor, _height, _id, _position, _ro
 import Effect (Effect)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
-import Math.Angle (Angle)
+import Math.Angle (Angle, degree)
 import Math.LineSeg (LineSeg)
 import Model.Polygon (Polygon, _polyVerts, counterClockPoly, modifyVertAt)
 import Model.Roof.RoofPlate (Point, vec2Point)
@@ -44,6 +44,10 @@ import Smarthouse.Algorithm.RoofGeneration (generateRoofs)
 import Smarthouse.Algorithm.Subtree (Subtree, _source, flipSubtree, treeLines)
 import Three.Math.Vector (Vector3)
 import Type.Proxy (Proxy(..))
+
+
+defaultSlope :: Angle
+defaultSlope = degree 30.0
 
 newtype House = House {
     id        :: UUID,

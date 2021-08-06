@@ -5,20 +5,23 @@ import Prelude hiding (div, degree)
 import Control.Alternative (empty)
 import Data.Default (class Default, def)
 import Data.Int (round)
-import Data.Lens (Lens', view, (.~))
+import Data.Lens (Lens', view, (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
+import Data.List (head)
+import Data.Map (values)
 import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Newtype (class Newtype)
-import Editor.Common.Lenses (_slope, _slopeSelected)
+import Editor.Common.Lenses (_roof, _roofs, _slope, _slopeSelected)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic, dynEvent, step)
 import FRP.Event (Event, create)
 import Foreign.Object as Obj
 import Math.Angle (Angle, degree, degreeVal, fromString)
-import Model.SmartHouse.Roof (Roof)
-import Models.SmartHouse.ActiveItem (ActiveItem(..), activeRoof, isActiveHouse)
+import Model.SmartHouse.House (defaultSlope)
+import Models.SmartHouse.ActiveItem (ActHouseRoof, ActiveItem(..), activeHouse, isActiveHouse)
+import SmartHouse.HouseEditor (_house)
 import SmartHouse.SlopeOption (SlopeOption, slopeOption)
 import Specular.Dom.Browser (Attrs)
 import Specular.Dom.Browser as DOM
@@ -76,10 +79,6 @@ delButton actItemDyn = do
 showAngle :: Angle -> String
 showAngle a = show (round $ degreeVal a)
 
-showMaybeAngle :: Maybe Angle -> String
-showMaybeAngle Nothing  = "0°"
-showMaybeAngle (Just a) = showAngle a
-
 appendDegSym :: String -> String
 appendDegSym s = s <> "°"
 
@@ -92,9 +91,9 @@ unsafeEventTarget :: DOM.Event -> Node
 unsafeEventTarget e = (unsafeCoerce e).target
 
 
-slopeSelector :: Dynamic (Maybe Angle) -> Widget (Event Angle)
+slopeSelector :: Dynamic Angle -> Widget (Event Angle)
 slopeSelector slopeDyn = div [class_ "uk-flex"] do
-    slopeStrDyn <- liftEffect $ toUIDyn $ showMaybeAngle <$> slopeDyn
+    slopeStrDyn <- liftEffect $ toUIDyn $ showAngle <$> slopeDyn
 
     -- create new slope event for user interaction
     { event: slopeEvt, push: slopePush } <- liftEffect create
@@ -123,16 +122,24 @@ slopeScopeUI = div [classes ["uk-flex", "uk-flex-row", "uk-flex-middle"]] do
 
     fromUIDyn checkD
 
-houseSlopeUI :: Dynamic Boolean -> Dynamic (Maybe Roof) -> Widget (Event SlopeOption)
-houseSlopeUI showDyn roofDyn = do
+getSlope :: Maybe ActHouseRoof -> Angle
+getSlope (Just h) = case h ^. _roof of
+    Just r  -> r ^. _slope
+    Nothing -> let r = head $ values $ h ^. _house <<< _roofs
+               in maybe defaultSlope (view _slope) r
+getSlope Nothing  = defaultSlope
+
+houseSlopeUI :: Dynamic Boolean -> Dynamic Angle -> Widget (Event SlopeOption)
+houseSlopeUI showDyn slopeDyn = do
     visDyn   <- liftEffect $ toUIDyn showDyn
     div [classes ["uk-flex", "uk-flex-column", "uk-margin-top"], visible visDyn] do
         text "Slope:"
-        slopeEvt <- slopeSelector $ map (view _slope) <$> roofDyn
+        slopeEvt <- slopeSelector slopeDyn
         scopeD   <- slopeScopeUI
         
         let slopeD = step (degree 30.0) slopeEvt
         pure $ dynEvent $ slopeOption <$> slopeD <*> scopeD
+
 
 activeItemUI :: Dynamic (Maybe ActiveItem) -> Widget ActiveItemUI
 activeItemUI actItemDyn = do
@@ -144,7 +151,7 @@ activeItemUI actItemDyn = do
         div [class_ "uk-text-bold"] $ dynText $ subtitle <$> d
 
         let isActHouseDyn = maybe false isActiveHouse <$> actItemDyn
-        slopeEvt <- houseSlopeUI isActHouseDyn $ join <<< map activeRoof <$> actItemDyn
+        slopeEvt <- houseSlopeUI isActHouseDyn $ getSlope <<< join <<< map activeHouse <$> actItemDyn
 
         delEvt <- delButton actItemDyn
 

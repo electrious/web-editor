@@ -39,11 +39,10 @@ import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic, dynEvent, performDynamic, sampleDyn, step)
 import FRP.Event (Event, create, keepLatest, sampleOn, sampleOn_, subscribe)
 import FRP.Event.Extra (delay, multicast, performEvent)
-import Math.Angle (degree)
 import Model.ActiveMode (ActiveMode(..), fromBoolean)
 import Model.Hardware.PanelTextureInfo (PanelTextureInfo)
 import Model.Hardware.PanelType (PanelType(..))
-import Model.SmartHouse.House (House, JSHouses(..), _trees, createHouseFrom, exportHouse)
+import Model.SmartHouse.House (House, JSHouses(..), _trees, createHouseFrom, defaultSlope, exportHouse)
 import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo, _imageFile, _size, _texture, mkHouseTextureInfo)
 import Model.SmartHouse.Tree (Tree, TreeNode, TreeOp(..))
 import Model.UUID (idLens)
@@ -375,7 +374,7 @@ builderForHouse evts tInfo =
 
                 -- create house from the traced polygon
                 let polyDyn   = step Nothing $ Just <$> traceRes ^. _tracedPolygon
-                    mkHouse   = traverse (createHouseFrom (degree 30.0))
+                    mkHouse   = traverse (createHouseFrom defaultSlope)
                     houseDyn  = performDynamic $ mkHouse <$> polyDyn
                     houseEvt  = compact $ dynEvent houseDyn
 
