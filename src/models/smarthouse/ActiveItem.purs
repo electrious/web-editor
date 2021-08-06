@@ -26,6 +26,10 @@ data ActiveItem = ActiveHouse ActHouseRoof
                 | ActiveTree Tree
 
 
+isActiveHouse :: ActiveItem -> Boolean
+isActiveHouse (ActiveHouse _) = true
+isActiveHouse (ActiveTree _)  = false
+
 activeRoof :: ActiveItem -> Maybe Roof
 activeRoof (ActiveHouse h) = h ^. _roof
 activeRoof (ActiveTree _)  = Nothing

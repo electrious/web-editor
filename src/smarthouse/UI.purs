@@ -16,9 +16,9 @@ import Editor.SceneEvent (Size, size)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic)
 import FRP.Event (Event)
-import Math.Angle (Angle)
 import Models.SmartHouse.ActiveItem (ActiveItem)
 import SmartHouse.ActiveItemUI (_deleteHouse)
+import SmartHouse.SlopeOption (SlopeOption)
 import Specular.Dom.Element (attrsD, class_, classes, dynText, el)
 import Specular.Dom.Widget (Widget)
 import Specular.FRP as S
@@ -56,7 +56,7 @@ _activeItemDyn = _Newtype <<< prop (Proxy :: Proxy "activeItemDyn")
 
 newtype BuilderUIEvents = BuilderUIEvents {
     buttons       :: ButtonsPane,
-    slopeSelected :: Event Angle,
+    slopeSelected :: Event SlopeOption,
     deleteHouse   :: Event Unit,
     buildTree     :: Event Boolean
     }

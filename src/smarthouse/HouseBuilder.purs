@@ -28,7 +28,7 @@ import Data.Traversable (traverse)
 import Data.Tuple (fst)
 import Data.UUID (UUID)
 import Data.UUIDMap (UUIDMap)
-import Editor.Common.Lenses (_apiConfig, _buttons, _height, _houseId, _leadId, _modeDyn, _mouseMove, _name, _panelType, _panels, _parent, _roofs, _slope, _slopeSelected, _tapped, _textureInfo, _updated, _width)
+import Editor.Common.Lenses (_apiConfig, _buttons, _height, _houseId, _leadId, _modeDyn, _mouseMove, _name, _panelType, _panels, _parent, _roofs, _slopeSelected, _tapped, _textureInfo, _updated, _width)
 import Editor.Editor (Editor, _sizeDyn, setMode)
 import Editor.EditorMode as EditorMode
 import Editor.HouseEditor (ArrayEditParam, HouseConfig, _dataServer, _heatmapTexture, _rotBtnTexture)
@@ -39,7 +39,7 @@ import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic, dynEvent, performDynamic, sampleDyn, step)
 import FRP.Event (Event, create, keepLatest, sampleOn, sampleOn_, subscribe)
 import FRP.Event.Extra (delay, multicast, performEvent)
-import Math.Angle (Angle, degree)
+import Math.Angle (degree)
 import Model.ActiveMode (ActiveMode(..), fromBoolean)
 import Model.Hardware.PanelTextureInfo (PanelTextureInfo)
 import Model.Hardware.PanelType (PanelType(..))
@@ -55,6 +55,7 @@ import Rendering.TextureLoader (textureFromUrl)
 import SmartHouse.ActiveItemUI (_deleteHouse)
 import SmartHouse.HouseEditor (HouseRenderMode(..), _arrayEditParam, _house, _roofsData, editHouse, renderHouse)
 import SmartHouse.HouseTracer (TracerMode(..), _stopTracing, _tracedPolygon, _tracerMode, _undoTracing, traceHouse)
+import SmartHouse.SlopeOption (SlopeOption)
 import SmartHouse.TreeBuilder (buildTree, editTree)
 import SmartHouse.UI (_activeItemDyn, _savingStepDyn, houseBuilderUI)
 import Smarthouse.HouseNode (HouseNode, HouseOp(..), _actHouseRoof, _activated)
@@ -247,7 +248,7 @@ getActiveTree tid hd = M.lookup tid (hd ^. _trees)
 getTreeUpd :: forall f. Foldable f => Functor f => f TreeNode -> Event TreeOp
 getTreeUpd = foldEvtWith (view _updated)
 
-renderHouseDict :: Dynamic (Maybe UUID) -> HouseConfig -> ArrayEditParam -> Event Angle -> Event RoofsData -> HouseDict -> Node HouseTextureInfo (UUIDMap HouseNode)
+renderHouseDict :: Dynamic (Maybe UUID) -> HouseConfig -> ArrayEditParam -> Event SlopeOption -> Event RoofsData -> HouseDict -> Node HouseTextureInfo (UUIDMap HouseNode)
 renderHouseDict actIdDyn houseCfg arrParam slopeEvt roofsDatEvt houses = traverse render houses
     where getMode h (Just i) | h ^. idLens == i = Active
                              | otherwise        = Inactive
@@ -283,8 +284,7 @@ newtype BuilderInputEvts = BuilderInputEvts {
     export        :: Event Unit,
     undoTracing   :: Event Unit,
     stopTracing   :: Event Unit,
-    slope         :: Event Angle,       -- slope event for all roofs
-    slopeSelected :: Event Angle,       -- slope event for active roof
+    slopeSelected :: Event SlopeOption,
     deleteHouse   :: Event Unit,
     buildTree     :: Event Boolean
     }
@@ -295,7 +295,6 @@ instance Default BuilderInputEvts where
         export        : empty,
         undoTracing   : empty,
         stopTracing   : empty,
-        slope         : empty,
         slopeSelected : empty,
         deleteHouse   : empty,
         buildTree     : empty
@@ -375,10 +374,9 @@ builderForHouse evts tInfo =
                 newTreeEvt <- buildTree (treeBuilderMode <$> actIdDyn <*> buildTreeDyn) mouseEvt
 
                 -- create house from the traced polygon
-                let slopeDyn  = step (degree 30.0) (evts ^. _slope)
-                    polyDyn   = step Nothing $ Just <$> traceRes ^. _tracedPolygon
-                    mkHouse s = traverse (createHouseFrom s)
-                    houseDyn  = performDynamic $ mkHouse <$> slopeDyn <*> polyDyn
+                let polyDyn   = step Nothing $ Just <$> traceRes ^. _tracedPolygon
+                    mkHouse   = traverse (createHouseFrom (degree 30.0))
+                    houseDyn  = performDynamic $ mkHouse <$> polyDyn
                     houseEvt  = compact $ dynEvent houseDyn
 
                     addHouseEvt = HouseOpCreate <$> houseEvt

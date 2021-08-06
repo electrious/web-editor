@@ -18,10 +18,9 @@ import Data.Meter (Meter, meterVal)
 import Data.Newtype (class Newtype)
 import Data.Time.Duration (Milliseconds(..))
 import Data.Traversable (class Traversable, traverse)
-import Data.Tuple (Tuple(..))
 import Data.UUID (UUID)
 import Editor.ArrayBuilder (runArrayBuilder)
-import Editor.Common.Lenses (_alignment, _edges, _floor, _height, _houseId, _id, _modeDyn, _name, _orientation, _panelType, _panels, _position, _roof, _roofs, _slope, _slopeSelected, _tapped, _updated)
+import Editor.Common.Lenses (_alignment, _edges, _floor, _height, _houseId, _id, _modeDyn, _name, _orientation, _panelType, _panels, _position, _roof, _roofs, _slopeSelected, _tapped, _updated)
 import Editor.Disposable (Disposee(..))
 import Editor.HeightEditor (_min, dragArrowPos, setupHeightEditor)
 import Editor.HouseEditor (ArrayEditParam, HouseConfig, _heatmap, runHouseEditor)
@@ -36,7 +35,6 @@ import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, dynEvent, gateDyn, latestEvt, sampleDyn, step)
 import FRP.Event (Event)
 import FRP.Event.Extra (delay, multicast, performEvent)
-import Math.Angle (Angle)
 import Math.LineSeg (LineSeg, mkLineSeg)
 import Model.ActiveMode (ActiveMode(..), fromBoolean, isActive)
 import Model.Polygon (Polygon, _polyVerts)
@@ -44,7 +42,7 @@ import Model.Racking.OldRackingSystem (OldRoofRackingData, guessRackingType)
 import Model.Racking.RackingType (RackingType(..))
 import Model.Roof.Panel (Alignment(..), Orientation(..), PanelsDict, panelsDict)
 import Model.Roof.RoofPlate (RoofPlate, _roofIntId)
-import Model.SmartHouse.House (House, _peakPoint, _trees, flipRoof, getHouseLines, updateActiveRoofSlope, updateHeight, updateSlopes)
+import Model.SmartHouse.House (House, _trees, flipRoof, getHouseLines, updateHeight, updateHouseSlope)
 import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo)
 import Model.SmartHouse.Roof (Roof, RoofEvents, _flipped, renderActRoofOutline, renderRoof)
 import Model.UUID (idLens)
@@ -53,7 +51,7 @@ import Rendering.DynamicNode (dynamic, dynamic_)
 import Rendering.Line (renderLine, renderLineLength, renderLineOnly, renderLineWith)
 import Rendering.Node (Node, _exportable, fixNodeDWith, getEnv, getParent, localEnv, node, tapMesh)
 import SmartHouse.Algorithm.Edge (_lineEdge)
-import SmartHouse.SlopeEditor (_maxHeightToEdge, slopeEditor)
+import SmartHouse.SlopeOption (SlopeOption)
 import Smarthouse.Algorithm.Subtree (_sinks, _source)
 import Smarthouse.HouseNode (HouseNode, HouseOp(..), _actHouseRoof, _activated)
 import Three.Core.Geometry (_bevelEnabled, _depth, mkExtrudeGeometry, mkShape)
@@ -75,7 +73,7 @@ newtype HouseEditorConf = HouseEditorConf {
     modeDyn        :: Dynamic ActiveMode,
     house          :: House,
 
-    slopeSelected  :: Event Angle,
+    slopeSelected  :: Event SlopeOption,
     
     roofsData      :: Event RoofsData,
     arrayEditParam :: ArrayEditParam
@@ -151,8 +149,8 @@ editHouse houseCfg conf = do
                 canEditDyn = (&&) <$> actDyn <*> (fromBoolean <$> houseEditDyn)
 
             -- render roofs
-            Tuple roofEvtsDyn sEvt <- node (def # _position .~ pDyn
-                                                # _name     .~ "roofs") do
+            roofEvtsDyn <- node (def # _position .~ pDyn
+                                     # _name     .~ "roofs") do
                 let roofsDyn = view _roofs <$> houseDyn
                     actRDyn = g <$> actRoofDyn <*> roofsDyn
                 node (def # _name .~ "roof-lines"
@@ -169,14 +167,7 @@ editHouse houseCfg conf = do
                 -- render roofs dynamically
                 roofEvts <- dynamic $ renderBuilderRoofs houseEditDyn actRoofDyn <$> roofsDyn
                 
-                -- setup slope editor and get the new slope event
-                -- enable slope editor only in EditingHouse mode and actDyn is active
-                sEvt <- slopeEditor $ def # _modeDyn  .~ canEditDyn
-                                          # _position .~ (view (_peakPoint <<< _position) <$> houseDyn)
-                                          # _slope    .~ house ^. _slope
-                                          # _maxHeightToEdge .~ (house ^. _peakPoint <<< _height)
-
-                pure $ Tuple roofEvts sEvt
+                pure roofEvts
 
 
             let flipEvt = latestAnyEvtWith (view _flipped) roofEvtsDyn
@@ -193,11 +184,10 @@ editHouse houseCfg conf = do
         
     
             let newHouseEvt1 = sampleDyn houseDyn $ updateHeight <$> hEvt
-                newHouseEvt2 = performEvent $ sampleDyn houseDyn $ updateSlopes <$> sEvt
-                newHouseEvt3 = sampleDyn houseDyn $ flipRoof <$> flipEvt
-                newHouseEvt4 = performEvent $ sampleDyn houseDyn $ sampleDyn actRoofIdDyn $ updateActiveRoofSlope <$> conf ^. _slopeSelected
+                newHouseEvt2 = sampleDyn houseDyn $ flipRoof <$> flipEvt
+                newHouseEvt3 = performEvent $ sampleDyn houseDyn $ sampleDyn actRoofIdDyn $ updateHouseSlope <$> conf ^. _slopeSelected
 
-                newHouseEvt  = multicast $ newHouseEvt1 <|> newHouseEvt2 <|> newHouseEvt3 <|> newHouseEvt4
+                newHouseEvt  = multicast $ newHouseEvt1 <|> newHouseEvt2 <|> newHouseEvt3
 
                 roofTappedEvt = multicast $ latestAnyEvtWith (view _tapped) roofEvtsDyn
 

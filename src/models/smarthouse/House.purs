@@ -24,11 +24,11 @@ import Data.Tuple (Tuple(..))
 import Data.UUID (UUID, emptyUUID, genUUID)
 import Data.UUIDMap (UUIDMap)
 import Data.UUIDMap as UM
-import Editor.Common.Lenses (_edge, _edges, _floor, _height, _id, _position, _roofs, _slope)
+import Editor.Common.Lenses (_edge, _edges, _floor, _height, _id, _position, _roofs)
 import Effect (Effect)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
-import Math.Angle (Angle, degree)
+import Math.Angle (Angle)
 import Math.LineSeg (LineSeg)
 import Model.Polygon (Polygon, _polyVerts, counterClockPoly, modifyVertAt)
 import Model.Roof.RoofPlate (Point, vec2Point)
@@ -39,6 +39,7 @@ import SmartHouse.Algorithm.HouseParam (houseParamFrom)
 import SmartHouse.Algorithm.Skeleton (skeletonize)
 import SmartHouse.Algorithm.VertInfo (VertWithSlope, updateSlope, vertWithSlope)
 import SmartHouse.Algorithm.VertNode (VertNode)
+import SmartHouse.SlopeOption (SlopeOption(..))
 import Smarthouse.Algorithm.RoofGeneration (generateRoofs)
 import Smarthouse.Algorithm.Subtree (Subtree, _source, flipSubtree, treeLines)
 import Three.Math.Vector (Vector3)
@@ -48,7 +49,6 @@ newtype House = House {
     id        :: UUID,
     floor     :: Polygon VertWithSlope,
     height    :: Meter,
-    slope     :: Angle,
     trees     :: UUIDMap Subtree,
     edges     :: List Edge,
     roofs     :: UUIDMap Roof,
@@ -62,7 +62,6 @@ instance Default House where
         id        : emptyUUID,
         floor     : def,
         height    : meter 0.0,
-        slope     : degree 20.0,
         trees     : M.empty,
         edges     : empty,
         roofs     : M.empty,
@@ -94,7 +93,6 @@ createHouseFrom slope poly = do
         id        : i,
         floor     : floor,
         height    : meter 3.5,   -- default height
-        slope     : slope,
         trees     : UM.fromFoldable trees,
         edges     : edges,
         roofs     : UM.fromFoldable roofs,
@@ -109,11 +107,17 @@ findPeakPoint = foldl (\o t -> if t ^. _source <<< _height > o ^. _height then t
 updateHeight :: Meter -> House -> House
 updateHeight height h = h # _height .~ height
 
+updateHouseSlope :: SlopeOption -> Maybe UUID -> House -> Effect House
+updateHouseSlope (ActiveRoof a) id h = updateActiveRoofSlope a id h
+updateHouseSlope (AllRoofs a)   _  h = updateHouseWith (updateSlope a <$> h ^. _floor) h
 
-updateSlopes :: Angle -> House -> Effect House
-updateSlopes slope h = do
-    nh <- updateHouseWith (updateSlope slope <$> h ^. _floor) h
-    pure $ nh # _slope .~ slope
+updateActiveRoofSlope :: Angle -> Maybe UUID -> House -> Effect House
+updateActiveRoofSlope _ Nothing   h = pure h
+updateActiveRoofSlope a (Just ai) h = do
+    let roof = M.lookup ai (h ^. _roofs)
+        f r = updateSlopeForRoof r a h
+    nh <- traverse f roof
+    pure $ fromMaybe h nh
 
 updateSlopeForRoof :: Roof -> Angle -> House -> Effect House
 updateSlopeForRoof roof slope h = updateHouseWith floor h
@@ -146,14 +150,6 @@ flipRoof i h = h # _roofs .~ UM.fromFoldable roofs
           nts = M.update (Just <<< flip flipSubtree vs) i ts
           -- generate new roofs
           roofs = generateRoofs (S.fromFoldable nts) (h ^. _edges)
-
-updateActiveRoofSlope :: Angle -> Maybe UUID -> House -> Effect House
-updateActiveRoofSlope _ Nothing   h = pure h
-updateActiveRoofSlope a (Just ai) h = do
-    let roof = M.lookup ai (h ^. _roofs)
-        f r = updateSlopeForRoof r a h
-    nh <- traverse f roof
-    pure $ fromMaybe h nh
 
 
 getHouseLines :: House -> List (LineSeg Vector3)

@@ -8,33 +8,36 @@ import Data.Int (round)
 import Data.Lens (Lens', view, (.~))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.Maybe (Maybe(..), isJust)
+import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Newtype (class Newtype)
 import Editor.Common.Lenses (_slope, _slopeSelected)
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import FRP.Dynamic (Dynamic)
+import FRP.Dynamic (Dynamic, dynEvent, step)
 import FRP.Event (Event, create)
-import Math.Angle (Angle, degreeVal, fromString)
+import Foreign.Object as Obj
+import Math.Angle (Angle, degree, degreeVal, fromString)
 import Model.SmartHouse.Roof (Roof)
-import Models.SmartHouse.ActiveItem (ActiveItem(..), activeRoof)
+import Models.SmartHouse.ActiveItem (ActiveItem(..), activeRoof, isActiveHouse)
+import SmartHouse.SlopeOption (SlopeOption, slopeOption)
 import Specular.Dom.Browser (Attrs)
 import Specular.Dom.Browser as DOM
+import Specular.Dom.Builder.Class (text)
 import Specular.Dom.Element (attr, attrsD, class_, classes, dynText, on, valueD)
 import Specular.Dom.Element.Class (el)
 import Specular.Dom.Node.Class (Node)
 import Specular.Dom.Widget (Widget)
 import Specular.Dom.Widgets.Button (buttonOnClick)
-import Specular.Dom.Widgets.Input (getTextInputValue)
+import Specular.Dom.Widgets.Input (checkbox, getTextInputValue)
 import Type.Proxy (Proxy(..))
-import UI.Bridge (fromUIEvent, toUIDyn)
+import UI.Bridge (fromUIDyn, fromUIEvent, toUIDyn)
 import UI.Utils (div, mkAttrs, mkStyle, visible, (:~))
 import Unsafe.Coerce (unsafeCoerce)
 
 
 newtype ActiveItemUI = ActiveItemUI {
     deleteHouse   :: Event Unit,
-    slopeSelected :: Event Angle
+    slopeSelected :: Event SlopeOption
     }
 
 derive instance Newtype ActiveItemUI _
@@ -46,8 +49,6 @@ instance Default ActiveItemUI where
 
 _deleteHouse :: forall t a r. Newtype t { deleteHouse :: a | r } => Lens' t a
 _deleteHouse = _Newtype <<< prop (Proxy :: Proxy "deleteHouse")
-
-
 
 activeItemUIStyle :: Boolean -> Attrs
 activeItemUIStyle d = mkStyle [
@@ -67,13 +68,10 @@ delBtnLabel Nothing = ""
 
 
 delButton :: Dynamic (Maybe ActiveItem) -> Widget (Event Unit)
-delButton actItemDyn =
-    div [classes ["uk-flex", "uk-flex-column", "uk-margin-top"]] do
-        d <- liftEffect $ toUIDyn actItemDyn
-        div [class_ "uk-text-bold"] $ dynText $ subtitle <$> d
-        
-        e <- buttonOnClick (pure $ mkAttrs ["class" :~ "uk-button uk-button-danger"]) $ dynText $ delBtnLabel <$> d
-        fromUIEvent e
+delButton actItemDyn = do
+    d <- liftEffect $ toUIDyn actItemDyn
+    e <- buttonOnClick (pure $ mkAttrs ["class" :~ "uk-button uk-button-danger uk-margin-top"]) $ dynText $ delBtnLabel <$> d
+    fromUIEvent e
 
 showAngle :: Angle -> String
 showAngle a = show (round $ degreeVal a)
@@ -93,43 +91,60 @@ withTargetValue cb = \event -> do
 unsafeEventTarget :: DOM.Event -> Node
 unsafeEventTarget e = (unsafeCoerce e).target
 
-houseSlopeUI :: Dynamic (Maybe Angle) -> Widget (Event Angle)
-houseSlopeUI slopeDyn = do
-    slopeDynU <- liftEffect $ toUIDyn slopeDyn
-    div [class_ "uk-flex", visible (isJust <$> slopeDynU)] do
-        let slopeStrDyn = showMaybeAngle <$> slopeDynU
 
-        -- create new slope event for user interaction
-        { event: slopeEvt, push: slopePush } <- liftEffect create
-        -- convert value string to slope angle and push it to the event
-        let pushNewVal v = case fromString v of
-                Just a -> slopePush a
-                Nothing -> pure unit
+slopeSelector :: Dynamic (Maybe Angle) -> Widget (Event Angle)
+slopeSelector slopeDyn = div [class_ "uk-flex"] do
+    slopeStrDyn <- liftEffect $ toUIDyn $ showMaybeAngle <$> slopeDyn
 
-        -- show the range slide to select the slope
-        el "input" [attr "type" "range",
-                    attr "min" "5",
-                    attr "max" "85",
-                    attr "step" "1",
-                    valueD slopeStrDyn,
-                    on "input" (withTargetValue pushNewVal)
-                    ] $ pure unit
+    -- create new slope event for user interaction
+    { event: slopeEvt, push: slopePush } <- liftEffect create
+    -- convert value string to slope angle and push it to the event
+    let pushNewVal v = case fromString v of
+            Just a -> slopePush a
+            Nothing -> pure unit
 
-        el "div" [ class_ "uk-margin-left"] $ dynText $ appendDegSym <$> slopeStrDyn
+    -- show the range slide to select the slope
+    el "input" [attr "type" "range",
+                attr "min" "5",
+                attr "max" "85",
+                attr "step" "1",
+                valueD slopeStrDyn,
+                on "input" (withTargetValue pushNewVal)
+                ] $ pure unit
 
-        pure slopeEvt
+    el "div" [ class_ "uk-margin-left"] $ dynText $ appendDegSym <$> slopeStrDyn
+    pure slopeEvt
 
 
-dynSlopeUI :: Dynamic (Maybe Roof) -> Widget (Event Angle)
-dynSlopeUI roofDyn = houseSlopeUI (map (view _slope) <$> roofDyn)
+slopeScopeUI :: Widget (Dynamic Boolean)
+slopeScopeUI = div [classes ["uk-flex", "uk-flex-row", "uk-flex-middle"]] do
+    checkD <- checkbox true Obj.empty
+    text "Apply to All Roofs"
+
+    fromUIDyn checkD
+
+houseSlopeUI :: Dynamic Boolean -> Dynamic (Maybe Roof) -> Widget (Event SlopeOption)
+houseSlopeUI showDyn roofDyn = do
+    visDyn   <- liftEffect $ toUIDyn showDyn
+    div [classes ["uk-flex", "uk-flex-column", "uk-margin-top"], visible visDyn] do
+        text "Slope:"
+        slopeEvt <- slopeSelector $ map (view _slope) <$> roofDyn
+        scopeD   <- slopeScopeUI
+        
+        let slopeD = step (degree 30.0) slopeEvt
+        pure $ dynEvent $ slopeOption <$> slopeD <*> scopeD
 
 activeItemUI :: Dynamic (Maybe ActiveItem) -> Widget ActiveItemUI
 activeItemUI actItemDyn = do
     styleD <- liftEffect $ toUIDyn $ activeItemUIStyle <<< isJust <$> actItemDyn
     div [classes ["uk-flex", "uk-flex-column", "uk-margin-top"],
          attrsD styleD] do
-        
-        slopeEvt <- dynSlopeUI $ join <<< map activeRoof <$> actItemDyn
+        -- subtitle
+        d <- liftEffect $ toUIDyn actItemDyn
+        div [class_ "uk-text-bold"] $ dynText $ subtitle <$> d
+
+        let isActHouseDyn = maybe false isActiveHouse <$> actItemDyn
+        slopeEvt <- houseSlopeUI isActHouseDyn $ join <<< map activeRoof <$> actItemDyn
 
         delEvt <- delButton actItemDyn
 
