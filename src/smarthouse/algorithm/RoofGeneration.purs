@@ -3,14 +3,17 @@ module Smarthouse.Algorithm.RoofGeneration where
 import Prelude
 
 import Data.Foldable (foldl)
+import Data.Graph (Graph, fromAdjacencyList, shortestPath)
 import Data.Lens (Lens', view, (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.List (List(..), elem, singleton, sortBy, (:))
+import Data.List (List(..), concatMap, elem, singleton, (:))
 import Data.Map as M
+import Data.Maybe (fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Set (Set)
 import Data.Set as S
+import Data.Tuple (Tuple(..))
 import Data.UUID (UUID)
 import Data.UUIDMap (UUIDMap)
 import Data.UUIDMap as UM
@@ -19,10 +22,10 @@ import Math.LineSeg (LineSeg, _start, direction)
 import Model.Polygon (newPolygon)
 import Model.SmartHouse.Roof (Roof, _subtrees, createRoofFrom)
 import Model.UUID (class HasUUID, idLens)
-import SmartHouse.Algorithm.Edge (Edge, _leftVertex, _lineEdge, _rightVertex)
+import SmartHouse.Algorithm.Edge (Edge, _leftVertex, _rightVertex)
 import SmartHouse.Algorithm.EdgeInfo (_line)
 import SmartHouse.Algorithm.VertNode (VertNode)
-import Smarthouse.Algorithm.Subtree (Subtree, SubtreeType(..), _source, _subtreeType, mergedEdge, normalSubtree)
+import Smarthouse.Algorithm.Subtree (Subtree, SubtreeType(..), _sinks, _source, _subtreeType, mergedEdge, normalSubtree)
 import Three.Math.Vector (Vector3, mkVec3, (<->), (<.>))
 import Type.Proxy (Proxy(..))
 
@@ -36,7 +39,9 @@ distanceAlong p e = (p <-> e ^. _start) <.> direction e
 newtype RoofData = RoofData {
     id        :: UUID,
     subtrees  :: Set Subtree,
-    edgeNodes :: List Vector3,
+    leftVert  :: VertNode,
+    rightVert :: VertNode,
+    edgeNodes :: List VertNode,   -- all vertex nodes between left and right vertex for the single roof.
     edge      :: Edge   -- used only for calculating distance to edge
     }
 
@@ -51,6 +56,12 @@ instance ordRoofData :: Ord RoofData where
 _edgeNodes :: forall t a r. Newtype t { edgeNodes :: a | r } => Lens' t a
 _edgeNodes = _Newtype <<< prop (Proxy :: Proxy "edgeNodes")
 
+_leftVert :: forall t a r. Newtype t { leftVert :: a | r } => Lens' t a
+_leftVert = _Newtype <<< prop (Proxy :: Proxy "leftVert")
+
+_rightVert :: forall t a r. Newtype t { rightVert :: a | r } => Lens' t a
+_rightVert = _Newtype <<< prop (Proxy :: Proxy "rightVert")
+
 -- all nodes in the roof polygon of an edge, but omit the MergedNode
 -- if the edge should be merged
 treesForEdge :: Edge -> Set Subtree -> Set Subtree
@@ -64,7 +75,9 @@ roofDataForEdge ts e =
     in RoofData {
         id        : e ^. idLens,
         subtrees  : treesForEdge e ts,
-        edgeNodes : (lv : rv : Nil),
+        leftVert  : lv,
+        rightVert : rv,
+        edgeNodes : Nil,
         edge      : e
         }
 
@@ -76,22 +89,30 @@ mergeRoofDataWith t lr rr =
     in RoofData {
         id        : lr ^. idLens,
         subtrees  : S.union (lr ^. _subtrees) (rr ^. _subtrees),
-        edgeNodes : lns <> singleton (t ^. _source <<< _position) <> rns,
+        leftVert  : lr ^. _leftVert,
+        rightVert : rr ^. _rightVert,
+        edgeNodes : lns <> (lr ^. _rightVert : t ^. _source : rr ^. _leftVert : Nil) <> rns,
         edge      : lr ^. _edge
         }
 
-sortedNodes :: Edge -> List Subtree -> List VertNode
-sortedNodes e ts =
-    let edge    = e ^. _lineEdge
-        g t1 t2 = comparing (flip distanceAlong edge <<< view _position) t2 t1
-    in sortBy g $ view _source <$> ts
+-- convert all subtrees of a single edge into an undirected graph
+mkGraph :: List Subtree -> Graph VertNode Number
+mkGraph ts = fromAdjacencyList $ concatMap f ts
+    where f t = let src         = t ^. _source
+                    sinks       = t ^. _sinks
+                    srcLst      = singleton $ mkVal src
+                    posEdge     = Tuple src $ mkVal <$> sinks
+                    mkNegEdge s = Tuple s srcLst
+                    negEdges    = mkNegEdge <$> sinks
+                in posEdge : negEdges
+          mkVal n = Tuple n 1.0
 
 -- find polygon for an edge
 roofForEdge :: RoofData -> Roof
 roofForEdge rd = createRoofFrom (rd ^. idLens) (newPolygon nodes) (rd ^. _subtrees) (rd ^. _edge) (rd ^. _edge <<< _normal) slope
     where slope  = rd ^. _edge <<< _line <<< _slope
-          sorted = sortedNodes (rd ^. _edge) $ S.toUnfoldable $ rd ^. _subtrees
-          nodes  = (view _position <$> sorted) <> rd ^. _edgeNodes
+          sorted = fromMaybe Nil $ shortestPath (rd ^. _rightVert) (rd ^. _leftVert) $ mkGraph $ S.toUnfoldable $ rd ^. _subtrees
+          nodes  = view _position <$> (sorted <> rd ^. _edgeNodes)
 
 procMerge :: UUIDMap RoofData -> Subtree -> UUIDMap RoofData
 procMerge m t = case t ^. _subtreeType of

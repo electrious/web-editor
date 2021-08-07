@@ -14,14 +14,15 @@ import Math.LineSeg (LineSeg)
 import Model.UUID (class HasUUID, idLens)
 import SmartHouse.Algorithm.EdgeInfo (EdgeInfo, _line)
 import SmartHouse.Algorithm.Ray (Ray)
+import SmartHouse.Algorithm.VertNode (VertNode)
 import Three.Math.Vector (Vector3)
 import Type.Proxy (Proxy(..))
 
 newtype Edge = Edge {
     id            :: UUID,
     line          :: EdgeInfo,
-    leftVertex    :: Vector3,
-    rightVertex   :: Vector3,
+    leftVertex    :: VertNode,
+    rightVertex   :: VertNode,
     leftBisector  :: Ray,
     rightBisector :: Ray,
 

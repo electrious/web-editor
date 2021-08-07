@@ -16,6 +16,7 @@ import Model.UUID (idLens)
 import SmartHouse.Algorithm.Edge (Edge(..))
 import SmartHouse.Algorithm.EdgeInfo (mkEdgeInfo)
 import SmartHouse.Algorithm.VertInfo (VertInfo, VertWithSlope, _bisector, vertInfoFrom)
+import SmartHouse.Algorithm.VertNode (VertNode(..))
 import Three.Math.Vector (mkVec3, normal, vecX, vecY)
 
 newtype HouseParam = HouseParam {
@@ -39,6 +40,13 @@ mkVi (Triple prev p next) = vertInfoFrom (p ^. idLens) pp Nothing 0.0 leftE righ
           leftE = mkEdgeInfo (mkLineSeg prevP pp) (prev ^. _slope)
           rightE = mkEdgeInfo (mkLineSeg pp nextP) (p ^. _slope)
 
+vertNodeFromVertInfo :: VertInfo -> VertNode
+vertNodeFromVertInfo vi = VertNode {
+        id : vi ^. idLens,
+        position : vi ^. _position,
+        height : 0.0
+    }
+
 edge :: VertInfo -> VertInfo -> Edge
 edge lv rv =
     let lp = lv ^. _position
@@ -51,8 +59,8 @@ edge lv rv =
     in Edge {
         id            : lv ^. idLens,
         line          : lv ^. _rightEdge,
-        leftVertex    : lp,
-        rightVertex   : rp,
+        leftVertex    : vertNodeFromVertInfo lv,
+        rightVertex   : vertNodeFromVertInfo rv,
         leftBisector  : lv ^. _bisector,
         rightBisector : rv ^. _bisector,
         normal        : n

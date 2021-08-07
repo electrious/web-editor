@@ -19,7 +19,7 @@ import Data.Set as Set
 import Data.Traversable (traverse)
 import Data.Triple (Triple(..))
 import Data.Tuple (Tuple(..), snd)
-import Editor.Common.Lenses (_distance, _edge, _edges, _leftEdge, _position, _rightEdge, _vertices)
+import Editor.Common.Lenses (_distance, _edge, _edges, _height, _leftEdge, _position, _rightEdge, _slope, _vertices)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import Math (abs)
@@ -29,12 +29,13 @@ import Math.LineSeg as S
 import Math.Utils (approxSame, epsilon)
 import Model.UUID (idLens)
 import SmartHouse.Algorithm.Edge (Edge, _leftBisector, _lineEdge, _rightBisector)
+import SmartHouse.Algorithm.EdgeInfo (_line)
 import SmartHouse.Algorithm.Event (EdgeE, EdgesE, PointEvent(..), SplitE, _intersection, _oppositeEdge, _vertexA, _vertexB, _vertexC, distance, edgeE, edgesE, intersectionPoint, splitE)
 import SmartHouse.Algorithm.HouseParam (HouseParam)
 import SmartHouse.Algorithm.LAV (LAV, SLAV, _lavs, addLav, delLav, emptySLAV, eventValid, getLav, invalidateVertex, lavFromVertices, length, nextVertex, prevVertex, runSLAV, unifyThreeVerts, unifyVerts, updateLav, verticesFromTo)
 import SmartHouse.Algorithm.Ray (ray)
 import SmartHouse.Algorithm.VertInfo (_bisector, _cross, _isReflex)
-import SmartHouse.Algorithm.VertNode (VertNode, mkVertNode, vertNodeFromVertex)
+import SmartHouse.Algorithm.VertNode (VertNode(..), mkVertNode, projNodeTo3D)
 import SmartHouse.Algorithm.Vertex (Vertex, _lavId, vertexFrom)
 import SmartHouse.HouseTracer (almostParallel)
 import Smarthouse.Algorithm.Subtree (Subtree, SubtreeType(..), subtree)
@@ -173,7 +174,7 @@ handleEdgeEvent' e lav =
                     edges = Set.fromFoldable $ Arr.concatMap (\v -> [v ^. _leftEdge, v ^. _rightEdge]) vs
                     
                 -- this new Vertex is only used in the final subtree. only position and height is used.
-                newV <- liftEffect $ mkVertNode (e ^. _intersection) (e ^. _edge) (e ^. _distance)
+                newV <- liftEffect $ mkVertNode (e ^. _intersection) (e ^. _edge <<< _line) (e ^. _distance)
 
                 -- delete this LAV and invalidate all vertices in it
                 delLav (lav ^. idLens)
@@ -210,7 +211,7 @@ handleEdgesEvent' e lav =
                     edges = Set.fromFoldable $ Arr.concatMap (\v -> [v ^. _leftEdge, v ^. _rightEdge]) vs
 
                 -- this new Vertex is only used in the final subtree. only position and height is used.
-                newV <- liftEffect $ mkVertNode (e ^. _intersection) (e ^. _edge) (e ^. _distance)
+                newV <- liftEffect $ mkVertNode (e ^. _intersection) (e ^. _edge <<< _line) (e ^. _distance)
 
                 -- delete this LAV and invalidate all vertices in it
                 delLav (lav ^. idLens)
@@ -336,6 +337,18 @@ testV eStart eNorm p v = do
 
 addEvtsToQueue :: forall f. Foldable f => PQueue Number PointEvent -> f PointEvent -> PQueue Number PointEvent
 addEvtsToQueue = foldl (\q' e -> PQ.insert (distance e) e q')
+
+vertNodeFromVertex :: Vertex -> VertNode
+vertNodeFromVertex v =
+    let vn = VertNode {
+                id       : v ^. idLens,
+                position : v ^. _position,
+                height   : v ^. _height
+            }
+        s = view (_line <<< _slope) <$> v ^. _edge
+    in case s of
+        Nothing -> vn
+        Just slope -> projNodeTo3D slope vn
 
 -- Compute Straight Skeleton of a polygon
 skeletonize :: HouseParam -> Effect (Tuple (List Subtree) (List Edge))

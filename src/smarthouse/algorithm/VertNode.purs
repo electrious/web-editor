@@ -4,18 +4,15 @@ import Prelude
 
 import Data.Default (class Default, def)
 import Data.Generic.Rep (class Generic)
-import Data.Lens (view, (%~), (^.))
-import Data.Maybe (Maybe(..))
+import Data.Lens ((%~), (^.))
 import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
 import Data.UUID (UUID, emptyUUID, genUUID)
-import Editor.Common.Lenses (_edge, _height, _id, _position, _slope)
+import Editor.Common.Lenses (_height, _id, _position, _slope)
 import Effect (Effect)
 import Math.Angle (Angle, degreeVal, tan)
 import Model.UUID (class HasUUID, idLens)
-import SmartHouse.Algorithm.Edge (Edge)
-import SmartHouse.Algorithm.EdgeInfo (_line)
-import SmartHouse.Algorithm.Vertex (Vertex)
+import SmartHouse.Algorithm.EdgeInfo (EdgeInfo)
 import Three.Math.Vector (Vector3, mkVec3, vecX, vecY)
 
 -- A node representing a vertex node in the final subtrees.
@@ -31,6 +28,8 @@ instance Show VertNode where
     show = genericShow
 instance Eq VertNode where
     eq v1 v2 = v1 ^. idLens == v2 ^. idLens
+instance Ord VertNode where
+    compare v1 v2 = compare (v1 ^. idLens) (v2 ^. idLens)
 instance HasUUID VertNode where
     idLens = _id
 instance Default VertNode where
@@ -53,22 +52,10 @@ projNodeTo3D :: Angle -> VertNode -> VertNode
 projNodeTo3D slope v = v # _position %~ setZ (v ^. _height * s)
     where s = scaleFactor slope
 
-vertNodeFromVertex :: Vertex -> VertNode
-vertNodeFromVertex v =
-    let vn = VertNode {
-                id       : v ^. idLens,
-                position : v ^. _position,
-                height   : v ^. _height
-            }
-        s = view (_line <<< _slope) <$> v ^. _edge
-    in case s of
-        Nothing -> vn
-        Just slope -> projNodeTo3D slope vn
-
-mkVertNode :: Vector3 -> Edge -> Number -> Effect VertNode
+mkVertNode :: Vector3 -> EdgeInfo -> Number -> Effect VertNode
 mkVertNode p e h = do
     i <- genUUID
-    pure $ projNodeTo3D (e ^. _line <<< _slope) $ VertNode {
+    pure $ projNodeTo3D (e ^. _slope) $ VertNode {
         id       : i,
         position : p,
         height   : h
