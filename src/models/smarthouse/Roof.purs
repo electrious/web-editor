@@ -55,7 +55,7 @@ newtype Roof = Roof {
     polygon  :: Polygon Vector3,
     subtrees :: UUIDMap Subtree,
 
-    edge     :: Edge,
+    edges    :: List Edge,
     slope    :: Angle,
 
     normal   :: Vector3
@@ -73,8 +73,8 @@ instance HasUUID Roof where
 _subtrees :: forall t a r. Newtype t { subtrees :: a | r } => Lens' t a
 _subtrees = _Newtype <<< prop (Proxy :: Proxy "subtrees")
 
-createRoofFrom :: UUID -> Polygon Vector3 -> Set Subtree -> Edge -> Vector3 -> Angle -> Roof
-createRoofFrom i p ts e n s = Roof { id : i, polygon : p, subtrees : UM.fromSet ts, edge : e, slope: s, normal : n }
+createRoofFrom :: UUID -> Polygon Vector3 -> Set Subtree -> List Edge -> Vector3 -> Angle -> Roof
+createRoofFrom i p ts es n s = Roof { id : i, polygon : p, subtrees : UM.fromSet ts, edges : es, slope: s, normal : n }
 
 -- check if a roof can be gable
 canBeGable :: Roof -> Boolean

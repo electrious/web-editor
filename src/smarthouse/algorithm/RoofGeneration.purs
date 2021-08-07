@@ -42,7 +42,8 @@ newtype RoofData = RoofData {
     leftVert  :: VertNode,
     rightVert :: VertNode,
     edgeNodes :: List VertNode,   -- all vertex nodes between left and right vertex for the single roof.
-    edge      :: Edge   -- used only for calculating distance to edge
+    edge      :: Edge,            -- used only for calculating distance to edge
+    edges     :: List Edge        -- all edges in one roof
     }
 
 derive instance newtypeRoofData :: Newtype RoofData _
@@ -78,7 +79,8 @@ roofDataForEdge ts e =
         leftVert  : lv,
         rightVert : rv,
         edgeNodes : Nil,
-        edge      : e
+        edge      : e,
+        edges     : singleton e
         }
 
 -- merge roofdata of two edges with the MergedNode position
@@ -92,7 +94,8 @@ mergeRoofDataWith t lr rr =
         leftVert  : lr ^. _leftVert,
         rightVert : rr ^. _rightVert,
         edgeNodes : lns <> (lr ^. _rightVert : t ^. _source : rr ^. _leftVert : Nil) <> rns,
-        edge      : lr ^. _edge
+        edge      : lr ^. _edge,
+        edges     : lr ^. _edges <> rr ^. _edges
         }
 
 -- convert all subtrees of a single edge into an undirected graph
@@ -109,7 +112,7 @@ mkGraph ts = fromAdjacencyList $ concatMap f ts
 
 -- find polygon for an edge
 roofForEdge :: RoofData -> Roof
-roofForEdge rd = createRoofFrom (rd ^. idLens) (newPolygon nodes) (rd ^. _subtrees) (rd ^. _edge) (rd ^. _edge <<< _normal) slope
+roofForEdge rd = createRoofFrom (rd ^. idLens) (newPolygon nodes) (rd ^. _subtrees) (rd ^. _edges) (rd ^. _edge <<< _normal) slope
     where slope  = rd ^. _edge <<< _line <<< _slope
           sorted = fromMaybe Nil $ shortestPath (rd ^. _rightVert) (rd ^. _leftVert) $ mkGraph $ S.toUnfoldable $ rd ^. _subtrees
           nodes  = view _position <$> (sorted <> rd ^. _edgeNodes)

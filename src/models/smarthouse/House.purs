@@ -24,7 +24,7 @@ import Data.Tuple (Tuple(..))
 import Data.UUID (UUID, emptyUUID, genUUID)
 import Data.UUIDMap (UUIDMap)
 import Data.UUIDMap as UM
-import Editor.Common.Lenses (_edge, _edges, _floor, _height, _id, _position, _roofs)
+import Editor.Common.Lenses (_edges, _floor, _height, _id, _position, _roofs)
 import Effect (Effect)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
@@ -125,9 +125,10 @@ updateActiveRoofSlope a (Just ai) h = do
 
 updateSlopeForRoof :: Roof -> Angle -> House -> Effect House
 updateSlopeForRoof roof slope h = updateHouseWith floor h
-    where e     = roof ^. _edge
-          idx   = fromMaybe 0 $ findIndex ((==) e) $ h ^. _edges
-          floor = modifyVertAt idx (updateSlope slope) (h ^. _floor)
+    where es    = roof ^. _edges
+          getIdx e = fromMaybe 0 $ findIndex ((==) e) $ h ^. _edges
+          idxs = getIdx <$> es
+          floor = foldl (\f idx -> modifyVertAt idx (updateSlope slope) f) (h ^. _floor) idxs
 
 
 -- rerun the skeletonization algorithm and roof generation on the house with
