@@ -9,14 +9,13 @@ import Data.Default (class Default, def)
 import Data.Filterable (filter)
 import Data.Foldable (class Foldable, foldl, traverse_)
 import Data.Generic.Rep (class Generic)
-import Data.Show.Generic (genericShow)
 import Data.Lens (Lens', view, (%~), (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (List(..), head, (:))
 import Data.Maybe (Maybe(..), fromMaybe, isJust)
 import Data.Newtype (class Newtype)
-import Type.Proxy (Proxy(..))
+import Data.Show.Generic (genericShow)
 import Data.Tuple (Tuple(..), fst)
 import Editor.Common.Lenses (_face, _modeDyn, _mouseMove, _name, _parent, _point, _position)
 import Editor.ObjectAdder (AdderType(..), createObjectAdder, mkCandidatePoint)
@@ -37,6 +36,7 @@ import Three.Core.Geometry (CircleGeometry, mkCircleGeometry)
 import Three.Core.Material (LineDashedMaterial, MeshBasicMaterial, mkLineDashedMaterial, mkMeshBasicMaterial)
 import Three.Core.Object3D (worldToLocal)
 import Three.Math.Vector (Vector3, addScaled, dist, mkVec3, toVec2, toVec3)
+import Type.Proxy (Proxy(..))
 
 newtype HouseTracerConf = HouseTracerConf {
     modeDyn     :: Dynamic ActiveMode,
@@ -205,6 +205,9 @@ canShowPerpLine _ _                 = false
 -- check if two lines is almost parallel or not
 almostParallel :: LineSeg Vector3 -> LineSeg Vector3 -> Boolean
 almostParallel l1 l2 = let a = degreeVal (linesAngle l1 l2) in a < 10.0 || a > 170.0
+
+almostParaSameDirection :: LineSeg Vector3 -> LineSeg Vector3 -> Boolean
+almostParaSameDirection l1 l2 = degreeVal (linesAngle l1 l2) < 10.0
 
 -- check if a point is close to the vector of the specified line
 pointCloseToLine :: Vector3 -> LineSeg Vector3 -> Boolean

@@ -8,11 +8,9 @@ import Data.Lens ((%~), (^.))
 import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
 import Data.UUID (UUID, emptyUUID, genUUID)
-import Editor.Common.Lenses (_height, _id, _position, _slope)
+import Editor.Common.Lenses (_height, _id, _position)
 import Effect (Effect)
-import Math.Angle (Angle, degreeVal, tan)
 import Model.UUID (class HasUUID, idLens)
-import SmartHouse.Algorithm.EdgeInfo (EdgeInfo)
 import Three.Math.Vector (Vector3, mkVec3, vecX, vecY)
 
 -- A node representing a vertex node in the final subtrees.
@@ -39,23 +37,17 @@ instance Default VertNode where
         height   : 0.0
     }
 
-
-scaleFactor :: Angle -> Number
-scaleFactor a | degreeVal a < 90.0 = tan a
-              | otherwise          = 0.0
-
 setZ :: Number -> Vector3 -> Vector3
 setZ z v = mkVec3 (vecX v) (vecY v) z
 
--- project a subtree node source's Z to 3D value based on slope and distance to corresponding edge
-projNodeTo3D :: Angle -> VertNode -> VertNode
-projNodeTo3D slope v = v # _position %~ setZ (v ^. _height * s)
-    where s = scaleFactor slope
+-- project a subtree node source's Z to 3D value based on height of the VertNode
+projNodeTo3D :: VertNode -> VertNode
+projNodeTo3D v = v # _position %~ setZ (v ^. _height)
 
-mkVertNode :: Vector3 -> EdgeInfo -> Number -> Effect VertNode
-mkVertNode p e h = do
+mkVertNode :: Vector3 -> Number -> Effect VertNode
+mkVertNode p h = do
     i <- genUUID
-    pure $ projNodeTo3D (e ^. _slope) $ VertNode {
+    pure $ projNodeTo3D $ VertNode {
         id       : i,
         position : p,
         height   : h
