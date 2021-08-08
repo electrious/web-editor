@@ -107,9 +107,9 @@ verticesFromTo vs ve lav = go (Just vs) Nil
           go Nothing ls = ls
 
 
-unifyVerts :: Vertex -> Vertex -> Vector3 -> Edge -> Number -> LAV -> Effect (Tuple LAV Vertex)
-unifyVerts va vb point e h lav = do
-    nv <- vertexFrom (lav ^. idLens) point (Just e) h (va ^. _leftEdge) (vb ^. _rightEdge) (Just $ vb ^. _bisector <<< _direction) (Just $ va ^. _bisector <<< _direction)
+unifyVerts :: Vertex -> Vertex -> Vector3 -> Edge -> LAV -> Effect (Tuple LAV Vertex)
+unifyVerts va vb point e lav = do
+    nv <- vertexFrom (lav ^. idLens) point (Just e) (va ^. _leftEdge) (vb ^. _rightEdge) (Just $ vb ^. _bisector <<< _direction) (Just $ va ^. _bisector <<< _direction)
 
     let idxA = vertIndex va lav
         idxB = vertIndex vb lav
@@ -131,9 +131,9 @@ unifyVerts va vb point e h lav = do
     pure $ Tuple newLav nv
 
 
-unifyThreeVerts :: Vertex -> Vertex -> Vertex -> Vector3 -> Edge -> Number -> LAV -> Effect (Triple LAV Vertex Boolean)
-unifyThreeVerts va vb vc point e h lav = do
-    nv <- vertexFrom (lav ^. idLens) point (Just e) h (va ^. _leftEdge) (vc ^. _rightEdge) (Just $ vc ^. _bisector <<< _direction) (Just $ va ^. _bisector <<< _direction)
+unifyThreeVerts :: Vertex -> Vertex -> Vertex -> Vector3 -> Edge -> LAV -> Effect (Triple LAV Vertex Boolean)
+unifyThreeVerts va vb vc point e lav = do
+    nv <- vertexFrom (lav ^. idLens) point (Just e) (va ^. _leftEdge) (vc ^. _rightEdge) (Just $ vc ^. _bisector <<< _direction) (Just $ va ^. _bisector <<< _direction)
 
     let idxA = vertIndex va lav
         idxB = vertIndex vb lav

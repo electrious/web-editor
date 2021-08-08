@@ -32,7 +32,7 @@ instance Default HouseParam where
     }
 
 mkVi :: Triple VertWithSlope VertWithSlope VertWithSlope -> VertInfo
-mkVi (Triple prev p next) = vertInfoFrom (p ^. idLens) pp Nothing 0.0 leftE rightE Nothing Nothing
+mkVi (Triple prev p next) = vertInfoFrom (p ^. idLens) pp Nothing leftE rightE Nothing Nothing
     where prevP = prev ^. _position
           pp    = p ^. _position
           nextP = next ^. _position
@@ -43,8 +43,7 @@ mkVi (Triple prev p next) = vertInfoFrom (p ^. idLens) pp Nothing 0.0 leftE righ
 vertNodeFromVertInfo :: VertInfo -> VertNode
 vertNodeFromVertInfo vi = VertNode {
         id : vi ^. idLens,
-        position : vi ^. _position,
-        height : 0.0
+        position : vi ^. _position
     }
 
 edge :: VertInfo -> VertInfo -> Edge

@@ -53,7 +53,6 @@ newtype VertInfo = VertInfo {
     position  :: Vector3,
 
     edge      :: Maybe Edge,
-    height    :: Number,
 
     isReflex  :: Boolean,
     bisector  :: Ray,
@@ -100,8 +99,8 @@ calcDir leftV leftSlope rightV rightSlope isReflex
             usable = abs (degreeVal a - 90.0) < 2.0
         in Tuple dir usable
 
-vertInfoFrom :: UUID -> Vector3 -> Maybe Edge -> Number -> EdgeInfo -> EdgeInfo -> Maybe Vector3 -> Maybe Vector3 -> VertInfo
-vertInfoFrom i p e h leftEdge rightEdge vecL vecR =
+vertInfoFrom :: UUID -> Vector3 -> Maybe Edge -> EdgeInfo -> EdgeInfo -> Maybe Vector3 -> Maybe Vector3 -> VertInfo
+vertInfoFrom i p e leftEdge rightEdge vecL vecR =
     let leftVec  = direction (leftEdge ^. _line) <**> (-1.0)
         rightVec = direction $ rightEdge ^. _line
         lv       = fromMaybe leftVec $ normal <$> vecL
@@ -117,7 +116,6 @@ vertInfoFrom i p e h leftEdge rightEdge vecL vecR =
         position  : p,
 
         edge      : e,
-        height    : h,
 
         isReflex  : isReflex,
         bisector  : ray p dir,

@@ -38,7 +38,7 @@ import SmartHouse.Algorithm.Edge (Edge, _lineEdge)
 import SmartHouse.Algorithm.HouseParam (houseParamFrom)
 import SmartHouse.Algorithm.Skeleton (skeletonize)
 import SmartHouse.Algorithm.VertInfo (VertWithSlope, updateSlope, vertWithSlope)
-import SmartHouse.Algorithm.VertNode (VertNode)
+import SmartHouse.Algorithm.VertNode (VertNode, height)
 import SmartHouse.SlopeOption (SlopeOption(..))
 import Smarthouse.Algorithm.RoofGeneration (generateRoofs)
 import Smarthouse.Algorithm.Subtree (Subtree, _source, flipSubtree, treeLines)
@@ -106,7 +106,7 @@ createHouseFrom slope poly = do
 
 -- find the peak point of all subtrees in a house
 findPeakPoint :: forall f. Foldable f => f Subtree -> VertNode
-findPeakPoint = foldl (\o t -> if t ^. _source <<< _height > o ^. _height then t ^. _source else o) def
+findPeakPoint = foldl (\o t -> if height (t ^. _source) > height o then t ^. _source else o) def
 
 updateHeight :: Meter -> House -> House
 updateHeight height h = h # _height .~ height

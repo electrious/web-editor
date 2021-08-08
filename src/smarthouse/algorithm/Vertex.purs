@@ -9,9 +9,8 @@ import Data.Lens.Record (prop)
 import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
-import Data.Tuple (Tuple(..))
 import Data.UUID (UUID, genUUID)
-import Editor.Common.Lenses (_edge, _height, _id, _position)
+import Editor.Common.Lenses (_edge, _id, _position)
 import Effect (Effect)
 import Model.UUID (class HasUUID, idLens)
 import SmartHouse.Algorithm.Edge (Edge)
@@ -27,7 +26,6 @@ newtype Vertex = Vertex {
     position  :: Vector3,
 
     edge      :: Maybe Edge, -- edge closest to the vertex
-    height    :: Number,     -- minimum height to a corresponding edge
 
     leftEdge  :: Edge,
     rightEdge :: Edge,
@@ -50,15 +48,11 @@ instance hasUUID :: HasUUID Vertex where
 _lavId :: forall t a r. Newtype t { lavId :: a | r } => Lens' t a
 _lavId = _Newtype <<< prop (Proxy :: Proxy "lavId")
 
-
-vertToSink :: Vertex -> Tuple Vector3 Number
-vertToSink v = Tuple (v ^. _position) (v ^. _height)
-
 -- create a Vectex from a point and edges it connects to
-vertexFrom :: UUID -> Vector3 -> Maybe Edge -> Number -> Edge -> Edge -> Maybe Vector3 -> Maybe Vector3 -> Effect Vertex
-vertexFrom lavId p e h leftEdge rightEdge vecL vecR = do
+vertexFrom :: UUID -> Vector3 -> Maybe Edge -> Edge -> Edge -> Maybe Vector3 -> Maybe Vector3 -> Effect Vertex
+vertexFrom lavId p e leftEdge rightEdge vecL vecR = do
     i <- genUUID
-    let vi = vertInfoFrom i p e h (leftEdge ^. _line) (rightEdge ^. _line) vecL vecR
+    let vi = vertInfoFrom i p e (leftEdge ^. _line) (rightEdge ^. _line) vecL vecR
     pure $ vertexFromVertInfo lavId leftEdge rightEdge vi
 
 -- create vertex from edges and VertInfo data
@@ -68,7 +62,6 @@ vertexFromVertInfo lavId leftEdge rightEdge vi = Vertex {
         position  : vi ^. _position,
 
         edge      : vi ^. _edge,
-        height    : vi ^. _height,
 
         leftEdge  : leftEdge,
         rightEdge : rightEdge,

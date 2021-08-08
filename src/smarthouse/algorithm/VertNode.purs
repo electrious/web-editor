@@ -4,20 +4,19 @@ import Prelude
 
 import Data.Default (class Default, def)
 import Data.Generic.Rep (class Generic)
-import Data.Lens ((%~), (^.))
+import Data.Lens ((^.))
 import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
 import Data.UUID (UUID, emptyUUID, genUUID)
-import Editor.Common.Lenses (_height, _id, _position)
+import Editor.Common.Lenses (_id, _position)
 import Effect (Effect)
 import Model.UUID (class HasUUID, idLens)
-import Three.Math.Vector (Vector3, mkVec3, vecX, vecY)
+import Three.Math.Vector (Vector3, mkVec3, vecX, vecY, vecZ)
 
 -- A node representing a vertex node in the final subtrees.
 newtype VertNode = VertNode {
     id       :: UUID,
-    position :: Vector3,
-    height   :: Number
+    position :: Vector3
 }
 
 derive instance Newtype VertNode _
@@ -33,22 +32,19 @@ instance HasUUID VertNode where
 instance Default VertNode where
     def = VertNode {
         id       : emptyUUID,
-        position : def,
-        height   : 0.0
+        position : def
     }
 
 setZ :: Number -> Vector3 -> Vector3
 setZ z v = mkVec3 (vecX v) (vecY v) z
 
--- project a subtree node source's Z to 3D value based on height of the VertNode
-projNodeTo3D :: VertNode -> VertNode
-projNodeTo3D v = v # _position %~ setZ (v ^. _height)
+height :: VertNode -> Number
+height node = vecZ $ node ^. _position
 
-mkVertNode :: Vector3 -> Number -> Effect VertNode
-mkVertNode p h = do
+mkVertNode :: Vector3 -> Effect VertNode
+mkVertNode p = do
     i <- genUUID
-    pure $ projNodeTo3D $ VertNode {
+    pure $ VertNode {
         id       : i,
-        position : p,
-        height   : h
+        position : p
     }

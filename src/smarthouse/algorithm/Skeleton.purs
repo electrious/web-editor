@@ -19,7 +19,7 @@ import Data.Set as Set
 import Data.Traversable (traverse)
 import Data.Triple (Triple(..))
 import Data.Tuple (Tuple(..), snd)
-import Editor.Common.Lenses (_distance, _edge, _edges, _height, _leftEdge, _position, _rightEdge, _slope, _vertices)
+import Editor.Common.Lenses (_edge, _edges, _leftEdge, _position, _rightEdge, _slope, _vertices)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import Math (abs)
@@ -36,11 +36,11 @@ import SmartHouse.Algorithm.HouseParam (HouseParam)
 import SmartHouse.Algorithm.LAV (LAV, SLAV, _lavs, addLav, delLav, emptySLAV, eventValid, getLav, invalidateVertex, lavFromVertices, length, nextVertex, prevVertex, runSLAV, unifyThreeVerts, unifyVerts, updateLav, verticesFromTo)
 import SmartHouse.Algorithm.Ray (ray)
 import SmartHouse.Algorithm.VertInfo (_bisector, _cross, _isReflex)
-import SmartHouse.Algorithm.VertNode (VertNode(..), mkVertNode, projNodeTo3D)
+import SmartHouse.Algorithm.VertNode (VertNode(..), mkVertNode, setZ)
 import SmartHouse.Algorithm.Vertex (Vertex, _lavId, vertexFrom)
 import SmartHouse.HouseTracer (almostParaSameDirection)
 import Smarthouse.Algorithm.Subtree (Subtree, SubtreeType(..), subtree)
-import Three.Math.Vector (Vector3, dist, normal, (<**>), (<+>), (<->), (<.>))
+import Three.Math.Vector (Vector3, dist, normal, vecZ, (<**>), (<+>), (<->), (<.>))
 import Three.Math.Vector as V
 
 
@@ -99,14 +99,14 @@ nextEvtForReflex v = do
         findValidB t = locateB v t >>= (\r -> if validB r then Just r else Nothing)
 
         mkSplitEvt :: Tuple Edge Vector3 -> PointEvent
-        mkSplitEvt (Tuple e b) = splitE (projVecTo3D b e) b v e
+        mkSplitEvt (Tuple e b) = splitE (projVecTo3D b e) v e
 
     pure $ compact $ (validIntersectP >=> findValidB >>> map mkSplitEvt) <$> edges
 
 
 -- project an intersection 2D point to 3D height
-projVecTo3D :: Vector3 -> Edge -> Number
-projVecTo3D p e = distToLineSeg p (l ^. _line) * tan slope
+projVecTo3D :: Vector3 -> Edge -> Vector3
+projVecTo3D p e = setZ (distToLineSeg p (l ^. _line) * tan slope) p
     where l = e ^. _line
           slope = l ^. _slope
 
@@ -121,15 +121,16 @@ nextEvent lav v = do
         iPrev = prevV >>= intersectWith
         iNext = nextV >>= intersectWith
 
-        mkPrevEdgeEvt e pv pi = edgeE e (projVecTo3D pi e) pi pv v
-        mkNextEdgeEvt e nv ni = edgeE e (projVecTo3D ni e) ni v nv
-        mkEdgesEvt le re pv nv i = let ld = projVecTo3D i le
-                                       rd = projVecTo3D i re
-                                       e  = if ld < rd then le else re
-                                   in edgesE e (min ld rd) i pv v nv
+        mkPrevEdgeEvt e pv pi = edgeE e (projVecTo3D pi e) pv v
+        mkNextEdgeEvt e nv ni = edgeE e (projVecTo3D ni e) v nv
+        mkEdgesEvt le re pv nv i = let lp = projVecTo3D i le
+                                       rp = projVecTo3D i re
+                                   in if vecZ lp < vecZ rp
+                                      then edgesE le lp pv v nv
+                                      else edgesE re rp pv v nv
 
         -- if prev and next intersection is very close, and left edge of prev vert
-        -- is almost parallel to the right edge of next vert in the same direction,
+        -- is almost parallel to the right edge of next vert in the same direction=
         -- BUT NOT the same, then it's a MergedNode, otherwise it should be NormalNode
         prevLeftE = view _leftEdge <$> prevV
         nextRightE = view _rightEdge <$> nextV
@@ -181,8 +182,8 @@ handleEdgeEvent' e lav =
                     sinks = fromFoldable $ vertNodeFromVertex <$> vs
                     edges = Set.fromFoldable $ Arr.concatMap (\v -> [v ^. _leftEdge, v ^. _rightEdge]) vs
                     
-                -- this new Vertex is only used in the final subtree. only position and height is used.
-                newV <- liftEffect $ mkVertNode (e ^. _intersection) (e ^. _distance)
+                -- this new Vertex is only used in the final subtree.
+                newV <- liftEffect $ mkVertNode (e ^. _intersection)
 
                 -- delete this LAV and invalidate all vertices in it
                 delLav (lav ^. idLens)
@@ -193,7 +194,7 @@ handleEdgeEvent' e lav =
                 pure $ Tuple t Nil
         else do let va = e ^. _vertexA
                     vb = e ^. _vertexB
-                Tuple newLav newV <- liftEffect $ unifyVerts va vb (e ^. _intersection) (e ^. _edge) (e ^. _distance) lav
+                Tuple newLav newV <- liftEffect $ unifyVerts va vb (e ^. _intersection) (e ^. _edge) lav
                 invalidateVertex va
                 invalidateVertex vb
 
@@ -218,8 +219,8 @@ handleEdgesEvent' e lav =
                     sinks = fromFoldable $ vertNodeFromVertex <$> vs
                     edges = Set.fromFoldable $ Arr.concatMap (\v -> [v ^. _leftEdge, v ^. _rightEdge]) vs
 
-                -- this new Vertex is only used in the final subtree. only position and height is used.
-                newV <- liftEffect $ mkVertNode (e ^. _intersection) (e ^. _distance)
+                -- this new Vertex is only used in the final subtree.
+                newV <- liftEffect $ mkVertNode (e ^. _intersection)
 
                 -- delete this LAV and invalidate all vertices in it
                 delLav (lav ^. idLens)
@@ -230,7 +231,7 @@ handleEdgesEvent' e lav =
         else do let va = e ^. _vertexA
                     vb = e ^. _vertexB
                     vc = e ^. _vertexC
-                Triple newLav newV canHaveNewEvts <- liftEffect $ unifyThreeVerts va vb vc (e ^. _intersection) (e ^. _edge) (e ^. _distance) lav
+                Triple newLav newV canHaveNewEvts <- liftEffect $ unifyThreeVerts va vb vc (e ^. _intersection) (e ^. _edge) lav
                 invalidateVertex va
                 invalidateVertex vb
                 invalidateVertex vc
@@ -260,10 +261,9 @@ handleSplitEvent' e (Tuple x y) = do
     let lavId  = e ^. _vertex <<< _lavId
         intPos = e ^. _intersection
         edge   = e ^. _edge
-        h      = e ^. _distance
         v      = e ^. _vertex
-    v1 <- liftEffect $ vertexFrom lavId intPos (Just edge) h (v ^. _leftEdge) (e ^. _oppositeEdge) Nothing Nothing
-    v2 <- liftEffect $ vertexFrom lavId intPos (Just edge) h (e ^. _oppositeEdge) (v ^. _rightEdge) Nothing Nothing
+    v1 <- liftEffect $ vertexFrom lavId intPos (Just edge) (v ^. _leftEdge) (e ^. _oppositeEdge) Nothing Nothing
+    v2 <- liftEffect $ vertexFrom lavId intPos (Just edge) (e ^. _oppositeEdge) (v ^. _rightEdge) Nothing Nothing
 
     lav <- getLav lavId
     let edges = Set.fromFoldable [v ^. _leftEdge, v ^. _rightEdge]
@@ -347,10 +347,9 @@ addEvtsToQueue :: forall f. Foldable f => PQueue Number PointEvent -> f PointEve
 addEvtsToQueue = foldl (\q' e -> PQ.insert (distance e) e q')
 
 vertNodeFromVertex :: Vertex -> VertNode
-vertNodeFromVertex v = projNodeTo3D $ VertNode {
+vertNodeFromVertex v = VertNode {
     id       : v ^. idLens,
-    position : v ^. _position,
-    height   : v ^. _height
+    position : v ^. _position
     }
 
 -- Compute Straight Skeleton of a polygon
