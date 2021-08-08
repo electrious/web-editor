@@ -40,7 +40,7 @@ import SmartHouse.Algorithm.VertNode (VertNode(..), mkVertNode, setZ)
 import SmartHouse.Algorithm.Vertex (Vertex, _lavId, vertexFrom)
 import SmartHouse.HouseTracer (almostParaSameDirection)
 import Smarthouse.Algorithm.Subtree (Subtree, SubtreeType(..), subtree)
-import Three.Math.Vector (Vector3, dist, normal, vecZ, (<**>), (<+>), (<->), (<.>))
+import Three.Math.Vector (Vector3, dist, mkVec3, normal, vecX, vecY, vecZ, (<**>), (<+>), (<->), (<.>))
 import Three.Math.Vector as V
 
 
@@ -104,10 +104,16 @@ nextEvtForReflex v = do
     pure $ compact $ (validIntersectP >=> findValidB >>> map mkSplitEvt) <$> edges
 
 
+-- set Z of a Vector3 to zero 
+zeroZ :: Vector3 -> Vector3
+zeroZ v = mkVec3 (vecX v) (vecY v) 0.0
+
 -- project an intersection 2D point to 3D height
 projVecTo3D :: Vector3 -> Edge -> Vector3
-projVecTo3D p e = setZ (distToLineSeg p (l ^. _line) * tan slope) p
+projVecTo3D p e = setZ (distToLineSeg i (l ^. _line) * tan slope) p
     where l = e ^. _line
+          i = zeroZ p  -- make sure the intersection point p is 2D with zero Z.
+                       -- this will make sure the distToLineSeg calculation is correct.
           slope = l ^. _slope
 
 -- next event for a vertex
