@@ -27,7 +27,7 @@ import Math.Angle (tan)
 import Math.Line (_direction, _origin, intersection)
 import Math.LineSeg (LineSeg, _start, direction, distToLineSeg)
 import Math.LineSeg as S
-import Math.Utils (approxSame, epsilon)
+import Math.Utils (approxSame, epsilon, zeroZ)
 import Model.UUID (idLens)
 import SmartHouse.Algorithm.Edge (Edge, _leftBisector, _lineEdge, _rightBisector)
 import SmartHouse.Algorithm.EdgeInfo (_line)
@@ -40,7 +40,7 @@ import SmartHouse.Algorithm.VertNode (VertNode(..), mkVertNode, setZ)
 import SmartHouse.Algorithm.Vertex (Vertex, _lavId, vertexFrom)
 import SmartHouse.HouseTracer (almostParaSameDirection)
 import Smarthouse.Algorithm.Subtree (Subtree, SubtreeType(..), subtree)
-import Three.Math.Vector (Vector3, dist, mkVec3, normal, vecX, vecY, vecZ, (<**>), (<+>), (<->), (<.>))
+import Three.Math.Vector (Vector3, dist, normal, vecZ, (<**>), (<+>), (<->), (<.>))
 import Three.Math.Vector as V
 
 
@@ -103,10 +103,6 @@ nextEvtForReflex v = do
 
     pure $ compact $ (validIntersectP >=> findValidB >>> map mkSplitEvt) <$> edges
 
-
--- set Z of a Vector3 to zero 
-zeroZ :: Vector3 -> Vector3
-zeroZ v = mkVec3 (vecX v) (vecY v) 0.0
 
 -- project an intersection 2D point to 3D height
 projVecTo3D :: Vector3 -> Edge -> Vector3

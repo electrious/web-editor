@@ -11,6 +11,9 @@ import Three.Math.Vector (class Vector, Vector3, mkVec3, vecX, vecY, vecZ)
 epsilon :: Number
 epsilon = 0.0001
 
+-- set Z of a Vector3 to zero 
+zeroZ :: Vector3 -> Vector3
+zeroZ v = mkVec3 (vecX v) (vecY v) 0.0
 
 approxEqual :: Number -> Number -> Boolean
 approxEqual a b = abs (a - b) < epsilon

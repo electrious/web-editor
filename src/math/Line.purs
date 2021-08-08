@@ -2,17 +2,19 @@ module Math.Line where
 
 import Prelude
 
+import Data.Filterable (filter)
 import Data.Generic.Rep (class Generic)
-import Data.Show.Generic (genericShow)
 import Data.Lens (Lens', (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype)
-import Type.Proxy (Proxy(..))
+import Data.Show.Generic (genericShow)
+import Math.Angle (degreeVal)
 import Math.LineSeg (LineSeg, _start, direction)
-import Math.Utils (lineIntersection)
-import Three.Math.Vector (class Vector, Vector3, length, (<**>), (<+>), (<->), (<.>))
+import Math.Utils (lineIntersection, zeroZ)
+import Three.Math.Vector (class Vector, Vector3, angleBetween, length, normal, (<**>), (<+>), (<->), (<.>))
+import Type.Proxy (Proxy(..))
 
 newtype Line v = Line {
     origin    :: v,
@@ -46,9 +48,17 @@ distFromPoint p l =
         dir = l ^. _direction
     in length $ d <-> (dir <**> (d <.> dir))
 
+
+sameDir :: Vector3 -> Vector3 -> Boolean
+sameDir a b = degreeVal (angleBetween (normal a) (normal b)) < 1.0
+
+-- make sure the lines are 2D and the intersection point should in the same direction
+-- of both lines to avoid incorrect intersection points
 intersection :: Line Vector3 -> Line Vector3 -> Maybe Vector3
-intersection l1 l2 = lineIntersection s1 e1 s2 e2
-    where s1 = l1 ^. _origin
+intersection l1 l2 = filter f i
+    where s1 = zeroZ $ l1 ^. _origin
           e1 = s1 <+> l1 ^. _direction
-          s2 = l2 ^. _origin
+          s2 = zeroZ $ l2 ^. _origin
           e2 = s2 <+> l2 ^. _direction
+          i = lineIntersection s1 e1 s2 e2
+          f p = sameDir (p <-> s1) (l1 ^. _direction) && sameDir (p <-> s2) (l2 ^. _direction)

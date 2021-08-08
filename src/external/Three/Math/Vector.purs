@@ -1,9 +1,9 @@
 module Three.Math.Vector  where
 
-import Prelude hiding (add,sub)
+import Prelude hiding (add, sub, degree)
 
 import Data.Default (class Default)
-import Math.Angle (Angle, acos)
+import Math.Angle (Angle, acos, degree)
 import Three.Math.Matrix (Matrix4)
 
 foreign import data Vector2 :: Type
@@ -136,6 +136,12 @@ toVec3 :: Vector2 -> Number -> Vector3
 toVec3 v z = mkVec3 (vecX v) (vecY v) z
 
 -- | helper function to calculate angle between two Vector3
+-- make sure the acos is not returning NaN values
 angleBetween :: forall a. Vector a => a -> a -> Angle
-angleBetween v1 v2 = acos $ d / (length v1 * length v2)
+angleBetween v1 v2 = if v >= 1.0
+                     then degree 0.0
+                     else if v <= -1.0
+                          then degree 180.0
+                          else acos v
     where d = v1 <.> v2
+          v = d / (length v1 * length v2)

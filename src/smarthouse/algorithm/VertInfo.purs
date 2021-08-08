@@ -105,7 +105,7 @@ vertInfoFrom i p e leftEdge rightEdge vecL vecR =
         rightVec = direction $ rightEdge ^. _line
         lv       = fromMaybe leftVec $ normal <$> vecL
         rv       = fromMaybe rightVec $ normal <$> vecR
-        isReflex = _cross lv rv < 0.0
+        isReflex = _cross lv rv > 0.0
 
         lSlope   = leftEdge  ^. _slope
         rSlope   = rightEdge ^. _slope
