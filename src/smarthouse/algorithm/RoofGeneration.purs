@@ -18,7 +18,6 @@ import Data.UUID (UUID)
 import Data.UUIDMap (UUIDMap)
 import Data.UUIDMap as UM
 import Editor.Common.Lenses (_edge, _edges, _id, _normal, _position, _slope)
-import Math.LineSeg (LineSeg, _start, direction)
 import Model.Polygon (newPolygon)
 import Model.SmartHouse.Roof (Roof, _subtrees, createRoofFrom)
 import Model.UUID (class HasUUID, idLens)
@@ -26,14 +25,11 @@ import SmartHouse.Algorithm.Edge (Edge, _leftVertex, _rightVertex)
 import SmartHouse.Algorithm.EdgeInfo (_line)
 import SmartHouse.Algorithm.VertNode (VertNode)
 import Smarthouse.Algorithm.Subtree (Subtree, SubtreeType(..), _sinks, _source, _subtreeType, mergedEdge, normalSubtree)
-import Three.Math.Vector (Vector3, mkVec3, (<->), (<.>))
+import Three.Math.Vector (Vector3, mkVec3)
 import Type.Proxy (Proxy(..))
 
 upVec :: Vector3
 upVec = mkVec3 0.0 0.0 1.0
-
-distanceAlong :: Vector3 -> LineSeg Vector3 -> Number
-distanceAlong p e = (p <-> e ^. _start) <.> direction e
 
 -- data accumulated to generate a single roof
 newtype RoofData = RoofData {
