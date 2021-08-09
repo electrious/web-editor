@@ -6,7 +6,7 @@ import Control.Alternative (empty)
 import Data.Array as Arr
 import Data.Default (class Default, def)
 import Data.Filterable (filter)
-import Data.Foldable (class Foldable, foldl)
+import Data.Foldable (foldl)
 import Data.Generic.Rep (class Generic)
 import Data.Lens (Lens', view, (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
@@ -38,10 +38,9 @@ import SmartHouse.Algorithm.Edge (Edge, _lineEdge)
 import SmartHouse.Algorithm.HouseParam (houseParamFrom)
 import SmartHouse.Algorithm.Skeleton (skeletonize)
 import SmartHouse.Algorithm.VertInfo (VertWithSlope, updateSlope, vertWithSlope)
-import SmartHouse.Algorithm.VertNode (VertNode, height)
 import SmartHouse.SlopeOption (SlopeOption(..))
 import Smarthouse.Algorithm.RoofGeneration (generateRoofs)
-import Smarthouse.Algorithm.Subtree (Subtree, _source, treeLines)
+import Smarthouse.Algorithm.Subtree (Subtree, treeLines)
 import Three.Math.Vector (Vector3)
 import Type.Proxy (Proxy(..))
 
@@ -55,8 +54,7 @@ newtype House = House {
     height    :: Meter,
     trees     :: UUIDMap Subtree,
     edges     :: List Edge,
-    roofs     :: UUIDMap Roof,
-    peakPoint :: VertNode
+    roofs     :: UUIDMap Roof
     }
 
 derive instance Newtype House _
@@ -68,8 +66,7 @@ instance Default House where
         height    : meter 0.0,
         trees     : M.empty,
         edges     : empty,
-        roofs     : M.empty,
-        peakPoint : def
+        roofs     : M.empty
         }
 instance Eq House where
     eq h1 h2 = h1 ^. _id == h2 ^. _id
@@ -81,9 +78,6 @@ instance HasUUID House where
 _trees :: forall t a r. Newtype t { trees :: a | r } => Lens' t a
 _trees = _Newtype <<< prop (Proxy :: Proxy "trees")
 
-_peakPoint :: forall t a r. Newtype t { peakPoint :: a | r } => Lens' t a
-_peakPoint = _Newtype <<< prop (Proxy :: Proxy "peakPoint")
-
 createHouseFrom :: Angle -> Polygon Vector3 -> Effect House
 createHouseFrom slope poly = do
     i <- genUUID
@@ -91,22 +85,15 @@ createHouseFrom slope poly = do
     let hi = houseParamFrom floor
     Tuple trees edges <- skeletonize hi
     let roofs = generateRoofs (S.fromFoldable trees) edges
-        n = findPeakPoint trees
-    
+
     pure $ House {
         id        : i,
         floor     : floor,
         height    : meter 3.5,   -- default height
         trees     : UM.fromFoldable trees,
         edges     : edges,
-        roofs     : UM.fromFoldable roofs,
-        peakPoint : n
+        roofs     : UM.fromFoldable roofs
         }
-
-
--- find the peak point of all subtrees in a house
-findPeakPoint :: forall f. Foldable f => f Subtree -> VertNode
-findPeakPoint = foldl (\o t -> if height (t ^. _source) > height o then t ^. _source else o) def
 
 updateHeight :: Meter -> House -> House
 updateHeight height h = h # _height .~ height
@@ -143,7 +130,6 @@ updateHouseWith floor h = do
              # _trees    .~ UM.fromFoldable trees
              # _edges    .~ edges
              # _roofs    .~ UM.fromFoldable roofs
-             # _peakPoint .~ findPeakPoint trees
 
 getHouseLines :: House -> List (LineSeg Vector3)
 getHouseLines h = tLines <> eLines
