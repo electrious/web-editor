@@ -19,6 +19,7 @@ import Data.Newtype (class Newtype)
 import Data.Time.Duration (Milliseconds(..))
 import Data.Traversable (class Traversable, traverse)
 import Data.UUID (UUID)
+import Data.UUIDMap (UUIDMap)
 import Editor.ArrayBuilder (runArrayBuilder)
 import Editor.Common.Lenses (_alignment, _edges, _floor, _height, _houseId, _id, _modeDyn, _name, _orientation, _panelType, _panels, _position, _roof, _roofs, _slopeSelected, _tapped, _updated)
 import Editor.Disposable (Disposee(..))
@@ -115,6 +116,13 @@ data HouseEditorMode = EditingHouse
 
 derive instance eqwHouseEditorMode :: Eq HouseEditorMode
 
+activeRoofId :: ActiveMode -> Maybe UUID -> Maybe UUID
+activeRoofId Active   i = i
+activeRoofId Inactive _ = Nothing
+
+getActiveRoof :: Maybe UUID -> UUIDMap Roof -> Maybe Roof
+getActiveRoof (Just i) m = M.lookup i m
+getActiveRoof Nothing _  = Nothing
 
 editHouse :: HouseConfig -> HouseEditorConf -> Node HouseTextureInfo HouseNode
 editHouse houseCfg conf = do
@@ -137,14 +145,8 @@ editHouse houseCfg conf = do
             wallTap <- latestEvt <$> dynamic (renderWalls floor <$> hDyn)
 
             -- calculate the active roof id based on house's activeness and active roof id
-            let f Active   i = i
-                f Inactive _ = Nothing
-
-                g (Just i) m = M.lookup i m
-                g Nothing _  = Nothing
-
-                -- id of active roof, taking into account of the house activeness
-                actRoofDyn = f <$> actDyn <*> actRoofIdDyn
+            let -- id of active roof, taking into account of the house activeness
+                actRoofDyn = activeRoofId <$> actDyn <*> actRoofIdDyn
                 
                 canEditDyn = (&&) <$> actDyn <*> (fromBoolean <$> houseEditDyn)
 
@@ -152,7 +154,7 @@ editHouse houseCfg conf = do
             roofEvtsDyn <- node (def # _position .~ pDyn
                                      # _name     .~ "roofs") do
                 let roofsDyn = view _roofs <$> houseDyn
-                    actRDyn = g <$> actRoofDyn <*> roofsDyn
+                    actRDyn = getActiveRoof <$> actRoofDyn <*> roofsDyn
                 node (def # _name .~ "roof-lines"
                           # _position .~ pure (mkVec3 0.0 0.0 0.02)) do
                     -- render ridge lines
