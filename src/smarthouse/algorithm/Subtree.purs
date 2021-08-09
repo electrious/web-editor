@@ -2,23 +2,20 @@ module Smarthouse.Algorithm.Subtree where
 
 import Prelude
 
-import Data.Foldable (foldl)
 import Data.Generic.Rep (class Generic)
-import Data.Lens (Lens', set, view, (%~), (.~), (^.))
+import Data.Lens (Lens', view, (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.List (List(..), elem, (:))
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.List (List)
 import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
 import Data.UUID (UUID, genUUID)
-import Editor.Common.Lenses (_edges, _id, _position)
+import Editor.Common.Lenses (_edges, _id)
 import Effect (Effect)
 import Math.LineSeg (LineSeg, mkLineSeg)
 import Model.UUID (class HasUUID, idLens)
 import SmartHouse.Algorithm.Edge (Edge)
-import SmartHouse.Algorithm.VertNode (VertNode, setZ)
-import Three.Math.Vector (Vector3, vecZ, (<**>), (<+>))
+import SmartHouse.Algorithm.VertNode (VertNode)
 import Type.Proxy (Proxy(..))
 
 data SubtreeType = NormalNode
@@ -37,9 +34,7 @@ newtype Subtree = Subtree {
     source          :: VertNode,
     sinks           :: List VertNode,
     edges           :: List Edge,
-    subtreeType     :: SubtreeType,
-    isGable         :: Boolean,         -- if this subtree node is gable
-    originalSubtree :: Maybe Subtree    -- the original subtree after gabled
+    subtreeType     :: SubtreeType
     }
 
 derive instance newtypeSubtree :: Newtype Subtree _
@@ -54,7 +49,6 @@ instance showSubtree :: Show Subtree where
                      ", sinks: "       <> show (t ^. _sinks) <>
                      ", edges: "       <> show (t ^. _edges) <>
                      ", subtreeType: " <> show (t ^. _subtreeType) <>
-                     ", isGable: "     <> show (t ^. _isGable) <>
                      "}"
     
 _source :: forall t a r. Newtype t { source :: a | r } => Lens' t a
@@ -81,9 +75,7 @@ subtree t source ss es = do
         source          : source,
         sinks           : ss,
         edges           : es,
-        subtreeType     : t,
-        isGable         : false,
-        originalSubtree : Nothing
+        subtreeType     : t
         }
 
 normalSubtree :: Subtree -> Boolean
@@ -98,23 +90,3 @@ mergedEdge e t = case t ^. _subtreeType of
 treeLines :: Subtree -> List (LineSeg VertNode)
 treeLines t = mkLineSeg s <$> t ^. _sinks
     where s = t ^. _source
-
-gableSubtree :: Subtree -> List Vector3 -> Subtree
-gableSubtree t vs = mkT $ foldl f Nil (view _position <$> t ^. _sinks)
-    where f ls v = if elem v vs
-                   then Cons v ls
-                   else ls
-          mkT ls = case ls of
-              (v1:v2:_) -> let op = t ^. _source <<< _position
-                               np = setZ (vecZ op) ((v1 <+> v2) <**> 0.5)
-                           in t # _source          %~ set _position np
-                                # _isGable         .~ true
-                                # _originalSubtree .~ Just t
-              _ -> t
-
-
--- flip a subtree between gable and slope value
-flipSubtree :: Subtree -> List Vector3 -> Subtree
-flipSubtree t vs = if t ^. _isGable
-                   then fromMaybe t $ t ^. _originalSubtree
-                   else gableSubtree t vs

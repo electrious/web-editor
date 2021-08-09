@@ -11,7 +11,7 @@ import Data.Generic.Rep (class Generic)
 import Data.Lens (Lens', view, (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.List (List, concatMap, findIndex, fromFoldable)
+import Data.List (List, concatMap, findIndex)
 import Data.Map (values)
 import Data.Map as M
 import Data.Maybe (Maybe(..), fromMaybe)
@@ -41,7 +41,7 @@ import SmartHouse.Algorithm.VertInfo (VertWithSlope, updateSlope, vertWithSlope)
 import SmartHouse.Algorithm.VertNode (VertNode, height)
 import SmartHouse.SlopeOption (SlopeOption(..))
 import Smarthouse.Algorithm.RoofGeneration (generateRoofs)
-import Smarthouse.Algorithm.Subtree (Subtree, _source, flipSubtree, treeLines)
+import Smarthouse.Algorithm.Subtree (Subtree, _source, treeLines)
 import Three.Math.Vector (Vector3)
 import Type.Proxy (Proxy(..))
 
@@ -144,18 +144,6 @@ updateHouseWith floor h = do
              # _edges    .~ edges
              # _roofs    .~ UM.fromFoldable roofs
              # _peakPoint .~ findPeakPoint trees
-
--- flip a roof to/from gable
-flipRoof :: UUID -> House -> House
-flipRoof i h = h # _roofs .~ UM.fromFoldable roofs
-                 # _trees .~ nts
-    where vs  = fromFoldable $ view _position <$> h ^. _floor <<< _polyVerts
-          ts  = h ^. _trees
-          -- flip the subtree at idx
-          nts = M.update (Just <<< flip flipSubtree vs) i ts
-          -- generate new roofs
-          roofs = generateRoofs (S.fromFoldable nts) (h ^. _edges)
-
 
 getHouseLines :: House -> List (LineSeg Vector3)
 getHouseLines h = tLines <> eLines

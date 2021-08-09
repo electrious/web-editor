@@ -6,21 +6,15 @@ import Algorithm.Plane (Plane)
 import Custom.Mesh (TappableMesh)
 import Data.Default (def)
 import Data.Generic.Rep (class Generic)
-import Data.Lens (Lens', view, (.~), (^.))
-import Data.Lens.Iso.Newtype (_Newtype)
-import Data.Lens.Record (prop)
-import Data.List (List(..), (:))
-import Data.Map as M
+import Data.Lens (view, (.~), (^.))
+import Data.List (List)
 import Data.Maybe (Maybe(..))
 import Data.Meter (Meter, meterVal)
 import Data.Newtype (class Newtype)
-import Data.Set (Set)
 import Data.Show.Generic (genericShow)
 import Data.Traversable (traverse_)
 import Data.UUID (UUID)
-import Data.UUIDMap (UUIDMap)
-import Data.UUIDMap as UM
-import Editor.Common.Lenses (_id, _name, _normal, _polygon, _tapped)
+import Editor.Common.Lenses (_id, _name, _normal, _polygon, _slope, _tapped)
 import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, gateDyn)
@@ -37,11 +31,10 @@ import Model.UUID (class HasUUID, idLens)
 import Rendering.Line (renderLineOnlyWith)
 import Rendering.Node (Node, _exportable, getEnv, tapMesh)
 import SmartHouse.Algorithm.Edge (Edge)
+import SmartHouse.Algorithm.VertInfo (is90)
 import SmartHouse.PolyGeometry (mkPolyGeometry, mkPolyGeometryWithUV)
-import Smarthouse.Algorithm.Subtree (Subtree, _isGable)
 import Three.Core.Material (LineBasicMaterial, MeshPhongMaterial, mkLineBasicMaterial, mkMeshBasicMaterialWithTexture, mkMeshPhongMaterial)
 import Three.Math.Vector (Vector3, mkVec3, vecX, vecY, vecZ)
-import Type.Proxy (Proxy(..))
 
 data RoofState = SlopeRoof
                | Gable
@@ -51,7 +44,6 @@ derive instance Eq RoofState
 newtype Roof = Roof {
     id       :: UUID,
     polygon  :: Polygon Vector3,
-    subtrees :: UUIDMap Subtree,
 
     edges    :: List Edge,
     slope    :: Angle,
@@ -68,26 +60,11 @@ instance Eq Roof where
 instance HasUUID Roof where
     idLens = _id
 
-_subtrees :: forall t a r. Newtype t { subtrees :: a | r } => Lens' t a
-_subtrees = _Newtype <<< prop (Proxy :: Proxy "subtrees")
+createRoofFrom :: UUID -> Polygon Vector3 -> List Edge -> Vector3 -> Angle -> Roof
+createRoofFrom i p es n s = Roof { id : i, polygon : p, edges : es, slope: s, normal : n }
 
-createRoofFrom :: UUID -> Polygon Vector3 -> Set Subtree -> List Edge -> Vector3 -> Angle -> Roof
-createRoofFrom i p ts es n s = Roof { id : i, polygon : p, subtrees : UM.fromSet ts, edges : es, slope: s, normal : n }
-
--- check if a roof can be gable
-canBeGable :: Roof -> Boolean
-canBeGable r = M.size (r ^. _subtrees) < 2
-
--- | get the roof's current state, if it's gable or not
 roofState :: Roof -> RoofState
-roofState r = case M.values $ r ^. _subtrees of
-    (t:Nil) -> if t ^. _isGable then Gable else SlopeRoof
-    _       -> SlopeRoof
-
-subtreeIndex :: Roof -> Maybe UUID
-subtreeIndex r = case M.values $ r ^. _subtrees of
-    (t:Nil) -> Just $ t ^. idLens
-    _       -> Nothing
+roofState r = if is90 $ r ^. _slope then Gable else SlopeRoof
 
 roofPlane :: Roof -> Plane
 roofPlane = polyPlane <<< view _polygon

@@ -19,7 +19,7 @@ import Data.UUIDMap (UUIDMap)
 import Data.UUIDMap as UM
 import Editor.Common.Lenses (_edge, _edges, _id, _normal, _position, _slope)
 import Model.Polygon (newPolygon)
-import Model.SmartHouse.Roof (Roof, _subtrees, createRoofFrom)
+import Model.SmartHouse.Roof (Roof, createRoofFrom)
 import Model.UUID (class HasUUID, idLens)
 import SmartHouse.Algorithm.Edge (Edge, _leftVertex, _rightVertex)
 import SmartHouse.Algorithm.EdgeInfo (_line)
@@ -49,6 +49,9 @@ instance eqRoofData :: Eq RoofData where
     eq r1 r2 = r1 ^. idLens == r2 ^. idLens
 instance ordRoofData :: Ord RoofData where
     compare = comparing (view idLens)
+
+_subtrees :: forall t a r. Newtype t { subtrees :: a | r } => Lens' t a
+_subtrees = _Newtype <<< prop (Proxy :: Proxy "subtrees")
 
 _edgeNodes :: forall t a r. Newtype t { edgeNodes :: a | r } => Lens' t a
 _edgeNodes = _Newtype <<< prop (Proxy :: Proxy "edgeNodes")
@@ -108,7 +111,7 @@ mkGraph ts = fromAdjacencyList $ concatMap f ts
 
 -- find polygon for an edge
 roofForEdge :: RoofData -> Roof
-roofForEdge rd = createRoofFrom (rd ^. idLens) (newPolygon nodes) (rd ^. _subtrees) (rd ^. _edges) (rd ^. _edge <<< _normal) slope
+roofForEdge rd = createRoofFrom (rd ^. idLens) (newPolygon nodes) (rd ^. _edges) (rd ^. _edge <<< _normal) slope
     where slope  = rd ^. _edge <<< _line <<< _slope
           sorted = fromMaybe Nil $ shortestPath (rd ^. _rightVert) (rd ^. _leftVert) $ mkGraph $ S.toUnfoldable $ rd ^. _subtrees
           nodes  = view _position <$> (sorted <> rd ^. _edgeNodes)
