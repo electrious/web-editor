@@ -147,17 +147,8 @@ updateHouseWith floor h = do
 
 getHouseLines :: House -> List (LineSeg Vector3)
 getHouseLines h = tLines <> eLines
-    where -- all source VertNodes from all trees
-          allNodes = UM.fromFoldable $ view _source <$> h ^. _trees
-          -- get latest VertNode from allNodes
-          getN n = fromMaybe n $ M.lookup (n ^. idLens) allNodes
-          
-          tls = concatMap treeLines (values $ h ^. _trees)
-
-          -- NOTE: some sink VertNode in a subtree might not be up to date
-          -- due to Gable roof toggling. Get the node with getN to make
-          -- sure it's used correctly.
-          tLines = map (view _position <<< getN) <$> tls
+    where tls = concatMap treeLines (values $ h ^. _trees)
+          tLines = map (view _position) <$> tls
           eLines = view _lineEdge <$> h ^. _edges
 
 exportHouse :: House -> JSHouse

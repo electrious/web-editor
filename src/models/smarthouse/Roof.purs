@@ -1,6 +1,6 @@
 module Model.SmartHouse.Roof where
 
-import Prelude
+import Prelude hiding (degree)
 
 import Algorithm.Plane (Plane)
 import Custom.Mesh (TappableMesh)
@@ -22,7 +22,7 @@ import FRP.Event (Event)
 import FRP.Event.Extra (multicast)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
-import Math.Angle (Angle)
+import Math.Angle (Angle, degree)
 import Model.ActiveMode (ActiveMode(..), fromBoolean)
 import Model.Polygon (Polygon, _polyVerts, polyOutline, polyPlane)
 import Model.Roof.RoofPlate (Point, vec2Point)
@@ -31,7 +31,6 @@ import Model.UUID (class HasUUID, idLens)
 import Rendering.Line (renderLineOnlyWith)
 import Rendering.Node (Node, _exportable, getEnv, tapMesh)
 import SmartHouse.Algorithm.Edge (Edge)
-import SmartHouse.Algorithm.VertInfo (is90)
 import SmartHouse.PolyGeometry (mkPolyGeometry, mkPolyGeometryWithUV)
 import Three.Core.Material (LineBasicMaterial, MeshPhongMaterial, mkLineBasicMaterial, mkMeshBasicMaterialWithTexture, mkMeshPhongMaterial)
 import Three.Math.Vector (Vector3, mkVec3, vecX, vecY, vecZ)
@@ -64,7 +63,7 @@ createRoofFrom :: UUID -> Polygon Vector3 -> List Edge -> Vector3 -> Angle -> Ro
 createRoofFrom i p es n s = Roof { id : i, polygon : p, edges : es, slope: s, normal : n }
 
 roofState :: Roof -> RoofState
-roofState r = if is90 $ r ^. _slope then Gable else SlopeRoof
+roofState r = if r ^. _slope > degree 89.0 then Gable else SlopeRoof
 
 roofPlane :: Roof -> Plane
 roofPlane = polyPlane <<< view _polygon

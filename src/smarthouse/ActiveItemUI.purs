@@ -90,6 +90,12 @@ withTargetValue cb = \event -> do
 unsafeEventTarget :: DOM.Event -> Node
 unsafeEventTarget e = (unsafeCoerce e).target
 
+slopeTop :: Angle
+slopeTop = degree 89.6
+
+-- make sure slope is at most 89.6° for gable roof
+safeSlope :: Angle -> Angle
+safeSlope a = if a > slopeTop then slopeTop else a
 
 slopeSelector :: Dynamic Angle -> Widget (Event Angle)
 slopeSelector slopeDyn = div [class_ "uk-flex"] do
@@ -105,14 +111,14 @@ slopeSelector slopeDyn = div [class_ "uk-flex"] do
     -- show the range slide to select the slope
     el "input" [attr "type" "range",
                 attr "min" "5",
-                attr "max" "85",
+                attr "max" "90",
                 attr "step" "1",
                 valueD slopeStrDyn,
                 on "input" (withTargetValue pushNewVal)
                 ] $ pure unit
 
     el "div" [ class_ "uk-margin-left"] $ dynText $ appendDegSym <$> slopeStrDyn
-    pure slopeEvt
+    pure $ safeSlope <$> slopeEvt
 
 
 slopeScopeUI :: Widget (Dynamic Boolean)
