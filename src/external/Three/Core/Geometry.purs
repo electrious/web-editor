@@ -7,11 +7,11 @@ import Data.Lens (Lens')
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
-import Type.Proxy (Proxy(..))
 import Effect (Effect)
 import Three.Core.Face3 (Face3)
 import Three.Core.TypedArray (class IsTypedArray, TypedArray, toTypedArray)
 import Three.Math.Vector (Vector2, Vector3)
+import Type.Proxy (Proxy(..))
 import Unsafe.Coerce (unsafeCoerce)
 
 class IsGeometry geo where
@@ -37,9 +37,13 @@ setIndex :: forall geo. IsGeometry geo => BufferAttribute -> geo -> Effect Unit
 setIndex attr geo = jssetIndex attr (toGeometry geo)
 
 foreign import jsclone :: BufferGeometry -> Effect BufferGeometry
+foreign import jsdispose :: BufferGeometry -> Effect Unit
 
 clone :: forall geo. IsGeometry geo => geo -> Effect geo 
 clone geo = unsafeCoerce <$> jsclone (toGeometry geo)
+
+dispose :: forall geo. IsGeometry geo => geo -> Effect Unit
+dispose geo = jsdispose (toGeometry geo)
 
 foreign import jscomputeVertexNormals :: BufferGeometry -> Effect Unit
 
@@ -133,6 +137,8 @@ _bevelSegments = _Newtype <<< prop (Proxy :: Proxy "bevelSegments")
 foreign import mkExtrudeGeometry :: Shape -> ExtrudeSettings -> Effect ExtrudeGeometry
 
 foreign import data LineGeometry :: Type
+instance IsGeometry LineGeometry where
+    toGeometry = unsafeCoerce
 foreign import mkLineGeometry :: Array Vector3 -> Effect LineGeometry
 
 foreign import data BufferAttribute :: Type

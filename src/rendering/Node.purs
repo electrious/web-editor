@@ -14,16 +14,17 @@ import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import Editor.Common.Lenses (_color, _name, _parent, _position, _rotation, _scale)
+import Editor.Common.Lenses (_color, _mesh, _name, _parent, _position, _rotation, _scale)
 import Editor.Disposable (Disposee(..), dispose)
 import Editor.SceneEvent (setRaycastable)
 import Effect (Effect)
 import Effect.Class (class MonadEffect, liftEffect)
 import FRP.Dynamic (Dynamic, step, subscribeDyn)
 import FRP.Event (Event, create, subscribe)
-import Three.Core.Geometry (class IsGeometry, mkLineGeometry)
+import Three.Core.Geometry (class IsGeometry, BufferGeometry, LineGeometry, mkLineGeometry)
+import Three.Core.Geometry as Geo
 import Three.Core.Material (class IsLineMaterial, class IsMaterial)
-import Three.Core.Mesh (Line, Mesh, computeLineDistances, mkLine, mkMesh)
+import Three.Core.Mesh (Line, Mesh, computeLineDistances, geometry, mkLine, mkMesh)
 import Three.Core.Object3D (class IsObject3D, Object3D, add, lookAt, mkObject3D, remove, setCastShadow, setExportable, setName, setPosition, setReceiveShadow, setRenderOrder, setRotation, setScale, setVisible, toObject3D)
 import Three.Math.Euler (Euler)
 import Three.Math.Vector (Vector3, mkVec3)
@@ -155,8 +156,8 @@ setupProps prop o = do
     pure $ d1 *> d2 *> d3 *> d4 *> d5 *> d6
 
 -- internal helper function to create node functions with node maker function
-mkNode :: forall e m. IsObject3D m => Props -> Effect m -> Node e m
-mkNode prop func = do
+mkNode :: forall e m. IsObject3D m => Props -> Effect m -> (m -> Effect Unit) -> Node e m
+mkNode prop func disposeFunc = do
     m <- liftEffect func
     parent <- getParent
 
@@ -165,7 +166,7 @@ mkNode prop func = do
     d <- liftEffect $ setupProps prop m
 
     -- remove the object from parent if node is disposed
-    tell $ Disposee $ d *> remove m parent
+    tell $ Disposee $ d *> remove m parent *> disposeFunc m 
     pure m
 
 
@@ -173,37 +174,45 @@ mkNode prop func = do
 runChild :: forall e a m. IsObject3D m => Node e a -> m -> Node e a
 runChild child m = local (set _parent (toObject3D m)) child
 
+
+disposeMesh :: Mesh -> Effect Unit
+disposeMesh m = Geo.dispose (geometry m :: BufferGeometry)
+
+disposeLine :: Line -> Effect Unit
+disposeLine l = Geo.dispose (geometry l :: LineGeometry)
+
 -- empty node
 leaf :: forall e. Node e Unit
 leaf = pure unit
 
 node :: forall e a. Props -> Node e a -> Node e a
-node prop child = mkNode prop mkObject3D >>= runChild child
+node prop child = mkNode prop mkObject3D (const $ pure unit) >>= runChild child
 
 mesh :: forall geo mat e. IsGeometry geo => IsMaterial mat => Props -> geo -> mat -> Node e Mesh
-mesh prop geo mat = mkNode prop $ mkMesh geo mat
+mesh prop geo mat = mkNode prop (mkMesh geo mat) disposeMesh
 
 line :: forall e mat. IsLineMaterial mat => Props -> Array Vector3 -> mat -> Node e Line
-line prop vs mat = mkNode (prop # _raycastable .~ pure false) $ mkLineGeometry vs >>= flip mkLine mat
+line prop vs mat = mkNode (prop # _raycastable .~ pure false) (mkLineGeometry vs >>= flip mkLine mat) disposeLine
 
 dashLine :: forall e mat. IsLineMaterial mat => Props -> Array Vector3 -> mat -> Node e Line
-dashLine prop vs mat = mkNode (prop # _raycastable .~ pure false) do
-    geo <- mkLineGeometry vs
-    l <- mkLine geo mat
-    computeLineDistances l
-    pure l
+dashLine prop vs mat = mkNode (prop # _raycastable .~ pure false) lineF disposeLine
+    where lineF = do
+              geo <- mkLineGeometry vs
+              l <- mkLine geo mat
+              computeLineDistances l
+              pure l
 
 tapMesh :: forall geo mat e. IsGeometry geo => IsMaterial mat => Props -> geo -> mat -> Node e TappableMesh
-tapMesh prop geo mat = mkNode prop $ mkTappableMesh geo mat
+tapMesh prop geo mat = mkNode prop (mkTappableMesh geo mat) (view _mesh >>> disposeMesh)
 
 dragMesh :: forall geo mat e. IsGeometry geo => IsMaterial mat => Props -> geo -> mat -> Node e DraggableMesh
-dragMesh prop geo mat = mkNode prop $ mkDraggableMesh geo mat
+dragMesh prop geo mat = mkNode prop (mkDraggableMesh geo mat) (view _mesh >>> disposeMesh)
 
 tapDragMesh :: forall geo mat e. IsGeometry geo => IsMaterial mat => Props -> geo -> mat -> Node e TapDragMesh
-tapDragMesh prop geo mat = mkNode prop $ mkTapDragMesh geo mat
+tapDragMesh prop geo mat = mkNode prop (mkTapDragMesh geo mat) (view _mesh >>> disposeMesh)
 
 tapMouseMesh :: forall geo mat e. IsGeometry geo => IsMaterial mat => Props -> geo -> mat -> Node e TapMouseMesh
-tapMouseMesh prop geo mat = mkNode prop $ mkTapMouseMesh geo mat
+tapMouseMesh prop geo mat = mkNode prop (mkTapMouseMesh geo mat) (view _mesh >>> disposeMesh)
 
 
 newtype TextProps = TextProps {

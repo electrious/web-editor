@@ -17,6 +17,9 @@ exports.jssetIndex = idx => geo => _ => {
     geo.setIndex(idx);
 }
 
+exports.jsdispose = geo => _ => {
+    geo.dispose();
+}
 
 exports.jsvertices = geo => {
     let attr = geo.getAttribute("position");

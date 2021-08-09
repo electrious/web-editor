@@ -53,4 +53,4 @@ chassisGeo :: String -> BufferGeometry
 chassisGeo = memoize \_ -> unsafePerformEffect do
     loader <- makeOBJLoader
     let obj = parseOBJ bxChassisObjData loader
-    pure $ geometry $ unsafeCoerce obj
+    pure $ geometry (unsafeCoerce obj :: Mesh)
