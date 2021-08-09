@@ -3,10 +3,8 @@ module Model.SmartHouse.Roof where
 import Prelude
 
 import Algorithm.Plane (Plane)
-import Control.Alternative (empty)
 import Custom.Mesh (TappableMesh)
-import Data.Compactable (compact)
-import Data.Default (class Default, def)
+import Data.Default (def)
 import Data.Generic.Rep (class Generic)
 import Data.Lens (Lens', view, (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
@@ -31,7 +29,7 @@ import FRP.Event.Extra (multicast)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Math.Angle (Angle)
-import Model.ActiveMode (ActiveMode(..), fromBoolean, isActive)
+import Model.ActiveMode (ActiveMode(..), fromBoolean)
 import Model.Polygon (Polygon, _polyVerts, polyOutline, polyPlane)
 import Model.Roof.RoofPlate (Point, vec2Point)
 import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo, _size, _texture)
@@ -114,21 +112,6 @@ instance Encode JSRoof where
 instance Decode JSRoof where
     decode = genericDecode (defaultOptions { unwrapSingleConstructors = true })
 
-newtype RoofEvents = RoofEvents {
-    tapped  :: Event UUID,
-    flipped :: Event UUID   -- event to flip the roof state, the Int is index of the subtree
-    }
-
-derive instance Newtype RoofEvents _
-instance Default RoofEvents where
-    def = RoofEvents {
-        tapped  : empty,
-        flipped : empty
-        }
-
-_flipped :: forall t a r. Newtype t { flipped :: a | r } => Lens' t a
-_flipped = _Newtype <<< prop (Proxy :: Proxy "flipped")
-
 -- material for active roof outline
 actLineMat :: LineBasicMaterial
 actLineMat = unsafePerformEffect $ mkLineBasicMaterial 0xeeee00 4.0
@@ -144,24 +127,17 @@ renderActRoofOutline :: forall e. Maybe Roof -> Node e Unit
 renderActRoofOutline (Just r) = renderRoofOutline r
 renderActRoofOutline Nothing  = pure unit
 
-renderRoof :: Dynamic Boolean -> Dynamic (Maybe UUID) -> Roof -> Node HouseTextureInfo RoofEvents
-renderRoof enableDyn actIdDyn roof = do
+renderRoof :: Dynamic Boolean -> Roof -> Node HouseTextureInfo (Event UUID)
+renderRoof enableDyn roof = do
     let poly  = roof ^. _polygon
-
-        actDyn = getRoofActive roof <$> actIdDyn
 
     -- render the roof polygon
     m <- if roofState roof == Gable
          then renderGableRoof poly (roof ^. _normal)
          else renderSlopeRoof poly
-    let tapEvt      = multicast $ m ^. _tapped
-
-        actTapEvt   = gateDyn ((&&) <$> enableDyn <*> (isActive <$> actDyn)) tapEvt
-        inactTapEvt = gateDyn ((&&) <$> enableDyn <*> (not <<< isActive <$> actDyn)) tapEvt
-        
-    pure $ def # _tapped  .~ multicast (const (roof ^. idLens) <$> inactTapEvt)
-               # _flipped .~ multicast (compact $ const (subtreeIndex roof) <$> actTapEvt)
-
+    let tapEvt    = m ^. _tapped
+        actTapEvt = gateDyn enableDyn tapEvt
+    pure $ multicast (const (roof ^. idLens) <$> actTapEvt)
 
 gableMat :: MeshPhongMaterial
 gableMat = unsafePerformEffect $ mkMeshPhongMaterial 0x999999

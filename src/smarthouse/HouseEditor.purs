@@ -42,9 +42,9 @@ import Model.Racking.OldRackingSystem (OldRoofRackingData, guessRackingType)
 import Model.Racking.RackingType (RackingType(..))
 import Model.Roof.Panel (Alignment(..), Orientation(..), PanelsDict, panelsDict)
 import Model.Roof.RoofPlate (RoofPlate, _roofIntId)
-import Model.SmartHouse.House (House, _trees, flipRoof, getHouseLines, updateHeight, updateHouseSlope)
+import Model.SmartHouse.House (House, _trees, getHouseLines, updateHeight, updateHouseSlope)
 import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo)
-import Model.SmartHouse.Roof (Roof, RoofEvents, _flipped, renderActRoofOutline, renderRoof)
+import Model.SmartHouse.Roof (Roof, renderActRoofOutline, renderRoof)
 import Model.UUID (idLens)
 import Models.SmartHouse.ActiveItem (ActHouseRoof)
 import Rendering.DynamicNode (dynamic, dynamic_)
@@ -60,7 +60,7 @@ import Three.Core.Object3D (add, remove)
 import Three.Math.Vector (Vector3, mkVec3, toVec2, vecX, vecY)
 import Type.Proxy (Proxy(..))
 import UI.RoofEditorUI (_mode)
-import Util (debounceDyn, latestAnyEvtWith)
+import Util (debounceDyn, latestAnyEvt)
 
 
 -- how to render the House
@@ -165,13 +165,12 @@ editHouse houseCfg conf = do
                     dynamic_ $ renderActRoofOutline <$> actRDyn
 
                 -- render roofs dynamically
-                roofEvts <- dynamic $ renderBuilderRoofs houseEditDyn actRoofDyn <$> roofsDyn
+                roofEvts <- dynamic $ renderBuilderRoofs houseEditDyn <$> roofsDyn
                 
                 pure roofEvts
 
 
-            let flipEvt = latestAnyEvtWith (view _flipped) roofEvtsDyn
-                -- height editor arrow position
+            let -- height editor arrow position
                 hPos2D = dragArrowPos $ floor ^. _polyVerts
                 hPos   = mkVec3 (vecX hPos2D) (vecY hPos2D) (meterVal h)
 
@@ -184,12 +183,11 @@ editHouse houseCfg conf = do
         
     
             let newHouseEvt1 = sampleDyn houseDyn $ updateHeight <$> hEvt
-                newHouseEvt2 = sampleDyn houseDyn $ flipRoof <$> flipEvt
-                newHouseEvt3 = performEvent $ sampleDyn houseDyn $ sampleDyn actRoofIdDyn $ updateHouseSlope <$> conf ^. _slopeSelected
+                newHouseEvt2 = performEvent $ sampleDyn houseDyn $ sampleDyn actRoofIdDyn $ updateHouseSlope <$> conf ^. _slopeSelected
 
-                newHouseEvt  = multicast $ newHouseEvt1 <|> newHouseEvt2 <|> newHouseEvt3
+                newHouseEvt  = multicast $ newHouseEvt1 <|> newHouseEvt2
 
-                roofTappedEvt = multicast $ latestAnyEvtWith (view _tapped) roofEvtsDyn
+                roofTappedEvt = multicast $ latestAnyEvt roofEvtsDyn
 
                 validRoofTappedEvt = gateDyn (not <<< isActive <$> actDyn) roofTappedEvt
                 wallTappedEvt = const (house ^. idLens) <$> wallTap
@@ -226,8 +224,8 @@ renderLengths :: forall e. Maybe (List (LineSeg Vector3)) -> Node e Unit
 renderLengths (Just ls) = traverse_ renderLineLength ls
 renderLengths Nothing   = pure unit
 
-renderBuilderRoofs :: forall f. Traversable f => Dynamic Boolean -> Dynamic (Maybe UUID) -> f Roof -> Node HouseTextureInfo (f RoofEvents)
-renderBuilderRoofs houseEditDyn actRoofDyn = traverse (renderRoof houseEditDyn actRoofDyn)
+renderBuilderRoofs :: forall f. Traversable f => Dynamic Boolean -> f Roof -> Node HouseTextureInfo (f (Event UUID))
+renderBuilderRoofs houseEditDyn = traverse (renderRoof houseEditDyn)
 
 -- render the house as 2D wireframe
 renderHouse :: House -> Node HouseTextureInfo HouseNode
