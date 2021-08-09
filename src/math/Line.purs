@@ -57,8 +57,10 @@ sameDir a b = degreeVal (angleBetween (normal a) (normal b)) < 1.0
 intersection :: Line Vector3 -> Line Vector3 -> Maybe Vector3
 intersection l1 l2 = filter f i
     where s1 = zeroZ $ l1 ^. _origin
-          e1 = s1 <+> l1 ^. _direction
+          d1 = zeroZ $ l1 ^. _direction
+          e1 = s1 <+> d1
           s2 = zeroZ $ l2 ^. _origin
-          e2 = s2 <+> l2 ^. _direction
+          d2 = zeroZ $ l2 ^. _direction
+          e2 = s2 <+> d2
           i = lineIntersection s1 e1 s2 e2
-          f p = sameDir (p <-> s1) (l1 ^. _direction) && sameDir (p <-> s2) (l2 ^. _direction)
+          f p = sameDir (p <-> s1) d1 && sameDir (p <-> s2) d2
