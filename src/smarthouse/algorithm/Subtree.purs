@@ -63,10 +63,6 @@ _subtreeType = _Newtype <<< prop (Proxy :: Proxy "subtreeType")
 _isGable :: forall t a r. Newtype t { isGable :: a | r } => Lens' t a
 _isGable = _Newtype <<< prop (Proxy :: Proxy "isGable")
 
-_originalSubtree :: forall t a r. Newtype t { originalSubtree :: a | r } => Lens' t a
-_originalSubtree = _Newtype <<< prop (Proxy :: Proxy "originalSubtree")
-
-
 subtree :: SubtreeType -> VertNode -> List VertNode -> List Edge -> Effect Subtree
 subtree t source ss es = do
     i <- genUUID
