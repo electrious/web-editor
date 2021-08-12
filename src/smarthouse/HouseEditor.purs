@@ -11,7 +11,7 @@ import Data.Lens (Lens', view, (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (List(..))
-import Data.Map (Map, lookup)
+import Data.Map (lookup)
 import Data.Map as M
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Meter (Meter, meterVal)
@@ -28,7 +28,7 @@ import Editor.HouseEditor (ArrayEditParam, HouseConfig, _heatmap, runHouseEditor
 import Editor.PanelLayer (_initPanels, _mainOrientation, _roofActive)
 import Editor.PanelNode (PanelOpacity(..))
 import Editor.Rendering.PanelRendering (_opacity)
-import Editor.RoofManager (RoofsData, _racks, calcMainOrientation, getActivated)
+import Editor.RoofManager (RoofsData, calcMainOrientation, getActivated)
 import Editor.RoofNode (RoofNode, RoofNodeConfig, RoofNodeMode(..), createRoofNode)
 import Effect.Class (liftEffect)
 import Effect.Random (randomInt)
@@ -39,10 +39,9 @@ import FRP.Event.Extra (delay, multicast, performEvent)
 import Math.LineSeg (LineSeg, mkLineSeg)
 import Model.ActiveMode (ActiveMode(..), fromBoolean, isActive)
 import Model.Polygon (Polygon, _polyVerts)
-import Model.Racking.OldRackingSystem (OldRoofRackingData, guessRackingType)
 import Model.Racking.RackingType (RackingType(..))
 import Model.Roof.Panel (Alignment(..), Orientation(..), PanelsDict, panelsDict)
-import Model.Roof.RoofPlate (RoofPlate, _roofIntId)
+import Model.Roof.RoofPlate (RoofPlate)
 import Model.SmartHouse.House (House, _trees, getHouseLines, updateHeight, updateHouseSlope)
 import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo)
 import Model.SmartHouse.Roof (Roof, renderActRoofOutline, renderRoof)
@@ -253,7 +252,6 @@ renderRoofEditor param rdDyn = dynamic $ renderRd <$> rdDyn
                   fixNodeDWith Nothing \activeRoof -> do
                       let psDict = panelsDict $ rd ^. _panels
                           roofs  = rd ^. _roofs
-                          racks  = rd ^. _racks
 
                           orientDyn  = step Landscape $ param ^. _orientation
                           alignDyn   = step Grid      $ param ^. _alignment
@@ -268,20 +266,20 @@ renderRoofEditor param rdDyn = dynamic $ renderRd <$> rdDyn
                                     # _opacity         .~ opacityDyn
                                     # _heatmap         .~ (param ^. _heatmap)
 
-                      nodes <- traverse (mkRoofNode activeRoof psDict racks cfg) roofs
+                      nodes <- traverse (mkRoofNode activeRoof psDict cfg) roofs
                       let mainOrientEvt = calcMainOrientation nodes
                           actRoofEvt    = Just <$> getActivated nodes
               
                       pure { input : actRoofEvt, output : { input : mainOrientEvt, output : nodes }}
 
 
-mkRoofNode :: Dynamic (Maybe UUID) -> PanelsDict -> Map Int OldRoofRackingData -> RoofNodeConfig -> RoofPlate -> Node HouseConfig RoofNode
-mkRoofNode activeRoof panelsDict racks cfg roof = do
+mkRoofNode :: Dynamic (Maybe UUID) -> PanelsDict -> RoofNodeConfig -> RoofPlate -> Node HouseConfig RoofNode
+mkRoofNode activeRoof panelsDict cfg roof = do
     hCfg <- getEnv
 
     let rid = roof ^. _id
         ps  = fromMaybe Nil (lookup rid panelsDict)
-        rackType    = fromMaybe XR10 $ guessRackingType <$> lookup (roof ^. _roofIntId) racks
+        rackType    = XR10
         rackTypeDyn = pure rackType
         roofActive  = (==) (Just rid) <$> activeRoof
         

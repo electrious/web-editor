@@ -5,16 +5,9 @@ import Prelude
 import Data.Generic.Rep (class Generic)
 import Data.Show.Generic (genericShow)
 import Data.Newtype (class Newtype)
-import Editor.Common.ProtoCodable (class ProtoDecodable, class ProtoEncodable, fromProto, toProto)
-import Effect (Effect)
 import Foreign.Generic (class Decode, class Encode, defaultOptions, genericDecode, genericEncode)
-import Model.Racking.BX.Chassis (ChassisKind, ChassisType)
+import Model.Racking.BX.Chassis (ChassisType)
 
-foreign import data BXParameterPB :: Type
-foreign import mkBXParameterPB :: Effect BXParameterPB
-
-foreign import getChassisKind :: BXParameterPB -> ChassisKind
-foreign import setChassisKind :: ChassisKind -> BXParameterPB -> Effect Unit
 
 newtype BXRoofParameter = BXRoofParameter {
     chassisType :: ChassisType
@@ -32,13 +25,3 @@ instance decodeBXRoofParameter :: Decode BXRoofParameter where
     decode = genericDecode (defaultOptions { unwrapSingleConstructors = true,
                                               fieldTransform = const "chassis_type"
                                             })
-instance protoEncodableBXRoofParameter :: ProtoEncodable BXRoofParameter BXParameterPB where
-    toProto (BXRoofParameter { chassisType }) = do
-        bp <- mkBXParameterPB
-        ct <- toProto chassisType
-        setChassisKind ct bp
-        pure bp
-instance protoDecodableBXRoofParameter :: ProtoDecodable BXRoofParameter BXParameterPB where
-    fromProto p = BXRoofParameter {
-        chassisType: fromProto $ getChassisKind p
-    }

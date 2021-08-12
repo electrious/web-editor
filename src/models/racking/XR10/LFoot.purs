@@ -6,25 +6,12 @@ import Data.Default (def)
 import Data.Generic.Rep (class Generic)
 import Data.Show.Generic (genericShow)
 import Data.Lens (view, (.~))
-import Data.Meter (Meter, inch, meter)
+import Data.Meter (Meter, inch)
 import Data.Newtype (class Newtype)
 import Data.UUID (UUID)
 import Editor.Common.Lenses (_arrayNumber, _height, _id, _width, _x, _y, _z)
-import Editor.Common.ProtoCodable (class ProtoDecodable, fromProto)
-import Effect (Effect)
 import Model.ArrayComponent (class ArrayComponent)
-import Model.Class (class HasPBUUID, class IsPBArrayComp, getArrayNumber, getUUID, getX, getY, getZ)
 import Model.RoofComponent (class RoofComponent)
-import Model.UUID (PBUUID)
-
-foreign import data LFootPB :: Type
-foreign import mkLFootPB :: Effect LFootPB
-
-instance hasPBUUIDLFootPB :: HasPBUUID LFootPB
-instance isPBArrayCompLFootPB :: IsPBArrayComp LFootPB
-
-foreign import getFlashId :: LFootPB -> PBUUID
-foreign import setFlashId :: PBUUID -> LFootPB -> Effect Unit
 
 newtype LFoot = LFoot {
     id          :: UUID,
@@ -48,12 +35,3 @@ instance roofComponentLFoot :: RoofComponent LFoot where
                  # _height .~ inch 1.0
 instance arrayComponentLFoot :: ArrayComponent LFoot where
     arrayNumber = view _arrayNumber
-instance protoDecodableLFoot :: ProtoDecodable LFoot LFootPB where
-    fromProto l = LFoot {
-        id          : fromProto $ getUUID l,
-        x           : meter $ getX l,
-        y           : meter $ getY l,
-        z           : meter $ getZ l,
-        arrayNumber : getArrayNumber l,
-        flashId     : fromProto $ getFlashId l
-    }

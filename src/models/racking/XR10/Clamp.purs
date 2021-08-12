@@ -13,29 +13,9 @@ import Data.Meter (Meter, meter)
 import Data.Newtype (class Newtype)
 import Data.UUID (UUID)
 import Editor.Common.Lenses (_arrayNumber, _height, _id, _width, _x, _y, _z)
-import Editor.Common.ProtoCodable (class ProtoDecodable, fromProto)
-import Effect (Effect)
 import Model.ArrayComponent (class ArrayComponent)
-import Model.Class (class HasPBUUID, class HasPos, class IsPBArrayComp, getArrayNumber, getPos, getUUID, getX, getY, getZ)
 import Model.Racking.Common (RackPos)
 import Model.RoofComponent (class RoofComponent)
-
-newtype ClampKindPB = ClampKindPB Int
-derive newtype instance eqClampKindPB :: Eq ClampKindPB
-
-foreign import clampKindInvalid :: ClampKindPB
-foreign import clampKindMiddle :: ClampKindPB
-foreign import clampKindEnd :: ClampKindPB
-
-foreign import data ClampPB :: Type
-foreign import mkClampPB :: Effect ClampPB
-
-instance hasPBUUIDClampPB :: HasPBUUID ClampPB
-instance isPBArrayCompClampPB :: IsPBArrayComp ClampPB
-instance hasPosClampPB :: HasPos ClampPB
-
-foreign import getKind :: ClampPB -> ClampKindPB
-foreign import setKind :: ClampKindPB -> ClampPB -> Effect Unit
 
 data ClampType = Middle | End
 
@@ -54,10 +34,6 @@ instance boundEnumClampType :: BoundedEnum ClampType where
     cardinality = genericCardinality
     toEnum = genericToEnum
     fromEnum = genericFromEnum
-instance protoDecodableClampType :: ProtoDecodable ClampType ClampKindPB where
-    fromProto v | v == clampKindMiddle  = Middle
-                | v == clampKindEnd     = End
-                | otherwise             = Middle
 
 newtype Clamp = Clamp {
     id          :: UUID,
@@ -82,13 +58,3 @@ instance roofComponentClamp :: RoofComponent Clamp where
                  # _height .~ meter 0.03
 instance arrayComponentClamp :: ArrayComponent Clamp where
     arrayNumber = view _arrayNumber
-instance protoDecodableClamp :: ProtoDecodable Clamp ClampPB where
-    fromProto c = Clamp {
-        id          : fromProto $ getUUID c,
-        x           : meter $ getX c,
-        y           : meter $ getY c,
-        z           : meter $ getZ c,
-        arrayNumber : getArrayNumber c,
-        clampType   : fromProto $ getKind c,
-        clampPos    : fromProto $ getPos c
-    }

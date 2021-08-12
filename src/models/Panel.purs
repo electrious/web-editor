@@ -24,49 +24,14 @@ import Data.Meter (Meter, meter, meterVal)
 import Data.Newtype (class Newtype)
 import Type.Proxy (Proxy(..))
 import Data.Tuple (Tuple(..))
-import Data.UUID (UUID, emptyUUID, genUUID, toString)
+import Data.UUID (UUID, emptyUUID, genUUID)
 import Editor.Common.Lenses (_alignment, _height, _orientation, _slope, _width, _x, _y)
-import Editor.Common.ProtoCodable (class ProtoEncodable, toProto)
 import Effect (Effect)
 import Foreign.Generic (class Decode, class Encode, ForeignError(..), decode, defaultOptions, encode, genericDecode, genericEncode)
-import Math.Angle (Angle, degree, degreeVal)
+import Math.Angle (Angle, degree)
 import Model.ArrayComponent (class ArrayComponent)
-import Model.Class (class IsPBArrayComp, setArrayNumber, setX, setY)
 import Model.RoofComponent (class RoofComponent, compX, compY, size)
-import Model.UUID (PBUUID, mkPBUUID, setUUIDString)
 import Three.Math.Vector (Vector3, mkVec3, vecX, vecY)
-
-newtype OrientationPB = OrientationPB Int
-derive newtype instance eqOrientationPB :: Eq OrientationPB
-foreign import orientationInvalid   :: OrientationPB
-foreign import orientationLandscape :: OrientationPB
-foreign import orientationPortrait  :: OrientationPB
-
-newtype AlignmentPB = AlignmentPB Int
-derive newtype instance eqAlignmentPB :: Eq AlignmentPB
-foreign import alignmentInvalid :: AlignmentPB
-foreign import alignmentGrid    :: AlignmentPB
-foreign import alignmentBrick   :: AlignmentPB
-
-foreign import data PanelPB :: Type
-foreign import mkPanelPB :: Effect PanelPB
-
-instance isPBArrayCompPanelPB :: IsPBArrayComp PanelPB
-
-foreign import getUUID :: PanelPB -> PBUUID
-foreign import setUUID :: PBUUID -> PanelPB -> Effect Unit
-foreign import getLeadId :: PanelPB -> Int
-foreign import setLeadId :: Int -> PanelPB -> Effect Unit
-foreign import getRoofplateUUID :: PanelPB -> PBUUID
-foreign import setRoofplateUUID :: PBUUID -> PanelPB -> Effect Unit
-foreign import getRowNumber :: PanelPB -> Int
-foreign import setRowNumber :: Int -> PanelPB -> Effect Unit
-foreign import getSlope :: PanelPB -> Number
-foreign import setSlope :: Number -> PanelPB -> Effect Unit
-foreign import getOrientation :: PanelPB -> OrientationPB
-foreign import setOrientation :: OrientationPB -> PanelPB -> Effect Unit
-foreign import getAlignment :: PanelPB -> AlignmentPB
-foreign import setAlignment :: AlignmentPB -> PanelPB -> Effect Unit
 
 data Orientation = Landscape
                  | Portrait
@@ -95,9 +60,6 @@ instance decodeOrient :: Decode Orientation where
                         Just v -> pure v
                         Nothing -> throwError $ singleton $ ForeignError ("can't decode Orientation from " <> show i)
 
-instance protoEncodableOrientation :: ProtoEncodable Orientation OrientationPB where
-    toProto Landscape = pure orientationLandscape
-    toProto Portrait  = pure orientationPortrait
 
 flipOrientation :: Orientation -> Orientation
 flipOrientation Landscape = Portrait
@@ -138,10 +100,6 @@ instance decodeAlign :: Decode Alignment where
                       Just v -> pure v
                       Nothing -> throwError $ singleton $ ForeignError ("can't decode Alignment from " <> show i)
 
-instance protoEncodableAlignment :: ProtoEncodable Alignment AlignmentPB where
-    toProto Grid  = pure alignmentGrid
-    toProto Brick = pure alignmentBrick
-
 newtype Panel = Panel {
     uuid           :: UUID,
     roofplate_uuid :: UUID,
@@ -179,28 +137,7 @@ instance roofComponentPanel :: RoofComponent Panel where
                          # _height .~ panelLong
 instance arrayComponentPanel :: ArrayComponent Panel where
     arrayNumber p = p ^. _arrNumber
-instance protoEncodablePanel :: ProtoEncodable Panel PanelPB where
-    toProto p = do
-        pb <- mkPanelPB
-        u1 <- mkPBUUID
-        setUUIDString (toString $ p ^. _uuid) u1
-        setUUID u1 pb
 
-        u2 <- mkPBUUID
-        setUUIDString (toString $ p ^. _roofUUID) u2
-        setRoofplateUUID u2 pb
-        
-        setRowNumber (p ^. _row_number) pb
-        setArrayNumber (p ^. _arrNumber) pb
-        setX (meterVal $ p ^. _x) pb
-        setY (meterVal $ p ^. _y) pb
-        setSlope (degreeVal $ p ^. _slope) pb
-        orientPb <- toProto $ p ^. _orientation
-        setOrientation orientPb pb
-        alignPb <- toProto $ p ^. _alignment
-        setAlignment alignPb pb
-
-        pure pb
 instance defaultPanel :: Default Panel where
     def = Panel {
         uuid           : emptyUUID,

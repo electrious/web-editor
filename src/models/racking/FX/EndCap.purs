@@ -10,23 +10,9 @@ import Data.Meter (Meter, meter)
 import Data.Newtype (class Newtype)
 import Data.UUID (UUID)
 import Editor.Common.Lenses (_arrayNumber, _height, _id, _width, _x, _y, _z)
-import Editor.Common.ProtoCodable (class ProtoDecodable, fromProto)
-import Effect (Effect)
 import Model.ArrayComponent (class ArrayComponent)
-import Model.Class (class HasPBUUID, class HasPos, class IsPBArrayComp, getArrayNumber, getPos, getUUID, getX, getY, getZ)
 import Model.Racking.Common (RackPos)
 import Model.RoofComponent (class RoofComponent)
-import Model.UUID (PBUUID)
-
-foreign import data EndCapPB :: Type
-foreign import mkEndCapPB :: Effect EndCapPB
-
-instance hasPBUUIdEndCapPB :: HasPBUUID EndCapPB
-instance isPBArrayCompEndCapPB :: IsPBArrayComp EndCapPB
-instance hasPosEndCapPB :: HasPos EndCapPB
-
-foreign import getSkirt :: EndCapPB -> PBUUID
-foreign import setSkirt :: PBUUID -> EndCapPB -> Effect Unit
 
 newtype EndCap = EndCap {
     id          :: UUID,
@@ -51,13 +37,3 @@ instance roofComponentEndCap :: RoofComponent EndCap where
                  # _height .~ meter 0.03
 instance arrayComponentEndCap :: ArrayComponent EndCap where
     arrayNumber = view _arrayNumber
-instance protoDecodableEndCap :: ProtoDecodable EndCap EndCapPB where
-    fromProto e = EndCap {
-        id          : fromProto $ getUUID e,
-        x           : meter $ getX e,
-        y           : meter $ getY e,
-        z           : meter $ getZ e,
-        arrayNumber : getArrayNumber e,
-        skirtId     : fromProto $ getSkirt e,
-        position    : fromProto $ getPos e
-    }

@@ -11,18 +11,7 @@ import Data.Ord.Generic (genericCompare)
 import Data.Show.Generic (genericShow)
 import Data.List.NonEmpty (singleton)
 import Data.Maybe (Maybe(..))
-import Editor.Common.ProtoCodable (class ProtoDecodable)
 import Foreign.Generic (class Decode, class Encode, ForeignError(..), decode, encode)
-
-newtype RackingKind = RackingKind Int
-derive newtype instance eqRackingKind :: Eq RackingKind
-foreign import rackingKindInvalid :: RackingKind
-foreign import rackingKindFX      :: RackingKind
-foreign import rackingKindXR      :: RackingKind
-foreign import rackingKindXRFlat  :: RackingKind
-foreign import rackingKindBX      :: RackingKind
-foreign import rackingKindGAF     :: RackingKind
-
 
 data RackingType = FX
                  | XR10
@@ -53,13 +42,6 @@ instance decodeRackingType :: Decode RackingType where
                     case toEnum i of
                         Just v -> pure v
                         Nothing -> throwError $ singleton $ ForeignError ("can't decode RackingType from: " <> show i)
-instance protoDecodableRackingType :: ProtoDecodable RackingType RackingKind where
-    fromProto v | v == rackingKindXR     = XR10
-                | v == rackingKindFX     = FX
-                | v == rackingKindXRFlat = XRFlat
-                | v == rackingKindBX     = BX
-                | v == rackingKindGAF    = GAF
-                | otherwise              = XR10
 
 forNormalRoof :: RackingType -> Boolean
 forNormalRoof FX   = true

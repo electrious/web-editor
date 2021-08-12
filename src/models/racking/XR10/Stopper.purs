@@ -10,19 +10,9 @@ import Data.Meter (Meter, meter)
 import Data.Newtype (class Newtype)
 import Data.UUID (UUID)
 import Editor.Common.Lenses (_arrayNumber, _height, _id, _width, _x, _y, _z)
-import Editor.Common.ProtoCodable (class ProtoDecodable, fromProto)
-import Effect (Effect)
 import Model.ArrayComponent (class ArrayComponent)
-import Model.Class (class HasPBUUID, class HasPos, class IsPBArrayComp, getArrayNumber, getPos, getUUID, getX, getY, getZ)
 import Model.Racking.Common (RackPos)
 import Model.RoofComponent (class RoofComponent)
-
-foreign import data StopperPB :: Type
-foreign import mkStopperPB :: Effect StopperPB
-
-instance hasPBUUIDStopperPB :: HasPBUUID StopperPB
-instance isPBArrayCompStopperPB :: IsPBArrayComp StopperPB
-instance hasPosStopperPB :: HasPos StopperPB
 
 newtype Stopper = Stopper {
     id          :: UUID,
@@ -46,12 +36,3 @@ instance roofComponentStopper :: RoofComponent Stopper where
                  # _height .~ meter 0.04
 instance arrayComponentStopper :: ArrayComponent Stopper where
     arrayNumber = view _arrayNumber
-instance protoDecodableStopper :: ProtoDecodable Stopper StopperPB where
-    fromProto s = Stopper {
-        id          : fromProto $ getUUID s,
-        x           : meter $ getX s,
-        y           : meter $ getY s,
-        z           : meter $ getZ s,
-        arrayNumber : getArrayNumber s,
-        type        : fromProto $ getPos s
-    }

@@ -6,22 +6,12 @@ import Data.Default (def)
 import Data.Generic.Rep (class Generic)
 import Data.Show.Generic (genericShow)
 import Data.Lens (view, (.~))
-import Data.Meter (Meter, inch, meter)
+import Data.Meter (Meter, inch)
 import Data.Newtype (class Newtype)
 import Data.UUID (UUID)
 import Editor.Common.Lenses (_arrayNumber, _height, _id, _width, _x, _y, _z)
-import Editor.Common.ProtoCodable (class ProtoDecodable, fromProto)
-import Effect (Effect)
 import Model.ArrayComponent (class ArrayComponent)
-import Model.Class (class HasPBUUID, class IsPBArrayComp, getArrayNumber, getUUID, getX, getY, getZ)
 import Model.RoofComponent (class RoofComponent)
-
-
-foreign import data BridgePB :: Type
-foreign import mkBridgePB :: Effect BridgePB
-
-instance hasPBUUIdBridgePB :: HasPBUUID BridgePB
-instance isPBArrayCompBridgePB :: IsPBArrayComp BridgePB
 
 bridgeWidth :: Meter
 bridgeWidth = inch 8.0
@@ -47,11 +37,3 @@ instance roofComponentBridge :: RoofComponent Bridge where
                  # _height .~ inch 1.0
 instance arrayComponentBridge :: ArrayComponent Bridge where
     arrayNumber = view _arrayNumber
-instance protoDecodableBridge :: ProtoDecodable Bridge BridgePB where
-    fromProto b = Bridge {
-        id          : fromProto $ getUUID b,
-        x           : meter $ getX b,
-        y           : meter $ getY b,
-        z           : meter $ getZ b,
-        arrayNumber : getArrayNumber b
-    }

@@ -13,23 +13,8 @@ import Data.Newtype (class Newtype)
 import Type.Proxy (Proxy(..))
 import Data.UUID (UUID)
 import Editor.Common.Lenses (_arrayNumber, _height, _id, _width, _x, _y, _z)
-import Editor.Common.ProtoCodable (class ProtoDecodable, fromProto)
-import Effect (Effect)
 import Model.ArrayComponent (class ArrayComponent)
-import Model.Class (class HasPBUUID, class IsPBArrayComp, getArrayNumber, getUUID, getX, getY, getZ)
 import Model.RoofComponent (class RoofComponent)
-import Model.UUID (PBUUID)
-
-foreign import data MountPB :: Type
-foreign import mkMountPB :: Effect MountPB
-
-instance hasPBUUIdMountPB :: HasPBUUID MountPB
-instance isPBArrayCompMountPB :: IsPBArrayComp MountPB
-
-foreign import getFlash :: MountPB -> PBUUID
-foreign import setFlash :: PBUUID -> MountPB -> Effect Unit
-foreign import getClampX :: MountPB -> Number
-foreign import setClampX :: Number -> MountPB -> Effect Unit
 
 mountRadius :: Meter
 mountRadius = inch 5.0
@@ -63,16 +48,6 @@ instance roofComponentMount :: RoofComponent Mount where
                  # _height .~ meter 0.1
 instance arrayComponentMount :: ArrayComponent Mount where
     arrayNumber = view _arrayNumber
-instance protoDecodableMount :: ProtoDecodable Mount MountPB where
-    fromProto m = Mount {
-        id          : fromProto $ getUUID m,
-        x           : meter $ getX m,
-        y           : meter $ getY m,
-        z           : meter $ getZ m,
-        arrayNumber : getArrayNumber m,
-        flashId     : fromProto $ getFlash m,
-        clampX      : meter $ getClampX m
-    }
 
 _clampX :: Lens' Mount Meter
 _clampX = _Newtype <<< prop (Proxy :: Proxy "clampX")
