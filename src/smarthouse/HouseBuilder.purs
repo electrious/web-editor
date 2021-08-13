@@ -13,12 +13,14 @@ import Custom.Mesh (TapMouseMesh)
 import Data.Array (fromFoldable)
 import Data.Compactable (compact)
 import Data.Default (class Default, def)
+import Data.Either (fromLeft, fromRight, isLeft, isRight)
 import Data.Filterable (filter)
 import Data.Foldable (class Foldable)
 import Data.Generic.Rep (class Generic)
 import Data.Lens (Lens', view, (%~), (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
+import Data.List.NonEmpty (head, singleton)
 import Data.Map as M
 import Data.Maybe (Maybe(..), isNothing)
 import Data.Meter (meterVal)
@@ -39,6 +41,7 @@ import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic, dynEvent, performDynamic, sampleDyn, step)
 import FRP.Event (Event, create, keepLatest, sampleOn, sampleOn_, subscribe)
 import FRP.Event.Extra (delay, multicast, performEvent)
+import Foreign (ForeignError(..), MultipleErrors, renderForeignError)
 import Model.ActiveMode (ActiveMode(..), fromBoolean)
 import Model.Hardware.PanelTextureInfo (PanelTextureInfo)
 import Model.Hardware.PanelType (PanelType(..))
@@ -431,6 +434,9 @@ builderForHouse evts tInfo =
 runAPIEvent :: forall a. APIConfig -> Event (API (Event a)) -> Event a
 runAPIEvent apiCfg = keepLatest <<< performEvent <<< map (flip runAPI apiCfg)
 
+defError :: MultipleErrors
+defError = singleton $ ForeignError ""
+
 saveMeshes :: HouseBuilderConfig -> Event File -> Event MeshFiles -> Event JSHouses -> Event SavingStep
 saveMeshes cfg imgEvt mFilesEvt houseEvt =
     let leadId = cfg ^. _leadId
@@ -438,16 +444,28 @@ saveMeshes cfg imgEvt mFilesEvt houseEvt =
         
         doUpload fs img = uploadMeshFiles leadId fs img
         uploadedEvt = multicast $ runAPIEvent apiCfg $ doUpload <$> mFilesEvt <*> imgEvt
+        
+        uploadFailedEvt = fromLeft defError <$> filter isLeft uploadedEvt
+        uploadSuccEvt = filter isRight uploadedEvt
 
-        toCreateEvt = multicast $ sampleOn_ houseEvt uploadedEvt
+        toCreateEvt = multicast $ sampleOn_ houseEvt uploadSuccEvt
         createdEvt  = multicast $ runAPIEvent apiCfg $ createManual leadId <$> toCreateEvt
 
-        readyEvt = runAPIEvent apiCfg $ const (repeatCheckUntilReady leadId) <$> createdEvt
+        createFailedEvt = fromLeft defError <$> filter isLeft createdEvt
+        createSuccEvt = filter isRight createdEvt
+
+        readyEvt = runAPIEvent apiCfg $ const (repeatCheckUntilReady leadId) <$> createSuccEvt
+
+        readyFailedEvt = fromLeft defError <$> filter isLeft readyEvt
+        readySuccEvt = fromRight def <$> filter isRight readyEvt
+
+        failedEvt = delay 300 $ uploadFailedEvt <|> createFailedEvt <|> readyFailedEvt
 
     in (const UploadingFiles  <$> mFilesEvt)   <|>
        (const CreatingHouse   <$> toCreateEvt) <|>
-       (const WaitingForReady <$> createdEvt)  <|>
-       (Finished <<< view _houseId  <$> readyEvt)
+       (const WaitingForReady <$> createSuccEvt)  <|>
+       (Failed <<< renderForeignError <<< head <$> failedEvt) <|>
+       (Finished <<< view _houseId <$> readySuccEvt)
 
 
 -- load roof plates and panels data after saving mesh is finished

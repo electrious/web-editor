@@ -5,7 +5,7 @@ import Prelude
 import Axios (genericAxios)
 import Axios.Config (baseUrl, headers, method)
 import Axios.Types (Header(..), Method)
-import Control.Monad.Except (runExcept, throwError)
+import Control.Monad.Except (throwError)
 import Control.Monad.Reader (class MonadAsk, ReaderT, ask, runReaderT)
 import Data.Array as Array
 import Data.Compactable (separate)
@@ -18,13 +18,14 @@ import Data.Lens.Record (prop)
 import Data.List.NonEmpty (singleton)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
-import Type.Proxy (Proxy(..))
 import Effect (Effect)
 import Effect.Aff (Aff, Error, error, killFiber, launchAff_, runAff)
 import Effect.Class.Console (errorShow)
 import FRP.Event (Event, makeEvent, subscribe)
 import FRP.Event.Extra (performEvent)
-import Foreign.Generic (class Decode, class Encode, F, ForeignError(..), defaultOptions, genericDecode)
+import Foreign (MultipleErrors)
+import Foreign.Generic (class Decode, class Encode, ForeignError(..), defaultOptions, genericDecode)
+import Type.Proxy (Proxy(..))
 
 -- | convert an Aff action into a FRP Event
 affEvt :: forall a. Aff a -> Event (Either Error a)
@@ -108,26 +109,26 @@ apiAction m url dt req = do
                            , baseUrl $ cfg ^. _baseUrl] req
 
 -- | call an API and get the result Event
-callAPI :: forall req res. Encode req => Decode res => Method -> String -> req -> API (Event (F res))
+callAPI :: forall req res. Encode req => Decode res => Method -> String -> req -> API (Event (Either MultipleErrors res))
 callAPI m url req = apiAction m url JSON req >>= affEvt >>> map (join >>> toF) >>> pure
     where toF (Left e)  = throwError $ singleton $ ForeignError $ getErrorMessage e
           toF (Right v) = pure v
 
 -- | call an API, log any errors to console and return only valid result
 callAPI' :: forall req res. Encode req => Decode res => Method -> String -> req -> API (Event res)
-callAPI' m url req = (map runExcept >>> tap logLeft >>> onlyRight) <$> callAPI m url req
+callAPI' m url req = (tap logLeft >>> onlyRight) <$> callAPI m url req
     where logLeft (Left e) = errorShow e
           logLeft _        = pure unit
 
 
 -- | call an API with form data request
-formAPI :: forall req res. Encode req => Decode res => Method -> String -> req -> API (Event (F res))
+formAPI :: forall req res. Encode req => Decode res => Method -> String -> req -> API (Event (Either MultipleErrors res))
 formAPI m url req = apiAction m url Form req >>= affEvt >>> map (join >>> toF) >>> pure
     where toF (Left e)  = throwError $ singleton $ ForeignError $ getErrorMessage e
           toF (Right v) = pure v
 
 -- | call a form API, log any errors to console and return only valid result
 formAPI' :: forall req res. Encode req => Decode res => Method -> String -> req -> API (Event res)
-formAPI' m url req = (map runExcept >>> tap logLeft >>> onlyRight) <$> formAPI m url req
+formAPI' m url req = (tap logLeft >>> onlyRight) <$> formAPI m url req
     where logLeft (Left e) = errorShow e
           logLeft _        = pure unit
