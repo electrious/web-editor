@@ -328,3 +328,6 @@ _leftEdge = _Newtype <<< prop (Proxy :: Proxy "leftEdge")
 
 _rightEdge :: forall t a r. Newtype t { rightEdge :: a | r } => Lens' t a
 _rightEdge = _Newtype <<< prop (Proxy :: Proxy "rightEdge")
+
+_type :: forall t a r. Newtype t { type :: a | r } => Lens' t a
+_type = _Newtype <<< prop (Proxy :: Proxy "type")

@@ -4,7 +4,7 @@ import Prelude
 
 import Data.Lens (Lens', (.~))
 import Data.Traversable (class Traversable, traverse)
-import Data.UUID (UUID, genUUID)
+import Data.UUIDWrapper (UUID, genUUID)
 import Effect (Effect)
 
 class HasUUID a where

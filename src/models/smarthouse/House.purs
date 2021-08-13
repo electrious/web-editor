@@ -21,9 +21,9 @@ import Data.Set as S
 import Data.Show.Generic (genericShow)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import Data.UUID (UUID, emptyUUID, genUUID)
-import Data.UUIDMap (UUIDMap)
-import Data.UUIDMap as UM
+import Data.UUIDWrapper (UUID, emptyUUID, genUUID)
+import Data.UUIDWrapperMap (UUIDMap)
+import Data.UUIDWrapperMap as UM
 import Editor.Common.Lenses (_edges, _floor, _height, _id, _position, _roofs)
 import Effect (Effect)
 import Foreign.Class (class Decode, class Encode)

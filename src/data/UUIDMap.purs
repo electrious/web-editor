@@ -1,4 +1,4 @@
-module Data.UUIDMap where
+module Data.UUIDWrapperMap where
 
 import Prelude
 
@@ -10,7 +10,7 @@ import Data.Map as M
 import Data.Set (Set)
 import Data.Set as S
 import Data.Tuple (Tuple(..))
-import Data.UUID (UUID)
+import Data.UUIDWrapper (UUID)
 import Data.Unfoldable (class Unfoldable)
 import Model.UUID (class HasUUID, idLens)
 

@@ -2,7 +2,7 @@ module Data.Default where
 
 import Prelude
 
-import Data.UUID (UUID, emptyUUID)
+import Data.UUIDWrapper (UUID, emptyUUID)
 
 -- | class to represent types that have a default value
 class Default a where

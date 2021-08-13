@@ -10,7 +10,7 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
 import Type.Proxy (Proxy(..))
-import Data.UUID (UUID)
+import Data.UUIDWrapper (UUID)
 import Foreign.Generic (class Decode, class Encode, defaultOptions, genericDecode, genericEncode)
 
 newtype RoofSpecific a = RoofSpecific {

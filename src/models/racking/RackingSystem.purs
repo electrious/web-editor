@@ -8,7 +8,7 @@ import Data.Map (Map, fromFoldable, toUnfoldable)
 import Data.Maybe (fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Tuple (Tuple(..))
-import Data.UUID (UUID, emptyUUID, parseUUID)
+import Data.UUIDWrapper (UUID, emptyUUID, parseUUID)
 import Effect (Effect)
 import Model.Racking.RoofRackingData (RoofRackingData)
 
