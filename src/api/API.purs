@@ -43,9 +43,10 @@ onlyRight = f <<< separate
     where f v = v.right
 
 newtype APIConfig = APIConfig {
-    auth    :: Maybe String,
-    xUserId :: Maybe Int,
-    baseUrl :: String
+    auth       :: Maybe String,
+    xUserId    :: Maybe Int,
+    xCompanyId :: Maybe Int,
+    baseUrl    :: String
 }
 
 derive instance newtypeAPIConfig :: Newtype APIConfig _
@@ -55,15 +56,19 @@ instance decodeAPIConfig :: Decode APIConfig where
 
 instance defaultAPIConfig :: Default APIConfig where
     def = APIConfig {
-        auth    : Nothing,
-        xUserId : Nothing,
-        baseUrl : ""
+        auth       : Nothing,
+        xUserId    : Nothing,
+        xCompanyId : Nothing,
+        baseUrl    : ""
     }
 _auth :: Lens' APIConfig (Maybe String)
 _auth = _Newtype <<< prop (Proxy :: Proxy "auth")
 
 _xUserId :: Lens' APIConfig (Maybe Int)
 _xUserId = _Newtype <<< prop (Proxy :: Proxy "xUserId")
+
+_xCompanyId :: Lens' APIConfig (Maybe Int)
+_xCompanyId = _Newtype <<< prop (Proxy :: Proxy "xCompanyId")
 
 _baseUrl :: Lens' APIConfig String
 _baseUrl = _Newtype <<< prop (Proxy :: Proxy "baseUrl")
@@ -103,9 +108,10 @@ apiAction m url dt req = do
     let defHeaders = [contentType dt]
         authHeader = fromMaybe [] $ Array.singleton <<< Header "Authorization" <$> cfg ^. _auth
         userHeader = fromMaybe [] $ Array.singleton <<< Header "x-user-id" <<< show <$> cfg ^. _xUserId
+        companyHeader = fromMaybe [] $ Array.singleton <<< Header "x-company-id" <<< show <$> cfg ^. _xCompanyId
     
     pure $ genericAxios url [method m
-                           , headers (defHeaders <> authHeader <> userHeader)
+                           , headers (defHeaders <> authHeader <> userHeader <> companyHeader)
                            , baseUrl $ cfg ^. _baseUrl] req
 
 -- | call an API and get the result Event
