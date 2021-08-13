@@ -2,11 +2,11 @@ module SmartHouse.HouseBuilder (buildHouse, HouseBuilderConfig(..), HouseBuilt(.
 
 import Prelude hiding (degree)
 
-import API (API, APIConfig, runAPI)
+import API (API, APIConfig, _xCompanyId, runAPI)
 import API.Image (ImageResp, _link, _pixelPerMeter, getImageMeta)
 import API.Panel (loadPanels)
 import API.Roofplate (loadRoofplates)
-import API.SmartHouse (SavingStep(..), createManual, isFinished, repeatCheckUntilReady, savedHouseId, uploadMeshFiles)
+import API.SmartHouse (CreateManualResp, ReadyAPIResp, SavingStep(..), _companyId, createManual, isFinished, repeatCheckUntilReady, savedHouseId, uploadMeshFiles)
 import Control.Alt ((<|>))
 import Control.Alternative (empty)
 import Custom.Mesh (TapMouseMesh)
@@ -27,7 +27,7 @@ import Data.Meter (meterVal)
 import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
 import Data.Traversable (traverse)
-import Data.Tuple (fst)
+import Data.Tuple (Tuple(..), fst)
 import Data.UUID (UUID)
 import Data.UUIDMap (UUIDMap)
 import Editor.Common.Lenses (_apiConfig, _buttons, _height, _houseId, _leadId, _modeDyn, _mouseMove, _name, _panelType, _panels, _parent, _roofs, _slopeSelected, _tapped, _textureInfo, _updated, _width)
@@ -452,7 +452,7 @@ saveMeshes cfg imgEvt mFilesEvt houseEvt =
         createdEvt  = multicast $ runAPIEvent apiCfg $ createManual leadId <$> toCreateEvt
 
         createFailedEvt = fromLeft defError <$> filter isLeft createdEvt
-        createSuccEvt = filter isRight createdEvt
+        createSuccEvt = fromRight def <$> filter isRight createdEvt
 
         readyEvt = runAPIEvent apiCfg $ const (repeatCheckUntilReady leadId) <$> createSuccEvt
 
@@ -465,13 +465,15 @@ saveMeshes cfg imgEvt mFilesEvt houseEvt =
        (const CreatingHouse   <$> toCreateEvt) <|>
        (const WaitingForReady <$> createSuccEvt)  <|>
        (Failed <<< renderForeignError <<< head <$> failedEvt) <|>
-       (Finished <<< view _houseId <$> readySuccEvt)
+       (mkFinished <$> createSuccEvt <*> readySuccEvt)
 
+mkFinished :: CreateManualResp -> ReadyAPIResp -> SavingStep
+mkFinished cr r = Finished (r ^. _houseId) (cr ^. _companyId)
 
 -- load roof plates and panels data after saving mesh is finished
-loadRoofAndPanels :: HouseBuilderConfig -> Int -> Effect (Event RoofsData)
-loadRoofAndPanels conf houseId = do
-    let apiCfg = conf ^. _apiConfig
+loadRoofAndPanels :: HouseBuilderConfig -> Tuple Int Int -> Effect (Event RoofsData)
+loadRoofAndPanels conf (Tuple houseId companyId) = do
+    let apiCfg = (conf ^. _apiConfig) # _xCompanyId .~ Just companyId
     roofsEvt  <- runAPI (loadRoofplates houseId) apiCfg
     panelsEvt <- runAPI (loadPanels houseId) apiCfg
 

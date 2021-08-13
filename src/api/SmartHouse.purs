@@ -14,6 +14,7 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
+import Data.Tuple (Tuple(..))
 import FRP.Event (Event, keepLatest)
 import FRP.Event.Extra (delay, multicast)
 import Foreign (Foreign, MultipleErrors)
@@ -31,7 +32,7 @@ data SavingStep = NotSaving
                 | CreatingHouse
                 | WaitingForReady
                 | Failed String
-                | Finished Int
+                | Finished Int Int
 
 derive instance genericSavingStep :: Generic SavingStep _
 derive instance eqSavingStep :: Eq SavingStep
@@ -41,20 +42,20 @@ instance showSavingStep :: Show SavingStep where
     show CreatingHouse   = "Elli is analyzing the new house data..."
     show WaitingForReady = "Elli is analyzing the new house data..."
     show (Failed msg)    = "Savine house failed: " <> msg
-    show (Finished _)    = "Finished creating the new house"
+    show (Finished _ _)  = "Finished creating the new house"
 
 stepMode :: SavingStep -> ActiveMode
-stepMode NotSaving    = Inactive
-stepMode (Finished _) = Inactive
-stepMode _            = Active
+stepMode NotSaving      = Inactive
+stepMode (Finished _ _) = Inactive
+stepMode _              = Active
 
 isFinished :: SavingStep -> Boolean
-isFinished (Finished _) = true
-isFinished _            = false
+isFinished (Finished _ _) = true
+isFinished _              = false
 
-savedHouseId :: SavingStep -> Maybe Int
-savedHouseId (Finished h) = Just h
-savedHouseId _            = Nothing
+savedHouseId :: SavingStep -> Maybe (Tuple Int Int)
+savedHouseId (Finished h c) = Just $ Tuple h c
+savedHouseId _              = Nothing
 
 
 newtype UploadReq = UploadReq {
@@ -90,8 +91,25 @@ instance decodeAPIResp :: Decode APIResp where
 uploadMeshFiles :: Int -> MeshFiles -> File -> API (Event (Either MultipleErrors APIResp))
 uploadMeshFiles lid m t = formAPI POST ("/v1/lead/" <> show lid <> "/scene/upload") $ mkUploadReq m t
 
+
+newtype CreateManualResp = CreateManualResp {
+    success :: Boolean,
+    companyId :: Int
+}
+derive instance Newtype CreateManualResp _
+derive instance Generic CreateManualResp _
+instance Decode CreateManualResp where
+    decode = genericDecode (defaultOptions { unwrapSingleConstructors = true, fieldTransform = ft })
+instance Default CreateManualResp where
+    def = CreateManualResp { success: false, companyId: 0 }
+
+ft :: String -> String
+ft "success" = "success"
+ft "companyId" = "company_id"
+ft _ = ""
+
 -- API to create manual house/roof data
-createManual :: Int -> JSHouses -> API (Event (Either MultipleErrors APIResp))
+createManual :: Int -> JSHouses -> API (Event (Either MultipleErrors CreateManualResp))
 createManual lid = callAPI POST ("/v1/lead/" <> show lid <> "/create-manual")
 --    pure $ pure $ pure $ Left $ singleton $ ForeignError "failed message"
 
@@ -109,8 +127,8 @@ instance decodeReadyAPIResp :: Decode ReadyAPIResp where
                                            })
 instance Default ReadyAPIResp where
     def = ReadyAPIResp {
-        success : false,
-        houseId : 0
+        success   : false,
+        houseId   : 0
     }
 
 fieldTrans :: String -> String
@@ -122,6 +140,8 @@ fieldTrans _         = ""
 _success :: forall t a r. Newtype t { success :: a | r } => Lens' t a
 _success = _Newtype <<< prop (Proxy :: Proxy "success")
 
+_companyId :: forall t a r. Newtype t { companyId :: a | r } => Lens' t a
+_companyId = _Newtype <<< prop (Proxy :: Proxy "companyId")
 
 succeeded :: Either MultipleErrors ReadyAPIResp -> Boolean
 succeeded (Left _)     = false
