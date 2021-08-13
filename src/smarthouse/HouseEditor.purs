@@ -184,7 +184,10 @@ editHouse houseCfg conf = do
         
     
             let newHouseEvt1 = sampleDyn houseDyn $ updateHeight <$> hEvt
-                newHouseEvt2 = performEvent $ sampleDyn houseDyn $ sampleDyn actRoofIdDyn $ updateHouseSlope <$> conf ^. _slopeSelected
+
+                -- only accept slope events if the house is active and can be edit
+                slopeEvt = gateDyn (isActive <$> canEditDyn) $ conf ^. _slopeSelected
+                newHouseEvt2 = performEvent $ sampleDyn houseDyn $ sampleDyn actRoofIdDyn $ updateHouseSlope <$> slopeEvt
 
                 newHouseEvt  = multicast $ newHouseEvt1 <|> newHouseEvt2
 
