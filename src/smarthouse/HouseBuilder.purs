@@ -6,7 +6,7 @@ import API (API, APIConfig, _xCompanyId, runAPI)
 import API.Image (ImageResp, _link, _pixelPerMeter, getImageMeta)
 import API.Panel (loadPanels)
 import API.Roofplate (loadRoofplates)
-import API.SmartHouse (CreateManualResp, ReadyAPIResp, SavingStep(..), _companyId, createManual, isFinished, repeatCheckUntilReady, savedHouseId, uploadMeshFiles)
+import API.SmartHouse (ReadyAPIResp, SavingStep(..), _companyId, createManual, isFinished, repeatCheckUntilReady, savedHouseId, uploadMeshFiles)
 import Control.Alt ((<|>))
 import Control.Alternative (empty)
 import Custom.Mesh (TapMouseMesh)
@@ -429,12 +429,12 @@ builderForHouse evts tInfo =
                         newRoofsDatEvt = keepLatest $ performEvent $ loadRoofAndPanels cfg <$> newHouseIdEvt
 
                         res = def # _hasHouse    .~ (hasHouse <$> hdEvt)
-                                # _tracerMode  .~ (traceRes ^. _tracerMode)
-                                # _saveStepEvt .~ stepEvt
-                                # _activeItem  .~ (actRoofEvt <|>
-                                                    actTreeEvt <|>
-                                                    const Nothing <$> delHouseEvt <|>
-                                                    const Nothing <$> deactEvt)
+                                  # _tracerMode  .~ (traceRes ^. _tracerMode)
+                                  # _saveStepEvt .~ stepEvt
+                                  # _activeItem  .~ (actRoofEvt <|>
+                                                     actTreeEvt <|>
+                                                     const Nothing <$> delHouseEvt <|>
+                                                     const Nothing <$> deactEvt)
 
                     pure { input : compIdEvt, output: { input: newRoofsDatEvt, output: { input: newActIdEvt, output : { input: newHdEvt, output : res } } } }
 
@@ -460,7 +460,7 @@ saveMeshes cfg imgEvt mFilesEvt houseEvt =
         createdEvt  = multicast $ runAPIEvent apiCfg $ createManual leadId <$> toCreateEvt
 
         createFailedEvt = fromLeft defError <$> filter isLeft createdEvt
-        createSuccEvt = fromRight def <$> filter isRight createdEvt
+        createSuccEvt = filter isRight createdEvt
 
         readyEvt = runAPIEvent apiCfg $ const (repeatCheckUntilReady leadId) <$> createSuccEvt
 
@@ -473,10 +473,10 @@ saveMeshes cfg imgEvt mFilesEvt houseEvt =
        (const CreatingHouse   <$> toCreateEvt) <|>
        (const WaitingForReady <$> createSuccEvt)  <|>
        (Failed <<< renderForeignError <<< head <$> failedEvt) <|>
-       (mkFinished <$> createSuccEvt <*> readySuccEvt)
+       (mkFinished <$> readySuccEvt)
 
-mkFinished :: CreateManualResp -> ReadyAPIResp -> SavingStep
-mkFinished cr r = Finished (r ^. _houseId) (cr ^. _companyId)
+mkFinished :: ReadyAPIResp -> SavingStep
+mkFinished r = Finished (r ^. _houseId) (r ^. _companyId)
 
 -- load roof plates and panels data after saving mesh is finished
 loadRoofAndPanels :: HouseBuilderConfig -> Tuple Int Int -> Effect (Event RoofsData)

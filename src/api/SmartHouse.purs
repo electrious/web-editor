@@ -91,32 +91,16 @@ instance decodeAPIResp :: Decode APIResp where
 uploadMeshFiles :: Int -> MeshFiles -> File -> API (Event (Either MultipleErrors APIResp))
 uploadMeshFiles lid m t = formAPI POST ("/v1/lead/" <> show lid <> "/scene/upload") $ mkUploadReq m t
 
-
-newtype CreateManualResp = CreateManualResp {
-    success :: Boolean,
-    companyId :: Int
-}
-derive instance Newtype CreateManualResp _
-derive instance Generic CreateManualResp _
-instance Decode CreateManualResp where
-    decode = genericDecode (defaultOptions { unwrapSingleConstructors = true, fieldTransform = ft })
-instance Default CreateManualResp where
-    def = CreateManualResp { success: false, companyId: 0 }
-
-ft :: String -> String
-ft "success" = "success"
-ft "companyId" = "company_id"
-ft _ = ""
-
 -- API to create manual house/roof data
-createManual :: Int -> JSHouses -> API (Event (Either MultipleErrors CreateManualResp))
+createManual :: Int -> JSHouses -> API (Event (Either MultipleErrors APIResp))
 createManual lid = callAPI POST ("/v1/lead/" <> show lid <> "/create-manual")
 --    pure $ pure $ pure $ Left $ singleton $ ForeignError "failed message"
 
 
 newtype ReadyAPIResp = ReadyAPIResp {
-    success :: Boolean,
-    houseId :: Int
+    success   :: Boolean,
+    houseId   :: Int,
+    companyId :: Int
     }
 
 derive instance newtypeReadyAPIResp :: Newtype ReadyAPIResp _
@@ -128,13 +112,15 @@ instance decodeReadyAPIResp :: Decode ReadyAPIResp where
 instance Default ReadyAPIResp where
     def = ReadyAPIResp {
         success   : false,
-        houseId   : 0
+        houseId   : 0,
+        companyId : 1
     }
 
 fieldTrans :: String -> String
-fieldTrans "success" = "ready"
-fieldTrans "houseId" = "house_id"
-fieldTrans _         = ""
+fieldTrans "success"   = "ready"
+fieldTrans "houseId"   = "house_id"
+fieldTrans "companyId" = "company_id"
+fieldTrans _           = ""
 
 
 _success :: forall t a r. Newtype t { success :: a | r } => Lens' t a
