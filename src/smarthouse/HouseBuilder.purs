@@ -17,7 +17,7 @@ import Data.Either (fromLeft, fromRight, isLeft, isRight)
 import Data.Filterable (filter)
 import Data.Foldable (class Foldable)
 import Data.Generic.Rep (class Generic)
-import Data.Lens (Lens', view, (%~), (.~), (^.))
+import Data.Lens (Lens', set, view, (%~), (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List.NonEmpty (head, singleton)
@@ -250,8 +250,20 @@ getActiveTree tid hd = M.lookup tid (hd ^. _trees)
 getTreeUpd :: forall f. Foldable f => Functor f => f TreeNode -> Event TreeOp
 getTreeUpd = foldEvtWith (view _updated)
 
-renderHouseDict :: Dynamic (Maybe UUID) -> HouseConfig -> Event (Maybe Int) -> ArrayEditParam -> Event SlopeOption -> Event RoofsData -> HouseDict -> Node HouseTextureInfo (UUIDMap HouseNode)
-renderHouseDict actIdDyn houseCfg compIdEvt arrParam slopeEvt roofsDatEvt houses = traverse render houses
+updateHouseConfig :: HouseConfig -> Event (Maybe Int) -> Effect HouseConfig
+updateHouseConfig cfg compIdEvt = do
+    let apiCfgDyn = cfg ^. _apiConfig
+
+    defCfg <- current apiCfgDyn
+
+    let cfgEvt = dynEvent apiCfgDyn <|>
+                 sampleDyn apiCfgDyn (set _xCompanyId <$> compIdEvt)
+
+    pure $ cfg # _apiConfig .~ step defCfg cfgEvt
+
+
+renderHouseDict :: Dynamic (Maybe UUID) -> HouseConfig -> ArrayEditParam -> Event SlopeOption -> Event RoofsData -> HouseDict -> Node HouseTextureInfo (UUIDMap HouseNode)
+renderHouseDict actIdDyn houseCfg arrParam slopeEvt roofsDatEvt houses = traverse render houses
     where getMode h (Just i) | h ^. idLens == i = Active
                              | otherwise        = Inactive
           getMode _ Nothing                     = Inactive
@@ -259,16 +271,11 @@ renderHouseDict actIdDyn houseCfg compIdEvt arrParam slopeEvt roofsDatEvt houses
           render h = if houseRenderMode == EditHouseMode
                      then do
                          let md = getMode h <$> actIdDyn
-                             updApiCfg e d = sampleDyn d $ (\ci c -> c # _xCompanyId .~ ci) <$> e
-                         defCfg <- liftEffect $ current $ houseCfg ^. _apiConfig
-                         let cfgEvt = dynEvent (houseCfg ^. _apiConfig) <|> updApiCfg compIdEvt (houseCfg ^. _apiConfig)
-                             hCfg = houseCfg # _apiConfig .~ step defCfg cfgEvt
-
-                         editHouse hCfg $ def # _modeDyn        .~ md
-                                              # _house          .~ h
-                                              # _slopeSelected  .~ slopeEvt
-                                              # _roofsData      .~ roofsDatEvt
-                                              # _arrayEditParam .~ arrParam
+                         editHouse houseCfg $ def # _modeDyn        .~ md
+                                                  # _house          .~ h
+                                                  # _slopeSelected  .~ slopeEvt
+                                                  # _roofsData      .~ roofsDatEvt
+                                                  # _arrayEditParam .~ arrParam
                      else renderHouse h
 
 
@@ -350,13 +357,14 @@ builderForHouse evts tInfo =
                     -- render all houses
                     let houseToRenderEvt = compact $ view _housesToRender <$> hdEvt
                         treesToRenderEvt = compact $ view _treesToRender <$> hdEvt
-                        houseCfg = houseCfgFromBuilderCfg cfg
 
                         slopeEvt = evts ^. _slopeSelected
                         arrParam = def
                 
+                    houseCfg <- liftEffect $ updateHouseConfig (houseCfgFromBuilderCfg cfg) companyIdEvt
+
                     -- render houses and trees
-                    nodesEvt <- localEnv (const tInfo) $ eventNode (renderHouseDict actIdDyn houseCfg companyIdEvt arrParam slopeEvt roofsDatEvt <$> houseToRenderEvt)
+                    nodesEvt <- localEnv (const tInfo) $ eventNode (renderHouseDict actIdDyn houseCfg arrParam slopeEvt roofsDatEvt <$> houseToRenderEvt)
                     treesEvt <- eventNode (renderTrees actIdDyn <$> treesToRenderEvt)
 
                     let deactEvt    = multicast $ const Nothing <$> helper ^. _tapped
