@@ -5,7 +5,6 @@ import Prelude
 import Axios (genericAxios)
 import Axios.Config (baseUrl, headers, method)
 import Axios.Types (Header(..), Method)
-import Control.Monad.Except (throwError)
 import Control.Monad.Reader (class MonadAsk, ReaderT, ask, runReaderT)
 import Data.Array as Array
 import Data.Compactable (separate)
@@ -36,6 +35,10 @@ affEvt aff = makeEvent \k -> do
 -- | tap an action on an event
 tap :: forall a. (a -> Effect Unit) -> Event a -> Event a
 tap f evt = makeEvent \k -> subscribe evt \e -> f e *> k e
+
+mapLeft :: forall a b c. (a -> c) -> Either a b -> Either c b
+mapLeft f (Left e)  = Left (f e)
+mapLeft _ (Right a) = Right a
 
 -- | filter the Right value of Either in an event
 onlyRight :: forall a e. Event (Either e a) -> Event a
@@ -114,11 +117,13 @@ apiAction m url dt req = do
                            , headers (defHeaders <> authHeader <> userHeader <> companyHeader)
                            , baseUrl $ cfg ^. _baseUrl] req
 
+-- convert network Error to MultipleErrors
+toMultipleErrors :: Error -> MultipleErrors
+toMultipleErrors = singleton <<< ForeignError <<< getErrorMessage
+
 -- | call an API and get the result Event
 callAPI :: forall req res. Encode req => Decode res => Method -> String -> req -> API (Event (Either MultipleErrors res))
-callAPI m url req = apiAction m url JSON req >>= affEvt >>> map (join >>> toF) >>> pure
-    where toF (Left e)  = throwError $ singleton $ ForeignError $ getErrorMessage e
-          toF (Right v) = pure v
+callAPI m url req = apiAction m url JSON req >>= affEvt >>> map (join >>> mapLeft toMultipleErrors) >>> pure
 
 -- | call an API, log any errors to console and return only valid result
 callAPI' :: forall req res. Encode req => Decode res => Method -> String -> req -> API (Event res)
@@ -126,15 +131,6 @@ callAPI' m url req = (tap logLeft >>> onlyRight) <$> callAPI m url req
     where logLeft (Left e) = errorShow e
           logLeft _        = pure unit
 
-
 -- | call an API with form data request
 formAPI :: forall req res. Encode req => Decode res => Method -> String -> req -> API (Event (Either MultipleErrors res))
-formAPI m url req = apiAction m url Form req >>= affEvt >>> map (join >>> toF) >>> pure
-    where toF (Left e)  = throwError $ singleton $ ForeignError $ getErrorMessage e
-          toF (Right v) = pure v
-
--- | call a form API, log any errors to console and return only valid result
-formAPI' :: forall req res. Encode req => Decode res => Method -> String -> req -> API (Event res)
-formAPI' m url req = (tap logLeft >>> onlyRight) <$> formAPI m url req
-    where logLeft (Left e) = errorShow e
-          logLeft _        = pure unit
+formAPI m url req = apiAction m url Form req >>= affEvt >>> map (join >>> mapLeft toMultipleErrors) >>> pure
