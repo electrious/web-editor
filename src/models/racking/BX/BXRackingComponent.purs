@@ -17,9 +17,9 @@ newtype BXRackingComponent = BXRackingComponent {
     blocks      :: Array Block
 }
 
-derive instance newtypeBXRackingComponent :: Newtype BXRackingComponent _
-derive instance genericBXRackingComponent :: Generic BXRackingComponent _
-instance showBXRackingComponent :: Show BXRackingComponent where
+derive instance Newtype BXRackingComponent _
+derive instance Generic BXRackingComponent _
+instance Show BXRackingComponent where
     show = genericShow
 instance EncodeJson BXRackingComponent where
     encodeJson (BXRackingComponent c) = "an" := c.arrayNumber
@@ -45,7 +45,7 @@ newtype BXRackingNumbers = BXRackingNumbers {
     blocks  :: Int
 }
 
-derive instance newtypeBXRackingNumbers :: Newtype BXRackingNumbers _
-derive instance genericBXRackingNumbers :: Generic BXRackingNumbers _
-instance showBXRackingNumbers :: Show BXRackingNumbers where
+derive instance Newtype BXRackingNumbers _
+derive instance Generic BXRackingNumbers _
+instance Show BXRackingNumbers where
     show = genericShow

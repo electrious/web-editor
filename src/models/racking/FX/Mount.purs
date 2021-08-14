@@ -38,18 +38,18 @@ newtype Mount = Mount {
     clampX      :: Meter
 }
 
-derive instance newtypeMount :: Newtype Mount _
-derive instance genericMount :: Generic Mount _
-instance showMount :: Show Mount where
+derive instance Newtype Mount _
+derive instance Generic Mount _
+instance Show Mount where
     show = genericShow
-instance roofComponentMount :: RoofComponent Mount where
+instance RoofComponent Mount where
     compId = view _id
     compX  = view _x
     compY  = view _y
     compZ  = view _z
     size _ = def # _width  .~ mountWidth
                  # _height .~ meter 0.1
-instance arrayComponentMount :: ArrayComponent Mount where
+instance ArrayComponent Mount where
     arrayNumber = view _arrayNumber
 instance EncodeJson Mount where
     encodeJson (Mount m) = "id"  := m.id

@@ -2,9 +2,14 @@ module Model.Racking.RoofParameter where
 
 import Prelude
 
+import Data.Argonaut.Core (jsonEmptyObject)
+import Data.Argonaut.Decode (class DecodeJson, decodeJson, (.:?))
+import Data.Argonaut.Encode (class EncodeJson, (:=), (~>))
+import Data.Array (foldl)
+import Data.Default (class Default, def)
 import Data.Generic.Rep (class Generic)
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Show.Generic (genericShow)
-import Foreign.Generic (class Decode, class Encode, SumEncoding(..), defaultOptions, encode, genericDecode)
 import Model.Racking.BX.BXRoofParameter (BXRoofParameter)
 import Model.Racking.FX.FXRoofParameter (FXRoofParameter)
 import Model.Racking.GAF.GAFRoofParameter (GAFRoofParameter)
@@ -17,27 +22,33 @@ data RoofParameter = XRParameter XRRoofParameter
                    | BXParameter BXRoofParameter
                    | GAFParameter GAFRoofParameter
 
-derive instance genericRoofParameter :: Generic RoofParameter _
-instance showRoofParameter :: Show RoofParameter where
+derive instance Generic RoofParameter _
+instance Show RoofParameter where
     show = genericShow
-instance encodeRoofParameter :: Encode RoofParameter where
-    encode (XRParameter xr)       = encode { xr  : encode xr }
-    encode (FXParameter fx)       = encode { fx  : encode fx }
-    encode (XRFlatParameter flat) = encode { fl  : encode flat }
-    encode (BXParameter bx)       = encode { bx  : encode bx }
-    encode (GAFParameter gaf)     = encode { gaf : encode gaf }
-instance decodeRoofParameter :: Decode RoofParameter where
-    decode = genericDecode (defaultOptions { sumEncoding = TaggedObject {
-                                                                            tagFieldName: "tag",
-                                                                            contentsFieldName: "contents",
-                                                                            constructorTagTransform: toParamTag
-                                                                        }
-                                                        })
+instance Default RoofParameter where
+    def = XRParameter def
+instance EncodeJson RoofParameter where
+    encodeJson (XRParameter p)     = "xr"  := p ~> jsonEmptyObject
+    encodeJson (FXParameter p)     = "fx"  := p ~> jsonEmptyObject
+    encodeJson (XRFlatParameter p) = "fl"  := p ~> jsonEmptyObject
+    encodeJson (BXParameter p)     = "bx"  := p ~> jsonEmptyObject
+    encodeJson (GAFParameter p)    = "gaf" := p ~> jsonEmptyObject
+instance DecodeJson RoofParameter where
+    decodeJson = decodeJson >=> f
+        where f o = do
+                xr <- map XRParameter <$> o .:? "xr"
+                fx <- map FXParameter <$> o .:? "fx"
+                fl <- map XRFlatParameter <$> o .:? "fl"
+                bx <- map BXParameter <$> o .:? "bx"
+                gaf <- map GAFParameter <$> o .:? "gaf"
 
-toParamTag :: String -> String
-toParamTag "XRParameter"     = "xr"
-toParamTag "FXParameter"     = "fx"
-toParamTag "XRFlatParameter" = "fl"
-toParamTag "BXParameter"     = "bx"
-toParamTag "GAFParameter"    = "gaf"
-toParamTag _                 = "xr"
+                pure $ candidate [xr, fx, fl, bx, gaf]
+
+-- find a candidate value from a list of Maybe values, if all are Nothing, then
+-- use a Default value.
+candidate :: forall a. Default a => Array (Maybe a) -> a
+candidate = fromMaybe def <<< foldl f Nothing
+    where f a@(Just _) _ = a
+          f Nothing b@(Just _) = b
+          f Nothing Nothing  = Nothing
+          

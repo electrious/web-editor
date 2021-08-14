@@ -2,24 +2,33 @@ module Model.Racking.RackingSystem where
 
 import Prelude
 
+import Data.Argonaut.Core (jsonEmptyObject)
+import Data.Argonaut.Decode (class DecodeJson, decodeJson, (.:))
+import Data.Argonaut.Encode (class EncodeJson, (:=), (~>))
 import Data.Generic.Rep (class Generic)
-import Data.Show.Generic (genericShow)
 import Data.Map (Map, fromFoldable, toUnfoldable)
-import Data.Maybe (fromMaybe)
 import Data.Newtype (class Newtype)
+import Data.Show.Generic (genericShow)
 import Data.Tuple (Tuple(..))
-import Data.UUIDWrapper (UUID, emptyUUID, parseUUID)
-import Effect (Effect)
+import Data.UUIDWrapper (UUID)
 import Model.Racking.RoofRackingData (RoofRackingData)
 
 newtype RackingSystem = RackingSystem {
     roofRackings :: Map UUID RoofRackingData
 }
 
-derive instance newtypeRackingSystem :: Newtype RackingSystem _
-derive instance genericRackingSystem :: Generic RackingSystem _
-instance showRackingSystem :: Show RackingSystem where
+derive instance Newtype RackingSystem _
+derive instance Generic RackingSystem _
+instance Show RackingSystem where
     show = genericShow
+instance EncodeJson RackingSystem where
+    encodeJson (RackingSystem r) = "racks" := r ~> jsonEmptyObject
+instance DecodeJson RackingSystem where
+    decodeJson = decodeJson >=> f
+        where f o = mkRackingSystem <$> o .: "racks"
+
+mkRackingSystem :: Map UUID RoofRackingData -> RackingSystem
+mkRackingSystem rs = RackingSystem { roofRackings : rs }
 
 mapKeyVal :: forall k v k1 v1. Ord k => Ord k1 => (k -> k1) -> (v -> v1) -> Map k v -> Map k1 v1
 mapKeyVal kf vf m = fromFoldable $ f <$> arr

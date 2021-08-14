@@ -26,18 +26,18 @@ newtype Skirt = Skirt {
     length      :: Meter
 }
 
-derive instance newtypeSkirt :: Newtype Skirt _
-derive instance genericSKirt :: Generic Skirt _
-instance showSkirt :: Show Skirt where
+derive instance Newtype Skirt _
+derive instance Generic Skirt _
+instance Show Skirt where
     show = genericShow
-instance roofComponentSkirt :: RoofComponent Skirt where
+instance RoofComponent Skirt where
     compId = view _id
     compX  = view _x
     compY  = view _y
     compZ  = view _z
     size s = def # _width  .~ s ^. _length
                  # _height .~ meter 0.03
-instance arrayComponentSkirt :: ArrayComponent Skirt where
+instance ArrayComponent Skirt where
     arrayNumber = view _arrayNumber
 instance EncodeJson Skirt where
     encodeJson (Skirt s) = "id" := s.id

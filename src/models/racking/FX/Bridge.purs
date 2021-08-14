@@ -26,18 +26,18 @@ newtype Bridge = Bridge {
     arrayNumber :: Int
 }
 
-derive instance newtypeBridge :: Newtype Bridge _
-derive instance genericBridge :: Generic Bridge _
+derive instance Newtype Bridge _
+derive instance Generic Bridge _
 instance showBridge :: Show Bridge where
     show = genericShow
-instance roofComponentBridge :: RoofComponent Bridge where
+instance RoofComponent Bridge where
     compId = view _id
     compX  = view _x
     compY  = view _y
     compZ  = view _z
     size _ = def # _width  .~ inch 1.0
                  # _height .~ inch 1.0
-instance arrayComponentBridge :: ArrayComponent Bridge where
+instance ArrayComponent Bridge where
     arrayNumber = view _arrayNumber
 instance EncodeJson Bridge where
     encodeJson (Bridge b) = "id" := b.id

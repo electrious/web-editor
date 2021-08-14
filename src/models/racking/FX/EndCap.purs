@@ -27,18 +27,18 @@ newtype EndCap = EndCap {
     position    :: RackPos
 }
 
-derive instance newtypeEndCap :: Newtype EndCap _
-derive instance genericEndCap :: Generic EndCap _
-instance showEndCap :: Show EndCap where
+derive instance Newtype EndCap _
+derive instance Generic EndCap _
+instance Show EndCap where
     show = genericShow
-instance roofComponentEndCap :: RoofComponent EndCap where
+instance RoofComponent EndCap where
     compId = view _id
     compX  = view _x
     compY  = view _y
     compZ  = view _z
     size _ = def # _width  .~ meter 0.001
                  # _height .~ meter 0.03
-instance arrayComponentEndCap :: ArrayComponent EndCap where
+instance ArrayComponent EndCap where
     arrayNumber = view _arrayNumber
 instance EncodeJson EndCap where
     encodeJson (EndCap c) = "id"  := c.id

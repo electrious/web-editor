@@ -55,7 +55,7 @@ newtype Chassis = Chassis {
 
 derive instance Newtype Chassis _
 derive instance Generic Chassis _
-instance showChassis :: Show Chassis where
+instance Show Chassis where
     show = genericShow
 instance RoofComponent Chassis where
     compId = view _id

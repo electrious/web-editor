@@ -19,9 +19,9 @@ newtype BXRoofParameter = BXRoofParameter {
     chassisType :: ChassisType
 }
 
-derive instance newtypeBXRoofParameter :: Newtype BXRoofParameter _
-derive instance genericBXRoofParameter :: Generic BXRoofParameter _
-instance showBXRoofParameter :: Show BXRoofParameter where
+derive instance Newtype BXRoofParameter _
+derive instance Generic BXRoofParameter _
+instance Show BXRoofParameter where
     show = genericShow
 instance EncodeJson BXRoofParameter where
     encodeJson p = "ct" := p ^. _chassisType

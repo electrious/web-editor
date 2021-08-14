@@ -2,9 +2,12 @@ module Model.Racking.XRFlat.XRFlatRackingComponent where
 
 import Prelude
 
+import Data.Argonaut.Core (jsonEmptyObject)
+import Data.Argonaut.Decode (class DecodeJson, decodeJson, (.:))
+import Data.Argonaut.Encode (class EncodeJson, (:=), (~>))
 import Data.Generic.Rep (class Generic)
-import Data.Show.Generic (genericShow)
 import Data.Newtype (class Newtype)
+import Data.Show.Generic (genericShow)
 import Model.Racking.XR10.Clamp (Clamp)
 import Model.Racking.XR10.Rail (Rail)
 import Model.Racking.XR10.Splice (Splice)
@@ -25,10 +28,36 @@ newtype XRFlatRackingComponent = XRFlatRackingComponent {
     tiltLegs     :: Array TiltLeg
 }
 
-derive instance newtypeXRFlatRackingComponent :: Newtype XRFlatRackingComponent _
-derive instance genericXRFlatRackingComponent :: Generic XRFlatRackingComponent _
-instance showXRFlatRackingComponent :: Show XRFlatRackingComponent where
+derive instance Newtype XRFlatRackingComponent _
+derive instance Generic XRFlatRackingComponent _
+instance Show XRFlatRackingComponent where
     show = genericShow
+instance EncodeJson XRFlatRackingComponent where
+    encodeJson (XRFlatRackingComponent c) = "an"  := c.arrayNumber
+                                         ~> "rs"  := c.rails
+                                         ~> "rn"  := c.railsNum
+                                         ~> "ss"  := c.splices
+                                         ~> "cs"  := c.clamps
+                                         ~> "sts" := c.stoppers
+                                         ~> "srs" := c.supportRails
+                                         ~> "ms"  := c.baseMounts
+                                         ~> "ts"  := c.tiltLegs
+                                         ~> jsonEmptyObject
+instance DecodeJson XRFlatRackingComponent where
+    decodeJson = decodeJson >=> f
+        where f o = mkXRFlatRackingComponent <$> o .: "an"
+                                             <*> o .: "rs"
+                                             <*> o .: "rn"
+                                             <*> o .: "ss"
+                                             <*> o .: "cs"
+                                             <*> o .: "sts"
+                                             <*> o .: "srs"
+                                             <*> o .: "ms"
+                                             <*> o .: "ts"
+
+mkXRFlatRackingComponent :: Int -> Array Rail -> Int -> Array Splice -> Array Clamp -> Array Stopper -> Array SupportRail -> Array QBaseMount -> Array TiltLeg -> XRFlatRackingComponent
+mkXRFlatRackingComponent an rs rn ss cs sts srs ms ts = XRFlatRackingComponent {arrayNumber: an, rails: rs, railsNum: rn, splices: ss, clamps: cs, stoppers: sts, supportRails: srs, baseMounts: ms, tiltLegs: ts}
+
 
 newtype XRFlatRackingNumbers = XRFlatRackingNumbers {
     rails        :: Int,
@@ -40,7 +69,7 @@ newtype XRFlatRackingNumbers = XRFlatRackingNumbers {
     tiltLegs     :: Int
 }
 
-derive instance newtypeXRFlatRackingNumbers :: Newtype XRFlatRackingNumbers _
-derive instance genericXRFlatRackingNumbers :: Generic XRFlatRackingNumbers _
-instance showXRFlatRackingNumbers :: Show XRFlatRackingNumbers where
+derive instance Newtype XRFlatRackingNumbers _
+derive instance Generic XRFlatRackingNumbers _
+instance Show XRFlatRackingNumbers where
     show = genericShow
