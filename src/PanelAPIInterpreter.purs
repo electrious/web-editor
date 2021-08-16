@@ -17,7 +17,6 @@ import Data.Map as Map
 import Data.Map.Internal (keys)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
-import Type.Proxy (Proxy(..))
 import Data.Time.Duration (Milliseconds(..))
 import Data.Traversable (class Foldable, traverse)
 import Data.Tuple (Tuple(..))
@@ -25,13 +24,15 @@ import Data.UUIDWrapper (UUID, emptyUUID)
 import Editor.Common.Lenses (_apiConfig, _id, _houseId, _roof)
 import Editor.PanelOperation (PanelOperation(..))
 import Editor.Rendering.PanelRendering (_operations)
+import FRP.Dynamic (Dynamic, sampleDyn)
 import FRP.Event (Event, fold, keepLatest, withLast)
-import FRP.Event.Extra (anyEvt, debounce, performEvent)
+import FRP.Event.Extra (anyEvt, debounce, multicast, performEvent)
 import Model.Roof.Panel (PanelDict, _uuid, isDifferent)
 import Model.Roof.RoofPlate (RoofPlate)
+import Type.Proxy (Proxy(..))
 
 newtype PanelAPIInterpreterConfig = PanelAPIInterpreterConfig {
-    apiConfig  :: APIConfig,
+    apiConfig  :: Dynamic APIConfig,
     roof       :: RoofPlate,
     houseId    :: Int,
     clientId   :: UUID,
@@ -41,7 +42,7 @@ newtype PanelAPIInterpreterConfig = PanelAPIInterpreterConfig {
 derive instance newtypePanelAPIInterpreterConfig :: Newtype PanelAPIInterpreterConfig _
 instance defaultPanelAPIInterpreterConfig :: Default PanelAPIInterpreterConfig where
     def = PanelAPIInterpreterConfig {
-        apiConfig  : def,
+        apiConfig  : pure def,
         roof       : def,
         houseId    : 0,
         clientId   : emptyUUID,
@@ -99,8 +100,8 @@ mkPanelAPIInterpreter cfg = PanelAPIInterpreter { finished: debounce t apiResEvt
 
           newOpEvt  = calcOp <$> withLast (debounce t newStEvt)
 
-          runOps    = map anyEvt <<< traverse (flip runAPI apiCfg <<< callPanelAPI houseId roofId)
-          apiResEvt = keepLatest $ performEvent $ runOps <$> newOpEvt
+          runOps c = map anyEvt <<< traverse (flip runAPI c <<< callPanelAPI houseId roofId)
+          apiResEvt = multicast $ keepLatest $ performEvent $ sampleDyn apiCfg $ flip runOps <$> newOpEvt
 
 callPanelAPI :: Int -> UUID -> PanelOperation -> API (Event Unit)
 callPanelAPI _ _ (LoadPanels _)            = pure Plus.empty

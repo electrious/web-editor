@@ -6,22 +6,22 @@ import API (API, APIConfig, runAPI)
 import Control.Monad.Reader (class MonadAsk, class MonadReader, ReaderT, ask, runReaderT)
 import Control.Plus (empty)
 import Data.Default (class Default, def)
-import Data.Lens (Lens', view)
+import Data.Lens (Lens', (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
-import Type.Proxy (Proxy(..))
 import Editor.Common.Lenses (_apiConfig)
 import Editor.EditorMode (EditorMode(..))
 import Editor.PanelNode (PanelOpacity)
 import Effect (Effect)
 import Effect.Class (class MonadEffect, liftEffect)
-import FRP.Dynamic (Dynamic)
+import FRP.Dynamic (Dynamic, current)
 import FRP.Event (Event, makeEvent, subscribe)
 import Model.Hardware.PanelTextureInfo (PanelTextureInfo)
 import Model.Hardware.PanelType (PanelType(..))
 import Model.Roof.Panel (Alignment, Orientation, Panel)
 import Model.Roof.RoofPlate (RoofPlate)
+import Type.Proxy (Proxy(..))
 
 newtype ArrayEditParam = ArrayEditParam {
     alignment   :: Event Alignment,
@@ -54,7 +54,7 @@ newtype HouseConfig = HouseConfig {
     rotBtnTexture   :: String,
     heatmapTexture  :: String,
     panelType       :: Dynamic PanelType,
-    apiConfig       :: APIConfig,
+    apiConfig       :: Dynamic APIConfig,
     screenshotDelay :: Int
 }
 
@@ -71,7 +71,7 @@ instance defaultHouseConfig :: Default HouseConfig where
         rotBtnTexture   : "",
         heatmapTexture  : "",
         panelType       : pure Standard,
-        apiConfig       : def,
+        apiConfig       : pure def,
         screenshotDelay : 100
     }
 
@@ -110,4 +110,7 @@ performEditorEvent e = do
     pure $ makeEvent \k -> subscribe e (\v -> runHouseEditor v cfg >>= k)
 
 runAPIInEditor :: forall a. API a -> HouseEditor a
-runAPIInEditor api = ask >>= view _apiConfig >>> runAPI api >>> liftEffect
+runAPIInEditor api = do
+    cfg <- ask
+    apiCfg <- liftEffect $ current $ cfg ^. _apiConfig 
+    liftEffect $ runAPI api apiCfg

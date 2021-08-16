@@ -73,7 +73,7 @@ doTest roofDat panelDat = do
                                        # _textureInfo    .~ textures
                                        # _rotBtnTexture  .~ rotateButtonPNG
                                        # _heatmapTexture .~ heatmapGradientPNG
-                                       # _apiConfig      .~ apiCfg
+                                       # _apiConfig      .~ pure apiCfg
 
                     editor <- createEditor el $ def # _sizeDyn .~ sizeDyn
 
@@ -88,7 +88,7 @@ doTest roofDat panelDat = do
 
                         else do
                             let builderCfg = def # _leadId         .~ 359617   --318872
-                                                 # _apiConfig      .~ apiCfg
+                                                 # _apiConfig      .~ pure apiCfg
                                                  # _dataServer     .~ serverUrl
                                                  # _textureInfo    .~ textures
                                                  # _rotBtnTexture  .~ rotateButtonPNG
