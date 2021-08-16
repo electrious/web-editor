@@ -3,7 +3,6 @@ module API.SmartHouse where
 import Prelude
 
 import API (API, callAPI', formAPI', performAPIEvent)
-import Axios.Types (Method(..))
 import Control.Alt ((<|>))
 import Data.Filterable (filter)
 import Data.Generic.Rep (class Generic)

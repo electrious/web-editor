@@ -3,7 +3,6 @@ module API.Roofplate (loadRoofplates, buildRoofplates) where
 import Prelude
 
 import API (API, callAPI')
-import Axios.Types (Method(..))
 import Data.Generic.Rep (class Generic)
 import FRP.Event (Event)
 import Foreign (Foreign)

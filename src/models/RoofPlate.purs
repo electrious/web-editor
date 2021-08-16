@@ -2,29 +2,32 @@ module Model.Roof.RoofPlate where
 
 import Prelude hiding (degree)
 
+import Data.Argonaut.Decode (class DecodeJson, decodeJson)
+import Data.Argonaut.Decode.Generic (genericDecodeJson)
+import Data.Argonaut.Encode (class EncodeJson, encodeJson)
+import Data.Argonaut.Encode.Generic (genericEncodeJson)
 import Data.Array ((..))
 import Data.Array as Arr
 import Data.Default (class Default, def)
 import Data.Enum (fromEnum, toEnum)
-import Data.Generic.Rep (class Generic)
 import Data.Eq.Generic (genericEq)
-import Data.Show.Generic (genericShow)
+import Data.Generic.Rep (class Generic)
 import Data.Lens (Lens', (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
-import Type.Proxy (Proxy(..))
+import Data.Show.Generic (genericShow)
 import Data.UUIDWrapper (UUID, emptyUUID, genUUID, parseUUID, toString)
 import Editor.Common.Lenses (_alignment, _center, _id, _leadId, _normal, _orientation, _rotation, _slope)
 import Effect (Effect)
-import Foreign.Generic (class Decode, class Encode, decode, defaultOptions, encode, genericDecode, genericEncode)
 import Math as Math
 import Math.Angle (Angle, atan2, degree, degreeVal)
 import Model.Polygon (class IsPolygon, newPolygon)
 import Model.Roof.Panel (Alignment(..), Orientation(..))
 import Model.UUID (class HasUUID)
 import Three.Math.Vector (Vector2, Vector3, addScaled, angleBetween, cross, mkVec2, mkVec3, vecX, vecY, vecZ)
+import Type.Proxy (Proxy(..))
 
 -- | define the core RoofPlate type as a record
 newtype RoofPlate = RoofPlate {
@@ -43,19 +46,19 @@ newtype RoofPlate = RoofPlate {
     rotation      :: Angle
 }
 
-derive instance newtypeRoofplate :: Newtype RoofPlate _
-derive instance genericRoofplate :: Generic RoofPlate _
-instance showRoofplate :: Show RoofPlate where
+derive instance Newtype RoofPlate _
+derive instance Generic RoofPlate _
+instance Show RoofPlate where
     show = genericShow
-instance eqRoofplate :: Eq RoofPlate where
+instance Eq RoofPlate where
     eq = genericEq
-instance hasUUIDRoofPlate :: HasUUID RoofPlate where
+instance HasUUID RoofPlate where
     idLens = _id
-instance encodeRoofPlate :: Encode RoofPlate where
-    encode = encode <<< toJSRoofPlate
-instance decodeRoofPlate :: Decode RoofPlate where
-    decode = map fromJSRoofPlate <<< decode
-instance defaultRoofPlate :: Default RoofPlate where
+instance EncodeJson RoofPlate where
+    encodeJson = encodeJson <<< toJSRoofPlate
+instance DecodeJson RoofPlate where
+    decodeJson = map fromJSRoofPlate <<< decodeJson
+instance Default RoofPlate where
     def = RoofPlate {
         id            : emptyUUID,
         intId         : 0,
@@ -71,7 +74,7 @@ instance defaultRoofPlate :: Default RoofPlate where
         azimuth       : def,
         rotation      : def
     }
-instance isPolygonRoofPlate :: IsPolygon RoofPlate Vector2 where
+instance IsPolygon RoofPlate Vector2 where
     toPolygon r = newPolygon $ f <$> r ^. _borderPoints
         where f v = mkVec2 (vecX v) (vecY v)
 
@@ -100,17 +103,21 @@ newtype Point = Point {
     z :: Number
 }
 
-derive instance newtypePoint :: Newtype Point _
-derive instance genericPoint :: Generic Point _
-instance showPoint :: Show Point where
+derive instance Newtype Point _
+derive instance Generic Point _
+instance Show Point where
     show = genericShow
-instance encodePoint :: Encode Point where
-    encode = genericEncode (defaultOptions { unwrapSingleConstructors = true })
-instance decodePoint :: Decode Point where
-    decode = genericDecode (defaultOptions { unwrapSingleConstructors = true })
+instance EncodeJson Point where
+    encodeJson = genericEncodeJson
+instance DecodeJson Point where
+    decodeJson = genericDecodeJson
+
+
+mkPoint :: Number -> Number -> Number -> Point
+mkPoint x y z = Point { x, y, z }
 
 vec2Point :: Vector3 -> Point
-vec2Point v = Point { x: vecX v, y: vecY v, z: vecZ v }
+vec2Point v = mkPoint (vecX v) (vecY v) (vecZ v)
 
 point2Vec :: Point -> Vector3
 point2Vec (Point { x, y, z}) = mkVec3 x y z
@@ -124,16 +131,18 @@ newtype UnifiedPoint = UnifiedPoint {
     rating :: Number
 }
 
-derive instance newtypeUnifiedPoint :: Newtype UnifiedPoint _
-derive instance genericUnifiedPoint :: Generic UnifiedPoint _
-derive instance eqUnifiedPoint :: Eq UnifiedPoint
-instance showUnifiedPoint :: Show UnifiedPoint where
+derive instance Newtype UnifiedPoint _
+derive instance Generic UnifiedPoint _
+derive instance Eq UnifiedPoint
+instance Show UnifiedPoint where
     show = genericShow
-instance encodeUnifiedPoint :: Encode UnifiedPoint where
-    encode = genericEncode (defaultOptions { unwrapSingleConstructors = true })
-instance decodeUnifiedPoint :: Decode UnifiedPoint where
-    decode = genericDecode (defaultOptions { unwrapSingleConstructors = true })
+instance EncodeJson UnifiedPoint where
+    encodeJson = genericEncodeJson
+instance DecodeJson UnifiedPoint where
+    decodeJson = genericDecodeJson
 
+mkUnifiedPoint :: Number -> Number -> Number -> Number -> Number -> UnifiedPoint
+mkUnifiedPoint x y z s r = UnifiedPoint { x, y, z, shade: s, rating: r }
 
 -- | external JSRoofPlate model used in JS code. The data received from user and
 -- updates sent back to user should be in this format
@@ -153,13 +162,13 @@ newtype JSRoofPlate = JSRoofPlate {
     rotation_override :: Number
 }
 
-derive instance genericJSRoofPlate :: Generic JSRoofPlate _
-instance showJSRoofPlate :: Show JSRoofPlate where
+derive instance Generic JSRoofPlate _
+instance Show JSRoofPlate where
     show = genericShow
-instance encodeJSRoofPlate :: Encode JSRoofPlate where
-    encode = genericEncode (defaultOptions { unwrapSingleConstructors = true })
-instance decodeJSRoofPlate :: Decode JSRoofPlate where
-    decode = genericDecode (defaultOptions { unwrapSingleConstructors = true })
+instance EncodeJson JSRoofPlate where
+    encodeJson = genericEncodeJson
+instance DecodeJson JSRoofPlate where
+    decodeJson = genericDecodeJson
 
 arrVec :: Array Number -> Vector3
 arrVec [x, y, z] = mkVec3 x y z
@@ -278,10 +287,10 @@ data RoofOperation = RoofOpCreate RoofPlate
                    | RoofOpDelete UUID
                    | RoofOpUpdate RoofPlate
 
-derive instance genericRoofOp :: Generic RoofOperation _
-derive instance eqRoofOp :: Eq RoofOperation
+derive instance Generic RoofOperation _
+derive instance Eq RoofOperation
 
-instance showRoofOp :: Show RoofOperation where
+instance Show RoofOperation where
     show = genericShow
 
 
@@ -294,13 +303,12 @@ newtype RoofEdited = RoofEdited {
     indices  :: Array Int
 }
 
-derive instance newtypeRoofEdited :: Newtype RoofEdited _
-derive instance genericRoofEdited :: Generic RoofEdited _
-instance showRoofEdited :: Show RoofEdited where
+derive instance Newtype RoofEdited _
+derive instance Generic RoofEdited _
+instance Show RoofEdited where
     show = genericShow
-instance encodeRoofEdited :: Encode RoofEdited where
-    encode = genericEncode (defaultOptions { unwrapSingleConstructors = true })
-
+instance EncodeJson RoofEdited where
+    encodeJson = genericEncodeJson
 _ground :: Lens' RoofEdited Point
 _ground = _Newtype <<< prop (Proxy :: Proxy "ground")
 

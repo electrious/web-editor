@@ -4,6 +4,11 @@ import Prelude hiding (degree)
 
 import Algorithm.Plane (Plane)
 import Custom.Mesh (TappableMesh)
+import Data.Argonaut.Decode (class DecodeJson)
+import Data.Argonaut.Decode.Generic (genericDecodeJsonWith)
+import Data.Argonaut.Encode (class EncodeJson)
+import Data.Argonaut.Encode.Generic (genericEncodeJsonWith)
+import Data.Argonaut.Types.Generic (defaultEncoding)
 import Data.Default (def)
 import Data.Generic.Rep (class Generic)
 import Data.Lens (view, (.~), (^.))
@@ -20,8 +25,6 @@ import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, gateDyn)
 import FRP.Event (Event)
 import FRP.Event.Extra (multicast)
-import Foreign.Class (class Decode, class Encode)
-import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Math.Angle (Angle, degree)
 import Model.ActiveMode (ActiveMode(..), fromBoolean)
 import Model.Polygon (Polygon, _polyVerts, polyOutline, polyPlane)
@@ -83,10 +86,10 @@ newtype JSRoof = JSRoof {
 derive instance Generic JSRoof _
 instance Show JSRoof where
     show = genericShow
-instance Encode JSRoof where
-    encode = genericEncode (defaultOptions { unwrapSingleConstructors = true })
-instance Decode JSRoof where
-    decode = genericDecode (defaultOptions { unwrapSingleConstructors = true })
+instance EncodeJson JSRoof where
+    encodeJson = genericEncodeJsonWith (defaultEncoding { unwrapSingleArguments = true })
+instance DecodeJson JSRoof where
+    decodeJson = genericDecodeJsonWith (defaultEncoding { unwrapSingleArguments = true })
 
 -- material for active roof outline
 actLineMat :: LineBasicMaterial

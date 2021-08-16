@@ -2,11 +2,14 @@ module API where
 
 import Prelude
 
-import Axios (genericAxios)
-import Axios.Config (baseUrl, headers, method)
-import Axios.Types (Header(..), Method)
-import Control.Monad.Except (runExcept, throwError)
+import Affjax (Error(..), Request, Response, defaultRequest, request)
+import Affjax.RequestHeader (RequestHeader(..))
+import Axios.Types (Method)
 import Control.Monad.Reader (class MonadAsk, ReaderT, ask, runReaderT)
+import Data.Argonaut.Decode (class DecodeJson)
+import Data.Argonaut.Decode.Generic (genericDecodeJsonWith)
+import Data.Argonaut.Encode (class EncodeJson, encodeJson)
+import Data.Argonaut.Types.Generic (defaultEncoding)
 import Data.Array as Array
 import Data.Compactable (separate)
 import Data.Default (class Default)
@@ -15,22 +18,25 @@ import Data.Generic.Rep (class Generic)
 import Data.Lens (Lens', (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.List.NonEmpty (singleton)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
-import Type.Proxy (Proxy(..))
 import Effect (Effect)
-import Effect.Aff (Aff, Error, error, killFiber, launchAff_, runAff)
-import Effect.Class.Console (errorShow)
+import Effect.Aff (Aff, error, killFiber, launchAff_, runAff)
+import Effect.Aff as Aff
 import FRP.Event (Event, makeEvent, subscribe)
 import FRP.Event.Extra (performEvent)
-import Foreign.Generic (class Decode, class Encode, F, ForeignError(..), defaultOptions, genericDecode)
+import Type.Prelude (Proxy(..))
+import Web.HTML.HTMLMetaElement (content)
 
 -- | convert an Aff action into a FRP Event
-affEvt :: forall a. Aff a -> Event (Either Error a)
+affEvt :: forall a. Aff a -> Event (Either Aff.Error a)
 affEvt aff = makeEvent \k -> do
     f <- runAff k aff
     pure $ launchAff_ $ killFiber (error "kill Aff fiber") f
+
+
+requestEvt :: forall a. Request a -> Event (Either Error (Response a))
+requestEvt req = join <<< mapLeft XHROtherError <$> affEvt (request req)
 
 -- | tap an action on an event
 tap :: forall a. (a -> Effect Unit) -> Event a -> Event a
@@ -41,16 +47,20 @@ onlyRight :: forall a e. Event (Either e a) -> Event a
 onlyRight = f <<< separate
     where f v = v.right
 
+mapLeft :: forall a b c. (a -> c) -> Either a b -> Either c b
+mapLeft f (Left v) = Left (f v)
+mapLeft f (Right v) = Right v
+
 newtype APIConfig = APIConfig {
     auth    :: Maybe String,
     xUserId :: Maybe Int,
     baseUrl :: String
 }
 
-derive instance newtypeAPIConfig :: Newtype APIConfig _
-derive instance genericAPIConfig :: Generic APIConfig _
-instance decodeAPIConfig :: Decode APIConfig where
-    decode = genericDecode (defaultOptions { unwrapSingleConstructors = true })
+derive instance Newtype APIConfig _
+derive instance Generic APIConfig _
+instance DecodeJson APIConfig where
+    decodeJson = genericDecodeJsonWith (defaultEncoding { unwrapSingleArguments = true })
 
 instance defaultAPIConfig :: Default APIConfig where
     def = APIConfig {
@@ -69,12 +79,12 @@ _baseUrl = _Newtype <<< prop (Proxy :: Proxy "baseUrl")
 
 newtype API a = API (ReaderT APIConfig Effect a)
 
-derive newtype instance functorAPI :: Functor API
-derive newtype instance applicativeAPI :: Applicative API
-derive newtype instance applyAPI :: Apply API
-derive newtype instance bindAPI :: Bind API
-derive newtype instance monadAPI :: Monad API
-derive newtype instance monadAsKAPI :: MonadAsk APIConfig API
+derive newtype instance Functor API
+derive newtype instance Applicative API
+derive newtype instance Apply API
+derive newtype instance Bind API
+derive newtype instance Monad API
+derive newtype instance MonadAsk APIConfig API
 
 foreign import getErrorMessage :: Error -> String
 
@@ -91,21 +101,24 @@ performAPIEvent e = do
 data APIDataType = JSON
                  | Form
 
-contentType :: APIDataType -> Header
-contentType JSON = Header "Content-Type" "application/json"
-contentType Form = Header "Content-Type" "multipart/form-data"
+
+contentType :: APIDataType -> RequestHeader
+contentType JSON = ContentType "application/json"
+contentType Form = ContentType "multipart/form-data"
 
 
-apiAction :: forall req res. Encode req => Decode res => Method -> String -> APIDataType -> req -> API (Aff (Either Error res))
-apiAction m url dt req = do
+mkRequest :: forall req. EncodeJson req => Method -> String -> APIDataType -> req -> API (RequestHeader req)
+mkRequest m url dt req = do
     cfg <- ask
     let defHeaders = [contentType dt]
-        authHeader = fromMaybe [] $ Array.singleton <<< Header "Authorization" <$> cfg ^. _auth
-        userHeader = fromMaybe [] $ Array.singleton <<< Header "x-user-id" <<< show <$> cfg ^. _xUserId
-    
-    pure $ genericAxios url [method m
-                           , headers (defHeaders <> authHeader <> userHeader)
-                           , baseUrl $ cfg ^. _baseUrl] req
+        authHeader = fromMaybe [] $ Array.singleton <<< RequestHeader "Authorization" <$> cfg ^. _auth
+        userHeader = fromMaybe [] $ Array.singleton <<< RequestHeader "x-user-id" <<< show <$> cfg ^. _xUserId
+
+    pure $ defaultRequest { method  = m,
+                            headers = defHeaders <> authHeader <> userHeader,
+                            url     = (cfg ^. _baseUrl) <> url,
+                            content = encodeJson req
+                          }
 
 -- | call an API and get the result Event
 callAPI :: forall req res. Encode req => Decode res => Method -> String -> req -> API (Event (F res))

@@ -3,6 +3,11 @@ module Model.SmartHouse.House where
 import Prelude hiding (degree)
 
 import Control.Alternative (empty)
+import Data.Argonaut.Decode (class DecodeJson)
+import Data.Argonaut.Decode.Generic (genericDecodeJsonWith)
+import Data.Argonaut.Encode (class EncodeJson)
+import Data.Argonaut.Encode.Generic (genericEncodeJsonWith)
+import Data.Argonaut.Types.Generic (defaultEncoding)
 import Data.Array as Arr
 import Data.Default (class Default, def)
 import Data.Filterable (filter)
@@ -26,8 +31,6 @@ import Data.UUIDWrapperMap (UUIDMap)
 import Data.UUIDWrapperMap as UM
 import Editor.Common.Lenses (_edges, _floor, _height, _id, _position, _roofs)
 import Effect (Effect)
-import Foreign.Class (class Decode, class Encode)
-import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Math.Angle (Angle, degree)
 import Math.LineSeg (LineSeg)
 import Model.Polygon (Polygon, _polyVerts, counterClockPoly, modifyVertAt)
@@ -153,10 +156,10 @@ newtype JSHouse = JSHouse {
 derive instance Generic JSHouse _
 instance Show JSHouse where
     show = genericShow
-instance Encode JSHouse where
-    encode = genericEncode (defaultOptions { unwrapSingleConstructors = true })
-instance Decode JSHouse where
-    decode = genericDecode (defaultOptions { unwrapSingleConstructors = true })
+instance EncodeJson JSHouse where
+    encodeJson = genericEncodeJsonWith (defaultEncoding { unwrapSingleArguments = true })
+instance DecodeJson JSHouse where
+    decodeJson = genericDecodeJsonWith (defaultEncoding { unwrapSingleArguments = true })
 
 
 -- all houses generated data to export
@@ -167,5 +170,5 @@ newtype JSHouses = JSHouses {
 derive instance Generic JSHouses _
 instance Show JSHouses where
     show = genericShow
-instance Encode JSHouses where
-    encode = genericEncode (defaultOptions { unwrapSingleConstructors = true })
+instance EncodeJson JSHouses where
+    encodeJson = genericEncodeJsonWith (defaultEncoding { unwrapSingleArguments = true })

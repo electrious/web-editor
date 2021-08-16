@@ -1,7 +1,6 @@
 module API.Image where
 
 import API (API, callAPI')
-import Axios.Types (Method(..))
 import Control.Category ((<<<))
 import Data.Default (class Default)
 import Data.Generic.Rep (class Generic)

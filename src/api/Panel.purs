@@ -3,7 +3,6 @@ module API.Panel where
 import Prelude
 
 import API (API, callAPI')
-import Axios.Types (Method(..))
 import Data.Generic.Rep (class Generic)
 import Data.Lens ((^.))
 import Data.UUIDWrapper (UUID, toString)
