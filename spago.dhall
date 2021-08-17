@@ -20,7 +20,6 @@ You can edit this file as you like.
   , "event-extra"
   , "filterable"
   , "foldable-traversable"
-  , "foreign-generic"
   , "foreign-object"
   , "http-methods"
   , "integers"

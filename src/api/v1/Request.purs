@@ -6,8 +6,6 @@ import Data.Generic.Rep (class Generic)
 import Data.Show.Generic (genericShow)
 import Data.Map (Map)
 import Data.Newtype (class Newtype)
-import Data.Traversable (traverse)
-import Effect (Effect)
 import Model.Racking.RoofParameter (RoofParameter)
 import Model.Roof.Panel (Panel)
 

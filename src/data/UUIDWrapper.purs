@@ -8,7 +8,6 @@ import Data.Either (note)
 import Data.Maybe (Maybe)
 import Data.UUID as U
 import Effect (Effect)
-import Foreign.Generic (class Decode, class Encode, decode, encode)
 
 newtype UUID = UUID U.UUID
 
@@ -23,11 +22,6 @@ instance EncodeJson UUID where
 
 instance DecodeJson UUID where
     decodeJson = decodeJson >=> U.parseUUID >>> note (TypeMismatch "not valid UUID string") >>> map UUID
-
-instance Encode UUID where
-    encode (UUID u) = encode u
-instance Decode UUID where
-    decode = map UUID <<< decode
 
 emptyUUID :: UUID
 emptyUUID = UUID U.emptyUUID

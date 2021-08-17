@@ -7,7 +7,6 @@ import Data.Generic.Rep (class Generic)
 import Data.Show.Generic (genericShow)
 import Data.Newtype (class Newtype)
 import Editor.Common.Lenses (_id)
-import Foreign.Generic (class Decode, class Encode, defaultOptions, genericDecode, genericEncode)
 import Model.Hardware.PanelType (PanelType(..))
 
 newtype Panel = Panel {
@@ -49,10 +48,6 @@ derive instance newtypePanel :: Newtype Panel _
 derive instance genericPanel :: Generic Panel _
 instance showPanel :: Show Panel where
     show = genericShow
-instance encodePanel :: Encode Panel where
-    encode = genericEncode (defaultOptions { unwrapSingleConstructors = true })
-instance decodePanel :: Decode Panel where
-    decode = genericDecode (defaultOptions { unwrapSingleConstructors = true })
 
 getPanelType :: Panel -> PanelType
 getPanelType p | p ^. _id == 1 = Premium

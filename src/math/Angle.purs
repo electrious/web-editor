@@ -8,7 +8,6 @@ import Data.Default (class Default)
 import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype)
 import Data.Number as N
-import Foreign.Generic (class Decode, class Encode, decode, encode)
 import Math as M
 
 newtype Angle = Angle Number
@@ -18,13 +17,6 @@ derive instance Ord Angle
 derive instance Newtype Angle _
 instance Default Angle where
     def = Angle 0.0
-
-instance Encode Angle where
-    encode (Angle n) = encode n
-
-instance Decode Angle where
-    decode = map Angle <<< decode
-
 instance Show Angle where
   show (Angle a) = "Angle(" <> show a <> " deg)"
 
