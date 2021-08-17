@@ -28,7 +28,6 @@ You can edit this file as you like.
   , "lists"
   , "math"
   , "maybe"
-  , "media-types"
   , "memoize"
   , "newtype"
   , "numbers"

@@ -3,7 +3,7 @@ module API where
 import Prelude
 
 import Affjax (Error, Request, Response, defaultRequest, printError, request)
-import Affjax.RequestBody (RequestBody(..))
+import Affjax.RequestBody (formData)
 import Affjax.RequestBody as RB
 import Affjax.RequestHeader (RequestHeader(..))
 import Affjax.ResponseFormat (json)
@@ -21,7 +21,6 @@ import Data.Lens (Lens', (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..), fromMaybe)
-import Data.MediaType (MediaType(..))
 import Data.Newtype (class Newtype)
 import Effect (Effect)
 import Effect.Aff (Aff, error, killFiber, launchAff_, message, runAff)
@@ -119,24 +118,13 @@ performAPIEvent e = do
     cfg <- ask
     pure $ performEvent $ flip runAPI cfg <$> e
 
-
-data APIDataType = JSON
-                 | Form
-
-
-contentType :: APIDataType -> RequestHeader
-contentType JSON = ContentType $ MediaType "application/json"
-contentType Form = ContentType $ MediaType "multipart/form-data"
-
-
-getHeaders :: APIDataType -> API (Array RequestHeader)
-getHeaders dt = do
+getHeaders :: API (Array RequestHeader)
+getHeaders = do
     cfg <- ask
-    let defHeaders = [contentType dt]
-        authHeader = fromMaybe [] $ Array.singleton <<< RequestHeader "Authorization" <$> cfg ^. _auth
+    let authHeader = fromMaybe [] $ Array.singleton <<< RequestHeader "Authorization" <$> cfg ^. _auth
         userHeader = fromMaybe [] $ Array.singleton <<< RequestHeader "x-user-id" <<< show <$> cfg ^. _xUserId
         companyHeader = fromMaybe [] $ Array.singleton <<< RequestHeader "x-company-id" <<< show <$> cfg ^. _xCompanyId
-    pure $ defHeaders <> authHeader <> userHeader <> companyHeader
+    pure $ authHeader <> userHeader <> companyHeader
 
 mkRequest :: forall req. EncodeJson req => Method -> String -> req -> Array RequestHeader -> API (Request Json)
 mkRequest m url req headers = do
@@ -151,7 +139,7 @@ mkRequest m url req headers = do
 
 -- | call an API and get the result Event
 callAPI :: forall req res. EncodeJson req => DecodeJson res => Method -> String -> req -> API (Event (Either APIError res))
-callAPI m url req = getHeaders JSON >>= mkRequest m url req >>= requestEvt >>> map (join <<< map decodeResp) >>> pure
+callAPI m url req = getHeaders >>= mkRequest m url req >>= requestEvt >>> map (join <<< map decodeResp) >>> pure
 
 -- | call an API, log any errors to console and return only valid result
 callAPI' :: forall req res. EncodeJson req => DecodeJson res => Method -> String -> req -> API (Event res)
@@ -161,12 +149,12 @@ callAPI' m url req = (tap logLeft >>> onlyRight) <$> callAPI m url req
 
 -- | call an API with form data request
 formAPI :: forall res. DecodeJson res => Method -> String -> FormData -> API (Event (Either APIError res))
-formAPI m url req = getHeaders Form >>= formReq >>= requestEvt >>> map (join <<< map decodeResp) >>> pure
+formAPI m url req = getHeaders >>= formReq >>= requestEvt >>> map (join <<< map decodeResp) >>> pure
     where formReq hs = do
             cfg <- ask
             pure $ defaultRequest { method = Left m,
                                     headers = hs,
                                     url = cfg ^. _baseUrl <> url,
-                                    content = Just $ FormData req,
+                                    content = Just $ formData req,
                                     responseFormat = json
                                   }

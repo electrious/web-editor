@@ -25,7 +25,7 @@ import Model.SmartHouse.House (JSHouses)
 import OBJExporter (MeshFiles, _mtl, _obj)
 import Type.Proxy (Proxy(..))
 import Web.File.File (File, toBlob)
-import Web.XHR.FormData (EntryName(..), FormData, appendBlob, new)
+import Web.XHR.FormData (EntryName(..), FileName(..), FormData, appendBlob, new)
 
 
 data SavingStep = NotSaving
@@ -65,7 +65,7 @@ newtype UploadReq = UploadReq {
     texture :: File
     }
 
-derive instance newtypeUploadReq :: Newtype UploadReq _
+derive instance Newtype UploadReq _
 
 mkUploadReq :: MeshFiles -> File -> UploadReq
 mkUploadReq m t = UploadReq {
@@ -74,12 +74,12 @@ mkUploadReq m t = UploadReq {
     texture : t
     }
 
-toFormData :: UploadReq -> Effect FormData
+toFormData :: UploadReq -> Effect FormData              
 toFormData (UploadReq r) = do
     fd <- new
-    appendBlob (EntryName "obj") (toBlob r.obj) Nothing fd
-    appendBlob (EntryName "mtl") (toBlob r.mtl) Nothing fd
-    appendBlob (EntryName "texture") (toBlob r.texture) Nothing fd
+    appendBlob (EntryName "obj") (toBlob r.obj) (Just $ FileName "scene.obj") fd
+    appendBlob (EntryName "mtl") (toBlob r.mtl) (Just $ FileName "scene.mtl") fd
+    appendBlob (EntryName "texture") (toBlob r.texture) (Just $ FileName "scene.jpg") fd
     pure fd
 
 newtype APIResp = APIResp {
