@@ -3,9 +3,7 @@ module API.Panel where
 import Prelude
 
 import API (API, callAPI')
-import Data.Argonaut.Decode (class DecodeJson)
-import Data.Argonaut.Decode.Generic (genericDecodeJsonWith)
-import Data.Argonaut.Types.Generic (defaultEncoding)
+import Data.Argonaut.Decode (class DecodeJson, decodeJson, (.:))
 import Data.Generic.Rep (class Generic)
 import Data.HTTP.Method (Method(..))
 import Data.Lens ((^.))
@@ -20,7 +18,11 @@ newtype PanelsResult = PanelsResult {
 
 derive instance Generic PanelsResult _
 instance DecodeJson PanelsResult where
-    decodeJson = genericDecodeJsonWith (defaultEncoding { unwrapSingleArguments = true })
+    decodeJson = decodeJson >=> f
+        where f o = mkPanelsResult <$> o .: "panels"
+
+mkPanelsResult :: Array Panel -> PanelsResult
+mkPanelsResult panels = PanelsResult { panels }
 
 loadPanels :: Int -> API (Event (Array Panel))
 loadPanels i = map f <$> callAPI' GET url {}

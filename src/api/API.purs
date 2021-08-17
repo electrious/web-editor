@@ -10,9 +10,7 @@ import Affjax.ResponseFormat (json)
 import Control.Monad.Reader (class MonadAsk, ReaderT, ask, runReaderT)
 import Data.Argonaut.Core (Json)
 import Data.Argonaut.Decode (class DecodeJson, JsonDecodeError, decodeJson, printJsonDecodeError)
-import Data.Argonaut.Decode.Generic (genericDecodeJsonWith)
 import Data.Argonaut.Encode (class EncodeJson, encodeJson)
-import Data.Argonaut.Types.Generic (defaultEncoding)
 import Data.Array as Array
 import Data.Compactable (separate)
 import Data.Default (class Default)
@@ -82,8 +80,6 @@ newtype APIConfig = APIConfig {
 
 derive instance Newtype APIConfig _
 derive instance Generic APIConfig _
-instance DecodeJson APIConfig where
-    decodeJson = genericDecodeJsonWith (defaultEncoding { unwrapSingleArguments = true })
 
 instance defaultAPIConfig :: Default APIConfig where
     def = APIConfig {

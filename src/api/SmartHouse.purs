@@ -5,8 +5,6 @@ import Prelude
 import API (API, APIError, callAPI, formAPI, performAPIEvent)
 import Control.Alt ((<|>))
 import Data.Argonaut.Decode (class DecodeJson, decodeJson, (.:))
-import Data.Argonaut.Decode.Generic (genericDecodeJsonWith)
-import Data.Argonaut.Types.Generic (defaultEncoding)
 import Data.Default (class Default)
 import Data.Either (Either(..))
 import Data.Filterable (filter)
@@ -91,7 +89,11 @@ newtype APIResp = APIResp {
 derive instance Newtype APIResp _
 derive instance Generic APIResp _
 instance DecodeJson APIResp where
-    decodeJson = genericDecodeJsonWith (defaultEncoding { unwrapSingleArguments = true })
+    decodeJson = decodeJson >=> f
+        where f o = mkAPIResp <$> o .: "success"
+
+mkAPIResp :: Boolean -> APIResp
+mkAPIResp s = APIResp { success : s }
 
 -- API to upload obj/mtl/texture files
 uploadMeshFiles :: Int -> MeshFiles -> File -> API (Event (Either APIError APIResp))

@@ -3,9 +3,7 @@ module API.Roofplate (loadRoofplates, buildRoofplates) where
 import Prelude
 
 import API (API, callAPI')
-import Data.Argonaut.Decode (class DecodeJson)
-import Data.Argonaut.Decode.Generic (genericDecodeJsonWith)
-import Data.Argonaut.Types.Generic (defaultEncoding)
+import Data.Argonaut.Decode (class DecodeJson, decodeJson, (.:))
 import Data.Generic.Rep (class Generic)
 import Data.HTTP.Method (Method(..))
 import FRP.Event (Event)
@@ -17,7 +15,11 @@ newtype RoofPlatesResult = RoofPlatesResult {
 
 derive instance Generic RoofPlatesResult _
 instance DecodeJson RoofPlatesResult where
-    decodeJson = genericDecodeJsonWith (defaultEncoding { unwrapSingleArguments = true })
+    decodeJson = decodeJson >=> f
+        where f o = mkRoofPlatesResult <$> o .: "roofplates"
+    
+mkRoofPlatesResult :: Array RoofPlate -> RoofPlatesResult
+mkRoofPlatesResult roofplates = RoofPlatesResult { roofplates }
 
 loadRoofplates :: Int -> API (Event (Array RoofPlate))
 loadRoofplates i = map f <$> callAPI' GET url {}

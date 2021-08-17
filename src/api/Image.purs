@@ -50,7 +50,7 @@ instance Show ImageResp where
 instance DecodeJson ImageResp where
     decodeJson = decodeJson >=> f
         where f o = mkImageResp <$> o .: "Link"
-                                <*> o .: "PixelPerMeter"
+                                <*> o .: "PixelsPerMeter"
                                 <*> o .: "Provider"
 
 mkImageResp :: String -> Number -> String -> ImageResp

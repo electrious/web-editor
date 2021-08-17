@@ -2,11 +2,9 @@ module Model.RoofSpecific where
 
 import Prelude
 
-import Data.Argonaut.Decode (class DecodeJson)
-import Data.Argonaut.Decode.Generic (genericDecodeJsonWith)
-import Data.Argonaut.Encode (class EncodeJson)
-import Data.Argonaut.Encode.Generic (genericEncodeJsonWith)
-import Data.Argonaut.Types.Generic (defaultEncoding)
+import Data.Argonaut.Core (jsonEmptyObject)
+import Data.Argonaut.Decode (class DecodeJson, decodeJson, (.:))
+import Data.Argonaut.Encode (class EncodeJson, (:=), (~>))
 import Data.Eq.Generic (genericEq)
 import Data.Generic.Rep (class Generic)
 import Data.Lens (Lens')
@@ -30,9 +28,13 @@ instance Show a => Show (RoofSpecific a) where
 instance Eq a => Eq (RoofSpecific a) where
     eq = genericEq
 instance EncodeJson a => EncodeJson (RoofSpecific a) where
-    encodeJson = genericEncodeJsonWith $ defaultEncoding { unwrapSingleArguments = true }
+    encodeJson (RoofSpecific r) = "roofId" := r.roofId
+                               ~> "value" := r.value
+                               ~> jsonEmptyObject
 instance DecodeJson a => DecodeJson (RoofSpecific a) where
-    decodeJson = genericDecodeJsonWith $ defaultEncoding { unwrapSingleArguments = true }
+    decodeJson = decodeJson >=> f
+        where f o = mkRoofSpecific <$> o .: "roofId"
+                                   <*> o .: "value"
 
 instance Functor RoofSpecific where
     map f (RoofSpecific r) = RoofSpecific $ r { value = f r.value }

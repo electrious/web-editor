@@ -2,10 +2,9 @@ module Model.Roof.RoofPlate where
 
 import Prelude hiding (degree)
 
-import Data.Argonaut.Decode (class DecodeJson, decodeJson)
-import Data.Argonaut.Decode.Generic (genericDecodeJson)
-import Data.Argonaut.Encode (class EncodeJson, encodeJson)
-import Data.Argonaut.Encode.Generic (genericEncodeJson)
+import Data.Argonaut.Core (jsonEmptyObject)
+import Data.Argonaut.Decode (class DecodeJson, decodeJson, (.:))
+import Data.Argonaut.Encode (class EncodeJson, encodeJson, (:=), (~>))
 import Data.Array ((..))
 import Data.Array as Arr
 import Data.Default (class Default, def)
@@ -108,9 +107,15 @@ derive instance Generic Point _
 instance Show Point where
     show = genericShow
 instance EncodeJson Point where
-    encodeJson = genericEncodeJson
+    encodeJson (Point p) = "x" := p.x
+                        ~> "y" := p.y
+                        ~> "z" := p.z
+                        ~> jsonEmptyObject
 instance DecodeJson Point where
-    decodeJson = genericDecodeJson
+    decodeJson = decodeJson >=> f
+        where f o = mkPoint <$> o .: "x"
+                            <*> o .: "y"
+                            <*> o .: "z"
 
 
 mkPoint :: Number -> Number -> Number -> Point
@@ -137,9 +142,19 @@ derive instance Eq UnifiedPoint
 instance Show UnifiedPoint where
     show = genericShow
 instance EncodeJson UnifiedPoint where
-    encodeJson = genericEncodeJson
+    encodeJson (UnifiedPoint p) = "x" := p.x
+                               ~> "y" := p.y
+                               ~> "z" := p.z
+                               ~> "shade" := p.shade
+                               ~> "rating" := p.rating
+                               ~> jsonEmptyObject
 instance DecodeJson UnifiedPoint where
-    decodeJson = genericDecodeJson
+    decodeJson = decodeJson >=> f
+        where f o = mkUnifiedPoint <$> o .: "x"
+                                   <*> o .: "y"
+                                   <*> o .: "z"
+                                   <*> o .: "shade"
+                                   <*> o .: "rating"
 
 mkUnifiedPoint :: Number -> Number -> Number -> Number -> Number -> UnifiedPoint
 mkUnifiedPoint x y z s r = UnifiedPoint { x, y, z, shade: s, rating: r }
@@ -166,9 +181,38 @@ derive instance Generic JSRoofPlate _
 instance Show JSRoofPlate where
     show = genericShow
 instance EncodeJson JSRoofPlate where
-    encodeJson = genericEncodeJson
+    encodeJson (JSRoofPlate r) = "id" := r.id
+                              ~> "uuid" := r.uuid
+                              ~> "lead_id" := r.lead_id
+                              ~> "border_points" := r.border_points
+                              ~> "unified_points" := r.unified_points
+                              ~> "orientation" := r.orientation
+                              ~> "alignment" := r.alignment
+                              ~> "slope" := r.slope
+                              ~> "coefs" := r.coefs
+                              ~> "center" := r.center
+                              ~> "normal" := r.normal
+                              ~> "azimuth" := r.azimuth
+                              ~> "rotation_override" := r.rotation_override
+                              ~> jsonEmptyObject
 instance DecodeJson JSRoofPlate where
-    decodeJson = genericDecodeJson
+    decodeJson = decodeJson >=> f
+        where f o = mkJSRoofPlate <$> o .: "id"
+                                  <*> o .: "uuid"
+                                  <*> o .: "lead_id"
+                                  <*> o .: "border_points"
+                                  <*> o .: "unified_points"
+                                  <*> o .: "orientation"
+                                  <*> o .: "alignment"
+                                  <*> o .: "slope"
+                                  <*> o .: "coefs"
+                                  <*> o .: "center"
+                                  <*> o .: "normal"
+                                  <*> o .: "azimuth"
+                                  <*> o .: "rotation_override"
+
+mkJSRoofPlate :: Int -> String -> Int -> Array Point -> Maybe (Array UnifiedPoint) -> Int -> Int -> Number -> Array Number -> Array Number -> Array Number -> Number -> Number -> JSRoofPlate
+mkJSRoofPlate id uuid lead_id border_points unified_points orientation alignment slope coefs center normal azimuth rotation_override = JSRoofPlate { id, uuid, lead_id, border_points, unified_points, orientation, alignment, slope, coefs, center, normal, azimuth, rotation_override }
 
 arrVec :: Array Number -> Vector3
 arrVec [x, y, z] = mkVec3 x y z
@@ -308,7 +352,11 @@ derive instance Generic RoofEdited _
 instance Show RoofEdited where
     show = genericShow
 instance EncodeJson RoofEdited where
-    encodeJson = genericEncodeJson
+    encodeJson (RoofEdited r) = "ground" := r.ground
+                             ~> "inclined" := r.inclined
+                             ~> "contours" := r.contours
+                             ~> "indices" := r.indices
+                             ~> jsonEmptyObject
 _ground :: Lens' RoofEdited Point
 _ground = _Newtype <<< prop (Proxy :: Proxy "ground")
 

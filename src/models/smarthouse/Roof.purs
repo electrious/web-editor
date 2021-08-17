@@ -4,11 +4,9 @@ import Prelude hiding (degree)
 
 import Algorithm.Plane (Plane)
 import Custom.Mesh (TappableMesh)
-import Data.Argonaut.Decode (class DecodeJson)
-import Data.Argonaut.Decode.Generic (genericDecodeJsonWith)
-import Data.Argonaut.Encode (class EncodeJson)
-import Data.Argonaut.Encode.Generic (genericEncodeJsonWith)
-import Data.Argonaut.Types.Generic (defaultEncoding)
+import Data.Argonaut.Core (jsonEmptyObject)
+import Data.Argonaut.Decode (class DecodeJson, decodeJson, (.:))
+import Data.Argonaut.Encode (class EncodeJson, (:=), (~>))
 import Data.Default (def)
 import Data.Generic.Rep (class Generic)
 import Data.Lens (view, (.~), (^.))
@@ -87,9 +85,16 @@ derive instance Generic JSRoof _
 instance Show JSRoof where
     show = genericShow
 instance EncodeJson JSRoof where
-    encodeJson = genericEncodeJsonWith (defaultEncoding { unwrapSingleArguments = true })
+    encodeJson (JSRoof r) = "id" := r.id
+                         ~> "polygon" := r.polygon
+                         ~> jsonEmptyObject
 instance DecodeJson JSRoof where
-    decodeJson = genericDecodeJsonWith (defaultEncoding { unwrapSingleArguments = true })
+    decodeJson = decodeJson >=> f
+        where f o = mkJSRoof <$> o .: "id"
+                             <*> o .: "polygon"
+
+mkJSRoof :: UUID -> Array Point -> JSRoof
+mkJSRoof id polygon = JSRoof { id, polygon }
 
 -- material for active roof outline
 actLineMat :: LineBasicMaterial
