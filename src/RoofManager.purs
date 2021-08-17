@@ -26,8 +26,8 @@ import Data.Time.Duration (Milliseconds(..))
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Data.UUIDWrapper (UUID)
-import Data.UUIDWrapperMap (UUIDMap)
-import Data.UUIDWrapperMap as UM
+import Data.UUIDMap (UUIDMap)
+import Data.UUIDMap as UM
 import Editor.ArrayBuilder (runArrayBuilder)
 import Editor.Common.Lenses (_alignment, _deleted, _disposable, _face, _geometry, _houseId, _id, _mesh, _modeDyn, _mouseMove, _orientation, _panelType, _panels, _point, _position, _roof, _roofId, _roofs, _tapped, _updated, _verticeTree, _wrapper)
 import Editor.Disposable (class Disposable, dispose)

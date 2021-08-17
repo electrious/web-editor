@@ -1,4 +1,4 @@
-module Data.UUIDWrapperMap where
+module Data.UUIDMap where
 
 import Prelude
 
