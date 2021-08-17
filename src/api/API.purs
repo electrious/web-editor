@@ -6,7 +6,7 @@ import Affjax (Error, Request, Response, defaultRequest, printError, request)
 import Affjax.RequestBody (formData)
 import Affjax.RequestBody as RB
 import Affjax.RequestHeader (RequestHeader(..))
-import Affjax.ResponseFormat (json)
+import Affjax.ResponseFormat (ignore, json)
 import Control.Monad.Reader (class MonadAsk, ReaderT, ask, runReaderT)
 import Data.Argonaut.Core (Json)
 import Data.Argonaut.Decode (class DecodeJson, JsonDecodeError, decodeJson, printJsonDecodeError)
@@ -126,24 +126,42 @@ getHeaders = do
         companyHeader = fromMaybe [] $ Array.singleton <<< RequestHeader "x-company-id" <<< show <$> cfg ^. _xCompanyId
     pure $ authHeader <> userHeader <> companyHeader
 
-mkRequest :: forall req. EncodeJson req => Method -> String -> req -> Array RequestHeader -> API (Request Json)
-mkRequest m url req headers = do
-    cfg <- ask
-    pure $ defaultRequest { method         = Left m,
-                            headers        = headers,
-                            url            = (cfg ^. _baseUrl) <> url,
-                            content        = Just $ RB.Json $ encodeJson req,
-                            responseFormat = json
-                          }
-
 
 -- | call an API and get the result Event
 callAPI :: forall req res. EncodeJson req => DecodeJson res => Method -> String -> req -> API (Event (Either APIError res))
-callAPI m url req = getHeaders >>= mkRequest m url req >>= requestEvt >>> map (join <<< map decodeResp) >>> pure
+callAPI m url req = getHeaders >>= mkRequest >>= requestEvt >>> map (join <<< map decodeResp) >>> pure
+    where mkRequest headers = do
+            cfg <- ask
+            pure $ defaultRequest { method         = Left m,
+                                    headers        = headers,
+                                    url            = (cfg ^. _baseUrl) <> url,
+                                    content        = Just $ RB.Json $ encodeJson req,
+                                    responseFormat = json
+                                   }
 
 -- | call an API, log any errors to console and return only valid result
 callAPI' :: forall req res. EncodeJson req => DecodeJson res => Method -> String -> req -> API (Event res)
 callAPI' m url req = (tap logLeft >>> onlyRight) <$> callAPI m url req
+    where logLeft (Left e) = log $ showAPIError e
+          logLeft _        = pure unit
+
+getData :: forall a. Response a -> a
+getData r = r.body
+
+callAPI_ :: forall req. EncodeJson req => Method -> String -> req -> API (Event (Either APIError Unit))
+callAPI_ m url req = getHeaders >>= mkRequest >>= requestEvt >>> map (map getData) >>> pure
+    where mkRequest headers = do
+            cfg <- ask
+            pure $ defaultRequest { method         = Left m,
+                                    headers        = headers,
+                                    url            = (cfg ^. _baseUrl) <> url,
+                                    content        = Just $ RB.Json $ encodeJson req,
+                                    responseFormat = ignore
+                                   }
+
+-- | call an API, log any errors to console and return only valid result
+callAPI_' :: forall req. EncodeJson req => Method -> String -> req -> API (Event Unit)
+callAPI_' m url req = (tap logLeft >>> onlyRight) <$> callAPI_ m url req
     where logLeft (Left e) = log $ showAPIError e
           logLeft _        = pure unit
 
@@ -152,9 +170,9 @@ formAPI :: forall res. DecodeJson res => Method -> String -> FormData -> API (Ev
 formAPI m url req = getHeaders >>= formReq >>= requestEvt >>> map (join <<< map decodeResp) >>> pure
     where formReq hs = do
             cfg <- ask
-            pure $ defaultRequest { method = Left m,
-                                    headers = hs,
-                                    url = cfg ^. _baseUrl <> url,
-                                    content = Just $ formData req,
-                                    responseFormat = json
+            pure $ defaultRequest { method         = Left m,
+                                    headers        = hs,
+                                    url            = cfg ^. _baseUrl <> url,
+                                    content        = Just $ formData req,
+                                    responseFormat =  json
                                   }

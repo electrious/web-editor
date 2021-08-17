@@ -2,7 +2,7 @@ module API.Panel where
 
 import Prelude
 
-import API (API, callAPI')
+import API (API, callAPI', callAPI_')
 import Data.Argonaut.Decode (class DecodeJson, decodeJson, (.:))
 import Data.Generic.Rep (class Generic)
 import Data.HTTP.Method (Method(..))
@@ -30,21 +30,21 @@ loadPanels i = map f <$> callAPI' GET url {}
           f (PanelsResult r) = r.panels
 
 createPanel :: Int -> Panel -> API (Event Unit)
-createPanel leadId p = callAPI' POST url p
+createPanel leadId p = callAPI_' POST url p
     where url = "/v1/leads/" <> show leadId <> "/roofplates/" <> show (p ^. _roofUUID) <> "/panels"
 
 createPanels :: Int -> UUID -> Array Panel -> API (Event Unit)
-createPanels leadId roofId ps = callAPI' POST url ps
+createPanels leadId roofId ps = callAPI_' POST url ps
     where url = "/v1/leads/" <> show leadId <> "/roofplates/" <> toString roofId <> "/panels"
 
 deletePanels :: Int -> Array UUID -> API (Event Unit)
-deletePanels leadId pids = callAPI' DELETE url { uuids: pids }
+deletePanels leadId pids = callAPI_' DELETE url { uuids: pids }
     where url = "/v1/leads/" <> show leadId <> "/panels"
 
 deletePanelsInRoof :: Int -> UUID -> API (Event Unit)
-deletePanelsInRoof leadId roofId = callAPI' DELETE url {}
+deletePanelsInRoof leadId roofId = callAPI_' DELETE url {}
     where url = "/v1/leads/" <> show leadId <> "/roofplates/" <> toString roofId <> "/panels"
 
 updatePanels :: Int -> Array Panel -> API (Event Unit)
-updatePanels leadId ps = callAPI' PUT url ps
+updatePanels leadId ps = callAPI_' PUT url ps
     where url = "/v1/leads/" <> show leadId <> "/panels"
