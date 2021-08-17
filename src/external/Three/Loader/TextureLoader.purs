@@ -4,7 +4,7 @@ import Prelude
 
 import Effect (Effect)
 import FRP.Event (Event, makeEvent)
-import Web.File (File)
+import Web.File.File (File)
 
 foreign import data Texture  :: Type
 foreign import data WrapMode :: Type

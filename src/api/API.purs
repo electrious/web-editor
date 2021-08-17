@@ -2,17 +2,14 @@ module API where
 
 import Prelude
 
-<<<<<<< HEAD
-import Affjax (Error(..), Request, Response, defaultRequest, request)
+import Affjax (Error, Request, Response, defaultRequest, printError, request)
+import Affjax.RequestBody (RequestBody(..))
+import Affjax.RequestBody as RB
 import Affjax.RequestHeader (RequestHeader(..))
-import Axios.Types (Method)
-=======
-import Axios (genericAxios)
-import Axios.Config (baseUrl, headers, method)
-import Axios.Types (Header(..), Method)
->>>>>>> master
+import Affjax.ResponseFormat (json)
 import Control.Monad.Reader (class MonadAsk, ReaderT, ask, runReaderT)
-import Data.Argonaut.Decode (class DecodeJson)
+import Data.Argonaut.Core (Json)
+import Data.Argonaut.Decode (class DecodeJson, JsonDecodeError, decodeJson, printJsonDecodeError)
 import Data.Argonaut.Decode.Generic (genericDecodeJsonWith)
 import Data.Argonaut.Encode (class EncodeJson, encodeJson)
 import Data.Argonaut.Types.Generic (defaultEncoding)
@@ -21,34 +18,47 @@ import Data.Compactable (separate)
 import Data.Default (class Default)
 import Data.Either (Either(..))
 import Data.Generic.Rep (class Generic)
+import Data.HTTP.Method (Method)
 import Data.Lens (Lens', (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..), fromMaybe)
+import Data.MediaType (MediaType(..))
 import Data.Newtype (class Newtype)
 import Effect (Effect)
-import Effect.Aff (Aff, error, killFiber, launchAff_, runAff)
+import Effect.Aff (Aff, error, killFiber, launchAff_, message, runAff)
 import Effect.Aff as Aff
+import Effect.Class (class MonadEffect)
+import Effect.Console (log)
 import FRP.Event (Event, makeEvent, subscribe)
 import FRP.Event.Extra (performEvent)
-<<<<<<< HEAD
-import Type.Prelude (Proxy(..))
-import Web.HTML.HTMLMetaElement (content)
-=======
-import Foreign (MultipleErrors)
-import Foreign.Generic (class Decode, class Encode, ForeignError(..), defaultOptions, genericDecode)
 import Type.Proxy (Proxy(..))
->>>>>>> master
+import Web.XHR.FormData (FormData)
+
+
+data APIError = NetworkError Error
+              | DataError JsonDecodeError
+              | AffError Aff.Error
+              | StubError
+
+showAPIError :: APIError -> String
+showAPIError (NetworkError e) = "Network error: " <> printError e
+showAPIError (DataError e) = "Data error: " <> printJsonDecodeError e
+showAPIError (AffError e) = "Aff error: " <> message e
+showAPIError StubError = "Stub error"
 
 -- | convert an Aff action into a FRP Event
-affEvt :: forall a. Aff a -> Event (Either Aff.Error a)
+affEvt :: forall a. Aff a -> Event (Either APIError a)
 affEvt aff = makeEvent \k -> do
-    f <- runAff k aff
+    f <- runAff (mapLeft AffError >>> k) aff
     pure $ launchAff_ $ killFiber (error "kill Aff fiber") f
 
 
-requestEvt :: forall a. Request a -> Event (Either Error (Response a))
-requestEvt req = join <<< mapLeft XHROtherError <$> affEvt (request req)
+requestEvt :: forall a. Request a -> Event (Either APIError (Response a))
+requestEvt req = join <<< map (mapLeft NetworkError) <$> affEvt (request req)
+
+decodeResp :: forall res. DecodeJson res => Response Json -> Either APIError res
+decodeResp resp = mapLeft DataError $ decodeJson resp.body
 
 -- | tap an action on an event
 tap :: forall a. (a -> Effect Unit) -> Event a -> Event a
@@ -62,10 +72,6 @@ mapLeft _ (Right a) = Right a
 onlyRight :: forall a e. Event (Either e a) -> Event a
 onlyRight = f <<< separate
     where f v = v.right
-
-mapLeft :: forall a b c. (a -> c) -> Either a b -> Either c b
-mapLeft f (Left v) = Left (f v)
-mapLeft f (Right v) = Right v
 
 newtype APIConfig = APIConfig {
     auth       :: Maybe String,
@@ -106,8 +112,7 @@ derive newtype instance Apply API
 derive newtype instance Bind API
 derive newtype instance Monad API
 derive newtype instance MonadAsk APIConfig API
-
-foreign import getErrorMessage :: Error -> String
+derive newtype instance MonadEffect API
 
 runAPI :: forall a. API a -> APIConfig -> Effect a
 runAPI (API a) = runReaderT a
@@ -124,38 +129,48 @@ data APIDataType = JSON
 
 
 contentType :: APIDataType -> RequestHeader
-contentType JSON = ContentType "application/json"
-contentType Form = ContentType "multipart/form-data"
+contentType JSON = ContentType $ MediaType "application/json"
+contentType Form = ContentType $ MediaType "multipart/form-data"
 
 
-mkRequest :: forall req. EncodeJson req => Method -> String -> APIDataType -> req -> API (RequestHeader req)
-mkRequest m url dt req = do
+getHeaders :: APIDataType -> API (Array RequestHeader)
+getHeaders dt = do
     cfg <- ask
     let defHeaders = [contentType dt]
         authHeader = fromMaybe [] $ Array.singleton <<< RequestHeader "Authorization" <$> cfg ^. _auth
         userHeader = fromMaybe [] $ Array.singleton <<< RequestHeader "x-user-id" <<< show <$> cfg ^. _xUserId
         companyHeader = fromMaybe [] $ Array.singleton <<< RequestHeader "x-company-id" <<< show <$> cfg ^. _xCompanyId
+    pure $ defHeaders <> authHeader <> userHeader <> companyHeader
 
-    pure $ defaultRequest { method  = m,
-                            headers = defHeaders <> authHeader <> userHeader <> companyHeader,
-                            url     = (cfg ^. _baseUrl) <> url,
-                            content = encodeJson req
+mkRequest :: forall req. EncodeJson req => Method -> String -> req -> Array RequestHeader -> API (Request Json)
+mkRequest m url req headers = do
+    cfg <- ask
+    pure $ defaultRequest { method         = Left m,
+                            headers        = headers,
+                            url            = (cfg ^. _baseUrl) <> url,
+                            content        = Just $ RB.Json $ encodeJson req,
+                            responseFormat = json
                           }
 
--- convert network Error to MultipleErrors
-toMultipleErrors :: Error -> MultipleErrors
-toMultipleErrors = singleton <<< ForeignError <<< getErrorMessage
 
 -- | call an API and get the result Event
-callAPI :: forall req res. Encode req => Decode res => Method -> String -> req -> API (Event (Either MultipleErrors res))
-callAPI m url req = apiAction m url JSON req >>= affEvt >>> map (join >>> mapLeft toMultipleErrors) >>> pure
+callAPI :: forall req res. EncodeJson req => DecodeJson res => Method -> String -> req -> API (Event (Either APIError res))
+callAPI m url req = getHeaders JSON >>= mkRequest m url req >>= requestEvt >>> map (join <<< map decodeResp) >>> pure
 
 -- | call an API, log any errors to console and return only valid result
-callAPI' :: forall req res. Encode req => Decode res => Method -> String -> req -> API (Event res)
+callAPI' :: forall req res. EncodeJson req => DecodeJson res => Method -> String -> req -> API (Event res)
 callAPI' m url req = (tap logLeft >>> onlyRight) <$> callAPI m url req
-    where logLeft (Left e) = errorShow e
+    where logLeft (Left e) = log $ showAPIError e
           logLeft _        = pure unit
 
 -- | call an API with form data request
-formAPI :: forall req res. Encode req => Decode res => Method -> String -> req -> API (Event (Either MultipleErrors res))
-formAPI m url req = apiAction m url Form req >>= affEvt >>> map (join >>> mapLeft toMultipleErrors) >>> pure
+formAPI :: forall res. DecodeJson res => Method -> String -> FormData -> API (Event (Either APIError res))
+formAPI m url req = getHeaders Form >>= formReq >>= requestEvt >>> map (join <<< map decodeResp) >>> pure
+    where formReq hs = do
+            cfg <- ask
+            pure $ defaultRequest { method = Left m,
+                                    headers = hs,
+                                    url = cfg ^. _baseUrl <> url,
+                                    content = Just $ FormData req,
+                                    responseFormat = json
+                                  }

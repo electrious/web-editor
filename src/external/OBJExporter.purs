@@ -7,10 +7,10 @@ import Data.Lens (Lens')
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
-import Type.Proxy (Proxy(..))
 import Effect (Effect)
-import Web.File (File)
 import Three.Core.Object3D (Object3D)
+import Type.Proxy (Proxy(..))
+import Web.File.File (File)
 
 foreign import exportObject :: Object3D -> Effect MeshFiles
 

@@ -2,7 +2,7 @@ module SmartHouse.HouseBuilder (buildHouse, HouseBuilderConfig(..), HouseBuilt(.
 
 import Prelude hiding (degree)
 
-import API (API, APIConfig, _xCompanyId, runAPI)
+import API (API, APIConfig, APIError(..), _xCompanyId, runAPI, showAPIError)
 import API.Image (ImageResp, _link, _pixelPerMeter, getImageMeta)
 import API.Panel (loadPanels)
 import API.Roofplate (loadRoofplates)
@@ -20,14 +20,13 @@ import Data.Generic.Rep (class Generic)
 import Data.Lens (Lens', set, view, (%~), (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.List.NonEmpty (head, singleton)
 import Data.Map as M
 import Data.Maybe (Maybe(..), isNothing)
 import Data.Meter (meterVal)
 import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
 import Data.Traversable (traverse)
-import Data.Tuple (fst)
+import Data.Tuple (Tuple(..), fst, snd)
 import Data.UUIDWrapper (UUID)
 import Data.UUIDWrapperMap (UUIDMap)
 import Editor.Common.Lenses (_apiConfig, _buttons, _height, _houseId, _leadId, _modeDyn, _mouseMove, _name, _panelType, _panels, _parent, _roofs, _slopeSelected, _tapped, _textureInfo, _updated, _width)
@@ -41,7 +40,6 @@ import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic, current, dynEvent, performDynamic, sampleDyn, step)
 import FRP.Event (Event, create, keepLatest, sampleOn, sampleOn_, subscribe)
 import FRP.Event.Extra (delay, multicast, performEvent)
-import Foreign (ForeignError(..), MultipleErrors, renderForeignError)
 import Model.ActiveMode (ActiveMode(..), fromBoolean)
 import Model.Hardware.PanelTextureInfo (PanelTextureInfo)
 import Model.Hardware.PanelType (PanelType(..))
@@ -72,7 +70,7 @@ import UI.EditorUIOp (EditorUIOp(..))
 import UI.RoofEditorUI (_editorOp)
 import Unsafe.Coerce (unsafeCoerce)
 import Util (foldEvtWith)
-import Web.File (File)
+import Web.File.File (File)
 
 -- NOTE: global value to toggle between rendering house as full 3D editor or 2D wireframes
 houseRenderMode :: HouseRenderMode
@@ -450,8 +448,8 @@ builderForHouse evts tInfo =
 runAPIEvent :: forall a. Dynamic APIConfig -> Event (API (Event a)) -> Event a
 runAPIEvent apiCfg = keepLatest <<< performEvent <<< sampleDyn apiCfg <<< map runAPI
 
-defError :: MultipleErrors
-defError = singleton $ ForeignError ""
+defError :: APIError
+defError = StubError
 
 saveMeshes :: HouseBuilderConfig -> Event File -> Event MeshFiles -> Event JSHouses -> Event SavingStep
 saveMeshes cfg imgEvt mFilesEvt houseEvt =
@@ -480,7 +478,7 @@ saveMeshes cfg imgEvt mFilesEvt houseEvt =
     in (const UploadingFiles  <$> mFilesEvt)   <|>
        (const CreatingHouse   <$> toCreateEvt) <|>
        (const WaitingForReady <$> createSuccEvt)  <|>
-       (Failed <<< renderForeignError <<< head <$> failedEvt) <|>
+       (Failed <<< showAPIError <$> failedEvt) <|>
        (mkFinished <$> readySuccEvt)
 
 mkFinished :: ReadyAPIResp -> SavingStep

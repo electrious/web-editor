@@ -3,11 +3,14 @@ module API.Panel where
 import Prelude
 
 import API (API, callAPI')
+import Data.Argonaut.Decode (class DecodeJson)
+import Data.Argonaut.Decode.Generic (genericDecodeJsonWith)
+import Data.Argonaut.Types.Generic (defaultEncoding)
 import Data.Generic.Rep (class Generic)
+import Data.HTTP.Method (Method(..))
 import Data.Lens ((^.))
 import Data.UUIDWrapper (UUID, toString)
 import FRP.Event (Event)
-import Foreign.Generic (class Decode, defaultOptions, genericDecode)
 import Model.Roof.Panel (Panel, _roofUUID)
 
 
@@ -15,9 +18,9 @@ newtype PanelsResult = PanelsResult {
     panels :: Array Panel
 }
 
-derive instance genericPanelsResult :: Generic PanelsResult _
-instance decodePanelsResult :: Decode PanelsResult where
-    decode = genericDecode (defaultOptions { unwrapSingleConstructors = true })
+derive instance Generic PanelsResult _
+instance DecodeJson PanelsResult where
+    decodeJson = genericDecodeJsonWith (defaultEncoding { unwrapSingleArguments = true })
 
 loadPanels :: Int -> API (Event (Array Panel))
 loadPanels i = map f <$> callAPI' GET url {}
