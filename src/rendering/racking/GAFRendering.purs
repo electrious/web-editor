@@ -2,14 +2,15 @@ module Rendering.Racking.GAFRendering where
 
 import Prelude
 
-import Effect.Class (liftEffect)
+import Data.Default (def)
+import Data.Lens ((.~))
+import Editor.Common.Lenses (_name)
 import Model.Racking.GAF.GAFRackingComponent (GAFRackingComponent)
-import Rendering.Renderable (class Renderable)
-import Three.Core.Object3D (Object3D, mkObject3D, setName)
+import Model.Racking.GAF.Hood (Hood)
+import Rendering.Node (Node, node)
 
-newtype GAFRackingComponentRenderable = GAFRackingComponentRenderable GAFRackingComponent
-instance renderableGAFRackingComponent :: Renderable e GAFRackingComponentRenderable Object3D where
-    render (GAFRackingComponentRenderable _) = liftEffect do
-        comp <- mkObject3D
-        setName "GAFRackingComponent" comp
-        pure comp
+renderGAF :: forall e. GAFRackingComponent -> Node e Unit
+renderGAF _ = node (def # _name .~ "GAFRackingComponent") $ pure unit
+
+renderHood :: forall e. Hood -> Node e Unit
+renderHood _ = pure unit
