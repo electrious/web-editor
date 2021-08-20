@@ -7,6 +7,9 @@ import Data.Argonaut.Decode (class DecodeJson, decodeJson, (.:), (.:?))
 import Data.Argonaut.Encode (class EncodeJson, (:=), (~>))
 import Data.Default (class Default, def)
 import Data.Generic.Rep (class Generic)
+import Data.Lens (Lens')
+import Data.Lens.Iso.Newtype (_Newtype)
+import Data.Lens.Record (prop)
 import Data.Map (Map)
 import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
@@ -18,6 +21,7 @@ import Model.Racking.Rafter (Rafter)
 import Model.Racking.RoofParameter (RoofParameter, candidate)
 import Model.Racking.XR10.XRRackingComponent (XRRackingComponent, XRRackingNumbers)
 import Model.Racking.XRFlat.XRFlatRackingComponent (XRFlatRackingComponent, XRFlatRackingNumbers)
+import Type.Proxy (Proxy(..))
 
 data RackingComp = FX FXRackingComponent
                  | XR XRRackingComponent
@@ -81,3 +85,9 @@ instance DecodeJson RoofRackingData where
 
 mkRoofRackingData :: RackingType -> Array Rafter -> RoofParameter -> Map Int RackingComp -> RoofRackingData
 mkRoofRackingData t rs prm dat = RoofRackingData { rackingType : t, rafters: rs, parameters: prm, arrayComps: dat }
+
+_rafters :: forall t a r. Newtype t { rafters :: a | r } => Lens' t a
+_rafters = _Newtype <<< prop (Proxy :: Proxy "rafters")
+
+_arrayComps :: forall t a r. Newtype t { arrayComps :: a | r } => Lens' t a
+_arrayComps = _Newtype <<< prop (Proxy :: Proxy "arrayComps")
