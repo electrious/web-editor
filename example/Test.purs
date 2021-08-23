@@ -76,7 +76,7 @@ doTest roofDat panelDat = do
 
                     editor <- createEditor el $ def # _sizeDyn .~ sizeDyn
 
-                    let mode = HouseBuilArding
+                    let mode = HouseBuilding
 
                     if mode /= HouseBuilding
                        then do
