@@ -8,6 +8,7 @@ You can edit this file as you like.
   , "affjax"
   , "argonaut-codecs"
   , "argonaut-core"
+  , "argonaut-generic"
   , "arrays"
   , "console"
   , "control"

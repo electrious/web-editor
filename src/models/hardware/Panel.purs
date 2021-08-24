@@ -2,10 +2,14 @@ module Model.Hardware.Panel where
 
 import Prelude
 
-import Data.Lens ((^.))
+import Data.Argonaut.Decode (class DecodeJson)
+import Data.Argonaut.Decode.Generic (genericDecodeJson)
+import Data.Argonaut.Encode (class EncodeJson)
+import Data.Argonaut.Encode.Generic (genericEncodeJson)
 import Data.Generic.Rep (class Generic)
-import Data.Show.Generic (genericShow)
+import Data.Lens ((^.))
 import Data.Newtype (class Newtype)
+import Data.Show.Generic (genericShow)
 import Editor.Common.Lenses (_id)
 import Model.Hardware.PanelType (PanelType(..))
 
@@ -44,10 +48,14 @@ newtype Panel = Panel {
     year_approved_at                       :: Int
 }
 
-derive instance newtypePanel :: Newtype Panel _
-derive instance genericPanel :: Generic Panel _
-instance showPanel :: Show Panel where
+derive instance Newtype Panel _
+derive instance Generic Panel _
+instance Show Panel where
     show = genericShow
+instance EncodeJson Panel where
+    encodeJson = genericEncodeJson
+instance DecodeJson Panel where
+    decodeJson = genericDecodeJson
 
 getPanelType :: Panel -> PanelType
 getPanelType p | p ^. _id == 1 = Premium
