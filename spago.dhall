@@ -22,6 +22,7 @@ You can edit this file as you like.
   , "filterable"
   , "foldable-traversable"
   , "foreign-object"
+  , "foreign-generic"
   , "http-methods"
   , "integers"
   , "js-timers"

@@ -2,11 +2,16 @@ module Editor.EditorMode where
 
 import Prelude
 
-import Data.Enum (class BoundedEnum, class Enum)
-import Data.Generic.Rep (class Generic)
+import Control.Monad.Except (except)
 import Data.Bounded.Generic (genericBottom, genericTop)
+import Data.Either (note)
+import Data.Enum (class BoundedEnum, class Enum, fromEnum, toEnum)
 import Data.Enum.Generic (genericCardinality, genericFromEnum, genericPred, genericSucc, genericToEnum)
+import Data.Generic.Rep (class Generic)
+import Data.List.NonEmpty (singleton)
 import Data.Show.Generic (genericShow)
+import Foreign.Generic (class Decode, class Encode, decode, encode)
+import Foreign.Generic as F
 
 -- | Define the different modes the editor is running in.
 data EditorMode = Showing
@@ -14,18 +19,22 @@ data EditorMode = Showing
                 | ArrayEditing
                 | HouseBuilding
 
-derive instance genericEditorMode :: Generic EditorMode _
-derive instance eqEditorMode :: Eq EditorMode
-derive instance ordEditorMode :: Ord EditorMode
-instance showEditorMode :: Show EditorMode where
+derive instance Generic EditorMode _
+derive instance Eq EditorMode
+derive instance Ord EditorMode
+instance Show EditorMode where
     show = genericShow
-instance boundEditorMode :: Bounded EditorMode where
+instance Bounded EditorMode where
     top = genericTop
     bottom = genericBottom
-instance enumEditorMode :: Enum EditorMode where
+instance Enum EditorMode where
     succ = genericSucc
     pred = genericPred
-instance boundEnumEditorMode :: BoundedEnum EditorMode where
+instance BoundedEnum EditorMode where
     cardinality = genericCardinality
     toEnum = genericToEnum
     fromEnum = genericFromEnum
+instance Encode EditorMode where
+    encode = fromEnum >>> encode
+instance Decode EditorMode where
+    decode = decode >=> toEnum >>> note (singleton $ F.ForeignError "Invalid EditorMode") >>> except
