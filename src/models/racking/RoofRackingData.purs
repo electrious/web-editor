@@ -13,6 +13,7 @@ import Data.Lens.Record (prop)
 import Data.Map (Map)
 import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
+import Data.UUIDMap (fromObject, toObject)
 import Model.Racking.BX.BXRackingComponent (BXRackingComponent, BXRackingNumbers)
 import Model.Racking.FX.FXRackingComponent (FXRackingComponent, FXRackingNumbers)
 import Model.Racking.GAF.GAFRackingComponent (GAFRackingComponent, GAFRackingNumbers)
@@ -75,13 +76,13 @@ instance EncodeJson RoofRackingData where
     encodeJson (RoofRackingData d) = "t"   := d.rackingType
                                   ~> "rs"  := d.rafters
                                   ~> "prm" := d.parameters
-                                  ~> "dat" := d.arrayComps
+                                  ~> "dat" := toObject d.arrayComps
 instance DecodeJson RoofRackingData where
     decodeJson = decodeJson >=> f
         where f o = mkRoofRackingData <$> o .: "t"
                                       <*> o .: "rs"
                                       <*> o .: "prm"
-                                      <*> o .: "dat"
+                                      <*> (fromObject <$> o .: "dat")
 
 mkRoofRackingData :: RackingType -> Array Rafter -> RoofParameter -> Map Int RackingComp -> RoofRackingData
 mkRoofRackingData t rs prm dat = RoofRackingData { rackingType : t, rafters: rs, parameters: prm, arrayComps: dat }

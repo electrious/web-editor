@@ -10,6 +10,7 @@ import Data.Map (Map, fromFoldable, toUnfoldable)
 import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
 import Data.Tuple (Tuple(..))
+import Data.UUIDMap (fromObject, toObject)
 import Data.UUIDWrapper (UUID)
 import Model.Racking.RoofRackingData (RoofRackingData)
 
@@ -22,10 +23,10 @@ derive instance Generic RackingSystem _
 instance Show RackingSystem where
     show = genericShow
 instance EncodeJson RackingSystem where
-    encodeJson (RackingSystem r) = "racks" := r ~> jsonEmptyObject
+    encodeJson (RackingSystem r) = "racks" := toObject r.roofRackings ~> jsonEmptyObject
 instance DecodeJson RackingSystem where
     decodeJson = decodeJson >=> f
-        where f o = mkRackingSystem <$> o .: "racks"
+        where f o = mkRackingSystem <<< fromObject <$> o .: "racks"
 
 mkRackingSystem :: Map UUID RoofRackingData -> RackingSystem
 mkRackingSystem rs = RackingSystem { roofRackings : rs }

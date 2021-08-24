@@ -16,6 +16,7 @@ import Data.Map (Map)
 import Data.Meter (Meter, meter)
 import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
+import Data.UUIDMap (toObject)
 import Data.UUIDWrapper (UUID)
 import Effect (Effect)
 import FRP.Event (Event)
@@ -57,7 +58,7 @@ instance Default RackRequest where
         size       : def
     }
 instance EncodeJson RackRequest where
-    encodeJson (RackRequest r) = "prm" := r.parameters
+    encodeJson (RackRequest r) = "prm" := toObject r.parameters
                               ~> "ps" := r.panels
                               ~> "sz" := r.size
                               ~> jsonEmptyObject
