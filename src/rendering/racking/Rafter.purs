@@ -25,7 +25,7 @@ renderRafter rafter = void $ mesh (def # _name .~ "Rafter"
     where p = mkVec3 (meterVal $ compX rafter)
                      (meterVal $ compY rafter)
                      v
-          s = mkVec3 v
+          s = mkVec3 (meterVal $ inch 1.0)
                      (meterVal $ rafter ^. _length)
                      v
           v = meterVal $ inch 0.1
