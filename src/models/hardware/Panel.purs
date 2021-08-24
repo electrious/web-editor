@@ -11,6 +11,7 @@ import Data.Lens ((^.))
 import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
 import Editor.Common.Lenses (_id)
+import Foreign.Generic (class Decode, class Encode, defaultOptions, genericDecode, genericEncode)
 import Model.Hardware.PanelType (PanelType(..))
 
 newtype Panel = Panel {
@@ -52,6 +53,10 @@ derive instance Newtype Panel _
 derive instance Generic Panel _
 instance Show Panel where
     show = genericShow
+instance Encode Panel where
+    encode = genericEncode (defaultOptions { unwrapSingleConstructors = true })
+instance Decode Panel where
+    decode = genericDecode (defaultOptions { unwrapSingleConstructors = true })
 instance EncodeJson Panel where
     encodeJson = genericEncodeJson
 instance DecodeJson Panel where
