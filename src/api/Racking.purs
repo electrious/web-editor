@@ -67,7 +67,7 @@ _parameters :: forall t a r. Newtype t { parameters :: a | r } => Lens' t a
 _parameters = _Newtype <<< prop (Proxy :: Proxy "parameters")
 
 rackBaseUrl :: String
-rackBaseUrl = "http://racking.staging.electrious.com"
+rackBaseUrl = "https://racking.electrious.com"
 
 doRack :: RackRequest -> API (Event RackingSystem)
 doRack req = callAPI' POST "/racking" req
