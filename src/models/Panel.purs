@@ -2,6 +2,7 @@ module Model.Roof.Panel where
 
 import Prelude hiding (degree)
 
+import Control.Monad.Except (except)
 import Data.Argonaut.Core (jsonEmptyObject)
 import Data.Argonaut.Decode (class DecodeJson, JsonDecodeError(..), decodeJson, (.:))
 import Data.Argonaut.Encode (class EncodeJson, encodeJson, (:=), (~>))
@@ -17,6 +18,7 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (List(..), (:))
 import Data.List as List
+import Data.List.NonEmpty (singleton)
 import Data.Map (Map, insert, member, update)
 import Data.Map as Map
 import Data.Maybe (Maybe(..))
@@ -28,6 +30,7 @@ import Data.Tuple (Tuple(..))
 import Data.UUIDWrapper (UUID, emptyUUID, genUUID)
 import Editor.Common.Lenses (_alignment, _height, _orientation, _slope, _width, _x, _y)
 import Effect (Effect)
+import Foreign.Generic (class Decode, class Encode, ForeignError(ForeignError), decode, defaultOptions, encode, genericDecode, genericEncode)
 import Math.Angle (Angle, degree)
 import Model.ArrayComponent (class ArrayComponent)
 import Model.RoofComponent (class RoofComponent, compX, compY, size)
@@ -53,6 +56,10 @@ instance BoundedEnum Orientation where
     cardinality = genericCardinality
     toEnum = genericToEnum
     fromEnum = genericFromEnum
+instance Encode Orientation where
+    encode = fromEnum >>> encode
+instance Decode Orientation where
+    decode = decode >=> toEnum >>> note (singleton $ ForeignError "Invalid value for Orientation") >>> except
 instance EncodeJson Orientation where
     encodeJson = fromEnum >>> encodeJson
 instance DecodeJson Orientation where
@@ -89,6 +96,10 @@ instance BoundedEnum Alignment where
     cardinality = genericCardinality
     toEnum = genericToEnum
     fromEnum = genericFromEnum
+instance Encode Alignment where
+    encode = fromEnum >>> encode
+instance Decode Alignment where
+    decode = decode >=> toEnum >>> note (singleton $ ForeignError "Invalid value for Alignment") >>> except
 instance EncodeJson Alignment where
     encodeJson = fromEnum >>> encodeJson
 instance DecodeJson Alignment where
@@ -127,6 +138,10 @@ instance RoofComponent Panel where
                          # _height .~ panelLong
 instance ArrayComponent Panel where
     arrayNumber p = p ^. _arrNumber
+instance Encode Panel where
+    encode = genericEncode (defaultOptions { unwrapSingleConstructors = true })
+instance Decode Panel where
+    decode = genericDecode (defaultOptions { unwrapSingleConstructors = true })
 instance EncodeJson Panel where
     encodeJson (Panel p) = "uuid" := p.uuid
                         ~> "roofplate_uuid" := p.roofplate_uuid

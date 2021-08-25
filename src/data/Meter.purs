@@ -7,6 +7,7 @@ import Data.Argonaut.Encode (class EncodeJson, encodeJson)
 import Data.Default (class Default)
 import Data.Int (floor, round, toNumber)
 import Data.Newtype (class Newtype)
+import Foreign.Generic (class Decode, class Encode, decode, encode)
 
 newtype Meter = Meter Number
 
@@ -25,6 +26,10 @@ instance ringMeter :: Ring Meter where
 
 instance showMeter :: Show Meter where
     show (Meter m) = "Meter(" <> show m <> ")"
+instance Encode Meter where
+    encode (Meter m) = encode m
+instance Decode Meter where
+    decode = map Meter <<< decode
 instance EncodeJson Meter where
     encodeJson (Meter m) = encodeJson m
 instance DecodeJson Meter where

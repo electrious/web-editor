@@ -8,6 +8,7 @@ import Data.Default (class Default)
 import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype)
 import Data.Number as N
+import Foreign.Generic (class Decode, class Encode, decode, encode)
 import Math as M
 
 newtype Angle = Angle Number
@@ -30,6 +31,10 @@ instance Ring Angle where
   sub (Angle a) (Angle b) = Angle (a - b)
 
 instance CommutativeRing Angle
+instance Encode Angle where
+    encode (Angle a) = encode a
+instance Decode Angle where
+    decode = decode >>> map Angle
 instance EncodeJson Angle where
     encodeJson (Angle a) = encodeJson a
 instance DecodeJson Angle where
