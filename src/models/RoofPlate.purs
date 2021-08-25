@@ -20,6 +20,7 @@ import Data.Show.Generic (genericShow)
 import Data.UUIDWrapper (UUID, emptyUUID, genUUID, parseUUID, toString)
 import Editor.Common.Lenses (_alignment, _center, _id, _leadId, _normal, _orientation, _rotation, _slope)
 import Effect (Effect)
+import Foreign.Generic (class Decode, class Encode, decode, defaultOptions, encode, genericDecode, genericEncode)
 import Math as Math
 import Math.Angle (Angle, atan2, degree, degreeVal)
 import Model.Polygon (class IsPolygon, newPolygon)
@@ -53,6 +54,10 @@ instance Eq RoofPlate where
     eq = genericEq
 instance HasUUID RoofPlate where
     idLens = _id
+instance Encode RoofPlate where
+    encode = encode <<< toJSRoofPlate
+instance Decode RoofPlate where
+    decode = map fromJSRoofPlate <<< decode
 instance EncodeJson RoofPlate where
     encodeJson = encodeJson <<< toJSRoofPlate
 instance DecodeJson RoofPlate where
@@ -106,6 +111,10 @@ derive instance Newtype Point _
 derive instance Generic Point _
 instance Show Point where
     show = genericShow
+instance Encode Point where
+    encode = genericEncode (defaultOptions { unwrapSingleConstructors = true})
+instance Decode Point where
+    decode = genericDecode (defaultOptions { unwrapSingleConstructors = true})
 instance EncodeJson Point where
     encodeJson (Point p) = "x" := p.x
                         ~> "y" := p.y
@@ -141,6 +150,10 @@ derive instance Generic UnifiedPoint _
 derive instance Eq UnifiedPoint
 instance Show UnifiedPoint where
     show = genericShow
+instance Encode UnifiedPoint where
+    encode = genericEncode (defaultOptions { unwrapSingleConstructors = true })
+instance Decode UnifiedPoint where
+    decode = genericDecode (defaultOptions { unwrapSingleConstructors = true })
 instance EncodeJson UnifiedPoint where
     encodeJson (UnifiedPoint p) = "x" := p.x
                                ~> "y" := p.y
@@ -180,6 +193,10 @@ newtype JSRoofPlate = JSRoofPlate {
 derive instance Generic JSRoofPlate _
 instance Show JSRoofPlate where
     show = genericShow
+instance Encode JSRoofPlate where
+    encode = genericEncode (defaultOptions { unwrapSingleConstructors = true })
+instance Decode JSRoofPlate where
+    decode = genericDecode (defaultOptions { unwrapSingleConstructors = true })
 instance EncodeJson JSRoofPlate where
     encodeJson (JSRoofPlate r) = "id" := r.id
                               ~> "uuid" := r.uuid
