@@ -11,7 +11,7 @@ import Data.Map as Map
 import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype)
 import Data.Tuple (Tuple(..), snd)
-import Data.UUID (UUID)
+import Data.UUIDWrapper (UUID)
 import Data.Unfoldable (class Unfoldable)
 import Model.Roof.Panel (Panel, _uuid)
 

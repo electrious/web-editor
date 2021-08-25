@@ -2,55 +2,61 @@ module API.SmartHouse where
 
 import Prelude
 
-import API (API, callAPI', formAPI', performAPIEvent)
-import Axios.Types (Method(..))
+import API (API, APIError, callAPI, formAPI, performAPIEvent)
 import Control.Alt ((<|>))
+import Data.Argonaut.Decode (class DecodeJson, decodeJson, (.:))
+import Data.Default (class Default)
+import Data.Either (Either(..))
 import Data.Filterable (filter)
 import Data.Generic.Rep (class Generic)
-import Data.Lens (Lens', view, (^.))
+import Data.HTTP.Method (Method(..))
+import Data.Lens (Lens', (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
-import Type.Proxy (Proxy(..))
+import Data.Tuple (Tuple(..))
+import Effect (Effect)
+import Effect.Class (liftEffect)
 import FRP.Event (Event, keepLatest)
 import FRP.Event.Extra (delay, multicast)
-import Foreign (Foreign)
-import Foreign.Class (class Decode, class Encode)
-import Foreign.Generic (defaultOptions, genericDecode)
 import Model.ActiveMode (ActiveMode(..))
 import Model.SmartHouse.House (JSHouses)
 import OBJExporter (MeshFiles, _mtl, _obj)
-import Web.File (File)
+import Type.Proxy (Proxy(..))
+import Web.File.File (File, toBlob)
+import Web.XHR.FormData (EntryName(..), FileName(..), FormData, appendBlob, new)
 
 
 data SavingStep = NotSaving
                 | UploadingFiles
                 | CreatingHouse
                 | WaitingForReady
-                | Finished Int
+                | Failed String
+                | Finished Int Int
 
-derive instance genericSavingStep :: Generic SavingStep _
-derive instance eqSavingStep :: Eq SavingStep
-instance showSavingStep :: Show SavingStep where
+derive instance Generic SavingStep _
+derive instance Eq SavingStep
+instance Show SavingStep where
     show NotSaving       = "Not saving"
     show UploadingFiles  = "Uploading mesh files for the new house..."
     show CreatingHouse   = "Elli is analyzing the new house data..."
     show WaitingForReady = "Elli is analyzing the new house data..."
-    show (Finished _)    = "Finished creating the new house"
+    show (Failed msg)    = "Savine house failed: " <> msg
+    show (Finished _ _)  = "Finished creating the new house"
 
 stepMode :: SavingStep -> ActiveMode
-stepMode NotSaving    = Inactive
-stepMode (Finished _) = Inactive
-stepMode _            = Active
+stepMode NotSaving      = Inactive
+stepMode (Finished _ _) = Inactive
+stepMode _              = Active
 
 isFinished :: SavingStep -> Boolean
-isFinished (Finished _) = true
-isFinished _            = false
+isFinished (Finished _ _) = true
+isFinished _              = false
 
-savedHouseId :: SavingStep -> Maybe Int
-savedHouseId (Finished h) = Just h
-savedHouseId _            = Nothing
+savedHouseId :: SavingStep -> Maybe (Tuple Int Int)
+savedHouseId (Finished h c) = Just $ Tuple h c
+savedHouseId _              = Nothing
 
 
 newtype UploadReq = UploadReq {
@@ -59,12 +65,7 @@ newtype UploadReq = UploadReq {
     texture :: File
     }
 
-derive instance newtypeUploadReq :: Newtype UploadReq _
-
-foreign import toFormData :: UploadReq -> Foreign
-
-instance encodeUploadReq :: Encode UploadReq where
-    encode = toFormData
+derive instance Newtype UploadReq _
 
 mkUploadReq :: MeshFiles -> File -> UploadReq
 mkUploadReq m t = UploadReq {
@@ -73,56 +74,78 @@ mkUploadReq m t = UploadReq {
     texture : t
     }
 
+toFormData :: UploadReq -> Effect FormData              
+toFormData (UploadReq r) = do
+    fd <- new
+    appendBlob (EntryName "obj") (toBlob r.obj) (Just $ FileName "scene.obj") fd
+    appendBlob (EntryName "mtl") (toBlob r.mtl) (Just $ FileName "scene.mtl") fd
+    appendBlob (EntryName "texture") (toBlob r.texture) (Just $ FileName "scene.jpg") fd
+    pure fd
+
 newtype APIResp = APIResp {
     success :: Boolean
     }
 
-derive instance newtypeAPIResp :: Newtype APIResp _
-derive instance genericAPIResp :: Generic APIResp _
-instance decodeAPIResp :: Decode APIResp where
-    decode = genericDecode (defaultOptions { unwrapSingleConstructors = true })
+derive instance Newtype APIResp _
+derive instance Generic APIResp _
+instance DecodeJson APIResp where
+    decodeJson = decodeJson >=> f
+        where f o = mkAPIResp <$> o .: "success"
+
+mkAPIResp :: Boolean -> APIResp
+mkAPIResp s = APIResp { success : s }
 
 -- API to upload obj/mtl/texture files
-uploadMeshFiles :: Int -> MeshFiles -> File -> API (Event APIResp)
-uploadMeshFiles lid m t = formAPI' POST ("/v1/lead/" <> show lid <> "/scene/upload") $ mkUploadReq
- m t
+uploadMeshFiles :: Int -> MeshFiles -> File -> API (Event (Either APIError APIResp))
+uploadMeshFiles lid m t = liftEffect (toFormData (mkUploadReq m t)) >>= formAPI POST ("/v1/lead/" <> show lid <> "/scene/upload")
 
 -- API to create manual house/roof data
-createManual :: Int -> JSHouses -> API (Event APIResp)
-createManual lid = callAPI' POST ("/v1/lead/" <> show lid <> "/create-manual")
+createManual :: Int -> JSHouses -> API (Event (Either APIError APIResp))
+createManual lid = callAPI POST ("/v1/lead/" <> show lid <> "/create-manual")
+--    pure $ pure $ pure $ Left $ singleton $ ForeignError "failed message"
 
 
 newtype ReadyAPIResp = ReadyAPIResp {
-    success :: Boolean,
-    houseId :: Int
+    success   :: Boolean,
+    houseId   :: Int,
+    companyId :: Int
     }
 
-derive instance newtypeReadyAPIResp :: Newtype ReadyAPIResp _
-derive instance genericReadyAPIResp :: Generic ReadyAPIResp _
-instance decodeReadyAPIResp :: Decode ReadyAPIResp where
-    decode = genericDecode (defaultOptions { unwrapSingleConstructors = true,
-                                             fieldTransform = fieldTrans
-                                           })
+derive instance Newtype ReadyAPIResp _
+derive instance Generic ReadyAPIResp _
+instance DecodeJson ReadyAPIResp where
+    decodeJson = decodeJson >=> f
+        where f o = mkReadyAPIResp <$> o .: "ready"
+                                   <*> o .: "house_id"
+                                   <*> o .: "company_id"
 
-fieldTrans :: String -> String
-fieldTrans "success" = "ready"
-fieldTrans "houseId" = "house_id"
-fieldTrans _         = ""
+mkReadyAPIResp :: Boolean -> Int -> Int -> ReadyAPIResp
+mkReadyAPIResp success houseId companyId = ReadyAPIResp { success, houseId, companyId }
+
+instance Default ReadyAPIResp where
+    def = ReadyAPIResp {
+        success   : false,
+        houseId   : 0,
+        companyId : 1
+    }
 
 
 _success :: forall t a r. Newtype t { success :: a | r } => Lens' t a
 _success = _Newtype <<< prop (Proxy :: Proxy "success")
 
+_companyId :: forall t a r. Newtype t { companyId :: a | r } => Lens' t a
+_companyId = _Newtype <<< prop (Proxy :: Proxy "companyId")
 
-succeeded :: ReadyAPIResp -> Boolean
-succeeded = view _success
+succeeded :: Either APIError ReadyAPIResp -> Boolean
+succeeded (Left _)     = false
+succeeded (Right resp) = resp ^. _success
 
 -- API to check if the house is aready or not
-checkReady :: Int -> API (Event ReadyAPIResp)
-checkReady lid = callAPI' POST ("/v1/lead/" <> show lid <> "/ready") {}
+checkReady :: Int -> API (Event (Either APIError ReadyAPIResp))
+checkReady lid = callAPI POST ("/v1/lead/" <> show lid <> "/ready") {}
 
 -- check if the 2d house is ready or not repeatedly with a 2 seconds sleep, until it's ready.
-repeatCheckUntilReady :: Int -> API (Event ReadyAPIResp)
+repeatCheckUntilReady :: Int -> API (Event (Either APIError ReadyAPIResp))
 repeatCheckUntilReady lid = do
     re <- multicast <$> checkReady lid
     let se = filter succeeded re

@@ -2,34 +2,18 @@ module Model.Racking.FX.FXRackingComponent where
 
 import Prelude
 
+import Data.Argonaut.Core (jsonEmptyObject)
+import Data.Argonaut.Decode (class DecodeJson, decodeJson, (.:))
+import Data.Argonaut.Encode (class EncodeJson, (:=), (~>))
 import Data.Generic.Rep (class Generic)
-import Data.Show.Generic (genericShow)
 import Data.Newtype (class Newtype)
-import Editor.Common.ProtoCodable (class ProtoDecodable, fromProto)
-import Effect (Effect)
-import Model.Racking.Class (class HasArrayNumber, class HasFlashes, getArrayNumber, getFlashes)
-import Model.Racking.FX.Bridge (Bridge, BridgePB)
-import Model.Racking.FX.EndCap (EndCap, EndCapPB)
-import Model.Racking.FX.Mount (Mount, MountPB)
-import Model.Racking.FX.Skirt (Skirt, SkirtPB)
+import Data.Show.Generic (genericShow)
+import Model.Racking.FX.Bridge (Bridge)
+import Model.Racking.FX.EndCap (EndCap)
+import Model.Racking.FX.Mount (Mount)
+import Model.Racking.FX.Skirt (Skirt)
 import Model.Racking.Flash (Flash)
 
-foreign import data RailFreeComponentPB :: Type
-foreign import mkRailFreeComponentPB :: Effect RailFreeComponentPB
-
-instance hasArrayNumberRailFreeComponentPB :: HasArrayNumber RailFreeComponentPB
-instance hasFlashesRailFreeComponentPB :: HasFlashes RailFreeComponentPB
-
-foreign import getMounts :: RailFreeComponentPB -> Array MountPB
-foreign import setMounts :: Array MountPB -> RailFreeComponentPB -> Effect Unit
-foreign import getBridges :: RailFreeComponentPB -> Array BridgePB
-foreign import setBridges :: Array BridgePB -> RailFreeComponentPB -> Effect Unit
-foreign import getSkirts :: RailFreeComponentPB -> Array SkirtPB
-foreign import setSkirts :: Array SkirtPB -> RailFreeComponentPB -> Effect Unit
-foreign import getLeftCaps :: RailFreeComponentPB -> Array EndCapPB
-foreign import setLeftCaps :: Array EndCapPB -> RailFreeComponentPB -> Effect Unit
-foreign import getRightCaps :: RailFreeComponentPB -> Array EndCapPB
-foreign import setRightCaps :: Array EndCapPB -> RailFreeComponentPB -> Effect Unit
 
 newtype FXRackingComponent = FXRackingComponent {
     arrayNumber  :: Int,
@@ -41,20 +25,39 @@ newtype FXRackingComponent = FXRackingComponent {
     rightEndCaps :: Array EndCap
 }
 
-derive instance newtypeFXRackingComponent :: Newtype FXRackingComponent _
-derive instance genericFXRackingComponent :: Generic FXRackingComponent _
-instance showFXRackingComponent :: Show FXRackingComponent where
+derive instance Newtype FXRackingComponent _
+derive instance Generic FXRackingComponent _
+instance Show FXRackingComponent where
     show = genericShow
-instance protoDecodableRXRackingComponent :: ProtoDecodable FXRackingComponent RailFreeComponentPB where
-    fromProto c = FXRackingComponent {
-        arrayNumber  : getArrayNumber c,
-        flashes      : fromProto <$> getFlashes c,
-        mounts       : fromProto <$> getMounts c,
-        bridges      : fromProto <$> getBridges c,
-        skirts       : fromProto <$> getSkirts c,
-        leftEndCaps  : fromProto <$> getLeftCaps c,
-        rightEndCaps : fromProto <$> getRightCaps c
-    }
+instance EncodeJson FXRackingComponent where
+    encodeJson (FXRackingComponent c) = "an" := c.arrayNumber
+                                     ~> "fs" := c.flashes
+                                     ~> "ms" := c.mounts
+                                     ~> "bs" := c.bridges
+                                     ~> "ss" := c.skirts
+                                     ~> "lcs" := c.leftEndCaps
+                                     ~> "rcs" := c.rightEndCaps
+                                     ~> jsonEmptyObject
+instance DecodeJson FXRackingComponent where
+    decodeJson = decodeJson >=> f
+        where f o = mkFXRackkingComponent <$> o .: "an"
+                                          <*> o .: "fs"
+                                          <*> o .: "ms"
+                                          <*> o .: "bs"
+                                          <*> o .: "ss"
+                                          <*> o .: "lcs"
+                                          <*> o .: "rcs"
+
+mkFXRackkingComponent :: Int -> Array Flash -> Array Mount -> Array Bridge -> Array Skirt -> Array EndCap -> Array EndCap -> FXRackingComponent
+mkFXRackkingComponent arrayNumber flashes mounts bridges skirts leftEndCaps rightEndCaps = FXRackingComponent {
+    arrayNumber  : arrayNumber,
+    flashes      : flashes,
+    mounts       : mounts,
+    bridges      : bridges,
+    skirts       : skirts,
+    leftEndCaps  : leftEndCaps,
+    rightEndCaps : rightEndCaps
+}
 
 newtype FXRackingNumbers = FXRackingNumbers {
     flashes      :: Int,
@@ -65,7 +68,7 @@ newtype FXRackingNumbers = FXRackingNumbers {
     rightEndCaps :: Int
 }
 
-derive instance newtypeFXRackingNumbers :: Newtype FXRackingNumbers _
-derive instance genericFXRackingNumbers :: Generic FXRackingNumbers _
-instance showFXRackingNumbers :: Show FXRackingNumbers where
+derive instance Newtype FXRackingNumbers _
+derive instance Generic FXRackingNumbers _
+instance Show FXRackingNumbers where
     show = genericShow

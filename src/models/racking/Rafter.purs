@@ -2,26 +2,19 @@ module Model.Racking.Rafter where
 
 import Prelude
 
+import Data.Argonaut.Core (jsonEmptyObject)
+import Data.Argonaut.Decode (class DecodeJson, decodeJson, (.:))
+import Data.Argonaut.Encode (class EncodeJson, (:=), (~>))
 import Data.Default (def)
 import Data.Generic.Rep (class Generic)
-import Data.Show.Generic (genericShow)
 import Data.Lens (view, (.~), (^.))
-import Data.Meter (Meter, inch, meter)
+import Data.Meter (Meter, inch)
 import Data.Newtype (class Newtype)
-import Data.UUID (UUID)
+import Data.Show.Generic (genericShow)
+import Data.UUIDWrapper (UUID)
 import Editor.Common.Lenses (_height, _id, _length, _width, _x, _y, _z)
-import Editor.Common.ProtoCodable (class ProtoDecodable, fromProto)
-import Effect (Effect)
-import Model.Class (class HasLength, class HasPBUUID, class IsPBArrayComp, getLength, getUUID, getX, getY, getZ)
 import Model.RoofComponent (class RoofComponent)
 
-foreign import data RafterPB :: Type
-
-foreign import mkRafterPB :: Effect RafterPB
-
-instance hasPBUUIDRafterPB :: HasPBUUID RafterPB
-instance isPBArrayCompRafterPB :: IsPBArrayComp RafterPB
-instance hasLengthRafterPB :: HasLength RafterPB
 
 newtype Rafter = Rafter {
     id     :: UUID,
@@ -31,22 +24,31 @@ newtype Rafter = Rafter {
     length :: Meter
 }
 
-derive instance newtypeRafter :: Newtype Rafter _
-derive instance genericRafter :: Generic Rafter _
-instance showRafter :: Show Rafter where
+derive instance Newtype Rafter _
+derive instance Generic Rafter _
+instance Show Rafter where
     show = genericShow
-instance roofComponentRafter :: RoofComponent Rafter where
+instance RoofComponent Rafter where
     compId = view _id
     compX  = view _x
     compY  = view _y
     compZ  = view _z
     size r = def # _width  .~ inch 1.0
                  # _height .~ r ^. _length
-instance protoDecodableRafter :: ProtoDecodable Rafter RafterPB where
-    fromProto r = Rafter {
-        id     : fromProto $ getUUID r,
-        x      : meter $ getX r,
-        y      : meter $ getY r,
-        z      : meter $ getZ r,
-        length : meter $ getLength r
-    }
+instance EncodeJson Rafter where
+    encodeJson (Rafter r) = "id" := r.id
+                         ~> "x"  := r.x
+                         ~> "y"  := r.y
+                         ~> "z"  := r.z
+                         ~> "l"  := r.length
+                         ~> jsonEmptyObject
+instance DecodeJson Rafter where
+    decodeJson = decodeJson >=> f
+        where f o = mkRafter <$> o .: "id"
+                             <*> o .: "x"
+                             <*> o .: "y"
+                             <*> o .: "z"
+                             <*> o .: "l"
+
+mkRafter :: UUID -> Meter -> Meter -> Meter -> Meter -> Rafter
+mkRafter id x y z l = Rafter { id : id, x : x, y : y, z : z, length : l }

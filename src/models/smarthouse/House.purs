@@ -3,6 +3,9 @@ module Model.SmartHouse.House where
 import Prelude hiding (degree)
 
 import Control.Alternative (empty)
+import Data.Argonaut.Core (jsonEmptyObject)
+import Data.Argonaut.Decode (class DecodeJson, decodeJson, (.:))
+import Data.Argonaut.Encode (class EncodeJson, (:=), (~>))
 import Data.Array as Arr
 import Data.Default (class Default, def)
 import Data.Filterable (filter)
@@ -21,13 +24,11 @@ import Data.Set as S
 import Data.Show.Generic (genericShow)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import Data.UUID (UUID, emptyUUID, genUUID)
+import Data.UUIDWrapper (UUID, emptyUUID, genUUID)
 import Data.UUIDMap (UUIDMap)
 import Data.UUIDMap as UM
 import Editor.Common.Lenses (_edges, _floor, _height, _id, _position, _roofs)
 import Effect (Effect)
-import Foreign.Class (class Decode, class Encode)
-import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Math.Angle (Angle, degree)
 import Math.LineSeg (LineSeg)
 import Model.Polygon (Polygon, _polyVerts, counterClockPoly, modifyVertAt)
@@ -153,11 +154,21 @@ newtype JSHouse = JSHouse {
 derive instance Generic JSHouse _
 instance Show JSHouse where
     show = genericShow
-instance Encode JSHouse where
-    encode = genericEncode (defaultOptions { unwrapSingleConstructors = true })
-instance Decode JSHouse where
-    decode = genericDecode (defaultOptions { unwrapSingleConstructors = true })
+instance EncodeJson JSHouse where
+    encodeJson (JSHouse h) = "id" := h.id
+                          ~> "floor" := h.floor
+                          ~> "height" := h.height
+                          ~> "roofs" := h.roofs
+                          ~> jsonEmptyObject
+instance DecodeJson JSHouse where
+    decodeJson = decodeJson >=> f
+        where f o = mkJSHouse <$> o .: "id"
+                              <*> o .: "floor"
+                              <*> o .: "height"
+                              <*> o .: "roofs"
 
+mkJSHouse :: UUID -> Array Point -> Number -> Array JSRoof -> JSHouse
+mkJSHouse id floor height roofs = JSHouse { id, floor, height, roofs }
 
 -- all houses generated data to export
 newtype JSHouses = JSHouses {
@@ -167,5 +178,6 @@ newtype JSHouses = JSHouses {
 derive instance Generic JSHouses _
 instance Show JSHouses where
     show = genericShow
-instance Encode JSHouses where
-    encode = genericEncode (defaultOptions { unwrapSingleConstructors = true })
+instance EncodeJson JSHouses where
+    encodeJson (JSHouses h) = "houses" := h.houses
+                           ~> jsonEmptyObject

@@ -14,7 +14,7 @@ import Data.Newtype (class Newtype)
 import Data.Set (Set)
 import Data.Set as S
 import Data.Tuple (Tuple(..))
-import Data.UUID (UUID)
+import Data.UUIDWrapper (UUID)
 import Data.UUIDMap (UUIDMap)
 import Data.UUIDMap as UM
 import Editor.Common.Lenses (_edge, _edges, _id, _normal, _position, _slope)

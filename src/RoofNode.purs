@@ -1,6 +1,6 @@
 module Editor.RoofNode where
 
-import Prelude hiding (add)
+import Prelude hiding (add, degree)
 
 import Algorithm.HeatmapMesh (createNewGeometry)
 import Control.Alt ((<|>))
@@ -13,13 +13,13 @@ import Data.Generic.Rep (class Generic)
 import Data.Lens (Lens', view, (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.List (List)
+import Data.List (List(..))
+import Data.List as L
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
-import Type.Proxy (Proxy(..))
 import Data.Traversable (sequence_, traverse, traverse_)
 import Data.Tuple (Tuple(..))
-import Data.UUID (UUID)
+import Data.UUIDWrapper (UUID)
 import Editor.ArrayBuilder (ArrayBuilder, _editorMode, _heatmapMaterial, liftRenderingM)
 import Editor.Common.Lenses (_active, _alignment, _center, _houseId, _id, _mesh, _orientation, _panelType, _polygon, _position, _roof, _rotation, _slope, _tapped)
 import Editor.Disposable (class Disposable, dispose)
@@ -37,22 +37,28 @@ import FRP.Dynamic (Dynamic, current, dynEvent, performDynamic, step, subscribeD
 import FRP.Event (Event, create, keepLatest)
 import FRP.Event.Extra (multicast)
 import Math (pi)
-import Math.Angle (degreeVal, radianVal)
+import Math.Angle (degree, degreeVal, radianVal)
 import Model.ActiveMode (fromBoolean)
 import Model.Hardware.PanelModel (PanelModel)
 import Model.Polygon (Polygon, _polyVerts, newPolygon, renderPolygon)
-import Model.Roof.Panel (Alignment(..), Orientation(..), Panel)
-import Model.Roof.RoofPlate (RoofOperation(..), RoofPlate, _azimuth, _borderPoints, _unifiedPoints)
+import Model.Racking.RoofRackingData (RoofRackingData, _arrayComps, _rafters)
+import Model.Roof.Panel (Alignment(..), Orientation(..), Panel, validatedSlope)
+import Model.Roof.RoofPlate (RoofOperation(..), RoofPlate, _azimuth, _borderPoints, _unifiedPoints, isFlat)
 import Model.RoofSpecific (RoofSpecific, mkRoofSpecific)
 import Model.ShadePoint (ShadePoint, shadePointFrom)
-import Rendering.Node (mkNodeEnv, runNode)
+import Rendering.DynamicNode (dynamic_)
+import Rendering.Node (Node, mkNodeEnv, runNode)
+import Rendering.Racking.RackingComponentRendering (renderRackingComp)
+import Rendering.Racking.Rafter (renderRafters)
 import SimplePolygon (isSimplePolygon)
 import Three.Core.Geometry (ShapeGeometry, faces, vertices)
 import Three.Core.Material (MeshBasicMaterial, mkMeshBasicMaterial, setOpacity, setTransparent)
 import Three.Core.Mesh (Mesh, geometry, mkMesh)
 import Three.Core.Object3D (class IsObject3D, Object3D, add, matrix, mkObject3D, remove, rotateX, rotateZ, setName, setPosition, setVisible, updateMatrix, updateMatrixWorld, worldToLocal)
 import Three.Math.Vector (class Vector, Vector2, Vector3, applyMatrix, mkVec2, mkVec3, vecX, vecY, vecZ)
+import Type.Proxy (Proxy(..))
 import UI.RoofEditorUI (_mode)
+import Util (sampleMergeDyn)
 
 
 -- which env is the roof node used.
@@ -75,6 +81,7 @@ newtype RoofNodeConfig = RoofNodeConfig {
     alignment       :: Dynamic Alignment,
     panelType       :: Dynamic PanelModel,
     opacity         :: Dynamic PanelOpacity,
+    racking         :: Dynamic (Maybe RoofRackingData),
     heatmap         :: Event Boolean,
     initPanels      :: Event (List Panel)
 }
@@ -91,9 +98,13 @@ instance defaultRoofNodeConfig :: Default RoofNodeConfig where
         alignment       : pure Grid,
         panelType       : pure def,
         opacity         : pure Opaque,
+        racking         : pure Nothing,
         heatmap         : empty,
         initPanels      : empty
     }
+
+_racking :: forall t a r. Newtype t { racking :: a | r } => Lens' t a
+_racking = _Newtype <<< prop (Proxy :: Proxy "racking")
 
 newtype RoofNode = RoofNode {
     roofId        :: UUID,
@@ -257,6 +268,16 @@ evtInMaybe _ Nothing  = empty
 evtInMaybe f (Just a) = f a
 
 
+renderRacking :: forall e. RoofPlate -> List Panel -> Maybe RoofRackingData -> Node e Unit
+renderRacking _ _     Nothing  = pure unit
+renderRacking roof ps (Just r) = do
+    renderRafters $ r ^. _rafters
+    let defSlope = degree 0.0
+        slope = if isFlat roof
+                then fromMaybe defSlope $ join $ validatedSlope <$> L.head ps
+                else defSlope
+    traverse_ (renderRackingComp slope) $ r ^. _arrayComps
+
 createHeatmapMesh :: RoofPlate -> Object3D -> MeshBasicMaterial -> TappableMesh -> Effect Mesh
 createHeatmapMesh roof roofNode mat m = do
     let geo :: ShapeGeometry
@@ -285,8 +306,16 @@ createRoofNode cfg = do
     modeDyn <- view _editorMode <$> ask
     hmMat   <- view _heatmapMaterial <$> liftRenderingM ask
 
+    let roof = cfg ^. _roof
+        nodeEnv = mkNodeEnv obj unit
+
     -- render panels
     Tuple panelLayer d00 <- renderPanels cfg content
+
+    let panelsEvt = multicast $ panelLayer ^. _currentPanels
+        panelsDyn = step Nil panelsEvt
+    -- render racking components
+    Tuple _ d01 <- liftEffect $ flip runNode nodeEnv $ dynamic_ $ sampleMergeDyn (renderRacking roof) panelsDyn (cfg ^. _racking)
     
     let mode = cfg ^. _mode
         -- get the panel tap event on inactive roofs
@@ -297,7 +326,6 @@ createRoofNode cfg = do
                          then (==) RoofEditing <$> modeDyn
                          else pure false
         
-        roof           = cfg ^. _roof
         rid            = roof ^. _id
         isActive       = cfg ^. _roofActive
 
@@ -311,7 +339,7 @@ createRoofNode cfg = do
             -- PolyEditorConf
             opt = def # _active   .~ (fromBoolean <$> canEdit)
                       # _polygon  .~ poly
-        Tuple editor d0 <- runNode (createPolyEditor opt) (mkNodeEnv obj unit)
+        Tuple editor d0 <- runNode (createPolyEditor opt) nodeEnv
 
         let polyDyn = step poly (editor ^. _polygon)
             meshDyn = performDynamic (createRoofMesh <$> polyDyn <*> isActive <*> canEditRoofDyn)
@@ -345,8 +373,8 @@ createRoofNode cfg = do
             updated       : multicast newRoof,
             tapped        : multicast $ const roof <$> (roofTapEvt <|> roofTapOnPanelEvt),
             roofObject    : obj,
-            disposable    : sequence_ [d00, dispose d0, d1, d2],
-            currentPanels : panelLayer ^. _currentPanels,
+            disposable    : sequence_ [d00, dispose d01, dispose d0, d1, d2],
+            currentPanels : panelsEvt,
             serverUpdated : panelLayer ^. _serverUpdated,
             alignment     : map (map (view _alignment)) <$> roofSpecActArrEvt,
             orientation   : map (map (view _orientation)) <$> roofSpecActArrEvt

@@ -30,7 +30,6 @@
     "webpack-dev-server": "^3.8.2"
   },
   "dependencies": {
-    "axios": "^0.21.1",
     "clipper-lib": "^6.4.2",
     "earcut": "^2.2.2",
     "google-protobuf": "^3.12.2",
@@ -39,6 +38,6 @@
     "three": "^0.129.0",
     "troika-three-text": "^0.42.0",
     "uuid": "^8.3.1",
-    "webpb": "https://github.com/electrious/webpb"
+    "xhr2": "^0.2.1"
   }
 }

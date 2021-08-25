@@ -11,7 +11,6 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (class Newtype)
-import Type.Proxy (Proxy(..))
 import Data.Tuple (Tuple(..))
 import Editor.Common.Lenses (_apiConfig, _height, _houseId, _modeDyn, _roofs, _width)
 import Editor.Editor (_sizeDyn)
@@ -19,7 +18,7 @@ import Editor.EditorMode (EditorMode(..))
 import Editor.HouseEditor (ArrayEditParam)
 import Editor.SceneEvent (Size, size)
 import Effect.Class (liftEffect)
-import FRP.Dynamic (Dynamic)
+import FRP.Dynamic (Dynamic, sampleDyn)
 import FRP.Event (Event, keepLatest)
 import FRP.Event.Extra (multicast, performEvent)
 import Model.Roof.RoofPlate (RoofEdited)
@@ -27,6 +26,7 @@ import Specular.Dom.Element (attrs, attrsD, classWhenD, class_, classes, el)
 import Specular.Dom.Widget (Widget)
 import Specular.FRP (filterJustEvent, leftmost, tagDyn)
 import Specular.FRP as S
+import Type.Proxy (Proxy(..))
 import UI.ArrayEditorUI (ArrayEditorUIOpt, arrayEditorPane)
 import UI.Bridge (fromUIEvent, toUIDyn, toUIEvent)
 import UI.ButtonPane (_close, _save, _showCloseDyn, _showSaveDyn, buttons)
@@ -37,7 +37,7 @@ import UI.Utils (div, elA, mkStyle, (:~))
 
 newtype RoofEditorUIOpt = RoofEditorUIOpt {
     houseId   :: Int,
-    apiConfig :: APIConfig,
+    apiConfig :: Dynamic APIConfig,
     modeDyn   :: Dynamic EditorMode,
     sizeDyn   :: Dynamic Size,
     roofs     :: Dynamic (Maybe (Array RoofEdited)),
@@ -48,7 +48,7 @@ derive instance newtypeRoofEditorUIOpt :: Newtype RoofEditorUIOpt _
 instance defaultRoofEditorUIOpt :: Default RoofEditorUIOpt where
     def = RoofEditorUIOpt {
         houseId   : 0,
-        apiConfig : def,
+        apiConfig : pure def,
         modeDyn   : pure Showing,
         sizeDyn   : pure (size 10 10),
         roofs     : pure Nothing,
@@ -112,7 +112,8 @@ roofEditorUI opt = do
         let apiCfg = opt ^. _apiConfig
             hid    = opt ^. _houseId
             -- Save event here means the roofs are saved
-            savedEvt = multicast $ keepLatest $ performEvent (flip runAPI apiCfg <<< buildRoofplates hid <$> toSaveEvt)
+            f a = runAPI (buildRoofplates hid a)
+            savedEvt = multicast $ keepLatest $ performEvent $ sampleDyn apiCfg $ (f <$> toSaveEvt)
             roofSaved = const RoofSaved <$> savedEvt
             
         modeEvt <- fromUIEvent modeUIEvt

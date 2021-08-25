@@ -4,6 +4,9 @@ import Prelude hiding (degree)
 
 import Algorithm.Plane (Plane)
 import Custom.Mesh (TappableMesh)
+import Data.Argonaut.Core (jsonEmptyObject)
+import Data.Argonaut.Decode (class DecodeJson, decodeJson, (.:))
+import Data.Argonaut.Encode (class EncodeJson, (:=), (~>))
 import Data.Default (def)
 import Data.Generic.Rep (class Generic)
 import Data.Lens (view, (.~), (^.))
@@ -13,15 +16,13 @@ import Data.Meter (Meter, meterVal)
 import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
 import Data.Traversable (traverse_)
-import Data.UUID (UUID)
+import Data.UUIDWrapper (UUID)
 import Editor.Common.Lenses (_id, _name, _normal, _polygon, _slope, _tapped)
 import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, gateDyn)
 import FRP.Event (Event)
 import FRP.Event.Extra (multicast)
-import Foreign.Class (class Decode, class Encode)
-import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Math.Angle (Angle, degree)
 import Model.ActiveMode (ActiveMode(..), fromBoolean)
 import Model.Polygon (Polygon, _polyVerts, polyOutline, polyPlane)
@@ -83,10 +84,17 @@ newtype JSRoof = JSRoof {
 derive instance Generic JSRoof _
 instance Show JSRoof where
     show = genericShow
-instance Encode JSRoof where
-    encode = genericEncode (defaultOptions { unwrapSingleConstructors = true })
-instance Decode JSRoof where
-    decode = genericDecode (defaultOptions { unwrapSingleConstructors = true })
+instance EncodeJson JSRoof where
+    encodeJson (JSRoof r) = "id" := r.id
+                         ~> "polygon" := r.polygon
+                         ~> jsonEmptyObject
+instance DecodeJson JSRoof where
+    decodeJson = decodeJson >=> f
+        where f o = mkJSRoof <$> o .: "id"
+                             <*> o .: "polygon"
+
+mkJSRoof :: UUID -> Array Point -> JSRoof
+mkJSRoof id polygon = JSRoof { id, polygon }
 
 -- material for active roof outline
 actLineMat :: LineBasicMaterial

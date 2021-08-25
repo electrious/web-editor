@@ -137,11 +137,6 @@ let additions =
         , repo = "https://github.com/paf31/purescript-memoize.git"
         , version = "v5.0.0"
         }
-      , axios =
-        { dependencies = [ "prelude", "effect", "aff", "foreign-generic" ]
-        , repo = "https://github.com/manyoo/purescript-axios.git"
-        , version = "v1.1.3"
-        }
       , digraph =
         { dependencies = [ "newtype", "ordered-collections", "pqueue", "lists" ]
         , repo = "https://github.com/manyoo/purescript-digraph.git"

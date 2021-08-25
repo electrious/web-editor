@@ -5,8 +5,10 @@ You can edit this file as you like.
 { name = "my-project"
 , dependencies =
   [ "aff"
+  , "affjax"
+  , "argonaut-codecs"
+  , "argonaut-core"
   , "arrays"
-  , "axios"
   , "console"
   , "control"
   , "datetime"
@@ -18,9 +20,9 @@ You can edit this file as you like.
   , "event-extra"
   , "filterable"
   , "foldable-traversable"
-  , "foreign"
-  , "foreign-generic"
   , "foreign-object"
+  , "foreign-generic"
+  , "http-methods"
   , "integers"
   , "js-timers"
   , "lists"
@@ -46,9 +48,11 @@ You can edit this file as you like.
   , "uuid"
   , "web-dom"
   , "web-events"
+  , "web-file"
   , "web-html"
   , "web-touchevents"
   , "web-uievents"
+  , "web-xhr"
   ]
 , packages = ./packages.dhall
 , sources = [ "src/**/*.purs", "test/**/*.purs", "example/**/*.purs" ]

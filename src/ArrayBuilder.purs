@@ -8,7 +8,6 @@ import Data.Lens (Lens', view, (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
-import Type.Proxy (Proxy(..))
 import Editor.Common.Lenses (_apiConfig, _modeDyn, _panelType, _textureInfo)
 import Editor.EditorMode (EditorMode)
 import Editor.HouseEditor (HouseEditor, _heatmapTexture, _rotBtnTexture)
@@ -21,6 +20,7 @@ import Model.Roof.ArrayConfig (ArrayConfig, arrayConfigForRack)
 import Rendering.Renderable (RenderingM, runRenderingM)
 import Rendering.TextureLoader (loadMaterialFromUrl)
 import Three.Core.Material (MeshBasicMaterial, doubleSide, setSide)
+import Type.Proxy (Proxy(..))
 
 -- data used to provide env info for ArrayBuilder monad
 newtype ArrayBuilderEnv = ArrayBuilderEnv {
@@ -28,7 +28,7 @@ newtype ArrayBuilderEnv = ArrayBuilderEnv {
     textureInfo :: PanelTextureInfo,
     panelType   :: Dynamic PanelType,
     editorMode  :: Dynamic EditorMode,
-    apiConfig   :: APIConfig
+    apiConfig   :: Dynamic APIConfig
 }
 
 derive instance newtypeArrayBuilderEnv :: Newtype ArrayBuilderEnv _

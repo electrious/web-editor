@@ -5,7 +5,7 @@ import Prelude
 import Data.Generic.Rep (class Generic)
 import Data.Show.Generic (genericShow)
 import Data.List (List)
-import Data.UUID (UUID)
+import Data.UUIDWrapper (UUID)
 import Model.Roof.Panel (Panel)
 import Three.Math.Vector (Vector3)
 

@@ -2,6 +2,7 @@ module SmartHouse.HouseEditor where
 
 import Prelude hiding (add)
 
+import API.Racking (RackRequest, _parameters, doRack, runRackAPI)
 import Control.Alt ((<|>))
 import Control.Monad.RWS (tell)
 import Control.Plus (empty)
@@ -11,38 +12,41 @@ import Data.Lens (Lens', view, (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (List(..))
-import Data.Map (Map, lookup)
+import Data.Map (lookup)
 import Data.Map as M
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Meter (Meter, meterVal)
 import Data.Newtype (class Newtype)
 import Data.Time.Duration (Milliseconds(..))
 import Data.Traversable (class Traversable, traverse)
-import Data.UUID (UUID)
+import Data.Tuple (Tuple(..))
 import Data.UUIDMap (UUIDMap)
+import Data.UUIDWrapper (UUID)
 import Editor.ArrayBuilder (runArrayBuilder)
-import Editor.Common.Lenses (_alignment, _edges, _floor, _height, _houseId, _id, _modeDyn, _name, _orientation, _panelType, _panels, _position, _roof, _roofs, _slopeSelected, _tapped, _updated)
+import Editor.Common.Lenses (_alignment, _apiConfig, _edges, _floor, _height, _houseId, _id, _modeDyn, _name, _orientation, _panelType, _panels, _position, _roof, _roofRackings, _roofs, _slopeSelected, _tapped, _updated)
 import Editor.Disposable (Disposee(..))
 import Editor.HeightEditor (_min, dragArrowPos, setupHeightEditor)
 import Editor.HouseEditor (ArrayEditParam, HouseConfig, _heatmap, runHouseEditor)
 import Editor.PanelLayer (_initPanels, _mainOrientation, _roofActive)
 import Editor.PanelNode (PanelOpacity(..))
 import Editor.Rendering.PanelRendering (_opacity)
-import Editor.RoofManager (RoofsData, _racks, calcMainOrientation, getActivated)
-import Editor.RoofNode (RoofNode, RoofNodeConfig, RoofNodeMode(..), createRoofNode)
+import Editor.RoofManager (RoofsData, allPanelsEvt, calcMainOrientation, getActivated)
+import Editor.RoofNode (RoofNode, RoofNodeConfig, RoofNodeMode(..), _racking, createRoofNode)
 import Effect.Class (liftEffect)
 import Effect.Random (randomInt)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, dynEvent, gateDyn, latestEvt, sampleDyn, step)
-import FRP.Event (Event)
-import FRP.Event.Extra (delay, multicast, performEvent)
+import FRP.Event (Event, sampleOn)
+import FRP.Event as Evt
+import FRP.Event.Extra (debounce, delay, multicast, performEvent)
 import Math.LineSeg (LineSeg, mkLineSeg)
 import Model.ActiveMode (ActiveMode(..), fromBoolean, isActive)
 import Model.Polygon (Polygon, _polyVerts)
-import Model.Racking.OldRackingSystem (OldRoofRackingData, guessRackingType)
+import Model.Racking.RackingSystem (RackingSystem)
 import Model.Racking.RackingType (RackingType(..))
-import Model.Roof.Panel (Alignment(..), Orientation(..), PanelsDict, panelsDict)
-import Model.Roof.RoofPlate (RoofPlate, _roofIntId)
+import Model.Racking.RoofParameter (RoofParameter(..))
+import Model.Roof.Panel (Alignment(..), Orientation(..), Panel, PanelsDict, panelsDict)
+import Model.Roof.RoofPlate (RoofPlate)
 import Model.SmartHouse.House (House, _trees, getHouseLines, updateHeight, updateHouseSlope)
 import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo)
 import Model.SmartHouse.Roof (Roof, renderActRoofOutline, renderRoof)
@@ -50,7 +54,7 @@ import Model.UUID (idLens)
 import Models.SmartHouse.ActiveItem (ActHouseRoof)
 import Rendering.DynamicNode (dynamic, dynamic_)
 import Rendering.Line (renderLine, renderLineLength, renderLineOnly, renderLineWith)
-import Rendering.Node (Node, _exportable, fixNodeDWith, getEnv, getParent, localEnv, node, tapMesh)
+import Rendering.Node (Node, _exportable, fixNodeDWith, fixNodeE, getEnv, getParent, localEnv, node, tapMesh)
 import SmartHouse.Algorithm.Edge (_lineEdge)
 import SmartHouse.SlopeOption (SlopeOption)
 import Smarthouse.Algorithm.Subtree (_sinks, _source)
@@ -124,6 +128,13 @@ getActiveRoof :: Maybe UUID -> UUIDMap Roof -> Maybe Roof
 getActiveRoof (Just i) m = M.lookup i m
 getActiveRoof Nothing _  = Nothing
 
+-- | build rack request with panels using default XRParameter and panel size
+rackRequest :: Array Panel -> RoofsData -> RackRequest
+rackRequest ps rd = def # _parameters .~ params
+                        # _panels     .~ ps
+    where params = M.fromFoldable $ (\r -> Tuple (r ^. idLens) param) <$> rd ^. _roofs
+          param = XRParameter def
+
 editHouse :: HouseConfig -> HouseEditorConf -> Node HouseTextureInfo HouseNode
 editHouse houseCfg conf = do
     let house  = conf ^. _house
@@ -132,13 +143,15 @@ editHouse houseCfg conf = do
         h      = house ^. _height
         floor  = view _position <$> house ^. _floor
 
+        roofsEvt = multicast $ conf ^. _roofsData
         -- house editor mode
-        modeDyn = step EditingHouse $ const EditingArrays <$> conf ^. _roofsData
+        modeDyn = step EditingHouse $ const EditingArrays <$> roofsEvt
 
         houseEditDyn = (==) EditingHouse <$> modeDyn
         
     fixNodeDWith house \houseDyn ->
-        fixNodeDWith Nothing \actRoofIdDyn -> do
+        fixNodeDWith Nothing \actRoofIdDyn ->
+            fixNodeE \panelsEvt -> do
             let hDyn = view _height <$> houseDyn
                 pDyn = mkVec3 0.0 0.0 <<< meterVal <$> hDyn
             -- render walls
@@ -185,7 +198,10 @@ editHouse houseCfg conf = do
         
     
             let newHouseEvt1 = sampleDyn houseDyn $ updateHeight <$> hEvt
-                newHouseEvt2 = performEvent $ sampleDyn houseDyn $ sampleDyn actRoofIdDyn $ updateHouseSlope <$> conf ^. _slopeSelected
+
+                -- only accept slope events if the house is active and can be edit
+                slopeEvt = gateDyn (isActive <$> canEditDyn) $ conf ^. _slopeSelected
+                newHouseEvt2 = performEvent $ sampleDyn houseDyn $ sampleDyn actRoofIdDyn $ updateHouseSlope <$> slopeEvt
 
                 newHouseEvt  = multicast $ newHouseEvt1 <|> newHouseEvt2
 
@@ -202,11 +218,17 @@ editHouse houseCfg conf = do
                          # _actHouseRoof .~ dynEvent activeRoofDyn
 
                 -- render all roof nodes if available
-                roofsDyn = step Nothing $ Just <$> conf ^. _roofsData
+                roofsDyn = step Nothing $ Just <$> roofsEvt
 
-            void $ localEnv (const houseCfg) $ renderRoofEditor (conf ^. _arrayEditParam) roofsDyn
+                -- update racking system
+                reqEvt = sampleOn roofsEvt $ rackRequest <$> debounce (Milliseconds 100.0) panelsEvt
+                rackEvt = multicast $ Evt.keepLatest $ performEvent $ sampleDyn (houseCfg ^. _apiConfig) (runRackAPI <<< doRack <$> reqEvt)
+    
+            nodesDyn <- localEnv (const houseCfg) $ renderRoofEditor (conf ^. _arrayEditParam) roofsDyn rackEvt
+
+            let newPanelsEvt = multicast $ latestEvt $ allPanelsEvt <$> nodesDyn
             
-            pure { input : Just <$> roofTappedEvt, output : { input: newHouseEvt, output: hn } }
+            pure {input : newPanelsEvt, output : { input : Just <$> roofTappedEvt, output : { input: newHouseEvt, output: hn } } }
 
 
 wallMat :: MeshPhongMaterial
@@ -245,43 +267,43 @@ renderHouse house = do
 
 
 -- render roofNode on top of the house, which are used to edit arrays
-renderRoofEditor :: ArrayEditParam -> Dynamic (Maybe RoofsData) -> Node HouseConfig (Dynamic (Array RoofNode))
-renderRoofEditor param rdDyn = dynamic $ renderRd <$> rdDyn
+renderRoofEditor :: ArrayEditParam -> Dynamic (Maybe RoofsData) -> Event RackingSystem -> Node HouseConfig (Dynamic (Array RoofNode))
+renderRoofEditor param rdDyn rackSysEvt = dynamic $ renderRd <$> rdDyn
     where renderRd Nothing   = pure []
           renderRd (Just rd) =
               fixNodeDWith Landscape \mainOrientDyn ->
                   fixNodeDWith Nothing \activeRoof -> do
                       let psDict = panelsDict $ rd ^. _panels
                           roofs  = rd ^. _roofs
-                          racks  = rd ^. _racks
 
                           orientDyn  = step Landscape $ param ^. _orientation
                           alignDyn   = step Grid      $ param ^. _alignment
                           opacityDyn = step Opaque    $ param ^. _opacity
                   
-                          cfg = def # _mode            .~ RoofInBuilder
-                                    # _houseId         .~ (rd ^. _houseId)
-                                    # _mainOrientation .~ mainOrientDyn
-                                    # _orientation     .~ orientDyn
-                                    # _alignment       .~ alignDyn
-                                    # _panelType       .~ pure def
-                                    # _opacity         .~ opacityDyn
-                                    # _heatmap         .~ (param ^. _heatmap)
+                          cfg r = def # _mode            .~ RoofInBuilder
+                                      # _houseId         .~ (rd ^. _houseId)
+                                      # _mainOrientation .~ mainOrientDyn
+                                      # _orientation     .~ orientDyn
+                                      # _alignment       .~ alignDyn
+                                      # _panelType       .~ pure def
+                                      # _opacity         .~ opacityDyn
+                                      # _racking         .~ step Nothing (M.lookup (r ^. _id) <<< view _roofRackings <$> rackSysEvt)
+                                      # _heatmap         .~ (param ^. _heatmap)
 
-                      nodes <- traverse (mkRoofNode activeRoof psDict racks cfg) roofs
+                      nodes <- traverse (\r -> mkRoofNode activeRoof psDict (cfg r) r) roofs
                       let mainOrientEvt = calcMainOrientation nodes
                           actRoofEvt    = Just <$> getActivated nodes
               
                       pure { input : actRoofEvt, output : { input : mainOrientEvt, output : nodes }}
 
 
-mkRoofNode :: Dynamic (Maybe UUID) -> PanelsDict -> Map Int OldRoofRackingData -> RoofNodeConfig -> RoofPlate -> Node HouseConfig RoofNode
-mkRoofNode activeRoof panelsDict racks cfg roof = do
+mkRoofNode :: Dynamic (Maybe UUID) -> PanelsDict -> RoofNodeConfig -> RoofPlate -> Node HouseConfig RoofNode
+mkRoofNode activeRoof panelsDict cfg roof = do
     hCfg <- getEnv
 
     let rid = roof ^. _id
         ps  = fromMaybe Nil (lookup rid panelsDict)
-        rackType    = fromMaybe XR10 $ guessRackingType <$> lookup (roof ^. _roofIntId) racks
+        rackType    = XR10
         rackTypeDyn = pure rackType
         roofActive  = (==) (Just rid) <$> activeRoof
         

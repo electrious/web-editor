@@ -14,7 +14,6 @@ import Data.Number.Format (fixed, toStringWith)
 import Data.String (drop)
 import Type.Proxy (Proxy(..))
 import Editor.Common.Lenses (_name)
-import Foreign.Generic (class Decode, class Encode, defaultOptions, genericDecode, genericEncode)
 
 newtype PanelModel = PanelModel {
     id           :: Int,
@@ -45,10 +44,6 @@ instance defaultPanelModel :: Default PanelModel where
 derive instance eqPanelModel :: Eq PanelModel
 instance ordPanelModel :: Ord PanelModel where
     compare = genericCompare
-instance encodePanelModel :: Encode PanelModel where
-    encode = genericEncode (defaultOptions { unwrapSingleConstructors = true, fieldTransform = fieldTrans })
-instance decodePanelModel :: Decode PanelModel where
-    decode = genericDecode (defaultOptions { unwrapSingleConstructors = true, fieldTransform = fieldTrans })
 
 fieldTrans :: String -> String
 fieldTrans "id"           = "id"

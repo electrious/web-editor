@@ -1,7 +1,8 @@
 module Editor.RoofManager where
 
-import Prelude hiding (add,degree)
+import Prelude hiding (add, degree)
 
+import API.Racking (RackRequest, _parameters, doRack, runRackAPI)
 import Algorithm.MeshFlatten (flattenRoofPlates)
 import Algorithm.PointInPolygon (underPolygons)
 import Control.Alt ((<|>))
@@ -12,25 +13,23 @@ import Data.Compactable (compact)
 import Data.Default (class Default, def)
 import Data.Foldable (class Foldable, foldl, sequence_, traverse_)
 import Data.Generic.Rep (class Generic)
-import Data.Show.Generic (genericShow)
-import Data.Lens (Lens', view, (^.), (%~), (.~))
+import Data.Lens (Lens', view, (%~), (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.List (List(..), concat, toUnfoldable)
-import Data.List as List
-import Data.Map (Map, delete, insert, lookup, values)
+import Data.List (List(..), toUnfoldable)
+import Data.Map (delete, insert, lookup, values)
 import Data.Map as M
 import Data.Maybe (Maybe(..), fromMaybe, isNothing)
 import Data.Newtype (class Newtype)
-import Type.Proxy (Proxy(..))
+import Data.Show.Generic (genericShow)
 import Data.Time.Duration (Milliseconds(..))
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import Data.UUID (UUID)
 import Data.UUIDMap (UUIDMap)
 import Data.UUIDMap as UM
+import Data.UUIDWrapper (UUID)
 import Editor.ArrayBuilder (runArrayBuilder)
-import Editor.Common.Lenses (_alignment, _deleted, _disposable, _face, _geometry, _houseId, _id, _mesh, _modeDyn, _mouseMove, _orientation, _panelType, _panels, _point, _position, _roof, _roofId, _roofs, _tapped, _updated, _verticeTree, _wrapper)
+import Editor.Common.Lenses (_alignment, _apiConfig, _deleted, _disposable, _face, _geometry, _houseId, _id, _mesh, _modeDyn, _mouseMove, _orientation, _panelType, _panels, _point, _position, _roof, _roofId, _roofRackings, _roofs, _tapped, _updated, _verticeTree, _wrapper)
 import Editor.Disposable (class Disposable, dispose)
 import Editor.EditorMode (EditorMode(..))
 import Editor.House (HouseMeshData)
@@ -39,22 +38,24 @@ import Editor.ObjectAdder (AdderType(..), CandidatePoint, _faceNormal, createObj
 import Editor.PanelLayer (_currentPanels, _initPanels, _mainOrientation, _roofActive, _serverUpdated)
 import Editor.PanelNode (PanelOpacity(..))
 import Editor.Rendering.PanelRendering (_opacity)
-import Editor.RoofNode (RoofNode, RoofNodeConfig, createRoofNode)
+import Editor.RoofNode (RoofNode, RoofNodeConfig, _racking, createRoofNode)
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import FRP.Dynamic (Dynamic, gateDyn, step)
+import FRP.Dynamic (Dynamic, gateDyn, sampleDyn, step)
 import FRP.Event (Event, create, fold, keepLatest, sampleOn, subscribe, withLast)
 import FRP.Event.Extra (debounce, delay, distinct, mergeArray, multicast, performEvent)
 import Math.Angle (acos, degreeVal)
-import Model.Racking.OldRackingSystem (OldRoofRackingData, guessRackingType)
+import Model.Racking.RackingSystem (RackingSystem)
 import Model.Racking.RackingType (RackingType(..))
+import Model.Racking.RoofParameter (RoofParameter(..))
 import Model.Roof.Panel (Alignment(..), Orientation(..), Panel, PanelsDict, generalOrientation, panelsDict)
-import Model.Roof.RoofPlate (RoofEdited, RoofOperation(..), RoofPlate, _roofIntId, newRoofPlate, toRoofEdited)
+import Model.Roof.RoofPlate (RoofEdited, RoofOperation(..), RoofPlate, newRoofPlate, toRoofEdited)
 import Model.RoofSpecific (_value)
 import Rendering.Node (Node, mkNodeEnv, runNode)
 import Three.Core.Face3 (normal)
 import Three.Core.Object3D (class IsObject3D, Object3D, add, mkObject3D, remove, setName, worldToLocal)
 import Three.Math.Vector (Vector3, mkVec3, toVec2, (<.>))
+import Type.Proxy (Proxy(..))
 import Util (foldEvtWith)
 
 newtype ArrayEvents = ArrayEvents {
@@ -139,15 +140,15 @@ createWrapper = do
     pure wrapper
 
 -- | function to create roof node
-mkNode :: Event (Maybe UUID) -> PanelsDict -> Map Int OldRoofRackingData -> RoofNodeConfig -> RoofPlate -> HouseEditor RoofNode
-mkNode activeRoof panelsDict racks cfg roof = runArrayBuilder rackTypeDyn roofNodeBuilder
+mkNode :: Event (Maybe UUID) -> PanelsDict -> RoofNodeConfig -> RoofPlate -> HouseEditor RoofNode
+mkNode activeRoof panelsDict cfg roof = runArrayBuilder rackTypeDyn roofNodeBuilder
     where roofNodeBuilder = createRoofNode $ cfg # _roof       .~ roof
                                                  # _roofActive .~ roofActive
                                                  # _initPanels .~ delay 100 (pure ps)
 
           rid = roof ^. _id
           ps  = fromMaybe Nil (lookup rid panelsDict)
-          rackType    = fromMaybe XR10 $ guessRackingType <$> lookup (roof ^. _roofIntId) racks
+          rackType    = XR10
           rackTypeDyn = pure rackType
           roofActive  = step false $ (==) (Just rid) <$> activeRoof
 
@@ -165,18 +166,22 @@ renderNodes wrapper { last, now } = do
     pure now
 
 calcMainOrientation :: forall f. Foldable f => Functor f => f RoofNode -> Event Orientation
-calcMainOrientation nodes = calcOrient <<< concat <<< List.fromFoldable <$> mergeArray (Array.fromFoldable $ view _currentPanels <$> nodes)
+calcMainOrientation = map calcOrient <<< allPanelsEvt
     where calcOrient ps = generalOrientation $ view _orientation <$> ps
+
+
+allPanelsEvt :: forall f. Foldable f => Functor f => f RoofNode -> Event (Array Panel)
+allPanelsEvt nodes = Array.concat <<< map Array.fromFoldable <$> mergeArray (Array.fromFoldable $ view _currentPanels <$> nodes)
 
 -- | render dynamic roofs
 renderRoofs :: forall a. IsObject3D a => a
                                       -> ArrayEditParam
                                       -> Event (Maybe UUID)
                                       -> Event RoofDictData
+                                      -> Event RackingSystem
                                       -> PanelsDict
-                                      -> Map Int OldRoofRackingData
                                       -> HouseEditor (Tuple (Event (Array RoofNode)) (Effect Unit))
-renderRoofs wrapper param activeRoof roofsData panelsDict racks = do
+renderRoofs wrapper param activeRoof roofsData rackSysEvt panelsDict = do
     { event: mainOrientE, push: pushMainOrient } <- liftEffect create
 
     houseId <- view _houseId <$> ask
@@ -190,16 +195,17 @@ renderRoofs wrapper param activeRoof roofsData panelsDict racks = do
         panelTypeDyn  = pure def
 
         -- base config for roof node
-        cfg = def # _houseId         .~ houseId
-                  # _mainOrientation .~ mainOrientDyn
-                  # _orientation     .~ orientDyn
-                  # _alignment       .~ alignDyn
-                  # _panelType       .~ panelTypeDyn
-                  # _opacity         .~ opacityDyn
-                  # _heatmap         .~ (param ^. _heatmap)
+        cfg r = def # _houseId         .~ houseId
+                    # _mainOrientation .~ mainOrientDyn
+                    # _orientation     .~ orientDyn
+                    # _alignment       .~ alignDyn
+                    # _panelType       .~ panelTypeDyn
+                    # _opacity         .~ opacityDyn
+                    # _racking         .~ step Nothing (M.lookup (r ^. _id) <<< view _roofRackings <$> rackSysEvt)
+                    # _heatmap         .~ (param ^. _heatmap)
     
     -- create roofnode for each roof and render them
-    nodes <- performEditorEvent $ traverse (mkNode activeRoof panelsDict racks cfg) <$> rsToRenderArr
+    nodes <- performEditorEvent $ traverse (\r -> mkNode activeRoof panelsDict (cfg r) r) <$> rsToRenderArr
     let nodesEvt      = multicast  $ performEvent $ renderNodes wrapper <$> withLast nodes
         mainOrientEvt = keepLatest $ calcMainOrientation <$> nodesEvt
     
@@ -248,8 +254,7 @@ mergeArrEvt f arr = g <$> debounce (Milliseconds 50.0) (mergeArray (f <$> arr))
 newtype RoofsData = RoofsData {
     houseId :: Int,
     roofs   :: Array RoofPlate,
-    panels  :: Array Panel,
-    racks   :: Map Int OldRoofRackingData
+    panels  :: Array Panel
 }
 
 derive instance newtypeRoofsData :: Newtype RoofsData _
@@ -260,22 +265,27 @@ instance defaultRoofsData :: Default RoofsData where
     def = RoofsData {
         houseId : 0,
         roofs   : [],
-        panels  : [],
-        racks   : M.empty
+        panels  : []
         }
 
-
-_racks :: forall t a r. Newtype t { racks :: a | r } => Lens' t a
-_racks = _Newtype <<< prop (Proxy :: Proxy "racks")
+-- | build rack request with panels using default XRParameter and panel size
+rackRequest :: Array Panel -> M.Map UUID RoofPlate -> RackRequest
+rackRequest ps rs = def # _parameters .~ params
+                        # _panels     .~ ps
+    where params = const param <$> rs
+          param = XRParameter def
 
 -- | create RoofManager for an array of roofs
 createRoofManager :: ArrayEditParam -> HouseMeshData -> RoofsData -> HouseEditor RoofManager
 createRoofManager param meshData rsDat = do
     wrapper <- liftEffect createWrapper
 
+    apiCfgDyn <- view _apiConfig <$> ask
+
     -- create an event stream for the current active id
     { event : activeRoof, push : updateActive }    <- liftEffect create
     { event : roofsData,  push : updateRoofsData } <- liftEffect create
+    { event : rackSysEvt, push : updateRackSys }   <- liftEffect create
 
     let activeRoofDyn = step Nothing activeRoof
 
@@ -285,7 +295,7 @@ createRoofManager param meshData rsDat = do
     canEditRoofDyn <- isRoofEditing
 
     -- render roofs dynamically
-    Tuple renderedNodes d <- renderRoofs wrapper param activeRoof roofsData psDict $ rsDat ^. _racks
+    Tuple renderedNodes d <- renderRoofs wrapper param activeRoof roofsData rackSysEvt psDict
 
     let deleteRoofOp  = multicast  $ keepLatest $ getRoofDelete <$> renderedNodes
         updateRoofOp  = keepLatest $ getRoofUpdate              <$> renderedNodes
@@ -293,6 +303,8 @@ createRoofManager param meshData rsDat = do
         serverUpdEvt  = multicast $ keepLatest $ foldEvtWith (view _serverUpdated) <$> renderedNodes
         alignEvt      = multicast $ keepLatest $ mergeArrEvt (view _alignment)     <$> renderedNodes
         orientEvt     = multicast $ keepLatest $ mergeArrEvt (view _orientation)   <$> renderedNodes
+
+        panelsEvt     = multicast $ keepLatest $ allPanelsEvt <$> renderedNodes
 
         -- event of new roofs that will be updated on any change and
         -- run the roof flatten algorithm whenever there's new roof change
@@ -316,7 +328,13 @@ createRoofManager param meshData rsDat = do
 
     -- make sure the serverupdate event is subscribed so API calls will be called
     d3 <- liftEffect $ subscribe serverUpdEvt (const $ pure unit)
+
+    -- update racking system
+    let reqEvt = sampleOn newRoofs $ rackRequest <$> debounce (Milliseconds 100.0) panelsEvt
+        newRackEvt = keepLatest $ performEvent $ sampleDyn apiCfgDyn (runRackAPI <<< doRack <$> reqEvt)
     
+    d4 <- liftEffect $ subscribe newRackEvt updateRackSys
+
     -- set default values
     liftEffect do
         updateRoofsData defRoofData
@@ -334,5 +352,5 @@ createRoofManager param meshData rsDat = do
         wrapper     : wrapper,
         editedRoofs : multicast $ debounce (Milliseconds 1000.0) $ getRoofEdited <$> newRoofs,
         arrayEvents : arrEvts,
-        disposable  : sequence_ [d, d1, d2, d3, dispose adderDisp]
+        disposable  : sequence_ [d, d1, d2, d3, d4, dispose adderDisp]
     }

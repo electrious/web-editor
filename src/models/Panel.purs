@@ -2,15 +2,17 @@ module Model.Roof.Panel where
 
 import Prelude hiding (degree)
 
-import Control.Monad.Error.Class (throwError)
+import Control.Monad.Except (except)
+import Data.Argonaut.Core (jsonEmptyObject)
+import Data.Argonaut.Decode (class DecodeJson, JsonDecodeError(..), decodeJson, (.:))
+import Data.Argonaut.Encode (class EncodeJson, encodeJson, (:=), (~>))
+import Data.Bounded.Generic (genericBottom, genericTop)
 import Data.Default (class Default, def)
+import Data.Either (note)
 import Data.Enum (class BoundedEnum, class Enum, fromEnum, toEnum)
+import Data.Enum.Generic (genericCardinality, genericFromEnum, genericPred, genericSucc, genericToEnum)
 import Data.Foldable (class Foldable, foldl)
 import Data.Generic.Rep (class Generic)
-import Data.Bounded.Generic (genericBottom, genericTop)
-import Data.Enum.Generic (genericCardinality, genericFromEnum, genericPred, genericSucc, genericToEnum)
-import Data.Ord.Generic (genericCompare)
-import Data.Show.Generic (genericShow)
 import Data.Lens (Lens', view, (%~), (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
@@ -22,82 +24,46 @@ import Data.Map as Map
 import Data.Maybe (Maybe(..))
 import Data.Meter (Meter, meter, meterVal)
 import Data.Newtype (class Newtype)
-import Type.Proxy (Proxy(..))
+import Data.Ord.Generic (genericCompare)
+import Data.Show.Generic (genericShow)
 import Data.Tuple (Tuple(..))
-import Data.UUID (UUID, emptyUUID, genUUID, toString)
+import Data.UUIDWrapper (UUID, emptyUUID, genUUID)
 import Editor.Common.Lenses (_alignment, _height, _orientation, _slope, _width, _x, _y)
-import Editor.Common.ProtoCodable (class ProtoEncodable, toProto)
 import Effect (Effect)
-import Foreign.Generic (class Decode, class Encode, ForeignError(..), decode, defaultOptions, encode, genericDecode, genericEncode)
-import Math.Angle (Angle, degree, degreeVal)
+import Foreign.Generic (class Decode, class Encode, ForeignError(ForeignError), decode, defaultOptions, encode, genericDecode, genericEncode)
+import Math.Angle (Angle, degree)
 import Model.ArrayComponent (class ArrayComponent)
-import Model.Class (class IsPBArrayComp, setArrayNumber, setX, setY)
 import Model.RoofComponent (class RoofComponent, compX, compY, size)
-import Model.UUID (PBUUID, mkPBUUID, setUUIDString)
 import Three.Math.Vector (Vector3, mkVec3, vecX, vecY)
-
-newtype OrientationPB = OrientationPB Int
-derive newtype instance eqOrientationPB :: Eq OrientationPB
-foreign import orientationInvalid   :: OrientationPB
-foreign import orientationLandscape :: OrientationPB
-foreign import orientationPortrait  :: OrientationPB
-
-newtype AlignmentPB = AlignmentPB Int
-derive newtype instance eqAlignmentPB :: Eq AlignmentPB
-foreign import alignmentInvalid :: AlignmentPB
-foreign import alignmentGrid    :: AlignmentPB
-foreign import alignmentBrick   :: AlignmentPB
-
-foreign import data PanelPB :: Type
-foreign import mkPanelPB :: Effect PanelPB
-
-instance isPBArrayCompPanelPB :: IsPBArrayComp PanelPB
-
-foreign import getUUID :: PanelPB -> PBUUID
-foreign import setUUID :: PBUUID -> PanelPB -> Effect Unit
-foreign import getLeadId :: PanelPB -> Int
-foreign import setLeadId :: Int -> PanelPB -> Effect Unit
-foreign import getRoofplateUUID :: PanelPB -> PBUUID
-foreign import setRoofplateUUID :: PBUUID -> PanelPB -> Effect Unit
-foreign import getRowNumber :: PanelPB -> Int
-foreign import setRowNumber :: Int -> PanelPB -> Effect Unit
-foreign import getSlope :: PanelPB -> Number
-foreign import setSlope :: Number -> PanelPB -> Effect Unit
-foreign import getOrientation :: PanelPB -> OrientationPB
-foreign import setOrientation :: OrientationPB -> PanelPB -> Effect Unit
-foreign import getAlignment :: PanelPB -> AlignmentPB
-foreign import setAlignment :: AlignmentPB -> PanelPB -> Effect Unit
+import Type.Proxy (Proxy(..))
 
 data Orientation = Landscape
                  | Portrait
 
-derive instance genericOrient :: Generic Orientation _
-derive instance eqOrient :: Eq Orientation
-instance showOrient :: Show Orientation where
+derive instance Generic Orientation _
+derive instance Eq Orientation
+instance Show Orientation where
     show = genericShow
-instance ordOrient :: Ord Orientation where
+instance Ord Orientation where
     compare = genericCompare
-instance boundOrient :: Bounded Orientation where
+instance Bounded Orientation where
     top = genericTop
     bottom = genericBottom
-instance enumOrient :: Enum Orientation where
+instance Enum Orientation where
     succ = genericSucc
     pred = genericPred
-instance boundEnumOrient :: BoundedEnum Orientation where
+instance BoundedEnum Orientation where
     cardinality = genericCardinality
     toEnum = genericToEnum
     fromEnum = genericFromEnum
-instance encodeOrient :: Encode Orientation where
+instance Encode Orientation where
     encode = fromEnum >>> encode
-instance decodeOrient :: Decode Orientation where
-    decode o = decode o >>= \i -> do 
-                    case toEnum i of
-                        Just v -> pure v
-                        Nothing -> throwError $ singleton $ ForeignError ("can't decode Orientation from " <> show i)
-
-instance protoEncodableOrientation :: ProtoEncodable Orientation OrientationPB where
-    toProto Landscape = pure orientationLandscape
-    toProto Portrait  = pure orientationPortrait
+instance Decode Orientation where
+    decode = decode >=> toEnum >>> note (singleton $ ForeignError "Invalid value for Orientation") >>> except
+instance EncodeJson Orientation where
+    encodeJson = fromEnum >>> encodeJson
+instance DecodeJson Orientation where
+    decodeJson = decodeJson >=> toEnum >>> note (TypeMismatch "Invalid value for Orientation")
 
 flipOrientation :: Orientation -> Orientation
 flipOrientation Landscape = Portrait
@@ -114,33 +80,30 @@ generalOrientation = calcR <<< foldl f (Tuple 0 0)
 data Alignment = Grid
                | Brick
 
-derive instance genericAlign :: Generic Alignment _
-derive instance eqAlign :: Eq Alignment
-instance showAlign :: Show Alignment where
+derive instance Generic Alignment _
+derive instance Eq Alignment
+instance Show Alignment where
     show = genericShow
-instance ordAlign :: Ord Alignment where
+instance Ord Alignment where
     compare = genericCompare
-instance enumAlign :: Enum Alignment where
+instance Enum Alignment where
     succ = genericSucc
     pred = genericPred
-instance bounedAlign :: Bounded Alignment where
+instance Bounded Alignment where
     top = genericTop
     bottom = genericBottom
-instance boundedEnumAlign :: BoundedEnum Alignment where
+instance BoundedEnum Alignment where
     cardinality = genericCardinality
     toEnum = genericToEnum
     fromEnum = genericFromEnum
-instance encodeAlign :: Encode Alignment where
+instance Encode Alignment where
     encode = fromEnum >>> encode
-instance decodeAlign :: Decode Alignment where
-    decode a = decode a >>= \i -> do
-                   case toEnum i of
-                      Just v -> pure v
-                      Nothing -> throwError $ singleton $ ForeignError ("can't decode Alignment from " <> show i)
-
-instance protoEncodableAlignment :: ProtoEncodable Alignment AlignmentPB where
-    toProto Grid  = pure alignmentGrid
-    toProto Brick = pure alignmentBrick
+instance Decode Alignment where
+    decode = decode >=> toEnum >>> note (singleton $ ForeignError "Invalid value for Alignment") >>> except
+instance EncodeJson Alignment where
+    encodeJson = fromEnum >>> encodeJson
+instance DecodeJson Alignment where
+    decodeJson = decodeJson >=> toEnum >>> note (TypeMismatch "Invalid value for Alignment")
 
 newtype Panel = Panel {
     uuid           :: UUID,
@@ -155,19 +118,15 @@ newtype Panel = Panel {
     alignment      :: Alignment
 }
 
-derive instance newtypePanel :: Newtype Panel _
-derive instance genericPanel :: Generic Panel _
-instance showPanel :: Show Panel where
+derive instance Newtype Panel _
+derive instance Generic Panel _
+instance Show Panel where
     show = genericShow
-instance eqPanel :: Eq Panel where
+instance Eq Panel where
     eq p1 p2 = p1 ^. _uuid == p2 ^. _uuid
-instance ordPanel :: Ord Panel where
+instance Ord Panel where
     compare p1 p2 = compare (p1 ^. _uuid) (p2 ^. _uuid)
-instance encodePanel :: Encode Panel where
-    encode = genericEncode (defaultOptions { unwrapSingleConstructors = true })
-instance decodePanel :: Decode Panel where
-    decode = genericDecode (defaultOptions { unwrapSingleConstructors = true })
-instance roofComponentPanel :: RoofComponent Panel where
+instance RoofComponent Panel where
     compId = view _uuid
     compX  = view _x
     compY  = view _y
@@ -177,31 +136,38 @@ instance roofComponentPanel :: RoofComponent Panel where
                          # _height .~ panelShort
         Portrait  -> def # _width  .~ panelShort
                          # _height .~ panelLong
-instance arrayComponentPanel :: ArrayComponent Panel where
+instance ArrayComponent Panel where
     arrayNumber p = p ^. _arrNumber
-instance protoEncodablePanel :: ProtoEncodable Panel PanelPB where
-    toProto p = do
-        pb <- mkPanelPB
-        u1 <- mkPBUUID
-        setUUIDString (toString $ p ^. _uuid) u1
-        setUUID u1 pb
+instance Encode Panel where
+    encode = genericEncode (defaultOptions { unwrapSingleConstructors = true })
+instance Decode Panel where
+    decode = genericDecode (defaultOptions { unwrapSingleConstructors = true })
+instance EncodeJson Panel where
+    encodeJson (Panel p) = "uuid" := p.uuid
+                        ~> "roofplate_uuid" := p.roofplate_uuid
+                        ~> "roofplate_id" := p.roofplate_id
+                        ~> "row_number" := p.row_number
+                        ~> "array_number" := p.array_number
+                        ~> "x" := p.x
+                        ~> "y" := p.y
+                        ~> "slope" := p.slope
+                        ~> "orientation" := p.orientation
+                        ~> "alignment" := p.alignment
+                        ~> jsonEmptyObject
+instance DecodeJson Panel where
+    decodeJson = decodeJson >=> f
+        where f o = mkPanel <$> o .: "uuid"
+                            <*> o .: "roofplate_uuid"
+                            <*> o .: "roofplate_id"
+                            <*> o .: "row_number"
+                            <*> o .: "array_number"
+                            <*> o .: "x"
+                            <*> o .: "y"
+                            <*> o .: "slope"
+                            <*> o .: "orientation"
+                            <*> o .: "alignment"
 
-        u2 <- mkPBUUID
-        setUUIDString (toString $ p ^. _roofUUID) u2
-        setRoofplateUUID u2 pb
-        
-        setRowNumber (p ^. _row_number) pb
-        setArrayNumber (p ^. _arrNumber) pb
-        setX (meterVal $ p ^. _x) pb
-        setY (meterVal $ p ^. _y) pb
-        setSlope (degreeVal $ p ^. _slope) pb
-        orientPb <- toProto $ p ^. _orientation
-        setOrientation orientPb pb
-        alignPb <- toProto $ p ^. _alignment
-        setAlignment alignPb pb
-
-        pure pb
-instance defaultPanel :: Default Panel where
+instance Default Panel where
     def = Panel {
         uuid           : emptyUUID,
         roofplate_uuid : emptyUUID,
@@ -214,19 +180,23 @@ instance defaultPanel :: Default Panel where
         orientation    : Landscape,
         alignment      : Grid
     }
-_uuid :: Lens' Panel UUID
+
+mkPanel :: UUID -> UUID -> Int -> Int -> Int -> Meter -> Meter -> Angle -> Orientation -> Alignment -> Panel
+mkPanel u ru ri row an x y slope orientation alignment = Panel { uuid: u, roofplate_uuid: ru, roofplate_id: ri, row_number: row, array_number: an, x: x, y: y, slope: slope, orientation: orientation, alignment: alignment }
+
+_uuid :: forall t a r. Newtype t { uuid :: a | r } => Lens' t a
 _uuid = _Newtype <<< prop (Proxy :: Proxy "uuid")
 
-_roofUUID :: Lens' Panel UUID
+_roofUUID :: forall t a r. Newtype t { roofplate_uuid :: a | r } => Lens' t a
 _roofUUID = _Newtype <<< prop (Proxy :: Proxy "roofplate_uuid")
 
-_roofplateId :: Lens' Panel Int
+_roofplateId :: forall t a r. Newtype t { roofplate_id :: a | r } => Lens' t a
 _roofplateId = _Newtype <<< prop (Proxy :: Proxy "roofplate_id")
 
-_row_number :: Lens' Panel Int
+_row_number :: forall t a r. Newtype t { row_number :: a | r } => Lens' t a
 _row_number = _Newtype <<< prop (Proxy :: Proxy "row_number")
 
-_arrNumber :: Lens' Panel Int
+_arrNumber :: forall t a r. Newtype t { array_number :: a | r } => Lens' t a
 _arrNumber = _Newtype <<< prop (Proxy :: Proxy "array_number")
 
 

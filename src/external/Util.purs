@@ -13,7 +13,7 @@ import Effect (Effect)
 import Effect.Ref as Ref
 import Effect.Timer (clearTimeout, setTimeout)
 import Effect.Unsafe (unsafePerformEffect)
-import FRP.Dynamic (Dynamic, current, dynEvent, latestEvt, step)
+import FRP.Dynamic (Dynamic, current, dynEvent, latestEvt, sampleDyn, step)
 import FRP.Event (Event, create, makeEvent, subscribe)
 import FRP.Event.Extra (anyEvt)
 
@@ -57,3 +57,9 @@ debounceMaybe (Milliseconds period) evt = makeEvent \k -> do
             Nothing -> pure unit
         newT <- setTimeout (fromMaybe 1 $ fromNumber period) (k $ Just v)
         Ref.write (Just newT) timer
+
+
+-- | Merge two Dynamic value with the specified function. It will only sample the first Dynamic
+sampleMergeDyn :: forall a b c. (a -> b -> c) -> Dynamic a -> Dynamic b -> Dynamic c
+sampleMergeDyn f ad bd = step def (sampleDyn ad $ flip f <$> dynEvent bd)
+    where def = unsafePerformEffect $ f <$> current ad <*> current bd

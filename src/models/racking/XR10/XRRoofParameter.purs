@@ -2,55 +2,36 @@ module Model.Racking.XR.XRRoofParameter where
 
 import Prelude
 
+import Data.Argonaut.Core (jsonEmptyObject)
+import Data.Argonaut.Decode (class DecodeJson, decodeJson, (.:))
+import Data.Argonaut.Encode (class EncodeJson, (:=), (~>))
+import Data.Default (class Default)
 import Data.Generic.Rep (class Generic)
-import Data.Show.Generic (genericShow)
-import Data.Lens ((^.))
 import Data.Newtype (class Newtype)
-import Editor.Common.Lenses (_mountSpacing, _rafterSpacing)
-import Editor.Common.ProtoCodable (class ProtoDecodable, class ProtoEncodable, fromProto, toProto)
-import Effect (Effect)
-import Foreign.Generic (class Decode, class Encode, defaultOptions, genericDecode, genericEncode)
-import Model.Racking.Class (class HasSpacings, getMountSpacing, getRafterSpacing, setMountSpacing, setRafterSpacing)
-import Model.Racking.MountSpacing (MountSpacing)
-import Model.Racking.RafterSpacing (RafterSpacing)
+import Data.Show.Generic (genericShow)
+import Model.Racking.MountSpacing (MountSpacing(..))
+import Model.Racking.RafterSpacing (RafterSpacing(..))
 
-foreign import data XRParameterPB :: Type
-foreign import mkXRParameterPB :: Effect XRParameterPB
-
-instance hasSpacingsXRParameterPB :: HasSpacings XRParameterPB
 
 newtype XRRoofParameter = XRRoofParameter {
     mountSpacing  :: MountSpacing,
     rafterSpacing :: RafterSpacing
 }
 
-toJSFieldName :: String -> String
-toJSFieldName "mountSpacing"  = "mount_space"
-toJSFieldName "rafterSpacing" = "rafter_space"
-toJSFieldName _               = "mount_space"
-
-derive instance newtypeXRRoofParameter :: Newtype XRRoofParameter _
-derive instance genericXRRoofParameter :: Generic XRRoofParameter _
-instance showXRRoofParameter :: Show XRRoofParameter where
+derive instance Newtype XRRoofParameter _
+derive instance Generic XRRoofParameter _
+instance Show XRRoofParameter where
     show = genericShow
-instance encodeXRRoofParameter :: Encode XRRoofParameter where
-    encode = genericEncode (defaultOptions { unwrapSingleConstructors = true,
-                                             fieldTransform = toJSFieldName
-                                            })
-instance decodeXRRoofParameter :: Decode XRRoofParameter where
-    decode = genericDecode (defaultOptions { unwrapSingleConstructors = true,
-                                             fieldTransform = toJSFieldName
-                                            })
-instance protoEncodableXRRoofParameter :: ProtoEncodable XRRoofParameter XRParameterPB where
-    toProto p = do
-        xp <- mkXRParameterPB
-        ms <- toProto $ p ^. _mountSpacing
-        setMountSpacing ms xp
-        rs <- toProto $ p ^. _rafterSpacing
-        setRafterSpacing rs xp
-        pure xp
-instance protoDecodableXRRoofParameter :: ProtoDecodable XRRoofParameter XRParameterPB where
-    fromProto p = XRRoofParameter {
-        mountSpacing  : fromProto $ getMountSpacing p,
-        rafterSpacing : fromProto $ getRafterSpacing p
-    }
+instance Default XRRoofParameter where
+    def = mkXRRoofParameter MountSpacing64 RafterSpacing24
+instance EncodeJson XRRoofParameter where
+    encodeJson (XRRoofParameter p) = "ms" := p.mountSpacing
+                                  ~> "rs" := p.rafterSpacing
+                                  ~> jsonEmptyObject
+instance DecodeJson XRRoofParameter where
+    decodeJson = decodeJson >=> f
+        where f o = mkXRRoofParameter <$> o .: "ms"
+                                      <*> o .: "rs"
+
+mkXRRoofParameter :: MountSpacing -> RafterSpacing -> XRRoofParameter
+mkXRRoofParameter ms rs = XRRoofParameter { mountSpacing : ms, rafterSpacing : rs }

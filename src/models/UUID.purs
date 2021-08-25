@@ -4,16 +4,8 @@ import Prelude
 
 import Data.Lens (Lens', (.~))
 import Data.Traversable (class Traversable, traverse)
-import Data.UUID (UUID, genUUID)
+import Data.UUIDWrapper (UUID, genUUID)
 import Effect (Effect)
-
-
-foreign import data PBUUID :: Type
-
-foreign import mkPBUUID :: Effect PBUUID
-
-foreign import getUUIDString :: PBUUID -> String
-foreign import setUUIDString :: String -> PBUUID -> Effect Unit
 
 class HasUUID a where
     idLens :: Lens' a UUID

@@ -2,19 +2,14 @@ module Model.Racking.Common where
 
 import Prelude
 
-import Data.Enum (class BoundedEnum, class Enum)
-import Data.Generic.Rep (class Generic)
+import Data.Argonaut.Decode (class DecodeJson, JsonDecodeError(..), decodeJson)
+import Data.Argonaut.Encode (class EncodeJson, encodeJson)
 import Data.Bounded.Generic (genericBottom, genericTop)
+import Data.Either (note)
+import Data.Enum (class BoundedEnum, class Enum, fromEnum, toEnum)
 import Data.Enum.Generic (genericCardinality, genericFromEnum, genericPred, genericSucc, genericToEnum)
+import Data.Generic.Rep (class Generic)
 import Data.Show.Generic (genericShow)
-import Editor.Common.ProtoCodable (class ProtoDecodable)
-
-newtype LRPB = LRPB Int
-derive newtype instance eqLRPB :: Eq LRPB
-foreign import lrInvalid :: LRPB
-foreign import lrLeft :: LRPB
-foreign import lrRight :: LRPB
-
 
 data RackPos = Left | Right
 
@@ -33,7 +28,7 @@ instance boundEnumRackPos :: BoundedEnum RackPos where
     cardinality = genericCardinality
     toEnum = genericToEnum
     fromEnum = genericFromEnum
-instance protoDecodableRackPos :: ProtoDecodable RackPos LRPB where
-    fromProto v | v == lrLeft  = Left
-                | v == lrRight = Right
-                | otherwise    = Left
+instance EncodeJson RackPos where
+    encodeJson = fromEnum >>> encodeJson
+instance DecodeJson RackPos where
+    decodeJson = decodeJson >=> toEnum >>> note (TypeMismatch "invalid RackPos value")

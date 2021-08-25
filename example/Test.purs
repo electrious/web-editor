@@ -3,7 +3,8 @@ module Test where
 import Prelude
 
 import API (_auth, _baseUrl)
-import Control.Monad.Except (runExcept)
+import Data.Argonaut.Core (Json)
+import Data.Argonaut.Decode (decodeJson)
 import Data.Default (def)
 import Data.Either (Either(..))
 import Data.Filterable (filter)
@@ -19,8 +20,6 @@ import Effect (Effect)
 import Effect.Class.Console (logShow)
 import FRP.Event (subscribe)
 import FRP.Event.Extra (delay)
-import Foreign (Foreign)
-import Foreign.Generic (decode)
 import Model.Hardware.PanelTextureInfo (_premium, _standard, _standard72)
 import Model.Hardware.PanelType (PanelType(..))
 import Model.Roof.Panel (Panel)
@@ -42,15 +41,15 @@ foreign import heatmapGradientPNG :: String
 serverUrl :: String
 serverUrl = "http://data.electrious.com"
 
-doTest :: Foreign -> Foreign -> Effect Unit
+doTest :: Json -> Json -> Effect Unit
 doTest roofDat panelDat = do
     w <- window
     doc <- document w
     elem <- getElementById "editor" (toNonElementParentNode doc)
 
-    case runExcept $ decode roofDat of
+    case decodeJson roofDat of
         Left e -> logShow e
-        Right (roofs :: Array RoofPlate) -> case runExcept $ decode panelDat of
+        Right (roofs :: Array RoofPlate) -> case decodeJson panelDat of
             Left e -> logShow e
             Right (panels :: Array Panel) -> case elem of
                 Nothing -> logShow "can't find 'editor' element"
@@ -73,7 +72,7 @@ doTest roofDat panelDat = do
                                        # _textureInfo    .~ textures
                                        # _rotBtnTexture  .~ rotateButtonPNG
                                        # _heatmapTexture .~ heatmapGradientPNG
-                                       # _apiConfig      .~ apiCfg
+                                       # _apiConfig      .~ pure apiCfg
 
                     editor <- createEditor el $ def # _sizeDyn .~ sizeDyn
 
@@ -88,7 +87,7 @@ doTest roofDat panelDat = do
 
                         else do
                             let builderCfg = def # _leadId         .~ 359617   --318872
-                                                 # _apiConfig      .~ apiCfg
+                                                 # _apiConfig      .~ pure apiCfg
                                                  # _dataServer     .~ serverUrl
                                                  # _textureInfo    .~ textures
                                                  # _rotBtnTexture  .~ rotateButtonPNG

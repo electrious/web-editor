@@ -3,23 +3,19 @@ module Editor.HouseLoader (editHouse, House(..), _loaded, _screenshot, _roofUpda
 import Prelude hiding (add)
 
 import API.Panel (loadPanels)
-import API.Racking (loadRacking)
 import API.Roofplate (loadRoofplates)
 import Control.Alt ((<|>))
-import Control.Monad.Except (runExcept)
 import Control.Monad.Reader (ask)
 import Data.Compactable (compact)
 import Data.Default (def)
-import Data.Either (Either(..))
 import Data.Filterable (filter)
 import Data.Lens (Lens', view, (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.Map as Map
 import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (class Newtype)
 import Type.Proxy (Proxy(..))
-import Editor.Common.Lenses (_alignment, _apiConfig, _houseId, _leadId, _modeDyn, _orientation, _panels, _parent, _roofRackings, _roofs, _wrapper)
+import Editor.Common.Lenses (_alignment, _apiConfig, _houseId, _leadId, _modeDyn, _orientation, _panels, _parent, _roofs, _wrapper)
 import Editor.Disposable (dispose)
 import Editor.Editor (Editor, _canvas, _sizeDyn, addDisposable, setMode)
 import Editor.EditorMode (EditorMode(..))
@@ -28,7 +24,7 @@ import Editor.HouseEditor (ArrayEditParam, HouseConfig, HouseEditor, _dataServer
 import Editor.PanelLayer (_serverUpdated)
 import Editor.PanelNode (PanelOpacity(..))
 import Editor.Rendering.PanelRendering (_opacity)
-import Editor.RoofManager (_arrayEvents, _editedRoofs, _racks, createRoofManager)
+import Editor.RoofManager (_arrayEvents, _editedRoofs, createRoofManager)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (step)
@@ -155,18 +151,11 @@ loadHouse editor param = do
     panelsEvt <- if defPanels == []
                  then runAPIInEditor $ loadPanels houseId
                  else pure $ pure defPanels
-    racksEvt  <- runAPIInEditor $ loadRacking houseId
 
     -- extract the roof racking map data
-    let roofRackDatEvt = extrRoofRack <$> racksEvt
-        extrRoofRack res = case runExcept res of
-                            Left _ -> Map.empty
-                            Right v -> v ^. _roofRackings
-    
-        buildRoofMgr hmd roofsDat panelsDat roofRackData = do
+    let buildRoofMgr hmd roofsDat panelsDat = do
             mgr <- createRoofManager param hmd $ def # _roofs  .~ roofsDat
                                                      # _panels .~ panelsDat
-                                                     # _racks  .~ roofRackData
             liftEffect do
                 add (hmd ^. _wrapper) editor
                 add (mgr ^. _wrapper) editor
@@ -178,7 +167,7 @@ loadHouse editor param = do
         
         getScreenshot _ = toDataUrl "image/png" (editor ^. _canvas)
     
-    mgrEvt <- multicast <$> performEditorEvent (buildRoofMgr <$> hmEvt <*> roofsEvt <*> panelsEvt <*> roofRackDatEvt)
+    mgrEvt <- multicast <$> performEditorEvent (buildRoofMgr <$> hmEvt <*> roofsEvt <*> panelsEvt)
 
     pure $ HouseLoaded {
         loaded        : loadedEvt,
