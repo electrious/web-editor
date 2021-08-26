@@ -27,8 +27,8 @@ import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..), fst, snd)
-import Data.UUIDWrapper (UUID)
 import Data.UUIDMap (UUIDMap)
+import Data.UUIDWrapper (UUID)
 import Editor.Common.Lenses (_apiConfig, _buttons, _height, _houseId, _leadId, _modeDyn, _mouseMove, _name, _panelType, _panels, _parent, _roofs, _slopeSelected, _tapped, _textureInfo, _updated, _width)
 import Editor.Editor (Editor, _sizeDyn, setMode)
 import Editor.EditorMode as EditorMode
@@ -473,12 +473,14 @@ saveMeshes cfg imgEvt mFilesEvt houseEvt =
         readyFailedEvt = fromLeft defError <$> filter isLeft readyEvt
         readySuccEvt = fromRight def <$> filter isRight readyEvt
 
-        failedEvt = delay 300 $ uploadFailedEvt <|> createFailedEvt <|> readyFailedEvt
+        failedEvt = delay 300 $ (UploadFailed <<< showAPIError <$> uploadFailedEvt) <|>
+                                (CreatingFailed <<< showAPIError <$> createFailedEvt) <|>
+                                (ReadyFailed <<< showAPIError <$> readyFailedEvt)
 
     in (const UploadingFiles  <$> mFilesEvt)   <|>
        (const CreatingHouse   <$> toCreateEvt) <|>
        (const WaitingForReady <$> createSuccEvt)  <|>
-       (Failed <<< showAPIError <$> failedEvt) <|>
+       failedEvt <|>
        (mkFinished <$> readySuccEvt)
 
 mkFinished :: ReadyAPIResp -> SavingStep
