@@ -6,14 +6,14 @@ import Control.Plus (empty)
 import Data.Default (class Default, def)
 import Data.Generic.Rep (class Generic)
 import Data.Lens ((.~), (^.))
-import Data.Meter (Meter, meter)
+import Data.Meter (Meter, meter, meterVal)
 import Data.Newtype (class Newtype)
-import Data.UUID (UUID, emptyUUID, genUUID)
-import Editor.Common.Lenses (_id, _position)
+import Data.UUIDWrapper (UUID, emptyUUID, genUUID)
+import Editor.Common.Lenses (_height, _id, _length, _position, _width)
 import Effect (Effect)
 import FRP.Event (Event)
 import Model.UUID (class HasUUID, idLens)
-import Three.Math.Vector (Vector3)
+import Three.Math.Vector (Vector3, mkVec3)
 
 newtype Chimney = Chimney {
     id       :: UUID,
@@ -45,6 +45,11 @@ mkChimney pos = do
     pure $ def # _id       .~ i
                # _position .~ pos
 
+
+chimneyScale :: Chimney -> Vector3
+chimneyScale c = mkVec3 (meterVal $ c ^. _length)
+                        (meterVal $ c ^. _width)
+                        (meterVal $ c ^. _height)
 
 data ChimneyOp = ChimCreate Chimney
                | ChimDelete UUID
