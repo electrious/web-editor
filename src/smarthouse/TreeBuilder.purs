@@ -7,13 +7,11 @@ import Control.Alternative (empty)
 import Control.Monad.Reader.Class (ask)
 import Custom.Mesh (TappableMesh)
 import Data.Default (class Default, def)
-import Data.Lens (Lens', set, view, (.~), (^.))
-import Data.Lens.Iso.Newtype (_Newtype)
-import Data.Lens.Record (prop)
+import Data.Lens (set, view, (.~), (^.))
 import Data.Maybe (Maybe(..))
 import Data.Meter (Meter, feetInchStr, meter, meterVal)
 import Data.Newtype (class Newtype)
-import Editor.Common.Lenses (_face, _height, _isActive, _name, _parent, _point, _position, _rotation, _tapped, _updated)
+import Editor.Common.Lenses (_face, _fromTarget, _height, _isActive, _name, _parent, _point, _position, _rotation, _tapped, _toTarget, _updated)
 import Editor.ObjectAdder (AdderType(..), createObjectAdder, mkCandidatePoint)
 import Editor.SceneEvent (SceneMouseMoveEvent)
 import Effect.Class (liftEffect)
@@ -34,7 +32,6 @@ import Three.Core.Material (MeshPhongMaterial, mkMeshPhongMaterial)
 import Three.Core.Object3D (worldToLocal)
 import Three.Math.Euler (mkEuler)
 import Three.Math.Vector (Vector3, mkVec3, vecX, vecY, vecZ)
-import Type.Proxy (Proxy(..))
 import UI.DraggableObject (DragObjCfg, _customGeo, _deltaTransform, _validator, createDraggableObject, createDraggableObjectWith)
 
 
@@ -333,14 +330,6 @@ instance defaultTreeDragBtn :: Default TreeDragBtn where
         validator  : pure (const true),
         direction  : XZ
         }
-
-
-_toTarget :: forall t a r. Newtype t { toTarget :: a | r } => Lens' t a
-_toTarget = _Newtype <<< prop (Proxy :: Proxy "toTarget")
-
-_fromTarget :: forall t a r. Newtype t { fromTarget :: a | r } => Lens' t a
-_fromTarget = _Newtype <<< prop (Proxy :: Proxy "fromTarget")
-
 
 newtype TreeBtnEvts = TreeBtnEvts {
     height :: Event Meter,
