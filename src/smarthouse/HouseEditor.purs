@@ -135,6 +135,28 @@ rackRequest ps rd = def # _parameters .~ params
     where params = M.fromFoldable $ (\r -> Tuple (r ^. idLens) param) <$> rd ^. _roofs
           param = XRParameter def
 
+
+renderRoofs :: Dynamic Vector3 -> Dynamic House -> Dynamic (Maybe UUID) -> Dynamic Boolean -> Node HouseTextureInfo (Dynamic (UUIDMap (Event UUID)))
+renderRoofs pDyn houseDyn actRoofDyn houseEditDyn = 
+    node (def # _position .~ pDyn
+              # _name     .~ "roofs") do
+        let roofsDyn = view _roofs <$> houseDyn
+            actRDyn = getActiveRoof <$> actRoofDyn <*> roofsDyn
+        node (def # _name .~ "roof-lines"
+                  # _position .~ pure (mkVec3 0.0 0.0 0.02)) do
+            -- render ridge lines
+            let linesDyn = getHouseLines <$> houseDyn
+            dynamic_ $ traverse_ renderLineOnly <$> linesDyn
+            -- render line length texts
+            dynamic_ $ renderLengths <$> debounceDyn (Milliseconds 500.0) linesDyn
+
+            -- render roof outlines dynamically
+            dynamic_ $ renderActRoofOutline <$> actRDyn
+
+        -- render roofs dynamically
+        dynamic $ renderBuilderRoofs houseEditDyn <$> roofsDyn
+
+
 editHouse :: HouseConfig -> HouseEditorConf -> Node HouseTextureInfo HouseNode
 editHouse houseCfg conf = do
     let house  = conf ^. _house
@@ -163,26 +185,7 @@ editHouse houseCfg conf = do
                 canEditDyn = (&&) <$> actDyn <*> (fromBoolean <$> houseEditDyn)
 
             -- render roofs
-            roofEvtsDyn <- node (def # _position .~ pDyn
-                                     # _name     .~ "roofs") do
-                let roofsDyn = view _roofs <$> houseDyn
-                    actRDyn = getActiveRoof <$> actRoofDyn <*> roofsDyn
-                node (def # _name .~ "roof-lines"
-                          # _position .~ pure (mkVec3 0.0 0.0 0.02)) do
-                    -- render ridge lines
-                    let linesDyn = getHouseLines <$> houseDyn
-                    dynamic_ $ traverse_ renderLineOnly <$> linesDyn
-                    -- render line length texts
-                    dynamic_ $ renderLengths <$> debounceDyn (Milliseconds 500.0) linesDyn
-
-                    -- render roof outlines dynamically
-                    dynamic_ $ renderActRoofOutline <$> actRDyn
-
-                -- render roofs dynamically
-                roofEvts <- dynamic $ renderBuilderRoofs houseEditDyn <$> roofsDyn
-                
-                pure roofEvts
-
+            roofEvtsDyn <- renderRoofs pDyn houseDyn actRoofDyn houseEditDyn
 
             let -- height editor arrow position
                 hPos2D = dragArrowPos $ floor ^. _polyVerts
