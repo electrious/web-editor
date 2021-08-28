@@ -10,14 +10,13 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
-import Editor.Common.Lenses (_buttons, _height, _slopeSelected, _width)
+import Editor.Common.Lenses (_buttons, _deleted, _height, _slopeSelected, _width)
 import Editor.Editor (_sizeDyn)
 import Editor.SceneEvent (Size, size)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic)
 import FRP.Event (Event)
 import Models.SmartHouse.ActiveItem (ActiveItem)
-import SmartHouse.ActiveItemUI (_deleteHouse)
 import SmartHouse.SlopeOption (SlopeOption)
 import Specular.Dom.Element (attrsD, class_, classes, dynText, el)
 import Specular.Dom.Widget (Widget)
@@ -57,7 +56,7 @@ _activeItemDyn = _Newtype <<< prop (Proxy :: Proxy "activeItemDyn")
 newtype BuilderUIEvents = BuilderUIEvents {
     buttons       :: ButtonsPane,
     slopeSelected :: Event SlopeOption,
-    deleteHouse   :: Event Unit,
+    deleted       :: Event Unit,
     buildTree     :: Event Boolean
     }
 
@@ -66,7 +65,7 @@ instance defaultBuilderUIEvents :: Default BuilderUIEvents where
     def = BuilderUIEvents {
         buttons       : def,
         slopeSelected : empty,
-        deleteHouse   : empty,
+        deleted       : empty,
         buildTree     : empty
         }
 
@@ -103,5 +102,5 @@ houseBuilderUI cfg = do
 
         pure $ def # _buttons       .~ btns
                    # _slopeSelected .~ (editEvts ^. _activeItem <<< _slopeSelected)
-                   # _deleteHouse   .~ (editEvts ^. _activeItem <<< _deleteHouse)
+                   # _deleted       .~ (editEvts ^. _activeItem <<< _deleted)
                    # _buildTree     .~ (editEvts ^. _buildTree)

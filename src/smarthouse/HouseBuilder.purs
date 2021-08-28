@@ -29,7 +29,7 @@ import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..), fst)
 import Data.UUIDMap (UUIDMap)
 import Data.UUIDWrapper (UUID)
-import Editor.Common.Lenses (_apiConfig, _buttons, _height, _houseId, _leadId, _modeDyn, _mouseMove, _name, _panelType, _panels, _parent, _roofs, _slopeSelected, _tapped, _textureInfo, _updated, _width)
+import Editor.Common.Lenses (_apiConfig, _buttons, _deleted, _height, _houseId, _leadId, _modeDyn, _mouseMove, _name, _panelType, _panels, _parent, _roofs, _slopeSelected, _tapped, _textureInfo, _updated, _width)
 import Editor.Editor (Editor, _sizeDyn, setMode)
 import Editor.EditorMode as EditorMode
 import Editor.HouseEditor (ArrayEditParam, HouseConfig, _dataServer, _heatmapTexture, _rotBtnTexture)
@@ -53,7 +53,6 @@ import OBJExporter (MeshFiles, exportObject)
 import Rendering.DynamicNode (eventNode)
 import Rendering.Node (Node, _exportable, fixNodeDWith, fixNodeE, fixNodeEWith, getEnv, getParent, localEnv, mkNodeEnv, node, runNode, tapMouseMesh)
 import Rendering.TextureLoader (textureFromUrl)
-import SmartHouse.ActiveItemUI (_deleteHouse)
 import SmartHouse.HouseEditor (HouseRenderMode(..), _arrayEditParam, _house, _roofsData, editHouse, renderHouse)
 import SmartHouse.HouseTracer (TracerMode(..), _stopTracing, _tracedPolygon, _tracerMode, _undoTracing, traceHouse)
 import SmartHouse.SlopeOption (SlopeOption)
@@ -299,7 +298,7 @@ newtype BuilderInputEvts = BuilderInputEvts {
     undoTracing   :: Event Unit,
     stopTracing   :: Event Unit,
     slopeSelected :: Event SlopeOption,
-    deleteHouse   :: Event Unit,
+    deleted       :: Event Unit,
     buildTree     :: Event Boolean
     }
 
@@ -310,7 +309,7 @@ instance Default BuilderInputEvts where
         undoTracing   : empty,
         stopTracing   : empty,
         slopeSelected : empty,
-        deleteHouse   : empty,
+        deleted       : empty,
         buildTree     : empty
         }
 
@@ -414,7 +413,7 @@ builderForHouse evts tInfo =
                         slopeEvt = evts ^. _slopeSelected
 
                         mouseEvt = multicast $ helper ^. _mouseMove
-                        delEvt   = multicast $ evts ^. _deleteHouse
+                        delEvt   = multicast $ evts ^. _deleted
                         toExpEvt = multicast $ delay 15 $ evts ^. _export
 
                     houseCfg <- liftEffect $ updateHouseConfig (houseCfgFromBuilderCfg cfg) companyIdEvt
@@ -527,7 +526,7 @@ buildHouse editor cfg = do
                         # _undoTracing   .~ undoTracingEvt
                         # _stopTracing   .~ stopTracingEvt
                         # _slopeSelected .~ slopeEvt
-                        # _deleteHouse   .~ delHouseEvt
+                        # _deleted       .~ delHouseEvt
                         # _buildTree     .~ treeEvt
 
     res <- fst <$> runNode (createHouseBuilder inputEvts) (mkNodeEnv editor cfg)
@@ -544,7 +543,7 @@ buildHouse editor cfg = do
     void $ subscribe (const unit <$> uiEvts ^. _buttons <<< _reset) toStopTracing
     void $ subscribe (const unit <$> uiEvts ^. _buttons <<< _undo) toUndoTracing
     void $ subscribe (uiEvts ^. _slopeSelected) selectSlope
-    void $ subscribe (uiEvts ^. _deleteHouse) delHouse
+    void $ subscribe (uiEvts ^. _deleted) delHouse
     void $ subscribe (uiEvts ^. _buildTree) buildTree
 
     pure $ res # _editorOp .~ (const Close <$> uiEvts ^. _buttons <<< _close)

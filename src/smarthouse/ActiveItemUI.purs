@@ -5,14 +5,12 @@ import Prelude hiding (div, degree)
 import Control.Alternative (empty)
 import Data.Default (class Default, def)
 import Data.Int (round)
-import Data.Lens (Lens', view, (.~), (^.))
-import Data.Lens.Iso.Newtype (_Newtype)
-import Data.Lens.Record (prop)
+import Data.Lens (view, (.~), (^.))
 import Data.List (head)
 import Data.Map (values)
 import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Newtype (class Newtype)
-import Editor.Common.Lenses (_roof, _roofs, _slope, _slopeSelected)
+import Editor.Common.Lenses (_deleted, _roof, _roofs, _slope, _slopeSelected)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic, dynEvent, step)
@@ -32,26 +30,22 @@ import Specular.Dom.Node.Class (Node)
 import Specular.Dom.Widget (Widget)
 import Specular.Dom.Widgets.Button (buttonOnClick)
 import Specular.Dom.Widgets.Input (checkbox, getTextInputValue)
-import Type.Proxy (Proxy(..))
 import UI.Bridge (fromUIDyn, fromUIEvent, toUIDyn)
 import UI.Utils (div, mkAttrs, mkStyle, visible, (:~))
 import Unsafe.Coerce (unsafeCoerce)
 
 
 newtype ActiveItemUI = ActiveItemUI {
-    deleteHouse   :: Event Unit,
+    deleted       :: Event Unit,
     slopeSelected :: Event SlopeOption
     }
 
 derive instance Newtype ActiveItemUI _
 instance Default ActiveItemUI where
     def = ActiveItemUI {
-        deleteHouse   : empty,
+        deleted       : empty,
         slopeSelected : empty
         }
-
-_deleteHouse :: forall t a r. Newtype t { deleteHouse :: a | r } => Lens' t a
-_deleteHouse = _Newtype <<< prop (Proxy :: Proxy "deleteHouse")
 
 activeItemUIStyle :: Boolean -> Attrs
 activeItemUIStyle d = mkStyle [
@@ -162,4 +156,4 @@ activeItemUI actItemDyn = do
         delEvt <- delButton actItemDyn
 
         pure $ def # _slopeSelected .~ slopeEvt
-                   # _deleteHouse   .~ delEvt
+                   # _deleted       .~ delEvt
