@@ -54,7 +54,7 @@ import Model.UUID (idLens)
 import Models.SmartHouse.ActiveItem (ActHouseRoof)
 import Rendering.DynamicNode (dynamic, dynamic_)
 import Rendering.Line (renderLine, renderLineLength, renderLineOnly, renderLineWith)
-import Rendering.Node (Node, _exportable, fixNodeDWith, fixNodeE, getEnv, getParent, localEnv, node, tapMesh)
+import Rendering.Node (Node, _exportable, fixNodeD2With, fixNodeDWith, fixNodeE, getEnv, getParent, localEnv, node, tapMesh)
 import SmartHouse.Algorithm.Edge (_lineEdge)
 import SmartHouse.SlopeOption (SlopeOption)
 import Smarthouse.Algorithm.Subtree (_sinks, _source)
@@ -149,9 +149,8 @@ editHouse houseCfg conf = do
 
         houseEditDyn = (==) EditingHouse <$> modeDyn
         
-    fixNodeDWith house \houseDyn ->
-        fixNodeDWith Nothing \actRoofIdDyn ->
-            fixNodeE \panelsEvt -> do
+    fixNodeD2With house Nothing \houseDyn actRoofIdDyn ->
+        fixNodeE \panelsEvt -> do
             let hDyn = view _height <$> houseDyn
                 pDyn = mkVec3 0.0 0.0 <<< meterVal <$> hDyn
             -- render walls
@@ -228,7 +227,7 @@ editHouse houseCfg conf = do
 
             let newPanelsEvt = multicast $ latestEvt $ allPanelsEvt <$> nodesDyn
             
-            pure {input : newPanelsEvt, output : { input : Just <$> roofTappedEvt, output : { input: newHouseEvt, output: hn } } }
+            pure {input : newPanelsEvt, output : { input1: newHouseEvt, input2: Just <$> roofTappedEvt, output: hn } }
 
 
 wallMat :: MeshPhongMaterial
