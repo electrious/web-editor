@@ -15,7 +15,6 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
-import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import FRP.Event (Event, keepLatest)
@@ -28,12 +27,25 @@ import Web.File.File (File, toBlob)
 import Web.XHR.FormData (EntryName(..), FileName(..), FormData, appendBlob, new)
 
 
+-- data type for new built house
+newtype BuiltHouseInfo = BuiltHouseInfo {
+    houseId   :: Int,
+    companyId :: Int
+}
+
+derive instance Newtype BuiltHouseInfo _
+derive instance Generic BuiltHouseInfo _
+derive instance Eq BuiltHouseInfo
+
+mkBuiltHouseInfo :: Int -> Int -> BuiltHouseInfo
+mkBuiltHouseInfo h c = BuiltHouseInfo { houseId: h, companyId: c }
+
 data SavingStep = NotSaving
                 | UploadingFiles
                 | CreatingHouse
                 | WaitingForReady
                 | Failed String
-                | Finished Int Int
+                | Finished BuiltHouseInfo
 
 derive instance Generic SavingStep _
 derive instance Eq SavingStep
@@ -43,20 +55,20 @@ instance Show SavingStep where
     show CreatingHouse   = "Elli is analyzing the new house data..."
     show WaitingForReady = "Elli is analyzing the new house data..."
     show (Failed msg)    = "Savine house failed: " <> msg
-    show (Finished _ _)  = "Finished creating the new house"
+    show (Finished _)    = "Finished creating the new house"
 
 stepMode :: SavingStep -> ActiveMode
-stepMode NotSaving      = Inactive
-stepMode (Finished _ _) = Inactive
-stepMode _              = Active
+stepMode NotSaving    = Inactive
+stepMode (Finished _) = Inactive
+stepMode _            = Active
 
 isFinished :: SavingStep -> Boolean
-isFinished (Finished _ _) = true
-isFinished _              = false
+isFinished (Finished _) = true
+isFinished _            = false
 
-savedHouseId :: SavingStep -> Maybe (Tuple Int Int)
-savedHouseId (Finished h c) = Just $ Tuple h c
-savedHouseId _              = Nothing
+savedHouseInfo :: SavingStep -> Maybe BuiltHouseInfo
+savedHouseInfo (Finished h) = Just h
+savedHouseInfo _            = Nothing
 
 
 newtype UploadReq = UploadReq {
