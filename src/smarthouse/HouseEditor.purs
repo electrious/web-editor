@@ -2,6 +2,7 @@ module SmartHouse.HouseEditor where
 
 import Prelude hiding (add)
 
+import API (APIConfig)
 import API.Racking (RackRequest, _parameters, doRack, runRackAPI)
 import Control.Alt ((<|>))
 import Control.Monad.RWS (tell)
@@ -35,7 +36,7 @@ import Editor.RoofNode (RoofNode, RoofNodeConfig, RoofNodeMode(..), _racking, cr
 import Effect.Class (liftEffect)
 import Effect.Random (randomInt)
 import Effect.Unsafe (unsafePerformEffect)
-import FRP.Dynamic (Dynamic, dynEvent, gateDyn, latestEvt, sampleDyn, step)
+import FRP.Dynamic (Dynamic, current, dynEvent, gateDyn, latestEvt, sampleDyn, step)
 import FRP.Event (Event, sampleOn)
 import FRP.Event as Evt
 import FRP.Event.Extra (debounce, delay, multicast, performEvent)
@@ -157,12 +158,42 @@ renderRoofs pDyn houseDyn actRoofDyn houseEditDyn =
         dynamic $ renderBuilderRoofs houseEditDyn <$> roofsDyn
 
 
+houseWithNewHeight :: forall e. Dynamic ActiveMode -> Dynamic House -> Node e (Event House)
+houseWithNewHeight canEditDyn houseDyn = do
+    house <- liftEffect $ current houseDyn
+    let h = house ^. _height
+        floor  = view _position <$> house ^. _floor
+
+        -- height editor arrow position
+        hPos2D = dragArrowPos $ floor ^. _polyVerts
+        hPos   = mkVec3 (vecX hPos2D) (vecY hPos2D) (meterVal h)
+
+    -- setup height editor and get the height event
+    -- enable height editor only in EditingHouse mode and actDyn is active
+    hEvt <- setupHeightEditor $ def # _modeDyn  .~ canEditDyn
+                                    # _position .~ hPos
+                                    # _height   .~ h
+                                    # _min      .~ (- meterVal h)
+
+    pure $ sampleDyn houseDyn $ updateHeight <$> hEvt
+
+
+houseWithNewSlope :: Dynamic ActiveMode -> Event SlopeOption -> Dynamic House -> Dynamic (Maybe UUID) -> Event House
+houseWithNewSlope canEditDyn sEvt houseDyn actRoofIdDyn = performEvent $ sampleDyn houseDyn $ sampleDyn actRoofIdDyn $ updateHouseSlope <$> slopeEvt
+    -- only accept slope events if the house is active and can be edit
+    where slopeEvt = gateDyn (isActive <$> canEditDyn) sEvt
+
+
+rackSysForNewPanels :: Dynamic APIConfig -> Event RoofsData -> Event (Array Panel) -> Event RackingSystem
+rackSysForNewPanels apiCfg roofsEvt panelsEvt = Evt.keepLatest $ performEvent $ sampleDyn apiCfg (runRackAPI <<< doRack <$> reqEvt)
+    where reqEvt = sampleOn roofsEvt $ rackRequest <$> debounce (Milliseconds 100.0) panelsEvt
+
+
 editHouse :: HouseConfig -> HouseEditorConf -> Node HouseTextureInfo HouseNode
 editHouse houseCfg conf = do
     let house  = conf ^. _house
         actDyn = conf ^. _modeDyn
         
-        h      = house ^. _height
         floor  = view _position <$> house ^. _floor
 
         roofsEvt = multicast $ conf ^. _roofsData
@@ -187,24 +218,8 @@ editHouse houseCfg conf = do
             -- render roofs
             roofEvtsDyn <- renderRoofs pDyn houseDyn actRoofDyn houseEditDyn
 
-            let -- height editor arrow position
-                hPos2D = dragArrowPos $ floor ^. _polyVerts
-                hPos   = mkVec3 (vecX hPos2D) (vecY hPos2D) (meterVal h)
-
-            -- setup height editor and get the height event
-            -- enable height editor only in EditingHouse mode and actDyn is active
-            hEvt <- setupHeightEditor $ def # _modeDyn  .~ canEditDyn
-                                            # _position .~ hPos
-                                            # _height   .~ h
-                                            # _min      .~ (- meterVal h)
-        
-    
-            let newHouseEvt1 = sampleDyn houseDyn $ updateHeight <$> hEvt
-
-                -- only accept slope events if the house is active and can be edit
-                slopeEvt = gateDyn (isActive <$> canEditDyn) $ conf ^. _slopeSelected
-                newHouseEvt2 = performEvent $ sampleDyn houseDyn $ sampleDyn actRoofIdDyn $ updateHouseSlope <$> slopeEvt
-
+            newHouseEvt1 <- houseWithNewHeight canEditDyn houseDyn
+            let newHouseEvt2 = houseWithNewSlope canEditDyn (conf ^. _slopeSelected) houseDyn actRoofIdDyn
                 newHouseEvt  = multicast $ newHouseEvt1 <|> newHouseEvt2
 
                 roofTappedEvt = multicast $ latestAnyEvt roofEvtsDyn
@@ -222,10 +237,8 @@ editHouse houseCfg conf = do
                 -- render all roof nodes if available
                 roofsDyn = step Nothing $ Just <$> roofsEvt
 
-                -- update racking system
-                reqEvt = sampleOn roofsEvt $ rackRequest <$> debounce (Milliseconds 100.0) panelsEvt
-                rackEvt = multicast $ Evt.keepLatest $ performEvent $ sampleDyn (houseCfg ^. _apiConfig) (runRackAPI <<< doRack <$> reqEvt)
-    
+                rackEvt = rackSysForNewPanels (houseCfg ^. _apiConfig) roofsEvt panelsEvt
+                
             nodesDyn <- localEnv (const houseCfg) $ renderRoofEditor (conf ^. _arrayEditParam) roofsDyn rackEvt
 
             let newPanelsEvt = multicast $ latestEvt $ allPanelsEvt <$> nodesDyn
