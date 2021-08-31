@@ -55,7 +55,7 @@ import Model.UUID (idLens)
 import Models.SmartHouse.ActiveItem (ActHouseRoof)
 import Rendering.DynamicNode (dynamic, dynamic_)
 import Rendering.Line (renderLine, renderLineLength, renderLineOnly, renderLineWith)
-import Rendering.Node (Node, _exportable, fixNodeD2With, fixNodeDWith, fixNodeE, getEnv, getParent, localEnv, node, tapMesh)
+import Rendering.Node (Node, _exportable, fixNodeD2With, fixNodeE, getEnv, getParent, localEnv, node, tapMesh)
 import SmartHouse.Algorithm.Edge (_lineEdge)
 import SmartHouse.SlopeOption (SlopeOption)
 import Smarthouse.Algorithm.Subtree (_sinks, _source)
@@ -114,20 +114,12 @@ getRoof Nothing h  = def # _house .~ h
 getRoof (Just i) h = def # _house .~ h
                          # _roof  .~ M.lookup i (h ^. _roofs)
 
--- whether the house editor is in the mode for house editing or
--- loaded all roofs/arrays for editing the arrays
-data HouseEditorMode = EditingHouse
-                     | EditingArrays
-
-derive instance eqwHouseEditorMode :: Eq HouseEditorMode
-
 activeRoofId :: ActiveMode -> Maybe UUID -> Maybe UUID
 activeRoofId Active   i = i
 activeRoofId Inactive _ = Nothing
 
 getActiveRoof :: Maybe UUID -> UUIDMap Roof -> Maybe Roof
-getActiveRoof (Just i) m = M.lookup i m
-getActiveRoof Nothing _  = Nothing
+getActiveRoof i m = join $ flip M.lookup m <$> i
 
 -- | build rack request with panels using default XRParameter and panel size
 rackRequest :: Array Panel -> RoofsData -> RackRequest
@@ -197,10 +189,8 @@ editHouse houseCfg conf = do
         floor  = view _position <$> house ^. _floor
 
         roofsEvt = multicast $ conf ^. _roofsData
-        -- house editor mode
-        modeDyn = step EditingHouse $ const EditingArrays <$> roofsEvt
-
-        houseEditDyn = (==) EditingHouse <$> modeDyn
+        -- house can be edited until roofplates loaded and turn in to array edit mode
+        houseEditDyn = step true $ const false <$> roofsEvt
         
     fixNodeD2With house Nothing \houseDyn actRoofIdDyn ->
         fixNodeE \panelsEvt -> do
@@ -227,12 +217,10 @@ editHouse houseCfg conf = do
                 validRoofTappedEvt = gateDyn (not <<< isActive <$> actDyn) roofTappedEvt
                 wallTappedEvt = const (house ^. idLens) <$> wallTap
 
-                activeRoofDyn = getRoof <$> actRoofDyn <*> houseDyn
-                
                 hn = def # _id           .~ (house ^. idLens)
                          # _activated    .~ (validRoofTappedEvt <|> wallTappedEvt)
                          # _updated      .~ (HouseOpUpdate <$> newHouseEvt)
-                         # _actHouseRoof .~ dynEvent activeRoofDyn
+                         # _actHouseRoof .~ dynEvent (getRoof <$> actRoofDyn <*> houseDyn)
 
                 -- render all roof nodes if available
                 roofsDyn = step Nothing $ Just <$> roofsEvt
@@ -286,30 +274,29 @@ renderRoofEditor :: ArrayEditParam -> Dynamic (Maybe RoofsData) -> Event Racking
 renderRoofEditor param rdDyn rackSysEvt = dynamic $ renderRd <$> rdDyn
     where renderRd Nothing   = pure []
           renderRd (Just rd) =
-              fixNodeDWith Landscape \mainOrientDyn ->
-                  fixNodeDWith Nothing \activeRoof -> do
-                      let psDict = panelsDict $ rd ^. _panels
-                          roofs  = rd ^. _roofs
+              fixNodeD2With Landscape Nothing \mainOrientDyn activeRoof -> do
+                  let psDict = panelsDict $ rd ^. _panels
+                      roofs  = rd ^. _roofs
 
-                          orientDyn  = step Landscape $ param ^. _orientation
-                          alignDyn   = step Grid      $ param ^. _alignment
-                          opacityDyn = step Opaque    $ param ^. _opacity
-                  
-                          cfg r = def # _mode            .~ RoofInBuilder
-                                      # _houseId         .~ (rd ^. _houseId)
-                                      # _mainOrientation .~ mainOrientDyn
-                                      # _orientation     .~ orientDyn
-                                      # _alignment       .~ alignDyn
-                                      # _panelType       .~ pure def
-                                      # _opacity         .~ opacityDyn
-                                      # _racking         .~ step Nothing (M.lookup (r ^. _id) <<< view _roofRackings <$> rackSysEvt)
-                                      # _heatmap         .~ (param ^. _heatmap)
+                      orientDyn  = step Landscape $ param ^. _orientation
+                      alignDyn   = step Grid      $ param ^. _alignment
+                      opacityDyn = step Opaque    $ param ^. _opacity
 
-                      nodes <- traverse (\r -> mkRoofNode activeRoof psDict (cfg r) r) roofs
-                      let mainOrientEvt = calcMainOrientation nodes
-                          actRoofEvt    = Just <$> getActivated nodes
-              
-                      pure { input : actRoofEvt, output : { input : mainOrientEvt, output : nodes }}
+                      cfg r = def # _mode            .~ RoofInBuilder
+                                  # _houseId         .~ (rd ^. _houseId)
+                                  # _mainOrientation .~ mainOrientDyn
+                                  # _orientation     .~ orientDyn
+                                  # _alignment       .~ alignDyn
+                                  # _panelType       .~ pure def
+                                  # _opacity         .~ opacityDyn
+                                  # _racking         .~ step Nothing (M.lookup (r ^. _id) <<< view _roofRackings <$> rackSysEvt)
+                                  # _heatmap         .~ (param ^. _heatmap)
+
+                  nodes <- traverse (\r -> mkRoofNode activeRoof psDict (cfg r) r) roofs
+                  let mainOrientEvt = calcMainOrientation nodes
+                      actRoofEvt    = Just <$> getActivated nodes
+
+                  pure { input1 : mainOrientEvt, input2: actRoofEvt, output : nodes }
 
 
 mkRoofNode :: Dynamic (Maybe UUID) -> PanelsDict -> RoofNodeConfig -> RoofPlate -> Node HouseConfig RoofNode
