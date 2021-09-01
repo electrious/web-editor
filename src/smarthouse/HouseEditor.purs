@@ -50,7 +50,7 @@ import Model.Roof.Panel (Alignment(..), Orientation(..), Panel, PanelsDict, pane
 import Model.Roof.RoofPlate (RoofPlate)
 import Model.SmartHouse.House (House, _trees, getHouseLines, updateHeight, updateHouseSlope)
 import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo)
-import Model.SmartHouse.Roof (Roof, renderActRoofOutline, renderRoof)
+import Model.SmartHouse.Roof (Roof, RoofMesh, renderActRoofOutline, renderRoof)
 import Model.UUID (idLens)
 import Models.SmartHouse.ActiveItem (ActHouseRoof)
 import Rendering.DynamicNode (dynamic, dynamic_)
@@ -129,7 +129,7 @@ rackRequest ps rd = def # _parameters .~ params
           param = XRParameter def
 
 
-renderRoofs :: Dynamic Vector3 -> Dynamic House -> Dynamic (Maybe UUID) -> Dynamic Boolean -> Node HouseTextureInfo (Dynamic (UUIDMap (Event UUID)))
+renderRoofs :: Dynamic Vector3 -> Dynamic House -> Dynamic (Maybe UUID) -> Dynamic Boolean -> Node HouseTextureInfo (Dynamic (UUIDMap RoofMesh))
 renderRoofs pDyn houseDyn actRoofDyn houseEditDyn = 
     node (def # _position .~ pDyn
               # _name     .~ "roofs") do
@@ -212,7 +212,7 @@ editHouse houseCfg conf = do
             let newHouseEvt2 = houseWithNewSlope canEditDyn (conf ^. _slopeSelected) houseDyn actRoofIdDyn
                 newHouseEvt  = multicast $ newHouseEvt1 <|> newHouseEvt2
 
-                roofTappedEvt = multicast $ latestAnyEvt roofEvtsDyn
+                roofTappedEvt = multicast $ latestAnyEvt $ map (view _tapped) <$> roofEvtsDyn
 
                 validRoofTappedEvt = gateDyn (not <<< isActive <$> actDyn) roofTappedEvt
                 wallTappedEvt = const (house ^. idLens) <$> wallTap
@@ -251,7 +251,7 @@ renderLengths :: forall e. Maybe (List (LineSeg Vector3)) -> Node e Unit
 renderLengths (Just ls) = traverse_ renderLineLength ls
 renderLengths Nothing   = pure unit
 
-renderBuilderRoofs :: forall f. Traversable f => Dynamic Boolean -> f Roof -> Node HouseTextureInfo (f (Event UUID))
+renderBuilderRoofs :: forall f. Traversable f => Dynamic Boolean -> f Roof -> Node HouseTextureInfo (f RoofMesh)
 renderBuilderRoofs houseEditDyn = traverse (renderRoof houseEditDyn)
 
 -- render the house as 2D wireframe
