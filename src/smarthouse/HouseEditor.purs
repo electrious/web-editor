@@ -66,7 +66,7 @@ import Three.Core.Object3D (add, remove)
 import Three.Math.Vector (Vector3, mkVec3, toVec2, vecX, vecY)
 import Type.Proxy (Proxy(..))
 import UI.RoofEditorUI (_mode)
-import Util (debounceDyn, latestAnyEvt)
+import Util (debounceDyn, latestAnyEvtWith)
 
 
 -- how to render the House
@@ -212,7 +212,7 @@ editHouse houseCfg conf = do
             let newHouseEvt2 = houseWithNewSlope canEditDyn (conf ^. _slopeSelected) houseDyn actRoofIdDyn
                 newHouseEvt  = multicast $ newHouseEvt1 <|> newHouseEvt2
 
-                roofTappedEvt = multicast $ latestAnyEvt $ map (view _tapped) <$> roofEvtsDyn
+                roofTappedEvt = multicast $ latestAnyEvtWith (view _tapped) roofEvtsDyn
 
                 validRoofTappedEvt = gateDyn (not <<< isActive <$> actDyn) roofTappedEvt
                 wallTappedEvt = const (house ^. idLens) <$> wallTap
