@@ -25,7 +25,7 @@ import Type.Proxy (Proxy(..))
 import UI.Bridge (toUIDyn)
 import UI.ButtonPane (ButtonsPane, _showCloseDyn, _showResetDyn, _showSaveDyn, _showUndoDyn, buttons)
 import UI.ConfirmDialog (dialogAttr)
-import UI.EditPane (_activeItem, _buildTree, editPane)
+import UI.EditPane (_activeItem, _buildChimney, _buildTree, editPane)
 import UI.Utils (div, mkStyle, (:~))
 
 newtype BuilderUIConf = BuilderUIConf {
@@ -57,7 +57,8 @@ newtype BuilderUIEvents = BuilderUIEvents {
     buttons       :: ButtonsPane,
     slopeSelected :: Event SlopeOption,
     deleted       :: Event Unit,
-    buildTree     :: Event Boolean
+    buildTree     :: Event Boolean,
+    buildChimney  :: Event Boolean
     }
 
 derive instance newtypeBuilderUIEvents :: Newtype BuilderUIEvents _
@@ -66,7 +67,8 @@ instance defaultBuilderUIEvents :: Default BuilderUIEvents where
         buttons       : def,
         slopeSelected : empty,
         deleted       : empty,
-        buildTree     : empty
+        buildTree     : empty,
+        buildChimney  : empty
         }
 
 savingStepDialog :: S.Dynamic SavingStep -> Widget Unit
@@ -104,3 +106,4 @@ houseBuilderUI cfg = do
                    # _slopeSelected .~ (editEvts ^. _activeItem <<< _slopeSelected)
                    # _deleted       .~ (editEvts ^. _activeItem <<< _deleted)
                    # _buildTree     .~ (editEvts ^. _buildTree)
+                   # _buildChimney  .~ (editEvts ^. _buildChimney)
