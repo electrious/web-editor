@@ -464,6 +464,8 @@ builderForHouse evts tInfo =
                     buildTreeDyn = step false $ evts ^. _buildTree
                     buildChimDyn = step false $ evts ^. _buildChimney
 
+                    houseMouseEvt = keepLatest $ foldEvtWith (view _mouseMove) <$> houseNodesEvt
+
                 -- trace new house
                 traceRes <- traceHouse $ def # _modeDyn     .~ (tracerMode <$> actIdDyn <*> buildTreeDyn <*> buildChimDyn)
                                              # _mouseMove   .~ mouseEvt
@@ -471,7 +473,7 @@ builderForHouse evts tInfo =
                                              # _stopTracing .~ (evts ^. _stopTracing)
 
                 newTreeEvt <- buildTree (builderMode <$> actIdDyn <*> buildTreeDyn) mouseEvt
-                newChimEvt <- addChimney (builderMode <$> actIdDyn <*> buildChimDyn) mouseEvt
+                newChimEvt <- addChimney (builderMode <$> actIdDyn <*> buildChimDyn) houseMouseEvt
 
                 let houseOpEvt = getHouseOpEvt houseNodesEvt actIdDyn (traceRes ^. _tracedPolygon) delEvt
                     treeOpEvt  = getTreeOpEvt treeNodesEvt actIdDyn delEvt newTreeEvt
