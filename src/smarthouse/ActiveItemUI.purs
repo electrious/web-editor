@@ -56,11 +56,13 @@ activeItemUIStyle d = mkStyle [
 subtitle :: Maybe ActiveItem -> String
 subtitle (Just (ActiveHouse _)) = "Current House:"
 subtitle (Just (ActiveTree _)) = "Current Tree:"
+subtitle (Just (ActiveChimney _)) = "Current Chimney:"
 subtitle Nothing = ""
 
 delBtnLabel :: Maybe ActiveItem -> String
 delBtnLabel (Just (ActiveHouse _)) = "Delete This House"
 delBtnLabel (Just (ActiveTree _)) = "Delete This Tree"
+delBtnLabel (Just (ActiveChimney _)) = "Delete This Chimney"
 delBtnLabel Nothing = ""
 
 
