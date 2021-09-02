@@ -3,6 +3,7 @@ module Models.SmartHouse.ActiveItem where
 import Data.Default (class Default, def)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
+import Model.SmartHouse.Chimney (Chimney)
 import Model.SmartHouse.House (House)
 import Model.SmartHouse.Roof (Roof)
 import Model.SmartHouse.Tree (Tree)
@@ -22,12 +23,15 @@ instance Default ActHouseRoof where
 
 data ActiveItem = ActiveHouse ActHouseRoof
                 | ActiveTree Tree
+                | ActiveChimney Chimney
 
 
 isActiveHouse :: ActiveItem -> Boolean
 isActiveHouse (ActiveHouse _) = true
 isActiveHouse (ActiveTree _)  = false
+isActiveHouse (ActiveChimney _) = false
 
 activeHouse :: ActiveItem -> Maybe ActHouseRoof
 activeHouse (ActiveHouse h) = Just h
 activeHouse (ActiveTree _)  = Nothing
+activeHouse (ActiveChimney _) = Nothing

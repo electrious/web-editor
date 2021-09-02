@@ -24,7 +24,7 @@ import Data.Tuple (Tuple(..))
 import Data.UUIDMap (UUIDMap)
 import Data.UUIDWrapper (UUID)
 import Editor.ArrayBuilder (runArrayBuilder)
-import Editor.Common.Lenses (_alignment, _apiConfig, _edges, _floor, _height, _houseId, _id, _modeDyn, _name, _orientation, _panelType, _panels, _position, _roof, _roofRackings, _roofs, _slopeSelected, _tapped, _updated)
+import Editor.Common.Lenses (_alignment, _apiConfig, _edges, _floor, _height, _houseId, _id, _modeDyn, _mouseMove, _name, _orientation, _panelType, _panels, _position, _roof, _roofRackings, _roofs, _slopeSelected, _tapped, _updated)
 import Editor.Disposable (Disposee(..))
 import Editor.HeightEditor (_min, dragArrowPos, setupHeightEditor)
 import Editor.HouseEditor (ArrayEditParam, HouseConfig, _heatmap, runHouseEditor)
@@ -206,13 +206,14 @@ editHouse houseCfg conf = do
                 canEditDyn = (&&) <$> actDyn <*> (fromBoolean <$> houseEditDyn)
 
             -- render roofs
-            roofEvtsDyn <- renderRoofs pDyn houseDyn actRoofDyn houseEditDyn
+            roofMeshesDyn <- renderRoofs pDyn houseDyn actRoofDyn houseEditDyn
 
             newHouseEvt1 <- houseWithNewHeight canEditDyn houseDyn
             let newHouseEvt2 = houseWithNewSlope canEditDyn (conf ^. _slopeSelected) houseDyn actRoofIdDyn
                 newHouseEvt  = multicast $ newHouseEvt1 <|> newHouseEvt2
 
-                roofTappedEvt = multicast $ latestAnyEvtWith (view _tapped) roofEvtsDyn
+                roofTappedEvt = multicast $ latestAnyEvtWith (view _tapped) roofMeshesDyn
+                roofMouseEvt  = latestAnyEvtWith (view _mouseMove) roofMeshesDyn
 
                 validRoofTappedEvt = gateDyn (not <<< isActive <$> actDyn) roofTappedEvt
                 wallTappedEvt = const (house ^. idLens) <$> wallTap
@@ -221,6 +222,7 @@ editHouse houseCfg conf = do
                          # _activated    .~ (validRoofTappedEvt <|> wallTappedEvt)
                          # _updated      .~ (HouseOpUpdate <$> newHouseEvt)
                          # _actHouseRoof .~ dynEvent (getRoof <$> actRoofDyn <*> houseDyn)
+                         # _mouseMove    .~ roofMouseEvt
 
                 -- render all roof nodes if available
                 roofsDyn = step Nothing $ Just <$> roofsEvt

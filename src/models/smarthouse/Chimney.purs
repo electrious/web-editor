@@ -8,6 +8,7 @@ import Data.Generic.Rep (class Generic)
 import Data.Lens ((.~), (^.))
 import Data.Meter (Meter, meter, meterVal)
 import Data.Newtype (class Newtype)
+import Data.Show.Generic (genericShow)
 import Data.UUIDWrapper (UUID, emptyUUID, genUUID)
 import Editor.Common.Lenses (_height, _id, _length, _position, _width)
 import Effect (Effect)
@@ -25,6 +26,8 @@ newtype Chimney = Chimney {
 
 derive instance Newtype Chimney _
 derive instance Generic Chimney _
+instance Show Chimney where
+    show = genericShow
 instance HasUUID Chimney where
     idLens = _id
 instance Eq Chimney where
