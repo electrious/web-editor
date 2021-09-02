@@ -525,12 +525,14 @@ saveMeshes cfg imgEvt mFilesEvt houseEvt =
         readyFailedEvt = fromLeft defError <$> filter isLeft readyEvt
         readySuccEvt = fromRight def <$> filter isRight readyEvt
 
-        failedEvt = delay 300 $ uploadFailedEvt <|> createFailedEvt <|> readyFailedEvt
+        failedEvt = delay 300 $ (UploadFailed <<< showAPIError <$> uploadFailedEvt) <|>
+                                (CreatingFailed <<< showAPIError <$> createFailedEvt) <|>
+                                (ReadyFailed <<< showAPIError <$> readyFailedEvt)
 
     in (const UploadingFiles  <$> mFilesEvt)   <|>
        (const CreatingHouse   <$> toCreateEvt) <|>
        (const WaitingForReady <$> createSuccEvt)  <|>
-       (Failed <<< showAPIError <$> failedEvt) <|>
+       failedEvt <|>
        (mkFinished <$> readySuccEvt)
 
 mkFinished :: ReadyAPIResp -> SavingStep

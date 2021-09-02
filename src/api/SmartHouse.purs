@@ -44,18 +44,22 @@ data SavingStep = NotSaving
                 | UploadingFiles
                 | CreatingHouse
                 | WaitingForReady
-                | Failed String
+                | UploadFailed String
+                | CreatingFailed String
+                | ReadyFailed String
                 | Finished BuiltHouseInfo
 
 derive instance Generic SavingStep _
 derive instance Eq SavingStep
 instance Show SavingStep where
-    show NotSaving       = "Not saving"
-    show UploadingFiles  = "Uploading mesh files for the new house..."
-    show CreatingHouse   = "Elli is analyzing the new house data..."
-    show WaitingForReady = "Elli is analyzing the new house data..."
-    show (Failed msg)    = "Savine house failed: " <> msg
-    show (Finished _)    = "Finished creating the new house"
+    show NotSaving            = "Not saving"
+    show UploadingFiles       = "Uploading mesh files for the new house..."
+    show CreatingHouse        = "Elli is analyzing the new house data..."
+    show WaitingForReady      = "Elli is analyzing the new house data..."
+    show (UploadFailed msg)   = "Uploading mesh files failed : " <> msg
+    show (CreatingFailed msg) = "Analyzing house failed      : " <> msg
+    show (ReadyFailed msg)    = "Check result failed         : " <> msg
+    show (Finished _)         = "Finished creating the new house"
 
 stepMode :: SavingStep -> ActiveMode
 stepMode NotSaving    = Inactive
