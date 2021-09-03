@@ -20,7 +20,7 @@ import Math (abs, pi)
 import Model.ActiveMode (ActiveMode, isActive)
 import Model.SmartHouse.Chimney (Chimney, ChimneyNode, ChimneyOp(..), chimneyScale, mkChimney)
 import Model.UUID (idLens)
-import Rendering.Node (Node, _visible, fixNodeDWith, node, tapMesh)
+import Rendering.Node (Node, _exportable, _visible, fixNodeDWith, node, tapMesh)
 import Three.Core.Face3 (normal)
 import Three.Core.Geometry (BoxGeometry, BufferGeometry, CircleGeometry, mkBoxGeometry, mkCircleGeometry)
 import Three.Core.Material (MeshPhongMaterial, mkMeshPhongMaterial)
@@ -72,6 +72,7 @@ editChimney chimney actDyn = fixNodeDWith chimney $ \chimDyn -> do
     tapEvt <- view _tapped <$> tapMesh (def # _name .~ "tap"
                                             # _position .~ (chimBoxPos <$> chimDyn)
                                             # _scale .~ scaleDyn
+                                            # _exportable .~ true
                                         ) chimGeo chimMat
     
     hEvt <- heightBtn isActDyn chimney posDyn
