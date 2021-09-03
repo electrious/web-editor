@@ -69,7 +69,7 @@ editChimney chimney actDyn = fixNodeDWith chimney $ \chimDyn -> do
 
         isActDyn = isActive <$> actDyn
 
-    tapEvt <- view _tapped <$> tapMesh (def # _name .~ "tap"
+    tapEvt <- view _tapped <$> tapMesh (def # _name .~ "chimney"
                                             # _position .~ (chimBoxPos <$> chimDyn)
                                             # _scale .~ scaleDyn
                                             # _exportable .~ true
