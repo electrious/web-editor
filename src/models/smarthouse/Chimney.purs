@@ -36,9 +36,9 @@ instance Default Chimney where
     def = Chimney {
         id       : emptyUUID,
         position : def,
-        length   : meter 0.5,
-        width    : meter 0.5,
-        height   : meter 1.5
+        length   : meter 1.0,
+        width    : meter 1.0,
+        height   : meter 2.0
     }
 
 

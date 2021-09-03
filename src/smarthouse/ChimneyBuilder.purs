@@ -143,15 +143,18 @@ sizeBtn actDyn chimney posDyn = node (def # _name .~ "size-btn"
             
             transXY v = mkVec3 (vecX v) (vecY v) 0.0
             
+            px = meterVal (chimney ^. _width) / 2.0
+            py = meterVal (chimney ^. _length) / (-2.0)
+
             cfg :: DragObjCfg CircleGeometry
             cfg = def # _isActive .~ actDyn
-                      # _position .~ switchYZ (toSizeTarget def)
+                      # _position .~ toSizeTarget (mkVec3 px py 0.0)
                       # _validator .~ pure valid
                       # _deltaTransform .~ Just transXY
         btn <- createDraggableObject cfg
         let tEvt = multicast $ fromSizeTarget <$> btn ^. _position
-            lEvt = meter <<< vecX <$> tEvt
-            wEvt = meter <<< abs <<< vecY <$> tEvt
+            lEvt = meter <<< (*) 2.0 <<< vecX <$> tEvt
+            wEvt = meter <<< (*) 2.0 <<< abs <<< vecY <$> tEvt
         pure { input1 : wEvt, input2: lEvt, output: Tuple lEvt wEvt }
 
 -- big button to drag the chimney around
