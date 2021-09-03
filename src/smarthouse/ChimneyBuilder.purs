@@ -9,21 +9,23 @@ import Data.Lens (set, view, (.~), (^.))
 import Data.Maybe (Maybe(..))
 import Data.Meter (Meter, meter, meterVal)
 import Data.Tuple (Tuple(..))
-import Editor.Common.Lenses (_face, _height, _isActive, _length, _name, _parent, _point, _position, _scale, _tapped, _updated, _width)
+import Editor.Common.Lenses (_face, _height, _isActive, _length, _name, _parent, _point, _position, _rotation, _scale, _tapped, _updated, _width)
 import Editor.ObjectAdder (AdderType(..), createObjectAdder, mkCandidatePoint)
 import Editor.SceneEvent (SceneMouseMoveEvent)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, distinctDyn, sampleDyn, step)
 import FRP.Event (Event)
 import FRP.Event.Extra (multicast, performEvent)
+import Math (abs, pi)
 import Model.ActiveMode (ActiveMode, isActive)
 import Model.SmartHouse.Chimney (Chimney, ChimneyNode, ChimneyOp(..), chimneyScale, mkChimney)
 import Model.UUID (idLens)
-import Rendering.Node (Node, _visible, fixNodeDWith, node, tapMesh)
+import Rendering.Node (Node, _visible, fixNodeD2With, fixNodeDWith, node, tapMesh)
 import Three.Core.Face3 (normal)
 import Three.Core.Geometry (BoxGeometry, BufferGeometry, CircleGeometry, mkBoxGeometry, mkCircleGeometry)
 import Three.Core.Material (MeshPhongMaterial, mkMeshPhongMaterial)
 import Three.Core.Object3D (worldToLocal)
+import Three.Math.Euler (mkEuler)
 import Three.Math.Vector (Vector3, mkVec3, vecX, vecY, vecZ)
 import UI.DraggableObject (DragObjCfg, _customGeo, _deltaTransform, _validator, createDraggableObject)
 
@@ -55,6 +57,11 @@ chimGeo = unsafePerformEffect $ mkBoxGeometry 1.0 1.0 1.0
 chimMat :: MeshPhongMaterial
 chimMat = unsafePerformEffect $ mkMeshPhongMaterial 0xb35900
 
+chimBoxPos :: Chimney -> Vector3
+chimBoxPos c = mkVec3 (vecX p) (vecY p) (vecZ p + h / 2.0)
+    where p = c ^. _position
+          h = meterVal $ c ^. _height
+
 editChimney :: forall e. Chimney -> Dynamic ActiveMode -> Node e ChimneyNode
 editChimney chimney actDyn = fixNodeDWith chimney $ \chimDyn -> do
     let posDyn   = distinctDyn $ view _position <$> chimDyn
@@ -63,18 +70,16 @@ editChimney chimney actDyn = fixNodeDWith chimney $ \chimDyn -> do
         isActDyn = isActive <$> actDyn
 
     tapEvt <- view _tapped <$> tapMesh (def # _name .~ "tap"
-                                            # _position .~ posDyn
+                                            # _position .~ (chimBoxPos <$> chimDyn)
                                             # _scale .~ scaleDyn
                                         ) chimGeo chimMat
     
     hEvt <- heightBtn isActDyn chimney posDyn
     Tuple lEvt wEvt <- sizeBtn isActDyn chimney posDyn
-    posEvt <- chimPosBtn isActDyn chimney
 
     let updEvt = (set _height <$> hEvt) <|>
                  (set _length <$> lEvt) <|>
-                 (set _width  <$> wEvt) <|>
-                 (set _position <$> posEvt)
+                 (set _width  <$> wEvt)
 
         chimneyEvt = multicast $ sampleDyn chimDyn updEvt
         opEvt = ChimUpdate <$> chimneyEvt
@@ -86,6 +91,15 @@ editChimney chimney actDyn = fixNodeDWith chimney $ \chimDyn -> do
 
     pure { input: chimneyEvt, output: cn }
 
+
+toHeightTarget :: Vector3 -> Vector3
+toHeightTarget v = mkVec3 (vecX v) (vecY v) (vecZ v + 1.0)
+
+fromHeightTarget :: Vector3 -> Vector3
+fromHeightTarget v = mkVec3 (vecX v) (vecY v) (vecZ v - 1.0)
+
+switchYZ :: Vector3 -> Vector3
+switchYZ v = mkVec3 (vecX v) (vecZ v) (vecY v)
 
 -- button to change height of the chimney
 heightBtn :: forall e. Dynamic Boolean -> Chimney -> Dynamic Vector3 -> Node e (Event Meter)
@@ -101,42 +115,44 @@ heightBtn actDyn chimney posDyn = node (def # _name .~ "height-btn"
 
             cfg :: DragObjCfg BufferGeometry
             cfg = def # _isActive .~ actDyn
-                      # _position .~ mkVec3 0.0 0.0 (h + 0.5)
+                      # _position .~ switchYZ (toHeightTarget (mkVec3 0.0 0.0 h))
+                      # _rotation .~ mkEuler (pi / 2.0) 0.0 0.0
                       # _validator .~ pure valid
                       # _deltaTransform .~ Just transZ
         
         btn <- createDraggableObject cfg
-        let hEvt = meter <<< ((-) 0.5) <<< vecZ <$> btn ^. _position
+        let hEvt = meter <<< vecZ <<< fromHeightTarget <$> btn ^. _position
 
         pure { input : hEvt, output: hEvt }
 
+
+toSizeTarget :: Vector3 -> Vector3
+toSizeTarget v = mkVec3 (vecX v + 0.5) (vecY v) (vecZ v)
+
+fromSizeTarget :: Vector3 -> Vector3
+fromSizeTarget v = mkVec3 (vecX v - 0.5) (vecY v) (vecZ v)
 
 -- button to change size of the chimney
 sizeBtn :: forall e. Dynamic Boolean -> Chimney -> Dynamic Vector3 -> Node e (Tuple (Event Meter) (Event Meter))
 sizeBtn actDyn chimney posDyn = node (def # _name .~ "size-btn"
                                           # _position .~ posDyn) $
-    fixNodeDWith (chimney ^. _length) \lenDyn ->
-        fixNodeDWith (chimney ^. _width) \widDyn -> do
-            let toTarget v = mkVec3 (vecX v + 0.5) (vecY v) (vecZ v)
-                fromTarget v = mkVec3 (vecX v - 0.5) (vecY v) (vecZ v)
-
-                valid v = let x = vecX v - 0.5
-                              y = vecY v - 0.5
-                          in x > 0.5 && x < 50.0 && y > 0.5 && y < 50.0
-                
-                transXY v = mkVec3 (vecX v) (vecY v) 0.0
-                
-                cfg :: DragObjCfg CircleGeometry
-                cfg = def # _isActive .~ actDyn
-                          # _position .~ toTarget (mkVec3 0.0 0.0 0.5)
-                          # _validator .~ pure valid
-                          # _deltaTransform .~ Just transXY
-            btn <- createDraggableObject cfg
-            let tEvt = multicast $ fromTarget <$> btn ^. _position
-                lEvt = meter <<< vecX <$> tEvt
-                wEvt = meter <<< vecY <$> tEvt
-            pure { input: wEvt, output: { input: lEvt, output: Tuple lEvt wEvt } }
-
+    fixNodeD2With (chimney ^. _width) (chimney ^. _length) \widDyn lenDyn -> do
+        let valid v = let x = vecX v - 0.5
+                          y = vecY v - 0.5
+                      in x > 0.1 && x < 50.0 && y > (-50.0) && y < (-0.1)
+            
+            transXY v = mkVec3 (vecX v) (vecY v) 0.0
+            
+            cfg :: DragObjCfg CircleGeometry
+            cfg = def # _isActive .~ actDyn
+                      # _position .~ switchYZ (toSizeTarget def)
+                      # _validator .~ pure valid
+                      # _deltaTransform .~ Just transXY
+        btn <- createDraggableObject cfg
+        let tEvt = multicast $ fromSizeTarget <$> btn ^. _position
+            lEvt = meter <<< vecX <$> tEvt
+            wEvt = meter <<< abs <<< vecY <$> tEvt
+        pure { input1 : wEvt, input2: lEvt, output: Tuple lEvt wEvt }
 
 -- big button to drag the chimney around
 posBtnGeo :: CircleGeometry
