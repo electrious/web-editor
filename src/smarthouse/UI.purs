@@ -95,7 +95,7 @@ houseBuilderUI cfg = do
         savingStepDialog stepD
         
         btns <- buttons $ def # _showSaveDyn  .~ showD
-                              # _showCloseDyn .~ pure true
+                              # _showCloseDyn .~ pure false
                               # _showResetDyn .~ showR
                               # _showUndoDyn  .~ showR
 
