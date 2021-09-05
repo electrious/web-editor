@@ -18,7 +18,7 @@ import FRP.Event (Event)
 import FRP.Event.Extra (multicast, performEvent)
 import Math (abs, pi)
 import Model.ActiveMode (ActiveMode, isActive)
-import Model.SmartHouse.Chimney (Chimney, ChimneyNode, ChimneyOp(..), chimneyScale, mkChimney)
+import Model.SmartHouse.Chimney (Chimney, ChimneyNode, ChimneyOp(..), mkChimney)
 import Model.UUID (idLens)
 import Rendering.Node (Node, _exportable, _visible, fixNodeDWith, node, tapMesh)
 import Three.Core.Face3 (normal)
@@ -58,20 +58,26 @@ chimMat :: MeshPhongMaterial
 chimMat = unsafePerformEffect $ mkMeshPhongMaterial 0xb35900
 
 chimBoxPos :: Chimney -> Vector3
-chimBoxPos c = mkVec3 (vecX p) (vecY p) (vecZ p + h / 2.0)
+chimBoxPos c = mkVec3 (vecX p) (vecY p) ((vecZ p + h) / 2.0)
     where p = c ^. _position
           h = meterVal $ c ^. _height
+
+chimBoxScale :: Chimney -> Vector3
+chimBoxScale c = mkVec3 (meterVal $ c ^. _length)
+                        (meterVal $ c ^. _width)
+                        (h + z)
+    where h = meterVal $ c ^. _height
+          z = vecZ $ c ^. _position
 
 editChimney :: forall e. Chimney -> Dynamic ActiveMode -> Node e ChimneyNode
 editChimney chimney actDyn = fixNodeDWith chimney $ \chimDyn -> do
     let posDyn   = distinctDyn $ view _position <$> chimDyn
-        scaleDyn = distinctDyn $ chimneyScale <$> chimDyn
 
         isActDyn = isActive <$> actDyn
 
     tapEvt <- view _tapped <$> tapMesh (def # _name .~ "chimney"
                                             # _position .~ (chimBoxPos <$> chimDyn)
-                                            # _scale .~ scaleDyn
+                                            # _scale .~ (chimBoxScale <$> chimDyn)
                                             # _exportable .~ true
                                         ) chimGeo chimMat
     
