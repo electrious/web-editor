@@ -44,7 +44,6 @@ import Model.ActiveMode (ActiveMode(..), fromBoolean)
 import Model.Hardware.PanelTextureInfo (PanelTextureInfo)
 import Model.Hardware.PanelType (PanelType(..))
 import Model.Polygon (Polygon)
-import Model.SmartHouse.Chimney (Chimney, ChimneyNode, ChimneyOp(..))
 import Model.SmartHouse.House (House, JSHouses(..), _trees, createHouseFrom, defaultSlope, exportHouse)
 import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo, _imageFile, _size, _texture, mkHouseTextureInfo)
 import Model.SmartHouse.Tree (Tree, TreeNode, TreeOp(..))
@@ -54,7 +53,6 @@ import OBJExporter (MeshFiles, exportObject)
 import Rendering.DynamicNode (eventNode)
 import Rendering.Node (Node, _exportable, fixNodeDWith, fixNodeE, fixNodeE2With, getEnv, getParent, localEnv, mkNodeEnv, node, runNode, tapMouseMesh)
 import Rendering.TextureLoader (textureFromUrl)
-import SmartHouse.ChimneyBuilder (addChimney, editChimney)
 import SmartHouse.HouseEditor (HouseRenderMode(..), _arrayEditParam, _house, _roofsData, editHouse, renderHouse)
 import SmartHouse.HouseTracer (TracerMode(..), _stopTracing, _tracedPolygon, _tracerMode, _undoTracing, traceHouse)
 import SmartHouse.SlopeOption (SlopeOption)
@@ -165,15 +163,12 @@ mkHelperPlane t = do
 -- internal data structure to manage houses and trees
 type HouseDict = UUIDMap House
 type TreeDict = UUIDMap Tree
-type ChimneyDict = UUIDMap Chimney
 
 newtype HouseDictData = HouseDictData {
-    houses           :: HouseDict,
-    trees            :: TreeDict,
-    chimneys         :: ChimneyDict,
-    housesToRender   :: Maybe HouseDict,
-    treesToRender    :: Maybe TreeDict,
-    chimneysToRender :: Maybe ChimneyDict
+    houses         :: HouseDict,
+    trees          :: TreeDict,
+    housesToRender :: Maybe HouseDict,
+    treesToRender  :: Maybe TreeDict
     }
 
 derive instance Newtype HouseDictData _
@@ -182,28 +177,20 @@ instance Show HouseDictData where
     show = genericShow
 instance Default HouseDictData where
     def = HouseDictData {
-        houses           : M.empty,
-        trees            : M.empty,
-        chimneys         : M.empty,
-        housesToRender   : Nothing,
-        treesToRender    : Nothing,
-        chimneysToRender : Nothing
+        houses         : M.empty,
+        trees          : M.empty,
+        housesToRender : Nothing,
+        treesToRender  : Nothing
         }
 
 _houses :: forall t a r. Newtype t { houses :: a | r } => Lens' t a
 _houses = _Newtype <<< prop (Proxy :: Proxy "houses")
-
-_chimneys :: forall t a r. Newtype t { chimneys :: a | r } => Lens' t a
-_chimneys = _Newtype <<< prop (Proxy :: Proxy "chimneys")
 
 _housesToRender :: forall t a r. Newtype t { housesToRender :: a | r } => Lens' t a
 _housesToRender = _Newtype <<< prop (Proxy :: Proxy "housesToRender")
 
 _treesToRender :: forall t a r. Newtype t { treesToRender :: a | r } => Lens' t a
 _treesToRender = _Newtype <<< prop (Proxy :: Proxy "treesToRender")
-
-_chimneysToRender :: forall t a r. Newtype t { chimneysToRender :: a | r } => Lens' t a
-_chimneysToRender = _Newtype <<< prop (Proxy :: Proxy "chimneysToRender")
 
 
 hasHouse :: HouseDictData -> Boolean
@@ -216,10 +203,6 @@ renderAllHouses s = s # _housesToRender .~ Just (s ^. _houses)
 -- mark all trees to be rendered
 renderAllTrees :: HouseDictData -> HouseDictData
 renderAllTrees s = s # _treesToRender .~ Just (s ^. _trees)
-
--- mark all chimneys to be rendered
-renderAllChimneys :: HouseDictData -> HouseDictData
-renderAllChimneys s = s # _chimneysToRender .~ Just (s ^. _chimneys)
 
 -- | update the HouseDictData with house operations
 applyHouseOp :: HouseOp -> HouseDictData -> HouseDictData
@@ -239,15 +222,6 @@ applyTreeOp (TreeOpDelete tid)  d = if M.member tid (d ^. _trees)
                                     else d # _treesToRender .~ Nothing
 applyTreeOp (TreeOpUpdate tree) d = d # _trees %~ M.insert (tree ^. idLens) tree
                                       # _treesToRender .~ Nothing
-
--- | Update the HouseDictData with Chimney operations
-applyChimneyOp :: ChimneyOp -> HouseDictData -> HouseDictData
-applyChimneyOp (ChimCreate chimney) d = renderAllChimneys $ d # _chimneys %~ M.insert (chimney ^. idLens) chimney
-applyChimneyOp (ChimDelete cid)     d = if M.member cid (d ^. _chimneys)
-                                        then renderAllChimneys $ d # _chimneys %~ M.delete cid
-                                        else d # _chimneysToRender .~ Nothing
-applyChimneyOp (ChimUpdate chimney) d = d # _chimneys %~ M.insert (chimney ^. idLens) chimney
-                                          # _chimneysToRender .~ Nothing
 
 exportHouses :: HouseDictData -> JSHouses
 exportHouses hd = JSHouses { houses : fromFoldable $ M.values $ exportHouse <$> hd ^. _houses }
@@ -298,11 +272,6 @@ renderHouseDict actIdDyn houseCfg arrParam slopeEvt roofsDatEvt houses = travers
 renderTrees :: forall e. Dynamic (Maybe UUID) -> TreeDict -> Node e (UUIDMap TreeNode)
 renderTrees actIdDyn trees = traverse render trees
     where render t = editTree t (getMode t <$> actIdDyn)
-
-renderChimneys :: forall e. Dynamic (Maybe UUID) -> ChimneyDict -> Node e (UUIDMap ChimneyNode)
-renderChimneys actIdDyn chimneys = traverse render chimneys
-    where render c = editChimney c (getMode c <$> actIdDyn)
-
 
 getMode :: forall a. HasUUID a => a -> Maybe UUID -> ActiveMode
 getMode c (Just i) | c ^. idLens == i = Active
@@ -378,19 +347,9 @@ getTreeOpEvt treeNodesEvt actIdDyn delEvt newTreeEvt =
 
     in addTreeEvt <|> updTreeEvt <|> delTreeEvt
 
-
--- chimney operations
-getChimOpEvt :: Event (UUIDMap ChimneyNode) -> Dynamic (Maybe UUID) -> Event Unit -> Event Chimney -> Event ChimneyOp
-getChimOpEvt chimNodesEvt actIdDyn delEvt newChimEvt =
-    let addChimEvt = ChimCreate <$> newChimEvt
-        delChimEvt = multicast $ compact $ sampleDyn actIdDyn $ (const (map ChimDelete)) <$> delEvt
-        updChimEvt = keepLatest $ getUpdEvt <$> chimNodesEvt
-    
-    in addChimEvt <|> updChimEvt <|> delChimEvt
-
 -- manage active item
-getActiveItemEvt :: Event (UUIDMap HouseNode) -> Event (UUIDMap TreeNode) -> Event (UUIDMap ChimneyNode) -> Event SceneTapEvent -> Event HouseDictData -> Event Unit -> Tuple (Event (Maybe UUID)) (Event (Maybe ActiveItem))
-getActiveItemEvt houseNodesEvt treeNodesEvt chimNodesEvt helperTapEvt hdEvt delEvt =
+getActiveItemEvt :: Event (UUIDMap HouseNode) -> Event (UUIDMap TreeNode) -> Event SceneTapEvent -> Event HouseDictData -> Event Unit -> Tuple (Event (Maybe UUID)) (Event (Maybe ActiveItem))
+getActiveItemEvt houseNodesEvt treeNodesEvt helperTapEvt hdEvt delEvt =
     let deactEvt   = multicast $ const Nothing <$> helperTapEvt
 
         actHouseEvt = keepLatest $ getActivated <$> houseNodesEvt
@@ -399,12 +358,9 @@ getActiveItemEvt houseNodesEvt treeNodesEvt chimNodesEvt helperTapEvt hdEvt delE
         treeTapEvt = multicast $ keepLatest $ getTapped <$> treeNodesEvt 
         actTreeEvt = map ActiveTree <$> (sampleOn hdEvt $ getActive (view _trees) <$> treeTapEvt)
 
-        chimTapEvt = multicast $ keepLatest $ getTapped <$> chimNodesEvt
-        actChimEvt = map ActiveChimney <$> (sampleOn hdEvt $ getActive (view _chimneys) <$> chimTapEvt)
+        newActIdEvt = (Just <$> (actHouseEvt <|> treeTapEvt)) <|> deactEvt
 
-        newActIdEvt = (Just <$> (actHouseEvt <|> treeTapEvt <|> chimTapEvt)) <|> deactEvt
-
-        actItemEvt = actRoofEvt <|> actTreeEvt <|> actChimEvt <|> const Nothing <$> delEvt <|> const Nothing <$> deactEvt
+        actItemEvt = actRoofEvt <|> actTreeEvt <|> const Nothing <$> delEvt <|> const Nothing <$> deactEvt
     in Tuple newActIdEvt actItemEvt
 
 
@@ -445,7 +401,6 @@ builderForHouse evts tInfo =
                 -- render all houses
                 let houseToRenderEvt = compact $ view _housesToRender <$> hdEvt
                     treesToRenderEvt = compact $ view _treesToRender <$> hdEvt
-                    chimneysToRenderEvt = compact $ view _chimneysToRender <$> hdEvt
 
                     slopeEvt = evts ^. _slopeSelected
 
@@ -458,13 +413,10 @@ builderForHouse evts tInfo =
                 -- render houses and trees
                 houseNodesEvt <- localEnv (const tInfo) $ eventNode (renderHouseDict actIdDyn houseCfg def slopeEvt roofsDatEvt <$> houseToRenderEvt)
                 treeNodesEvt  <- eventNode (renderTrees actIdDyn <$> treesToRenderEvt)
-                chimNodesEvt  <- eventNode (renderChimneys actIdDyn <$> chimneysToRenderEvt)
 
-                let Tuple newActIdEvt actItemEvt = getActiveItemEvt houseNodesEvt treeNodesEvt chimNodesEvt (helper ^. _tapped) hdEvt delEvt
+                let Tuple newActIdEvt actItemEvt = getActiveItemEvt houseNodesEvt treeNodesEvt (helper ^. _tapped) hdEvt delEvt
                     buildTreeDyn = step false $ evts ^. _buildTree
                     buildChimDyn = step false $ evts ^. _buildChimney
-
-                    houseMouseEvt = keepLatest $ foldEvtWith (view _mouseMove) <$> houseNodesEvt
 
                 -- trace new house
                 traceRes <- traceHouse $ def # _modeDyn     .~ (tracerMode <$> actIdDyn <*> buildTreeDyn <*> buildChimDyn)
@@ -473,16 +425,13 @@ builderForHouse evts tInfo =
                                              # _stopTracing .~ (evts ^. _stopTracing)
 
                 newTreeEvt <- buildTree (builderMode <$> actIdDyn <*> buildTreeDyn) mouseEvt
-                newChimEvt <- addChimney (builderMode <$> actIdDyn <*> buildChimDyn) houseMouseEvt
 
                 let houseOpEvt = getHouseOpEvt houseNodesEvt actIdDyn (traceRes ^. _tracedPolygon) delEvt
                     treeOpEvt  = getTreeOpEvt treeNodesEvt actIdDyn delEvt newTreeEvt
-                    chimOpEvt  = getChimOpEvt chimNodesEvt actIdDyn delEvt newChimEvt
 
                     -- update HouseDictData by applying the house operations
                     newHdEvt = multicast $ sampleOn hdEvt $ (applyHouseOp <$> houseOpEvt) <|>
-                                                            (applyTreeOp <$> treeOpEvt) <|>
-                                                            (applyChimneyOp <$> chimOpEvt)
+                                                            (applyTreeOp <$> treeOpEvt)
 
                 -- export scene 
                 Tuple stepEvt builtHouseInfoEvt <- exportScene tInfo newHdEvt toExpEvt
