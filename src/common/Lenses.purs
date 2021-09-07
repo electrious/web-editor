@@ -337,3 +337,9 @@ _toTarget = _Newtype <<< prop (Proxy :: Proxy "toTarget")
 
 _fromTarget :: forall t a r. Newtype t { fromTarget :: a | r } => Lens' t a
 _fromTarget = _Newtype <<< prop (Proxy :: Proxy "fromTarget")
+
+_buildTree :: forall t a r. Newtype t { buildTree :: a | r } => Lens' t a
+_buildTree = _Newtype <<< prop (Proxy :: Proxy "buildTree")
+
+_buildChimney :: forall t a r. Newtype t { buildChimney :: a | r } => Lens' t a
+_buildChimney = _Newtype <<< prop (Proxy :: Proxy "buildChimney")

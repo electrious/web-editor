@@ -24,7 +24,7 @@ import Data.Tuple (Tuple(..))
 import Data.UUIDMap (UUIDMap)
 import Data.UUIDWrapper (UUID)
 import Editor.ArrayBuilder (runArrayBuilder)
-import Editor.Common.Lenses (_alignment, _apiConfig, _edges, _floor, _height, _houseId, _id, _modeDyn, _mouseMove, _name, _orientation, _panelType, _panels, _position, _roof, _roofRackings, _roofs, _slopeSelected, _tapped, _updated)
+import Editor.Common.Lenses (_alignment, _apiConfig, _buildChimney, _edges, _floor, _height, _houseId, _id, _modeDyn, _name, _orientation, _panelType, _panels, _position, _roof, _roofRackings, _roofs, _slopeSelected, _tapped, _updated)
 import Editor.Disposable (Disposee(..))
 import Editor.HeightEditor (_min, dragArrowPos, setupHeightEditor)
 import Editor.HouseEditor (ArrayEditParam, HouseConfig, _heatmap, runHouseEditor)
@@ -50,13 +50,14 @@ import Model.Roof.Panel (Alignment(..), Orientation(..), Panel, PanelsDict, pane
 import Model.Roof.RoofPlate (RoofPlate)
 import Model.SmartHouse.House (House, _trees, getHouseLines, updateHeight, updateHouseSlope)
 import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo)
-import Model.SmartHouse.Roof (Roof, RoofMesh, renderActRoofOutline, renderRoof)
+import Model.SmartHouse.Roof (Roof)
 import Model.UUID (idLens)
 import Models.SmartHouse.ActiveItem (ActHouseRoof)
 import Rendering.DynamicNode (dynamic, dynamic_)
 import Rendering.Line (renderLine, renderLineLength, renderLineOnly, renderLineWith)
 import Rendering.Node (Node, _exportable, fixNodeD2With, fixNodeE, getEnv, getParent, localEnv, node, tapMesh)
 import SmartHouse.Algorithm.Edge (_lineEdge)
+import SmartHouse.RoofNode (RoofMesh, renderActRoofOutline, renderRoof)
 import SmartHouse.SlopeOption (SlopeOption)
 import Smarthouse.Algorithm.Subtree (_sinks, _source)
 import Smarthouse.HouseNode (HouseNode, HouseOp(..), _actHouseRoof, _activated)
@@ -80,6 +81,7 @@ newtype HouseEditorConf = HouseEditorConf {
     house          :: House,
 
     slopeSelected  :: Event SlopeOption,
+    buildChimney   :: Event Boolean,
     
     roofsData      :: Event RoofsData,
     arrayEditParam :: ArrayEditParam
@@ -91,7 +93,7 @@ instance defaultHouseEditorConf :: Default HouseEditorConf where
         modeDyn        : pure Inactive,
         house          : def,
         slopeSelected  : empty,
-        
+        buildChimney   : empty,
         roofsData      : empty,
         arrayEditParam : def
         }
@@ -129,8 +131,8 @@ rackRequest ps rd = def # _parameters .~ params
           param = XRParameter def
 
 
-renderRoofs :: Dynamic Vector3 -> Dynamic House -> Dynamic (Maybe UUID) -> Dynamic Boolean -> Node HouseTextureInfo (Dynamic (UUIDMap RoofMesh))
-renderRoofs pDyn houseDyn actRoofDyn houseEditDyn = 
+renderRoofs :: Dynamic Vector3 -> Dynamic House -> Dynamic (Maybe UUID) -> Dynamic Boolean -> Dynamic Boolean -> Node HouseTextureInfo (Dynamic (UUIDMap RoofMesh))
+renderRoofs pDyn houseDyn actRoofDyn houseEditDyn chimEditDyn = 
     node (def # _position .~ pDyn
               # _name     .~ "roofs") do
         let roofsDyn = view _roofs <$> houseDyn
@@ -147,7 +149,7 @@ renderRoofs pDyn houseDyn actRoofDyn houseEditDyn =
             dynamic_ $ renderActRoofOutline <$> actRDyn
 
         -- render roofs dynamically
-        dynamic $ renderBuilderRoofs houseEditDyn <$> roofsDyn
+        dynamic $ renderBuilderRoofs houseEditDyn chimEditDyn <$> roofsDyn
 
 
 houseWithNewHeight :: forall e. Dynamic ActiveMode -> Dynamic House -> Node e (Event House)
@@ -191,6 +193,7 @@ editHouse houseCfg conf = do
         roofsEvt = multicast $ conf ^. _roofsData
         -- house can be edited until roofplates loaded and turn in to array edit mode
         houseEditDyn = step true $ const false <$> roofsEvt
+        buildChimDyn = step false $ conf ^. _buildChimney
         
     fixNodeD2With house Nothing \houseDyn actRoofIdDyn ->
         fixNodeE \panelsEvt -> do
@@ -206,14 +209,13 @@ editHouse houseCfg conf = do
                 canEditDyn = (&&) <$> actDyn <*> (fromBoolean <$> houseEditDyn)
 
             -- render roofs
-            roofMeshesDyn <- renderRoofs pDyn houseDyn actRoofDyn houseEditDyn
+            roofMeshesDyn <- renderRoofs pDyn houseDyn actRoofDyn houseEditDyn buildChimDyn
 
             newHouseEvt1 <- houseWithNewHeight canEditDyn houseDyn
             let newHouseEvt2 = houseWithNewSlope canEditDyn (conf ^. _slopeSelected) houseDyn actRoofIdDyn
                 newHouseEvt  = multicast $ newHouseEvt1 <|> newHouseEvt2
 
                 roofTappedEvt = multicast $ latestAnyEvtWith (view _tapped) roofMeshesDyn
-                roofMouseEvt  = latestAnyEvtWith (view _mouseMove) roofMeshesDyn
 
                 validRoofTappedEvt = gateDyn (not <<< isActive <$> actDyn) roofTappedEvt
                 wallTappedEvt = const (house ^. idLens) <$> wallTap
@@ -222,7 +224,6 @@ editHouse houseCfg conf = do
                          # _activated    .~ (validRoofTappedEvt <|> wallTappedEvt)
                          # _updated      .~ (HouseOpUpdate <$> newHouseEvt)
                          # _actHouseRoof .~ dynEvent (getRoof <$> actRoofDyn <*> houseDyn)
-                         # _mouseMove    .~ roofMouseEvt
 
                 -- render all roof nodes if available
                 roofsDyn = step Nothing $ Just <$> roofsEvt
@@ -253,8 +254,8 @@ renderLengths :: forall e. Maybe (List (LineSeg Vector3)) -> Node e Unit
 renderLengths (Just ls) = traverse_ renderLineLength ls
 renderLengths Nothing   = pure unit
 
-renderBuilderRoofs :: forall f. Traversable f => Dynamic Boolean -> f Roof -> Node HouseTextureInfo (f RoofMesh)
-renderBuilderRoofs houseEditDyn = traverse (renderRoof houseEditDyn)
+renderBuilderRoofs :: forall f. Traversable f => Dynamic Boolean -> Dynamic Boolean -> f Roof -> Node HouseTextureInfo (f RoofMesh)
+renderBuilderRoofs houseEditDyn chimEditDyn = traverse (renderRoof houseEditDyn chimEditDyn)
 
 -- render the house as 2D wireframe
 renderHouse :: House -> Node HouseTextureInfo HouseNode

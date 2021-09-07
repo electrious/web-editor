@@ -13,7 +13,6 @@ import Data.Show.Generic (genericShow)
 import Data.UUIDWrapper (UUID, emptyUUID)
 import Editor.Common.Lenses (_id)
 import Editor.RoofManager (ArrayEvents)
-import Editor.SceneEvent (SceneMouseMoveEvent)
 import FRP.Event (Event)
 import Model.SmartHouse.House (House)
 import Model.UUID (class HasUUID)
@@ -36,8 +35,7 @@ newtype HouseNode = HouseNode {
     updated      :: Event HouseOp,
     activated    :: Event UUID,
     actHouseRoof :: Event ActHouseRoof,
-    arrayEvents  :: ArrayEvents,
-    mouseMove    :: Event SceneMouseMoveEvent
+    arrayEvents  :: ArrayEvents
     }
 
 derive instance Newtype HouseNode _
@@ -49,8 +47,7 @@ instance Default HouseNode where
         updated      : empty,
         activated    : empty,
         actHouseRoof : empty,
-        arrayEvents  : def,
-        mouseMove    : empty
+        arrayEvents  : def
         }
 
 _activated :: forall t a r. Newtype t { activated :: a | r } => Lens' t a

@@ -10,6 +10,7 @@ import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Tuple (Tuple(..))
+import Editor.Common.Lenses (_buildChimney, _buildTree)
 import FRP.Dynamic (Dynamic)
 import FRP.Event (Event)
 import Models.SmartHouse.ActiveItem (ActiveItem)
@@ -38,12 +39,6 @@ instance defaultEditPane :: Default EditPane where
         buildChimney : empty,
         activeItem   : def
     }
-
-_buildTree :: forall t a r. Newtype t { buildTree :: a | r } => Lens' t a
-_buildTree = _Newtype <<< prop (Proxy :: Proxy "buildTree")
-
-_buildChimney :: forall t a r. Newtype t { buildChimney :: a | r } => Lens' t a
-_buildChimney = _Newtype <<< prop (Proxy :: Proxy "buildChimney")
 
 _activeItem :: forall t a r. Newtype t { activeItem :: a | r } => Lens' t a
 _activeItem = _Newtype <<< prop (Proxy :: Proxy "activeItem")
