@@ -69,8 +69,8 @@ chimBoxScale c = mkVec3 (meterVal $ c ^. _length)
     where h = meterVal $ c ^. _height
           z = vecZ $ c ^. _position
 
-editChimney :: forall e. Chimney -> Dynamic ActiveMode -> Node e ChimneyNode
-editChimney chimney actDyn = fixNodeDWith chimney $ \chimDyn -> do
+editChimney :: forall e. Dynamic ActiveMode -> Chimney -> Node e ChimneyNode
+editChimney actDyn chimney = fixNodeDWith chimney $ \chimDyn -> do
     let posDyn   = distinctDyn $ view _position <$> chimDyn
 
         isActDyn = isActive <$> actDyn

@@ -48,7 +48,7 @@ import Model.SmartHouse.House (House, JSHouses(..), _trees, createHouseFrom, def
 import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo, _imageFile, _size, _texture, mkHouseTextureInfo)
 import Model.SmartHouse.Tree (Tree, TreeNode, TreeOp(..))
 import Model.UUID (class HasUUID, idLens)
-import Models.SmartHouse.ActiveItem (ActHouseRoof, ActiveItem(..))
+import Models.SmartHouse.ActiveItem (ActHouseItem, ActiveItem(..))
 import OBJExporter (MeshFiles, exportObject)
 import Rendering.DynamicNode (eventNode)
 import Rendering.Node (Node, _exportable, fixNodeDWith, fixNodeE, fixNodeE2With, getEnv, getParent, localEnv, mkNodeEnv, node, runNode, tapMouseMesh)
@@ -58,7 +58,7 @@ import SmartHouse.HouseTracer (TracerMode(..), _stopTracing, _tracedPolygon, _tr
 import SmartHouse.SlopeOption (SlopeOption)
 import SmartHouse.TreeBuilder (buildTree, editTree)
 import SmartHouse.UI (_activeItemDyn, _savingStepDyn, houseBuilderUI)
-import Smarthouse.HouseNode (HouseNode, HouseOp(..), _actHouseRoof, _activated)
+import Smarthouse.HouseNode (HouseNode, HouseOp(..), _actHouseItem, _activated)
 import Specular.Dom.Widget (runMainWidgetInNode)
 import Three.Core.Geometry (mkPlaneGeometry)
 import Three.Core.Material (mkMeshBasicMaterialWithTexture)
@@ -225,8 +225,8 @@ applyTreeOp (TreeOpUpdate tree) d = d # _trees %~ M.insert (tree ^. idLens) tree
 exportHouses :: HouseDictData -> JSHouses
 exportHouses hd = JSHouses { houses : fromFoldable $ M.values $ exportHouse <$> hd ^. _houses }
 
-getActiveRoof :: forall f. Foldable f => Functor f => f HouseNode -> Event ActHouseRoof
-getActiveRoof = foldEvtWith (view _actHouseRoof)
+getActiveRoof :: forall f. Foldable f => Functor f => f HouseNode -> Event ActHouseItem
+getActiveRoof = foldEvtWith (view _actHouseItem)
 
 -- get the activated house from a list of house nodes
 getActivated :: forall f. Foldable f => Functor f => f HouseNode -> Event UUID
@@ -256,8 +256,8 @@ updateHouseConfig cfg compIdEvt = do
     pure $ cfg # _apiConfig .~ step defCfg cfgEvt
 
 
-renderHouseDict :: Dynamic (Maybe UUID) -> HouseConfig -> ArrayEditParam -> Event SlopeOption -> Event RoofsData -> HouseDict -> Node HouseTextureInfo (UUIDMap HouseNode)
-renderHouseDict actIdDyn houseCfg arrParam slopeEvt roofsDatEvt houses = traverse render houses
+renderHouseDict :: Dynamic (Maybe UUID) -> HouseConfig -> ArrayEditParam -> Event SlopeOption -> Event RoofsData -> Event Boolean -> HouseDict -> Node HouseTextureInfo (UUIDMap HouseNode)
+renderHouseDict actIdDyn houseCfg arrParam slopeEvt roofsDatEvt buildChimEvt houses = traverse render houses
     where render h = if houseRenderMode == EditHouseMode
                      then do
                          let md = getMode h <$> actIdDyn
@@ -266,6 +266,7 @@ renderHouseDict actIdDyn houseCfg arrParam slopeEvt roofsDatEvt houses = travers
                                                   # _slopeSelected  .~ slopeEvt
                                                   # _roofsData      .~ roofsDatEvt
                                                   # _arrayEditParam .~ arrParam
+                                                  # _buildChimney   .~ buildChimEvt
                      else renderHouse h
 
 renderTrees :: forall e. Dynamic (Maybe UUID) -> TreeDict -> Node e (UUIDMap TreeNode)
@@ -402,6 +403,7 @@ builderForHouse evts tInfo =
                     treesToRenderEvt = compact $ view _treesToRender <$> hdEvt
 
                     slopeEvt = evts ^. _slopeSelected
+                    buildChimEvt = evts ^. _buildChimney
 
                     mouseEvt = multicast $ helper ^. _mouseMove
                     delEvt   = multicast $ evts ^. _deleted
@@ -410,7 +412,7 @@ builderForHouse evts tInfo =
                 houseCfg <- liftEffect $ updateHouseConfig (houseCfgFromBuilderCfg cfg) companyIdEvt
 
                 -- render houses and trees
-                houseNodesEvt <- localEnv (const tInfo) $ eventNode (renderHouseDict actIdDyn houseCfg def slopeEvt roofsDatEvt <$> houseToRenderEvt)
+                houseNodesEvt <- localEnv (const tInfo) $ eventNode (renderHouseDict actIdDyn houseCfg def slopeEvt roofsDatEvt buildChimEvt <$> houseToRenderEvt)
                 treeNodesEvt  <- eventNode (renderTrees actIdDyn <$> treesToRenderEvt)
 
                 let Tuple newActIdEvt actItemEvt = getActiveItemEvt houseNodesEvt treeNodesEvt (helper ^. _tapped) hdEvt delEvt

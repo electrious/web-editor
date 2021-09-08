@@ -10,7 +10,7 @@ import Data.List (head)
 import Data.Map (values)
 import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Newtype (class Newtype)
-import Editor.Common.Lenses (_deleted, _roof, _roofs, _slope, _slopeSelected)
+import Editor.Common.Lenses (_chimney, _deleted, _roof, _roofs, _slope, _slopeSelected)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic, dynEvent, step)
@@ -18,7 +18,7 @@ import FRP.Event (Event, create)
 import Foreign.Object as Obj
 import Math.Angle (Angle, degree, degreeVal, fromString)
 import Model.SmartHouse.House (defaultSlope)
-import Models.SmartHouse.ActiveItem (ActHouseRoof, ActiveItem(..), activeHouse, isActiveHouse)
+import Models.SmartHouse.ActiveItem (ActHouseItem, ActiveItem(..), activeHouse, isActiveHouse)
 import SmartHouse.HouseEditor (_house)
 import SmartHouse.SlopeOption (SlopeOption, slopeOption)
 import Specular.Dom.Browser (Attrs)
@@ -54,15 +54,17 @@ activeItemUIStyle d = mkStyle [
 
 
 subtitle :: Maybe ActiveItem -> String
-subtitle (Just (ActiveHouse _)) = "Current House:"
+subtitle (Just (ActiveHouse h)) = case h ^. _chimney of
+    Nothing -> "Current House:"
+    Just _  -> "Current Chimney:"
 subtitle (Just (ActiveTree _)) = "Current Tree:"
-subtitle (Just (ActiveChimney _)) = "Current Chimney:"
 subtitle Nothing = ""
 
 delBtnLabel :: Maybe ActiveItem -> String
-delBtnLabel (Just (ActiveHouse _)) = "Delete This House"
+delBtnLabel (Just (ActiveHouse h)) = case h ^. _chimney of
+    Nothing -> "Delete This House"
+    Just _  -> "Delete This Chimney"
 delBtnLabel (Just (ActiveTree _)) = "Delete This Tree"
-delBtnLabel (Just (ActiveChimney _)) = "Delete This Chimney"
 delBtnLabel Nothing = ""
 
 
@@ -124,7 +126,7 @@ slopeScopeUI = div [classes ["uk-flex", "uk-flex-row", "uk-flex-middle"]] do
 
     fromUIDyn checkD
 
-getSlope :: Maybe ActHouseRoof -> Angle
+getSlope :: Maybe ActHouseItem -> Angle
 getSlope (Just h) = case h ^. _roof of
     Just r  -> r ^. _slope
     Nothing -> let r = head $ values $ h ^. _house <<< _roofs

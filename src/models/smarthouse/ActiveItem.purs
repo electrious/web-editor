@@ -9,29 +9,27 @@ import Model.SmartHouse.Roof (Roof)
 import Model.SmartHouse.Tree (Tree)
 
 
-newtype ActHouseRoof = ActHouseRoof {
-    house :: House,
-    roof  :: Maybe Roof
+newtype ActHouseItem = ActHouseItem {
+    house   :: House,
+    roof    :: Maybe Roof,
+    chimney :: Maybe Chimney
 }
 
-derive instance Newtype ActHouseRoof _
-instance Default ActHouseRoof where
-    def = ActHouseRoof {
-        house : def,
-        roof  : Nothing
+derive instance Newtype ActHouseItem _
+instance Default ActHouseItem where
+    def = ActHouseItem {
+        house   : def,
+        roof    : Nothing,
+        chimney : Nothing
     }
 
-data ActiveItem = ActiveHouse ActHouseRoof
+data ActiveItem = ActiveHouse ActHouseItem
                 | ActiveTree Tree
-                | ActiveChimney Chimney
-
 
 isActiveHouse :: ActiveItem -> Boolean
 isActiveHouse (ActiveHouse _) = true
 isActiveHouse (ActiveTree _)  = false
-isActiveHouse (ActiveChimney _) = false
 
-activeHouse :: ActiveItem -> Maybe ActHouseRoof
+activeHouse :: ActiveItem -> Maybe ActHouseItem
 activeHouse (ActiveHouse h) = Just h
 activeHouse (ActiveTree _)  = Nothing
-activeHouse (ActiveChimney _) = Nothing

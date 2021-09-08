@@ -52,7 +52,9 @@ data ChimneyOp = ChimCreate Chimney
                | ChimDelete UUID
                | ChimUpdate Chimney
 derive instance Eq ChimneyOp
-
+derive instance Generic ChimneyOp _
+instance Show ChimneyOp where
+    show = genericShow
 
 newtype ChimneyNode = ChimneyNode {
     id      :: UUID,

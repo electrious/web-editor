@@ -11,7 +11,7 @@ import Data.Default (class Default, def)
 import Data.Filterable (filter)
 import Data.Foldable (foldl)
 import Data.Generic.Rep (class Generic)
-import Data.Lens (Lens', view, (.~), (^.))
+import Data.Lens (Lens', view, (%~), (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (List, concatMap, findIndex)
@@ -24,15 +24,16 @@ import Data.Set as S
 import Data.Show.Generic (genericShow)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import Data.UUIDWrapper (UUID, emptyUUID, genUUID)
 import Data.UUIDMap (UUIDMap)
 import Data.UUIDMap as UM
+import Data.UUIDWrapper (UUID, emptyUUID, genUUID)
 import Editor.Common.Lenses (_edges, _floor, _height, _id, _position, _roofs)
 import Effect (Effect)
 import Math.Angle (Angle, degree)
 import Math.LineSeg (LineSeg)
 import Model.Polygon (Polygon, _polyVerts, counterClockPoly, modifyVertAt)
 import Model.Roof.RoofPlate (Point, vec2Point)
+import Model.SmartHouse.Chimney (Chimney, ChimneyOp(..))
 import Model.SmartHouse.Roof (JSRoof, Roof, RoofState(..), exportRoof, roofState)
 import Model.UUID (class HasUUID, idLens)
 import SmartHouse.Algorithm.Edge (Edge, _lineEdge)
@@ -55,7 +56,8 @@ newtype House = House {
     height    :: Meter,
     trees     :: UUIDMap Subtree,
     edges     :: List Edge,
-    roofs     :: UUIDMap Roof
+    roofs     :: UUIDMap Roof,
+    chimneys  :: UUIDMap Chimney
     }
 
 derive instance Newtype House _
@@ -67,7 +69,8 @@ instance Default House where
         height    : meter 0.0,
         trees     : M.empty,
         edges     : empty,
-        roofs     : M.empty
+        roofs     : M.empty,
+        chimneys  : M.empty
         }
 instance Eq House where
     eq h1 h2 = h1 ^. _id == h2 ^. _id
@@ -78,6 +81,9 @@ instance HasUUID House where
 
 _trees :: forall t a r. Newtype t { trees :: a | r } => Lens' t a
 _trees = _Newtype <<< prop (Proxy :: Proxy "trees")
+
+_chimneys :: forall t a r. Newtype t { chimneys :: a | r } => Lens' t a
+_chimneys = _Newtype <<< prop (Proxy :: Proxy "chimneys")
 
 createHouseFrom :: Angle -> Polygon Vector3 -> Effect House
 createHouseFrom slope poly = do
@@ -93,7 +99,8 @@ createHouseFrom slope poly = do
         height    : meter 3.5,   -- default height
         trees     : UM.fromFoldable trees,
         edges     : edges,
-        roofs     : UM.fromFoldable roofs
+        roofs     : UM.fromFoldable roofs,
+        chimneys  : M.empty
         }
 
 updateHeight :: Meter -> House -> House
@@ -102,6 +109,11 @@ updateHeight height h = h # _height .~ height
 updateHouseSlope :: SlopeOption -> Maybe UUID -> House -> Effect House
 updateHouseSlope (ActiveRoof a) id h = updateActiveRoofSlope a id h
 updateHouseSlope (AllRoofs a)   _  h = updateHouseWith (updateSlope a <$> h ^. _floor) h
+
+updateHouseChimney :: ChimneyOp -> House -> House
+updateHouseChimney (ChimCreate c) h = h # _chimneys %~ M.insert (c ^. idLens) c
+updateHouseChimney (ChimDelete i) h = h # _chimneys %~ M.delete i
+updateHouseChimney (ChimUpdate c) h = h # _chimneys %~ M.update (const $ Just c) (c ^. idLens)
 
 updateActiveRoofSlope :: Angle -> Maybe UUID -> House -> Effect House
 updateActiveRoofSlope _ Nothing   h = pure h
