@@ -24,7 +24,7 @@ import Data.Tuple (Tuple(..))
 import Data.UUIDMap (UUIDMap)
 import Data.UUIDWrapper (UUID)
 import Editor.ArrayBuilder (runArrayBuilder)
-import Editor.Common.Lenses (_alignment, _apiConfig, _buildChimney, _chimney, _edges, _floor, _height, _houseId, _id, _modeDyn, _mouseMove, _name, _orientation, _panelType, _panels, _position, _roof, _roofRackings, _roofs, _slopeSelected, _tapped, _updated)
+import Editor.Common.Lenses (_alignment, _apiConfig, _buildChimney, _edges, _floor, _height, _houseId, _id, _modeDyn, _mouseMove, _name, _orientation, _panelType, _panels, _position, _roof, _roofRackings, _roofs, _slopeSelected, _tapped, _updated)
 import Editor.Disposable (Disposee(..))
 import Editor.HeightEditor (_min, dragArrowPos, setupHeightEditor)
 import Editor.HouseEditor (ArrayEditParam, HouseConfig, _heatmap, runHouseEditor)
@@ -33,6 +33,7 @@ import Editor.PanelNode (PanelOpacity(..))
 import Editor.Rendering.PanelRendering (_opacity)
 import Editor.RoofManager (RoofsData, allPanelsEvt, calcMainOrientation, getActivated)
 import Editor.RoofNode (RoofNode, RoofNodeConfig, RoofNodeMode(..), _racking, createRoofNode)
+import Editor.SceneEvent (SceneMouseMoveEvent)
 import Effect.Class (liftEffect)
 import Effect.Random (randomInt)
 import Effect.Unsafe (unsafePerformEffect)
@@ -49,7 +50,7 @@ import Model.Racking.RoofParameter (RoofParameter(..))
 import Model.Roof.Panel (Alignment(..), Orientation(..), Panel, PanelsDict, panelsDict)
 import Model.Roof.RoofPlate (RoofPlate)
 import Model.SmartHouse.Chimney (Chimney, ChimneyNode, ChimneyOp(..))
-import Model.SmartHouse.House (House, _chimneys, _trees, getHouseLines, updateHeight, updateHouseChimney, updateHouseSlope)
+import Model.SmartHouse.House (House, _trees, getHouseLines, updateHeight, updateHouseSlope)
 import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo)
 import Model.SmartHouse.Roof (Roof)
 import Model.UUID (idLens)
@@ -117,7 +118,6 @@ getActItem :: Maybe UUID -> House -> ActHouseItem
 getActItem Nothing h  = def # _house .~ h
 getActItem (Just i) h = def # _house .~ h
                             # _roof  .~ M.lookup i (h ^. _roofs)
-                            # _chimney .~ M.lookup i (h ^. _chimneys)
 
 activeId :: ActiveMode -> Maybe UUID -> Maybe UUID
 activeId Active   i = i
@@ -152,20 +152,45 @@ renderRoofs pDyn houseDyn actRoofDyn houseEditDyn chimEditDyn =
             dynamic_ $ renderActRoofOutline <$> actRDyn
 
         -- render roofs dynamically
-        dynamic $ renderBuilderRoofs houseEditDyn chimEditDyn <$> roofsDyn
+        m <- dynamic $ renderBuilderRoofs houseEditDyn chimEditDyn <$> roofsDyn
 
-renderChimneys :: forall e. Dynamic Vector3 -> Dynamic ActiveMode -> Dynamic House -> Dynamic (Maybe UUID) -> Node e (Dynamic (UUIDMap ChimneyNode))
-renderChimneys pDyn actDyn hsDyn actIdDyn =
-    node (def # _name .~ "chimneys"
-              # _position .~ pDyn) do
-        let chimsDyn = distinctDyn $ view _chimneys <$> hsDyn
-            f c Active (Just i) = if c ^. idLens == i then Active else Inactive
-            f _ Active Nothing  = Inactive
-            f _ Inactive _      = Inactive
-            edit c = do
-                let d = f c <$> actDyn <*> actIdDyn
-                editChimney d c
-        dynamic $ traverse edit <$> chimsDyn
+        let mouseEvt = latestAnyEvtWith (view _mouseMove) m
+        editChimneys houseEditDyn chimEditDyn mouseEvt
+
+        pure m
+
+updateChimneys :: ChimneyOp -> UUIDMap Chimney -> UUIDMap Chimney
+updateChimneys (ChimCreate c) = M.insert (c ^. idLens) c
+updateChimneys (ChimUpdate c) = M.update (const $ Just c) (c ^. idLens)
+updateChimneys (ChimDelete c) = M.delete c
+
+renderChimneys :: forall e f. Traversable f => Dynamic ActiveMode -> Dynamic (Maybe UUID) -> f Chimney -> Node e (f ChimneyNode)
+renderChimneys actDyn actIdDyn = traverse f
+    where f c = editChimney (g c <$> actDyn <*> actIdDyn) c
+          g c Active (Just i) = if c ^. _id == i then Active else Inactive
+          g _ Active Nothing  = Inactive
+          g _ Inactive _      = Inactive
+
+
+editChimneys :: forall e. Dynamic Boolean -> Dynamic Boolean -> Event (Tuple UUID SceneMouseMoveEvent) -> Node e Unit
+editChimneys houseEditDyn chimEditDyn mouseEvt = do
+    let actDyn = fromBoolean <$> ((&&) <$> houseEditDyn <*> chimEditDyn)
+        actEditDyn = fromBoolean <$> houseEditDyn
+
+    fixNodeD2With M.empty Nothing \chimsDyn actIdDyn -> do
+        -- render all chimneys
+        chimNodesDyn <- dynamic $ renderChimneys actEditDyn actIdDyn <$> distinctDyn chimsDyn
+        let chimTapEvt = latestAnyEvtWith (view _tapped) chimNodesDyn
+            chimUpdEvt = latestAnyEvtWith (view _updated) chimNodesDyn
+
+        -- add new chimney
+        chimEvt <- addChimney actDyn mouseEvt
+        let newChimEvt = ChimCreate <$> chimEvt
+
+            newChimsEvt = sampleDyn chimsDyn $ updateChimneys <$> (newChimEvt <|> chimUpdEvt)
+
+        pure { input1: newChimsEvt, input2: Just <$> chimTapEvt, output: unit }
+
 
 houseWithNewHeight :: forall e. Dynamic ActiveMode -> Dynamic House -> Node e (Event House)
 houseWithNewHeight canEditDyn houseDyn = do
@@ -192,10 +217,6 @@ houseWithNewSlope canEditDyn sEvt houseDyn actRoofIdDyn = performEvent $ sampleD
     -- only accept slope events if the house is active and can be edit
     where slopeEvt = gateDyn (isActive <$> canEditDyn) sEvt
 
-houseWithNewChim :: Dynamic House -> Event Chimney -> Event ChimneyOp -> Event House
-houseWithNewChim houseDyn chEvt chOpEvt = sampleDyn houseDyn $ updateHouseChimney <$> opEvt
-    where opEvt = chOpEvt <|> (ChimCreate <$> chEvt)
-
 rackSysForNewPanels :: Dynamic APIConfig -> Event RoofsData -> Event (Array Panel) -> Event RackingSystem
 rackSysForNewPanels apiCfg roofsEvt panelsEvt = Evt.keepLatest $ performEvent $ sampleDyn apiCfg (runRackAPI <<< doRack <$> reqEvt)
     where reqEvt = sampleOn roofsEvt $ rackRequest <$> debounce (Milliseconds 100.0) panelsEvt
@@ -214,7 +235,6 @@ editHouse houseCfg conf = do
         houseEditDyn = step true $ const false <$> roofsEvt
         -- build chimney mode or not
         buildChimDyn = step false $ conf ^. _buildChimney
-        chimActDyn   = fromBoolean <$> ((&&) <$> houseEditDyn <*> buildChimDyn)
 
     fixNodeD2With house Nothing \houseDyn actIdDyn ->
         fixNodeE \panelsEvt -> do
@@ -232,18 +252,9 @@ editHouse houseCfg conf = do
             -- render roofs
             roofMeshesDyn <- renderRoofs pDyn houseDyn actItemIdDyn houseEditDyn buildChimDyn
 
-            -- render chimneys
-            chimNodesDyn <- renderChimneys pDyn chimActDyn houseDyn actIdDyn
-            let chimTapEvt = multicast $ latestAnyEvtWith (view _tapped) chimNodesDyn
-                chimUpdEvt = multicast $ latestAnyEvtWith (view _updated) chimNodesDyn
-
-            let roofMouseEvt = latestAnyEvtWith (view _mouseMove) roofMeshesDyn
-            chimEvt <- addChimney chimActDyn roofMouseEvt
-
             newHouseEvt1 <- houseWithNewHeight canEditDyn houseDyn
             let newHouseEvt2 = houseWithNewSlope canEditDyn (conf ^. _slopeSelected) houseDyn actIdDyn
-                newHouseEvt3 = houseWithNewChim houseDyn chimEvt chimUpdEvt
-                newHouseEvt  = multicast $ newHouseEvt1 <|> newHouseEvt2 <|> newHouseEvt3
+                newHouseEvt  = multicast $ newHouseEvt1 <|> newHouseEvt2
 
                 roofTappedEvt = multicast $ latestAnyEvtWith (view _tapped) roofMeshesDyn
                 validRoofTappedEvt = gateDyn (not <<< isActive <$> actDyn) roofTappedEvt
@@ -263,7 +274,7 @@ editHouse houseCfg conf = do
 
             let newPanelsEvt = multicast $ latestEvt $ allPanelsEvt <$> nodesDyn
             
-            pure {input : newPanelsEvt, output : { input1: newHouseEvt, input2: Just <$> (roofTappedEvt <|> chimTapEvt), output: hn } }
+            pure {input : newPanelsEvt, output : { input1: newHouseEvt, input2: Just <$> roofTappedEvt, output: hn } }
 
 
 wallMat :: MeshPhongMaterial

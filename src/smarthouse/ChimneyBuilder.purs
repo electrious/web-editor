@@ -8,13 +8,14 @@ import Data.Default (def)
 import Data.Lens (set, view, (.~), (^.))
 import Data.Maybe (Maybe(..))
 import Data.Meter (Meter, meter, meterVal)
-import Data.Tuple (Tuple(..))
+import Data.Tuple (Tuple(..), fst, snd)
+import Data.UUIDWrapper (UUID)
 import Editor.Common.Lenses (_face, _height, _isActive, _length, _name, _parent, _point, _position, _rotation, _scale, _tapped, _updated, _width)
 import Editor.ObjectAdder (AdderType(..), createObjectAdder, mkCandidatePoint)
 import Editor.SceneEvent (SceneMouseMoveEvent)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, distinctDyn, sampleDyn, step)
-import FRP.Event (Event)
+import FRP.Event (Event, sampleOn)
 import FRP.Event.Extra (multicast, performEvent)
 import Math (abs, pi)
 import Model.ActiveMode (ActiveMode, isActive)
@@ -30,7 +31,7 @@ import Three.Math.Vector (Vector3, mkVec3, vecX, vecY, vecZ)
 import UI.DraggableObject (DragObjCfg, _customGeo, _deltaTransform, _validator, createDraggableObject)
 
 
-addChimney :: forall e. Dynamic ActiveMode -> Event SceneMouseMoveEvent -> Node e (Event Chimney)
+addChimney :: forall e. Dynamic ActiveMode -> Event (Tuple UUID SceneMouseMoveEvent) -> Node e (Event Chimney)
 addChimney actDyn mouseEvt = node (def # _name .~ "chimney-builder"
                                        # _visible .~ (isActive <$> actDyn)) do
     e <- ask
@@ -41,14 +42,15 @@ addChimney actDyn mouseEvt = node (def # _name .~ "chimney-builder"
             np <- worldToLocal (evt ^. _point) parent
             pure $ Just $ mkCandidatePoint np (normal $ evt ^. _face)
        
-        candPntDyn = step Nothing $ performEvent $ getCandPoint <$> mouseEvt
+        mEvt = multicast mouseEvt
+        candPntDyn = step Nothing $ performEvent $ getCandPoint <<< snd <$> mEvt
 
         opt = def # _name .~ "chimney-adder"
                   # _position .~ pure (mkVec3 0.0 0.0 0.01)
         
     addedPntEvt <- node opt $ createObjectAdder DefaultAdder candPntDyn (isActive <$> actDyn)
-
-    pure $ performEvent $ mkChimney <<< view _position <$> addedPntEvt
+    let posEvt = view _position <$> addedPntEvt
+    pure $ performEvent $ sampleOn (fst <$> mEvt) $ flip mkChimney <$> posEvt
 
 
 chimGeo :: BoxGeometry

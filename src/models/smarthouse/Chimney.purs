@@ -10,7 +10,7 @@ import Data.Meter (Meter, meter)
 import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
 import Data.UUIDWrapper (UUID, emptyUUID, genUUID)
-import Editor.Common.Lenses (_id, _position)
+import Editor.Common.Lenses (_id, _position, _roofId)
 import Effect (Effect)
 import FRP.Event (Event)
 import Model.UUID (class HasUUID, idLens)
@@ -18,6 +18,7 @@ import Three.Math.Vector (Vector3)
 
 newtype Chimney = Chimney {
     id       :: UUID,
+    roofId   :: UUID,
     position :: Vector3,
     length   :: Meter,
     width    :: Meter,
@@ -35,6 +36,7 @@ instance Eq Chimney where
 instance Default Chimney where
     def = Chimney {
         id       : emptyUUID,
+        roofId   : emptyUUID,
         position : def,
         length   : meter 1.0,
         width    : meter 1.0,
@@ -42,10 +44,11 @@ instance Default Chimney where
     }
 
 
-mkChimney :: Vector3 -> Effect Chimney
-mkChimney pos = do
+mkChimney :: UUID -> Vector3 -> Effect Chimney
+mkChimney rid pos = do
     i <- genUUID
     pure $ def # _id       .~ i
+               # _roofId   .~ rid
                # _position .~ pos
 
 data ChimneyOp = ChimCreate Chimney

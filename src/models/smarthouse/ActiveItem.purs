@@ -1,8 +1,10 @@
 module Models.SmartHouse.ActiveItem where
 
 import Data.Default (class Default, def)
-import Data.Maybe (Maybe(..))
+import Data.Lens ((^.))
+import Data.Maybe (Maybe(..), isNothing)
 import Data.Newtype (class Newtype)
+import Editor.Common.Lenses (_chimney)
 import Model.SmartHouse.Chimney (Chimney)
 import Model.SmartHouse.House (House)
 import Model.SmartHouse.Roof (Roof)
@@ -27,7 +29,7 @@ data ActiveItem = ActiveHouse ActHouseItem
                 | ActiveTree Tree
 
 isActiveHouse :: ActiveItem -> Boolean
-isActiveHouse (ActiveHouse _) = true
+isActiveHouse (ActiveHouse h) = isNothing (h ^. _chimney)
 isActiveHouse (ActiveTree _)  = false
 
 activeHouse :: ActiveItem -> Maybe ActHouseItem

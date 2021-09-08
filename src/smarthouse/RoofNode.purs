@@ -8,6 +8,7 @@ import Data.Lens ((.~), (^.))
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Traversable (traverse_)
+import Data.Tuple (Tuple(..))
 import Data.UUIDWrapper (UUID)
 import Editor.Common.Lenses (_mouseMove, _name, _normal, _polygon, _tapped)
 import Editor.SceneEvent (SceneMouseMoveEvent)
@@ -29,7 +30,7 @@ import Three.Math.Vector (Vector3)
 
 newtype RoofMesh = RoofMesh {
     tapped    :: Event UUID,
-    mouseMove :: Event SceneMouseMoveEvent
+    mouseMove :: Event (Tuple UUID SceneMouseMoveEvent)
 }
 
 derive instance Newtype RoofMesh _
@@ -82,4 +83,4 @@ renderSlopeRoof rid enableDyn chimEditDyn poly = do
     m <- tapMouseMesh (def # _name       .~ "roof"
                            # _exportable .~ true) geo mat
     pure $ def # _tapped    .~ gateDyn enableDyn (const rid <$> m ^. _tapped)
-               # _mouseMove .~ gateDyn ((&&) <$> enableDyn <*> chimEditDyn) (m ^. _mouseMove)
+               # _mouseMove .~ gateDyn ((&&) <$> enableDyn <*> chimEditDyn) (Tuple rid <$> m ^. _mouseMove)
