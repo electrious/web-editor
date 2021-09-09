@@ -41,7 +41,7 @@ import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, current, distinctDyn, dynEvent, gateDyn, latestEvt, sampleDyn, step)
 import FRP.Event (Event, sampleOn)
 import FRP.Event as Evt
-import FRP.Event.Extra (debounce, debug, delay, multicast, performEvent)
+import FRP.Event.Extra (debounce, delay, multicast, performEvent)
 import Math.LineSeg (LineSeg, mkLineSeg)
 import Model.ActiveMode (ActiveMode(..), fromBoolean, isActive)
 import Model.Polygon (Polygon, _polyVerts)
@@ -61,7 +61,7 @@ import Rendering.Line (renderLine, renderLineLength, renderLineOnly, renderLineW
 import Rendering.Node (Node, _exportable, fixNodeD2With, fixNodeE, getEnv, getParent, localEnv, node, tapMesh)
 import SmartHouse.Algorithm.Edge (_lineEdge)
 import SmartHouse.ChimneyBuilder (addChimney, editChimney)
-import SmartHouse.RoofNode (RoofMesh, renderActRoofOutline, renderRoof)
+import SmartHouse.RoofNode (renderActRoofOutline, renderRoof)
 import SmartHouse.SlopeOption (SlopeOption)
 import Smarthouse.Algorithm.Subtree (_sinks, _source)
 import Smarthouse.HouseNode (HouseNode, HouseOp(..), _actHouseItem, _activated)
@@ -145,8 +145,8 @@ derive instance Newtype RoofEvts _
 _chimTapped :: forall t a r. Newtype t { chimTapped :: a | r } => Lens' t a
 _chimTapped = _Newtype <<< prop (Proxy :: Proxy "chimTapped")
 
-renderRoofs :: Dynamic Vector3 -> Dynamic House -> Dynamic (Maybe UUID) -> Dynamic Boolean -> Dynamic Boolean -> Node HouseTextureInfo RoofEvts
-renderRoofs pDyn houseDyn actRoofDyn houseEditDyn chimEditDyn = 
+renderRoofs :: Dynamic Vector3 -> Dynamic House -> Dynamic (Maybe UUID) -> Dynamic ActiveMode -> Dynamic Boolean -> Node HouseTextureInfo RoofEvts
+renderRoofs pDyn houseDyn actRoofDyn houseModeDyn chimEditDyn = 
     node (def # _position .~ pDyn
               # _name     .~ "roofs") do
         let roofsDyn = view _roofs <$> houseDyn
@@ -163,10 +163,10 @@ renderRoofs pDyn houseDyn actRoofDyn houseEditDyn chimEditDyn =
             dynamic_ $ renderActRoofOutline <$> actRDyn
 
         -- render roofs dynamically
-        m <- dynamic $ renderBuilderRoofs houseEditDyn chimEditDyn <$> roofsDyn
+        m <- dynamic $ traverse renderRoof <$> roofsDyn
 
         let mouseEvt = latestAnyEvtWith (view _mouseMove) m
-        chimActEvt <- editChimneys houseEditDyn chimEditDyn mouseEvt
+        chimActEvt <- editChimneys houseModeDyn chimEditDyn mouseEvt
 
         pure $ RoofEvts {
             tapped     : latestAnyEvtWith (view _tapped) m,
@@ -186,14 +186,13 @@ renderChimneys actDyn actIdDyn = traverse f
           g _ Inactive _      = Inactive
 
 
-editChimneys :: forall e. Dynamic Boolean -> Dynamic Boolean -> Event (Tuple UUID SceneMouseMoveEvent) -> Node e (Event Chimney)
-editChimneys houseEditDyn chimEditDyn mouseEvt = do
-    let actDyn = fromBoolean <$> ((&&) <$> houseEditDyn <*> chimEditDyn)
-        actEditDyn = fromBoolean <$> houseEditDyn
+editChimneys :: forall e. Dynamic ActiveMode -> Dynamic Boolean -> Event (Tuple UUID SceneMouseMoveEvent) -> Node e (Event Chimney)
+editChimneys houseModeDyn chimEditDyn mouseEvt = do
+    let actDyn =(&&) <$> houseModeDyn <*> (fromBoolean <$> chimEditDyn)
 
     fixNodeD2With M.empty Nothing \chimsDyn actIdDyn -> do
         -- render all chimneys
-        chimNodesDyn <- dynamic $ renderChimneys actEditDyn actIdDyn <$> distinctDyn chimsDyn
+        chimNodesDyn <- dynamic $ renderChimneys houseModeDyn actIdDyn <$> distinctDyn chimsDyn
         let chimTapEvt = multicast $ latestAnyEvtWith (view _tapped) chimNodesDyn
             chimUpdEvt = latestAnyEvtWith (view _updated) chimNodesDyn
 
@@ -267,7 +266,7 @@ editHouse houseCfg conf = do
                 canEditDyn = (&&) <$> actDyn <*> (fromBoolean <$> houseEditDyn)
 
             -- render roofs
-            roofEvts <- renderRoofs pDyn houseDyn actItemIdDyn houseEditDyn buildChimDyn
+            roofEvts <- renderRoofs pDyn houseDyn actItemIdDyn canEditDyn buildChimDyn
 
             newHouseEvt1 <- houseWithNewHeight canEditDyn houseDyn
             let newHouseEvt2 = houseWithNewSlope canEditDyn (conf ^. _slopeSelected) houseDyn actIdDyn
@@ -277,7 +276,7 @@ editHouse houseCfg conf = do
                 chimTappedEvt = multicast $ roofEvts ^. _chimTapped
                 chimTappedRoofEvt = view _roofId <$> chimTappedEvt
 
-                validRoofTappedEvt = debug $ gateDyn (not <<< isActive <$> actDyn) $ debug roofTappedEvt
+                validRoofTappedEvt = gateDyn (not <<< isActive <$> actDyn) roofTappedEvt
 
                 hn = def # _id           .~ (house ^. idLens)
                          # _activated    .~ (validRoofTappedEvt <|> (const hid <$> wallTap) <|> (const hid <$> chimTappedEvt))
@@ -313,9 +312,6 @@ renderLengths :: forall e. Maybe (List (LineSeg Vector3)) -> Node e Unit
 renderLengths (Just ls) = traverse_ renderLineLength ls
 renderLengths Nothing   = pure unit
 
-renderBuilderRoofs :: forall f. Traversable f => Dynamic Boolean -> Dynamic Boolean -> f Roof -> Node HouseTextureInfo (f RoofMesh)
-renderBuilderRoofs houseEditDyn chimEditDyn = traverse (renderRoof houseEditDyn chimEditDyn)
-
 -- render the house as 2D wireframe
 renderHouse :: House -> Node HouseTextureInfo HouseNode
 renderHouse house = do
@@ -327,7 +323,7 @@ renderHouse house = do
             mat <- liftEffect $ mkLineBasicMaterial c 4.0
             traverse_ (flip renderLineWith mat) $ mkLines t
     traverse_ renderTree $ house ^. _trees
-        
+    
     pure (def # _id .~ (house ^. idLens))
 
 

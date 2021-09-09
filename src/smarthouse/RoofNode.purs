@@ -14,7 +14,6 @@ import Editor.Common.Lenses (_mouseMove, _name, _normal, _polygon, _tapped)
 import Editor.SceneEvent (SceneMouseMoveEvent)
 import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
-import FRP.Dynamic (Dynamic, gateDyn)
 import FRP.Event (Event)
 import Model.ActiveMode (ActiveMode(..), fromBoolean)
 import Model.Polygon (Polygon, polyOutline)
@@ -55,32 +54,32 @@ renderActRoofOutline :: forall e. Maybe Roof -> Node e Unit
 renderActRoofOutline (Just r) = renderRoofOutline r
 renderActRoofOutline Nothing  = pure unit
 
-renderRoof :: Dynamic Boolean -> Dynamic Boolean -> Roof -> Node HouseTextureInfo RoofMesh
-renderRoof enableDyn chimEditDyn roof = do
+renderRoof :: Roof -> Node HouseTextureInfo RoofMesh
+renderRoof roof = do
     let poly = roof ^. _polygon
         rid  = roof ^. idLens
     -- render the roof polygon
     if roofState roof == Gable
-        then renderGableRoof rid enableDyn poly (roof ^. _normal)
-        else renderSlopeRoof rid enableDyn chimEditDyn poly
+        then renderGableRoof rid poly (roof ^. _normal)
+        else renderSlopeRoof rid poly
 
 
 gableMat :: MeshPhongMaterial
 gableMat = unsafePerformEffect $ mkMeshPhongMaterial 0x999999
 
-renderGableRoof :: forall e. UUID -> Dynamic Boolean -> Polygon Vector3 -> Vector3 -> Node e RoofMesh
-renderGableRoof rid enableDyn poly norm = do
+renderGableRoof :: forall e. UUID -> Polygon Vector3 -> Vector3 -> Node e RoofMesh
+renderGableRoof rid poly norm = do
     geo <- liftEffect $ mkPolyGeometry poly norm
     m <- tapMesh (def # _name       .~ "roof"
                       # _exportable .~ true) geo gableMat
-    pure $ def # _tapped .~ gateDyn enableDyn (const rid <$> m ^. _tapped)
+    pure $ def # _tapped .~ (const rid <$> m ^. _tapped)
 
-renderSlopeRoof :: UUID -> Dynamic Boolean -> Dynamic Boolean -> Polygon Vector3 -> Node HouseTextureInfo RoofMesh
-renderSlopeRoof rid enableDyn chimEditDyn poly = do
+renderSlopeRoof :: UUID -> Polygon Vector3 -> Node HouseTextureInfo RoofMesh
+renderSlopeRoof rid poly = do
     info <- getEnv
     geo <- liftEffect $ mkPolyGeometryWithUV (info ^. _size) poly
     mat <- liftEffect $ mkMeshBasicMaterialWithTexture (info ^. _texture)
     m <- tapMouseMesh (def # _name       .~ "roof"
                            # _exportable .~ true) geo mat
-    pure $ def # _tapped    .~ gateDyn enableDyn (const rid <$> m ^. _tapped)
-               # _mouseMove .~ gateDyn ((&&) <$> enableDyn <*> chimEditDyn) (Tuple rid <$> m ^. _mouseMove)
+    pure $ def # _tapped    .~ (const rid <$> m ^. _tapped)
+               # _mouseMove .~ (Tuple rid <$> m ^. _mouseMove)
