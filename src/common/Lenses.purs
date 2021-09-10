@@ -344,5 +344,8 @@ _buildTree = _Newtype <<< prop (Proxy :: Proxy "buildTree")
 _buildChimney :: forall t a r. Newtype t { buildChimney :: a | r } => Lens' t a
 _buildChimney = _Newtype <<< prop (Proxy :: Proxy "buildChimney")
 
+_delChimney :: forall t a r. Newtype t { delChimney :: a | r } => Lens' t a
+_delChimney = _Newtype <<< prop (Proxy :: Proxy "delChimney")
+
 _chimney :: forall t a r. Newtype t { chimney :: a | r } => Lens' t a
 _chimney = _Newtype <<< prop (Proxy :: Proxy "chimney")

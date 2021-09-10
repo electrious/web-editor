@@ -29,7 +29,7 @@ import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..), fst)
 import Data.UUIDMap (UUIDMap)
 import Data.UUIDWrapper (UUID)
-import Editor.Common.Lenses (_apiConfig, _buildChimney, _buildTree, _buttons, _deleted, _height, _houseId, _leadId, _modeDyn, _mouseMove, _name, _panelType, _panels, _parent, _roofs, _slopeSelected, _tapped, _textureInfo, _updated, _width)
+import Editor.Common.Lenses (_apiConfig, _buildChimney, _buildTree, _buttons, _delChimney, _deleted, _height, _houseId, _leadId, _modeDyn, _mouseMove, _name, _panelType, _panels, _parent, _roofs, _slopeSelected, _tapped, _textureInfo, _updated, _width)
 import Editor.Editor (Editor, _sizeDyn, setMode)
 import Editor.EditorMode as EditorMode
 import Editor.HouseEditor (ArrayEditParam, HouseConfig, _dataServer, _heatmapTexture, _rotBtnTexture)
@@ -256,8 +256,8 @@ updateHouseConfig cfg compIdEvt = do
     pure $ cfg # _apiConfig .~ step defCfg cfgEvt
 
 
-renderHouseDict :: Dynamic (Maybe UUID) -> HouseConfig -> ArrayEditParam -> Event SlopeOption -> Event RoofsData -> Event Boolean -> HouseDict -> Node HouseTextureInfo (UUIDMap HouseNode)
-renderHouseDict actIdDyn houseCfg arrParam slopeEvt roofsDatEvt buildChimEvt houses = traverse render houses
+renderHouseDict :: Dynamic (Maybe UUID) -> HouseConfig -> ArrayEditParam -> Event SlopeOption -> Event RoofsData -> Event Boolean -> Event UUID -> HouseDict -> Node HouseTextureInfo (UUIDMap HouseNode)
+renderHouseDict actIdDyn houseCfg arrParam slopeEvt roofsDatEvt buildChimEvt delChimEvt houses = traverse render houses
     where render h = if houseRenderMode == EditHouseMode
                      then do
                          let md = getMode h <$> actIdDyn
@@ -267,6 +267,7 @@ renderHouseDict actIdDyn houseCfg arrParam slopeEvt roofsDatEvt buildChimEvt hou
                                                   # _roofsData      .~ roofsDatEvt
                                                   # _arrayEditParam .~ arrParam
                                                   # _buildChimney   .~ buildChimEvt
+                                                  # _delChimney     .~ delChimEvt
                      else renderHouse h
 
 renderTrees :: forall e. Dynamic (Maybe UUID) -> TreeDict -> Node e (UUIDMap TreeNode)
@@ -292,7 +293,8 @@ newtype BuilderInputEvts = BuilderInputEvts {
     slopeSelected :: Event SlopeOption,
     deleted       :: Event Unit,
     buildTree     :: Event Boolean,
-    buildChimney  :: Event Boolean
+    buildChimney  :: Event Boolean,
+    delChimney    :: Event UUID
     }
 
 derive instance Newtype BuilderInputEvts _
@@ -304,7 +306,8 @@ instance Default BuilderInputEvts where
         slopeSelected : empty,
         deleted       : empty,
         buildTree     : empty,
-        buildChimney  : empty
+        buildChimney  : empty,
+        delChimney    : empty
         }
 
 _export :: forall t a r. Newtype t { export :: a | r } => Lens' t a
@@ -404,6 +407,7 @@ builderForHouse evts tInfo =
 
                     slopeEvt = evts ^. _slopeSelected
                     buildChimEvt = evts ^. _buildChimney
+                    delChimEvt   = evts ^. _delChimney
 
                     mouseEvt = multicast $ helper ^. _mouseMove
                     delEvt   = multicast $ evts ^. _deleted
@@ -412,7 +416,7 @@ builderForHouse evts tInfo =
                 houseCfg <- liftEffect $ updateHouseConfig (houseCfgFromBuilderCfg cfg) companyIdEvt
 
                 -- render houses and trees
-                houseNodesEvt <- localEnv (const tInfo) $ eventNode (renderHouseDict actIdDyn houseCfg def slopeEvt roofsDatEvt buildChimEvt <$> houseToRenderEvt)
+                houseNodesEvt <- localEnv (const tInfo) $ eventNode (renderHouseDict actIdDyn houseCfg def slopeEvt roofsDatEvt buildChimEvt delChimEvt <$> houseToRenderEvt)
                 treeNodesEvt  <- eventNode (renderTrees actIdDyn <$> treesToRenderEvt)
 
                 let Tuple newActIdEvt actItemEvt = getActiveItemEvt houseNodesEvt treeNodesEvt (helper ^. _tapped) hdEvt delEvt
@@ -518,6 +522,7 @@ buildHouse editor cfg = do
     { event: delHouseEvt, push: delHouse } <- create
     { event: treeEvt, push: buildTree } <- create
     { event: chimEvt, push: buildChim } <- create
+    { event: delChimEvt, push: delChim } <- create
 
     let inputEvts = def # _export        .~ expEvt
                         # _undoTracing   .~ undoTracingEvt
@@ -526,6 +531,7 @@ buildHouse editor cfg = do
                         # _deleted       .~ delHouseEvt
                         # _buildTree     .~ treeEvt
                         # _buildChimney  .~ chimEvt
+                        # _delChimney    .~ delChimEvt
 
     res <- fst <$> runNode (createHouseBuilder inputEvts) (mkNodeEnv editor cfg)
     let parentEl = unsafeCoerce $ editor ^. _parent
@@ -544,5 +550,6 @@ buildHouse editor cfg = do
     void $ subscribe (uiEvts ^. _deleted) delHouse
     void $ subscribe (uiEvts ^. _buildTree) buildTree
     void $ subscribe (uiEvts ^. _buildChimney) buildChim
+    void $ subscribe (uiEvts ^. _delChimney) delChim
 
     pure $ res # _editorOp .~ (const Close <$> uiEvts ^. _buttons <<< _close)

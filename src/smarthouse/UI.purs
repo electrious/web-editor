@@ -10,7 +10,8 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
-import Editor.Common.Lenses (_buildChimney, _buildTree, _buttons, _deleted, _height, _slopeSelected, _width)
+import Data.UUIDWrapper (UUID)
+import Editor.Common.Lenses (_buildChimney, _buildTree, _buttons, _delChimney, _deleted, _height, _slopeSelected, _width)
 import Editor.Editor (_sizeDyn)
 import Editor.SceneEvent (Size, size)
 import Effect.Class (liftEffect)
@@ -58,7 +59,8 @@ newtype BuilderUIEvents = BuilderUIEvents {
     slopeSelected :: Event SlopeOption,
     deleted       :: Event Unit,
     buildTree     :: Event Boolean,
-    buildChimney  :: Event Boolean
+    buildChimney  :: Event Boolean,
+    delChimney    :: Event UUID
     }
 
 derive instance newtypeBuilderUIEvents :: Newtype BuilderUIEvents _
@@ -68,7 +70,8 @@ instance defaultBuilderUIEvents :: Default BuilderUIEvents where
         slopeSelected : empty,
         deleted       : empty,
         buildTree     : empty,
-        buildChimney  : empty
+        buildChimney  : empty,
+        delChimney    : empty
         }
 
 savingStepDialog :: S.Dynamic SavingStep -> Widget Unit
@@ -106,4 +109,5 @@ houseBuilderUI cfg = do
                    # _slopeSelected .~ (editEvts ^. _activeItem <<< _slopeSelected)
                    # _deleted       .~ (editEvts ^. _activeItem <<< _deleted)
                    # _buildTree     .~ (editEvts ^. _buildTree)
-                   # _buildChimney  .~ (editEvts ^. _buildChimney)
+                   # _buildChimney  .~ (editEvts ^. _activeItem <<< _buildChimney)
+                   # _delChimney    .~ (editEvts ^. _activeItem <<< _delChimney)
