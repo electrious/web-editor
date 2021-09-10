@@ -11,7 +11,7 @@ import Data.Compactable (compact)
 import Data.Default (class Default, def)
 import Data.Filterable (filter)
 import Data.Foldable (traverse_)
-import Data.Lens (Lens', view, (.~), (^.))
+import Data.Lens (Lens', set, view, (.~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (List(..))
@@ -26,7 +26,7 @@ import Data.Tuple (Tuple(..))
 import Data.UUIDMap (UUIDMap)
 import Data.UUIDWrapper (UUID)
 import Editor.ArrayBuilder (runArrayBuilder)
-import Editor.Common.Lenses (_alignment, _apiConfig, _buildChimney, _chimney, _delChimney, _edges, _floor, _height, _houseId, _id, _modeDyn, _mouseMove, _name, _orientation, _panelType, _panels, _position, _roof, _roofId, _roofRackings, _roofs, _slopeSelected, _tapped, _updated)
+import Editor.Common.Lenses (_alignment, _apiConfig, _buildChimney, _chimney, _chimneys, _delChimney, _edges, _floor, _height, _houseId, _id, _modeDyn, _mouseMove, _name, _orientation, _panelType, _panels, _position, _roof, _roofId, _roofRackings, _roofs, _slopeSelected, _tapped, _updated)
 import Editor.Disposable (Disposee(..))
 import Editor.HeightEditor (_min, dragArrowPos, setupHeightEditor)
 import Editor.HouseEditor (ArrayEditParam, HouseConfig, _heatmap, runHouseEditor)
@@ -141,8 +141,8 @@ rackRequest ps rd = def # _parameters .~ params
 
 
 newtype RoofEvts = RoofEvts {
-    tapped     :: Event UUID,
-    activeChim :: Event (Maybe Chimney)
+    tapped  :: Event UUID,
+    chimney :: ChimneyEvts
 }
 
 derive instance Newtype RoofEvts _
@@ -150,8 +150,8 @@ derive instance Newtype RoofEvts _
 _activeChim :: forall t a r. Newtype t { activeChim :: a | r } => Lens' t a
 _activeChim = _Newtype <<< prop (Proxy :: Proxy "activeChim")
 
-renderRoofs :: Dynamic Vector3 -> Dynamic House -> Dynamic (Maybe UUID) -> Dynamic ActiveMode -> Event UUID -> Dynamic Boolean -> Node HouseTextureInfo RoofEvts
-renderRoofs pDyn houseDyn actRoofDyn houseModeDyn delChimEvt chimEditDyn = 
+renderRoofs :: Dynamic Vector3 -> Dynamic House -> Dynamic (Maybe UUID) -> Dynamic ActiveMode -> UUIDMap Chimney -> Event UUID -> Dynamic Boolean -> Node HouseTextureInfo RoofEvts
+renderRoofs pDyn houseDyn actRoofDyn houseModeDyn chims delChimEvt chimEditDyn = 
     node (def # _position .~ pDyn
               # _name     .~ "roofs") do
         let roofsDyn = view _roofs <$> houseDyn
@@ -172,11 +172,11 @@ renderRoofs pDyn houseDyn actRoofDyn houseModeDyn delChimEvt chimEditDyn =
 
         let mouseEvt = latestAnyEvtWith (view _mouseMove) m
             tapEvt   = multicast $ latestAnyEvtWith (view _tapped) m
-        chimActEvt <- editChimneys houseModeDyn chimEditDyn delChimEvt mouseEvt tapEvt
+        chimEvts <- editChimneys houseModeDyn chimEditDyn chims delChimEvt mouseEvt tapEvt
 
         pure $ RoofEvts {
-            tapped     : tapEvt,
-            activeChim : chimActEvt
+            tapped  : tapEvt,
+            chimney : chimEvts
         }
 
 updateChimneys :: ChimneyOp -> UUIDMap Chimney -> UUIDMap Chimney
@@ -192,11 +192,23 @@ renderChimneys actDyn actIdDyn = traverse f
           g _ Inactive _      = Inactive
 
 
-editChimneys :: forall e. Dynamic ActiveMode -> Dynamic Boolean -> Event UUID -> Event (Tuple UUID SceneMouseMoveEvent) -> Event UUID -> Node e (Event (Maybe Chimney))
-editChimneys houseModeDyn chimEditDyn delEvt mouseEvt roofTapEvt = do
+newtype ChimneyEvts = ChimneyEvts {
+    chimneys :: Event (UUIDMap Chimney),
+    activeChim :: Event (Maybe Chimney)
+}
+
+derive instance Newtype ChimneyEvts _
+instance Default ChimneyEvts where
+    def = ChimneyEvts {
+        chimneys : empty,
+        activeChim : empty
+    }
+
+editChimneys :: forall e. Dynamic ActiveMode -> Dynamic Boolean -> UUIDMap Chimney -> Event UUID -> Event (Tuple UUID SceneMouseMoveEvent) -> Event UUID -> Node e ChimneyEvts
+editChimneys houseModeDyn chimEditDyn chims delEvt mouseEvt roofTapEvt = do
     let actDyn =(&&) <$> houseModeDyn <*> (fromBoolean <$> chimEditDyn)
 
-    fixNodeD2With M.empty Nothing \chimsDyn actIdDyn -> do
+    fixNodeD2With chims Nothing \chimsDyn actIdDyn -> do
         -- render all chimneys
         chimNodesDyn <- dynamic $ renderChimneys houseModeDyn actIdDyn <$> distinctDyn chimsDyn
         let chimTapEvt = multicast $ latestAnyEvtWith (view _tapped) chimNodesDyn
@@ -207,7 +219,7 @@ editChimneys houseModeDyn chimEditDyn delEvt mouseEvt roofTapEvt = do
         let newChimEvt = ChimCreate <$> chimEvt
             delChimEvt = ChimDelete <$> delEvt
 
-            newChimsEvt = sampleDyn chimsDyn $ updateChimneys <$> (newChimEvt <|> chimUpdEvt <|> delChimEvt)
+            newChimsEvt = multicast $ sampleDyn chimsDyn $ updateChimneys <$> (newChimEvt <|> chimUpdEvt <|> delChimEvt)
 
             tappedChimEvt = compact $ sampleDyn chimsDyn $ M.lookup <$> chimTapEvt
 
@@ -215,7 +227,9 @@ editChimneys houseModeDyn chimEditDyn delEvt mouseEvt roofTapEvt = do
                                      (const Nothing <$> delChimEvt) <|>
                                      (const Nothing <$> roofTapEvt)
 
-        pure { input1: newChimsEvt, input2: map (view idLens) <$> actChimEvt, output: actChimEvt }
+            evts = def # _chimneys .~ newChimsEvt
+                       # _activeChim .~ actChimEvt
+        pure { input1: newChimsEvt, input2: map (view idLens) <$> actChimEvt, output: evts }
 
 
 houseWithNewHeight :: forall e. Dynamic ActiveMode -> Dynamic House -> Node e (Event House)
@@ -278,14 +292,15 @@ editHouse houseCfg conf = do
                 canEditDyn = (&&) <$> actDyn <*> (fromBoolean <$> houseEditDyn)
 
             -- render roofs
-            roofEvts <- renderRoofs pDyn houseDyn actItemIdDyn canEditDyn delChimEvt buildChimDyn
+            roofEvts <- renderRoofs pDyn houseDyn actItemIdDyn canEditDyn (house ^. _chimneys) delChimEvt buildChimDyn
 
             newHouseEvt1 <- houseWithNewHeight canEditDyn houseDyn
             let newHouseEvt2 = houseWithNewSlope canEditDyn (conf ^. _slopeSelected) houseDyn actIdDyn
-                newHouseEvt  = multicast $ newHouseEvt1 <|> newHouseEvt2
+                newHouseEvt3 = sampleDyn houseDyn $ set _chimneys <$> (roofEvts ^. _chimney <<< _chimneys)
+                newHouseEvt  = multicast $ newHouseEvt1 <|> newHouseEvt2 <|> newHouseEvt3
 
                 roofTappedEvt = multicast $ roofEvts ^. _tapped
-                chimActStEvt = multicast $ roofEvts ^. _activeChim
+                chimActStEvt = multicast $ roofEvts ^. _chimney <<< _activeChim
 
                 chimActiveEvt = filter isJust chimActStEvt
                 chimTappedRoofEvt = compact $ map (view _roofId) <$> chimActStEvt

@@ -349,3 +349,6 @@ _delChimney = _Newtype <<< prop (Proxy :: Proxy "delChimney")
 
 _chimney :: forall t a r. Newtype t { chimney :: a | r } => Lens' t a
 _chimney = _Newtype <<< prop (Proxy :: Proxy "chimney")
+
+_chimneys :: forall t a r. Newtype t { chimneys :: a | r } => Lens' t a
+_chimneys = _Newtype <<< prop (Proxy :: Proxy "chimneys")
