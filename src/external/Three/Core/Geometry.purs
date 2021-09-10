@@ -65,6 +65,11 @@ foreign import mkCylinderGeometry :: Number -> Number -> Number -> Int -> Boolea
 instance IsGeometry CylinderGeometry where
     toGeometry = unsafeCoerce
 
+foreign import data ConeGeometry :: Type
+foreign import mkConeGeometry :: Number -> Number -> Int -> Boolean -> Effect ConeGeometry
+instance IsGeometry ConeGeometry where
+    toGeometry = unsafeCoerce
+
 foreign import data ShapeGeometry :: Type
 foreign import data Shape :: Type
 foreign import mkShape :: Array Vector2 -> Effect Shape
@@ -83,6 +88,13 @@ instance IsGeometry PlaneGeometry where
 foreign import data ExtrudeGeometry :: Type
 instance IsGeometry ExtrudeGeometry where
     toGeometry = unsafeCoerce
+
+-- | TorusGeometry
+foreign import data TorusGeometry :: Type
+instance IsGeometry TorusGeometry where
+    toGeometry = unsafeCoerce
+
+foreign import mkTorusGeometry :: Number -> Number -> Int -> Int -> Number -> Effect TorusGeometry
 
 -- | ExtrudeSettings
 newtype ExtrudeSettings = ExtrudeSettings {
