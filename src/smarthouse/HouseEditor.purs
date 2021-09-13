@@ -66,9 +66,10 @@ import SmartHouse.RoofNode (renderActRoofOutline, renderRoof)
 import SmartHouse.SlopeOption (SlopeOption)
 import Smarthouse.Algorithm.Subtree (_sinks, _source)
 import Smarthouse.HouseNode (HouseNode, HouseOp(..), _actHouseItem, _activated)
-import Three.Core.Geometry (_bevelEnabled, _depth, mkExtrudeGeometry, mkShape)
+import Three.Core.Geometry (_bevelEnabled, _depth, mkExtrudeGeometry)
 import Three.Core.Material (MeshPhongMaterial, mkLineBasicMaterial, mkMeshPhongMaterial)
 import Three.Core.Object3D (add, remove)
+import Three.Math.Shape (mkShapeWith)
 import Three.Math.Vector (Vector3, mkVec3, toVec2, vecX, vecY)
 import Type.Proxy (Proxy(..))
 import UI.RoofEditorUI (_mode)
@@ -331,7 +332,7 @@ wallMat = unsafePerformEffect $ mkMeshPhongMaterial 0x999999
 
 renderWalls :: forall e. Polygon Vector3 -> Meter -> Node e (Event Unit)
 renderWalls poly height = do
-    shp <- liftEffect $ mkShape $ (toVec2 <$> poly) ^. _polyVerts
+    shp <- liftEffect $ mkShapeWith $ (toVec2 <$> poly) ^. _polyVerts
     geo <- liftEffect $ mkExtrudeGeometry shp $ def # _depth .~ meterVal height
                                                     # _bevelEnabled .~ false
     m <- tapMesh (def # _name       .~ "walls"

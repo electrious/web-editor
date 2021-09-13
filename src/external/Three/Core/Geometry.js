@@ -79,10 +79,6 @@ exports.mkConeGeometry = r => h => rs => openEnded => _ => {
     return new three.ConeGeometry(r, h, rs, 1, openEnded);
 }
 
-exports.mkShape = ps => _ => {
-    return new three.Shape(ps)
-}
-
 exports.mkShapeGeometry = shp => _ => {
     return new three.ShapeGeometry(shp)
 }

@@ -10,6 +10,7 @@ import Data.Newtype (class Newtype)
 import Effect (Effect)
 import Three.Core.Face3 (Face3)
 import Three.Core.TypedArray (class IsTypedArray, TypedArray, toTypedArray)
+import Three.Math.Shape (Shape)
 import Three.Math.Vector (Vector2, Vector3)
 import Type.Proxy (Proxy(..))
 import Unsafe.Coerce (unsafeCoerce)
@@ -71,8 +72,6 @@ instance IsGeometry ConeGeometry where
     toGeometry = unsafeCoerce
 
 foreign import data ShapeGeometry :: Type
-foreign import data Shape :: Type
-foreign import mkShape :: Array Vector2 -> Effect Shape
 foreign import mkShapeGeometry :: Shape -> Effect ShapeGeometry
 
 instance IsGeometry ShapeGeometry where
