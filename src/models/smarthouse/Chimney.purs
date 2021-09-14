@@ -13,6 +13,7 @@ import Data.UUIDWrapper (UUID, emptyUUID, genUUID)
 import Editor.Common.Lenses (_id, _position, _roofId)
 import Effect (Effect)
 import FRP.Event (Event)
+import Math.Angle (Angle)
 import Model.UUID (class HasUUID, idLens)
 import Three.Math.Vector (Vector3)
 
@@ -20,6 +21,7 @@ newtype Chimney = Chimney {
     id       :: UUID,
     roofId   :: UUID,
     position :: Vector3,
+    rotation :: Angle,
     length   :: Meter,
     width    :: Meter,
     height   :: Meter
@@ -38,6 +40,7 @@ instance Default Chimney where
         id       : emptyUUID,
         roofId   : emptyUUID,
         position : def,
+        rotation : def,
         length   : meter 1.0,
         width    : meter 1.0,
         height   : meter 2.0
