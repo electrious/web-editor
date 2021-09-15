@@ -10,26 +10,27 @@ import Data.Maybe (Maybe(..))
 import Data.Meter (Meter, meter, meterVal)
 import Data.Tuple (Tuple(..), fst, snd)
 import Data.UUIDWrapper (UUID)
-import Editor.Common.Lenses (_face, _height, _isActive, _length, _name, _parent, _point, _position, _rotation, _scale, _tapped, _updated, _width)
-import Editor.ObjectAdder (AdderType(..), createObjectAdder, mkCandidatePoint)
+import Editor.Common.Lenses (_face, _height, _isActive, _length, _name, _normal, _parent, _point, _position, _rotation, _scale, _tapped, _updated, _width)
+import Editor.ObjectAdder (AdderType(..), _faceNormal, createObjectAdder, mkCandidatePoint)
 import Editor.SceneEvent (SceneMouseMoveEvent, SceneTapEvent)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, distinctDyn, sampleDyn, step)
 import FRP.Event (Event, sampleOn)
 import FRP.Event.Extra (multicast, performEvent)
 import Math (abs, pi)
-import Math.Angle (Angle, degree, radianVal)
+import Math.Angle (Angle, atan2, degree, radianVal)
+import Math.Utils (zeroZ)
 import Model.ActiveMode (ActiveMode, isActive)
 import Model.SmartHouse.Chimney (Chimney, ChimneyNode, ChimneyOp(..), mkChimney)
 import Model.UUID (idLens)
-import Rendering.Node (Node, _exportable, _raycastable, _visible, fixNodeDWith, node, tapMesh)
+import Rendering.Node (Node, _exportable, _raycastable, _target, _visible, fixNodeDWith, node, tapMesh)
 import SmartHouse.ArrowGeometry (rotateArrowGeo)
 import Three.Core.Face3 (normal)
 import Three.Core.Geometry (BoxGeometry, BufferGeometry, CircleGeometry, mkBoxGeometry, mkCircleGeometry)
 import Three.Core.Material (MeshBasicMaterial, MeshPhongMaterial, doubleSide, mkMeshBasicMaterial, mkMeshPhongMaterial, setSide)
 import Three.Core.Object3D (worldToLocal)
 import Three.Math.Euler (Euler, mkEuler)
-import Three.Math.Vector (Vector3, mkVec3, vecX, vecY, vecZ)
+import Three.Math.Vector (Vector3, angleBetween, mkVec3, vecX, vecY, vecZ, (<+>))
 import UI.DraggableObject (DragObjCfg, _customGeo, _deltaTransform, _validator, createDraggableObject, invisibleMaterial)
 
 
@@ -50,9 +51,11 @@ addChimney actDyn mouseEvt = node (def # _name .~ "chimney-builder"
         opt = def # _name .~ "chimney-adder"
                   # _position .~ pure (mkVec3 0.0 0.0 0.01)
         
+        f cp i = let pos = cp ^. _position
+                     norm = zeroZ $ cp ^. _faceNormal
+                 in mkChimney i pos norm
     addedPntEvt <- node opt $ createObjectAdder DefaultAdder candPntDyn (isActive <$> actDyn)
-    let posEvt = view _position <$> addedPntEvt
-    pure $ performEvent $ sampleOn (fst <$> mEvt) $ flip mkChimney <$> posEvt
+    pure $ performEvent $ sampleOn (fst <$> mEvt) $ f <$> addedPntEvt
 
 
 chimGeo :: BoxGeometry
@@ -62,7 +65,7 @@ chimMat :: MeshPhongMaterial
 chimMat = unsafePerformEffect $ mkMeshPhongMaterial 0xb35900
 
 chimBoxPos :: Chimney -> Vector3
-chimBoxPos c = mkVec3 (vecX p) (vecY p) ((vecZ p + h) / 2.0)
+chimBoxPos c = mkVec3 0.0 0.0 ((h - vecZ p) / 2.0)
     where p = c ^. _position
           h = meterVal $ c ^. _height
 
@@ -76,37 +79,48 @@ chimBoxScale c = mkVec3 (meterVal $ c ^. _length)
 chimRotation :: Chimney -> Euler
 chimRotation c = mkEuler 0.0 0.0 (radianVal $ c ^. _rotation)
 
+chimFaceRotation :: Chimney -> Euler
+chimFaceRotation c = mkEuler 0.0 0.0 (radianVal rot + pi / 2.0)
+    where n = c ^. _normal
+          x = vecX n
+          y = vecY n
+          rot = atan2 y x
+
 editChimney :: forall e. Dynamic ActiveMode -> Chimney -> Node e ChimneyNode
 editChimney actDyn chimney = fixNodeDWith chimney $ \chimDyn -> do
     let posDyn   = distinctDyn $ view _position <$> chimDyn
 
         isActDyn = isActive <$> actDyn
 
-    tapEvt <- view _tapped <$> tapMesh (def # _name .~ "chimney"
-                                            # _position .~ (chimBoxPos <$> chimDyn)
-                                            # _scale .~ (chimBoxScale <$> chimDyn)
-                                            # _rotation .~ (chimRotation <$> chimDyn)
-                                            # _exportable .~ true
-                                        ) chimGeo chimMat
-    
-    hEvt <- heightBtn isActDyn chimney posDyn
-    Tuple lEvt wEvt <- sizeBtn isActDyn chimney posDyn
-    rotEvt <- rotateBtn isActDyn chimDyn posDyn
+    node (def # _name .~ "chimney-wrapper"
+              # _position .~ posDyn
+              # _rotation .~ pure (chimFaceRotation chimney)
+              ) do
+        tapEvt <- view _tapped <$> tapMesh (def # _name .~ "chimney"
+                                                # _position .~ (chimBoxPos <$> chimDyn)
+                                                # _scale .~ (chimBoxScale <$> chimDyn)
+                                                # _rotation .~ (chimRotation <$> chimDyn)
+                                                # _exportable .~ true
+                                            ) chimGeo chimMat
+        
+        hEvt <- heightBtn isActDyn chimney
+        Tuple lEvt wEvt <- sizeBtn isActDyn chimney
+        rotEvt <- rotateBtn isActDyn chimDyn
 
-    let updEvt = (set _height <$> hEvt) <|>
-                 (set _length <$> lEvt) <|>
-                 (set _width  <$> wEvt) <|>
-                 (addOver _rotation <$> rotEvt)
+        let updEvt = (set _height <$> hEvt) <|>
+                     (set _length <$> lEvt) <|>
+                     (set _width  <$> wEvt) <|>
+                     (addOver _rotation <$> rotEvt)
 
-        chimneyEvt = multicast $ sampleDyn chimDyn updEvt
-        opEvt = ChimUpdate <$> chimneyEvt
+            chimneyEvt = multicast $ sampleDyn chimDyn updEvt
+            opEvt = ChimUpdate <$> chimneyEvt
 
-        cid = chimney ^. idLens
-        cn = def # idLens .~ cid
-                 # _tapped .~ (const cid <$> tapEvt)
-                 # _updated .~ opEvt
+            cid = chimney ^. idLens
+            cn = def # idLens .~ cid
+                    # _tapped .~ (const cid <$> tapEvt)
+                    # _updated .~ opEvt
 
-    pure { input: chimneyEvt, output: cn }
+        pure { input: chimneyEvt, output: cn }
 
 
 toHeightTarget :: Vector3 -> Vector3
@@ -119,9 +133,8 @@ switchYZ :: Vector3 -> Vector3
 switchYZ v = mkVec3 (vecX v) (vecZ v) (vecY v)
 
 -- button to change height of the chimney
-heightBtn :: forall e. Dynamic Boolean -> Chimney -> Dynamic Vector3 -> Node e (Event Meter)
-heightBtn actDyn chimney posDyn = node (def # _name .~ "height-btn"
-                                            # _position .~ posDyn) $ do
+heightBtn :: forall e. Dynamic Boolean -> Chimney -> Node e (Event Meter)
+heightBtn actDyn chimney = do
     let h = meterVal $ chimney ^. _height
 
         valid v = let z = vecZ v - 0.5
@@ -146,9 +159,8 @@ fromSizeTarget :: Vector3 -> Vector3
 fromSizeTarget v = mkVec3 (vecX v - 0.5) (vecY v) (vecZ v)
 
 -- button to change size of the chimney
-sizeBtn :: forall e. Dynamic Boolean -> Chimney -> Dynamic Vector3 -> Node e (Tuple (Event Meter) (Event Meter))
-sizeBtn actDyn chimney posDyn = node (def # _name .~ "size-btn"
-                                          # _position .~ posDyn) $ do
+sizeBtn :: forall e. Dynamic Boolean -> Chimney -> Node e (Tuple (Event Meter) (Event Meter))
+sizeBtn actDyn chimney = do
     let valid v = let x = vecX v - 0.5
                       y = vecY v - 0.5
                   in x > 0.1 && x < 50.0 && y > (-50.0) && y < (-0.1)
@@ -196,9 +208,8 @@ arrowMesh actDyn = node (def # _name .~ "arrow") do
      pure $ inv ^. _tapped <|> m1 ^. _tapped
 
 -- button to rotate the chimney
-rotateBtn :: forall e. Dynamic Boolean -> Dynamic Chimney -> Dynamic Vector3 -> Node e (Event Angle)
-rotateBtn actDyn chimney posDyn = node (def # _name .~ "rotate-btn"
-                                            # _position .~ posDyn) $ do
+rotateBtn :: forall e. Dynamic Boolean -> Dynamic Chimney -> Node e (Event Angle)
+rotateBtn actDyn chimney = do
     let cwPos c = let px = meterVal (c ^. _width) / (-2.0)
                       py = meterVal (c ^. _length) / (-2.0)
                   in mkVec3 (px - 0.5) py 0.5

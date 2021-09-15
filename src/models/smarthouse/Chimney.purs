@@ -10,7 +10,7 @@ import Data.Meter (Meter, meter)
 import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
 import Data.UUIDWrapper (UUID, emptyUUID, genUUID)
-import Editor.Common.Lenses (_id, _position, _roofId)
+import Editor.Common.Lenses (_id, _normal, _position, _roofId)
 import Effect (Effect)
 import FRP.Event (Event)
 import Math.Angle (Angle)
@@ -21,6 +21,7 @@ newtype Chimney = Chimney {
     id       :: UUID,
     roofId   :: UUID,
     position :: Vector3,
+    normal   :: Vector3,
     rotation :: Angle,
     length   :: Meter,
     width    :: Meter,
@@ -40,6 +41,7 @@ instance Default Chimney where
         id       : emptyUUID,
         roofId   : emptyUUID,
         position : def,
+        normal   : def,
         rotation : def,
         length   : meter 1.0,
         width    : meter 1.0,
@@ -47,12 +49,13 @@ instance Default Chimney where
     }
 
 
-mkChimney :: UUID -> Vector3 -> Effect Chimney
-mkChimney rid pos = do
+mkChimney :: UUID -> Vector3 -> Vector3 -> Effect Chimney
+mkChimney rid pos norm = do
     i <- genUUID
     pure $ def # _id       .~ i
                # _roofId   .~ rid
                # _position .~ pos
+               # _normal   .~ norm
 
 data ChimneyOp = ChimCreate Chimney
                | ChimDelete UUID
