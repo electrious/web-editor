@@ -23,14 +23,14 @@ import Math.Utils (zeroZ)
 import Model.ActiveMode (ActiveMode, isActive)
 import Model.SmartHouse.Chimney (Chimney, ChimneyNode, ChimneyOp(..), mkChimney)
 import Model.UUID (idLens)
-import Rendering.Node (Node, _exportable, _raycastable, _target, _visible, fixNodeDWith, node, tapMesh)
+import Rendering.Node (Node, _exportable, _raycastable, _visible, fixNodeDWith, node, tapMesh)
 import SmartHouse.ArrowGeometry (rotateArrowGeo)
 import Three.Core.Face3 (normal)
 import Three.Core.Geometry (BoxGeometry, BufferGeometry, CircleGeometry, mkBoxGeometry, mkCircleGeometry)
 import Three.Core.Material (MeshBasicMaterial, MeshPhongMaterial, doubleSide, mkMeshBasicMaterial, mkMeshPhongMaterial, setSide)
 import Three.Core.Object3D (worldToLocal)
 import Three.Math.Euler (Euler, mkEuler)
-import Three.Math.Vector (Vector3, angleBetween, mkVec3, vecX, vecY, vecZ, (<+>))
+import Three.Math.Vector (Vector3, mkVec3, vecX, vecY, vecZ)
 import UI.DraggableObject (DragObjCfg, _customGeo, _deltaTransform, _validator, createDraggableObject, invisibleMaterial)
 
 
@@ -210,21 +210,22 @@ arrowMesh actDyn = node (def # _name .~ "arrow") do
 -- button to rotate the chimney
 rotateBtn :: forall e. Dynamic Boolean -> Dynamic Chimney -> Node e (Event Angle)
 rotateBtn actDyn chimney = do
-    let cwPos c = let px = meterVal (c ^. _width) / (-2.0)
+    let cwPos c = let px = meterVal (c ^. _width) / (2.0)
                       py = meterVal (c ^. _length) / (-2.0)
-                  in mkVec3 (px - 0.5) py 0.5
+                  in mkVec3 (px + 0.5) py 1.0
         
         ccwPos c = let px = meterVal (c ^. _width) / (-2.0)
-                       py = meterVal (c ^. _length) / 2.0
-                   in mkVec3 (px - 0.5) (py + 0.5) 0.5
+                       py = meterVal (c ^. _length) / (-2.0)
+                   in mkVec3 (px - 0.5) py 1.0
 
     cwEvt <- node (def # _name .~ "rotate-btn"
                        # _position .~ (cwPos <$> chimney)
+                       # _rotation .~ pure (mkEuler 0.0 0.0 (pi / 2.0))
                   ) (arrowMesh actDyn)
     
     ccwEvt <- node (def # _name .~ "rotate-btn-2"
                         # _position .~ (ccwPos <$> chimney)
-                        # _rotation .~ pure (mkEuler pi 0.0 0.0)) (arrowMesh actDyn)
+                        # _rotation .~ pure (mkEuler pi 0.0 (pi / 2.0))) (arrowMesh actDyn)
 
     pure $ (const (degree 5.0) <$> cwEvt) <|>
            (const (degree (-5.0)) <$> ccwEvt)
