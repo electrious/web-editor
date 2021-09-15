@@ -4,7 +4,6 @@ import Prelude hiding (degree)
 
 import Control.Alt ((<|>))
 import Control.Monad.Reader (ask)
-import Custom.Mesh (TappableMesh)
 import Data.Default (def)
 import Data.Lens (addOver, set, view, (.~), (^.))
 import Data.Maybe (Maybe(..))
@@ -13,7 +12,7 @@ import Data.Tuple (Tuple(..), fst, snd)
 import Data.UUIDWrapper (UUID)
 import Editor.Common.Lenses (_face, _height, _isActive, _length, _name, _parent, _point, _position, _rotation, _scale, _tapped, _updated, _width)
 import Editor.ObjectAdder (AdderType(..), createObjectAdder, mkCandidatePoint)
-import Editor.SceneEvent (SceneMouseMoveEvent)
+import Editor.SceneEvent (SceneMouseMoveEvent, SceneTapEvent)
 import Effect.Unsafe (unsafePerformEffect)
 import FRP.Dynamic (Dynamic, distinctDyn, sampleDyn, step)
 import FRP.Event (Event, sampleOn)
@@ -31,7 +30,7 @@ import Three.Core.Material (MeshBasicMaterial, MeshPhongMaterial, doubleSide, mk
 import Three.Core.Object3D (worldToLocal)
 import Three.Math.Euler (Euler, mkEuler)
 import Three.Math.Vector (Vector3, mkVec3, vecX, vecY, vecZ)
-import UI.DraggableObject (DragObjCfg, _customGeo, _deltaTransform, _validator, createDraggableObject)
+import UI.DraggableObject (DragObjCfg, _customGeo, _deltaTransform, _validator, createDraggableObject, invisibleMaterial)
 
 
 addChimney :: forall e. Dynamic ActiveMode -> Event (Tuple UUID SceneMouseMoveEvent) -> Node e (Event Chimney)
@@ -177,11 +176,24 @@ rotateArrowMat = unsafePerformEffect do
     setSide doubleSide m
     pure m
 
-arrowMesh :: forall e. Node e TappableMesh
-arrowMesh = tapMesh (def # _name .~ "arrow"
-                         # _position .~ pure (mkVec3 (-0.5) (-0.5) 0.0)
-                         # _scale .~ pure (mkVec3 0.005 0.005 1.0)
+
+invGeo :: BoxGeometry
+invGeo = unsafePerformEffect $ mkBoxGeometry 1.0 1.0 0.01
+
+arrowMesh :: forall e. Dynamic Boolean -> Node e (Event SceneTapEvent)
+arrowMesh actDyn = node (def # _name .~ "arrow") do
+     m1 <- tapMesh (def # _name .~ "arrow-icon"
+                        # _position .~ pure (mkVec3 (-0.5) (-0.5) 0.0)
+                        # _scale .~ pure (mkVec3 0.005 0.005 1.0)
+                        # _visible .~ actDyn
+                        # _raycastable .~ actDyn
                     ) rotateArrowGeo rotateArrowMat
+     inv <- tapMesh (def # _name .~ "arrow-invisible"
+                         # _visible .~ pure false
+                         # _raycastable .~ pure true
+                         # _visible .~ pure false
+                         # _raycastable .~ actDyn) invGeo invisibleMaterial
+     pure $ inv ^. _tapped <|> m1 ^. _tapped
 
 -- button to rotate the chimney
 rotateBtn :: forall e. Dynamic Boolean -> Dynamic Chimney -> Dynamic Vector3 -> Node e (Event Angle)
@@ -195,20 +207,16 @@ rotateBtn actDyn chimney posDyn = node (def # _name .~ "rotate-btn"
                        py = meterVal (c ^. _length) / 2.0
                    in mkVec3 (px - 0.5) (py + 0.5) 0.5
 
-    cwBtn <- node (def # _name .~ "rotate-btn"
+    cwEvt <- node (def # _name .~ "rotate-btn"
                        # _position .~ (cwPos <$> chimney)
-                       # _visible .~ actDyn
-                       # _raycastable .~ actDyn
-                  ) arrowMesh
+                  ) (arrowMesh actDyn)
     
-    ccwBtn <- node (def # _name .~ "rotate-btn-2"
+    ccwEvt <- node (def # _name .~ "rotate-btn-2"
                         # _position .~ (ccwPos <$> chimney)
-                        # _rotation .~ pure (mkEuler pi 0.0 0.0)
-                        # _visible .~ actDyn
-                        # _raycastable .~ actDyn) arrowMesh
+                        # _rotation .~ pure (mkEuler pi 0.0 0.0)) (arrowMesh actDyn)
 
-    pure $ (const (degree 2.0) <$> cwBtn ^. _tapped) <|>
-           (const (degree (-2.0)) <$> ccwBtn ^. _tapped)
+    pure $ (const (degree 5.0) <$> cwEvt) <|>
+           (const (degree (-5.0)) <$> ccwEvt)
 
 -- big button to drag the chimney around
 posBtnGeo :: CircleGeometry
