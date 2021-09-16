@@ -284,6 +284,18 @@ fixNodeE f = do
     tell $ Disposee d
     pure out
 
+fixNodeE2 :: forall e i j o. (Event i -> Event j -> Node e { input1 :: Event i, input2 :: Event j, output :: o }) -> Node e o
+fixNodeE2 f = fixNodeE \iEvt ->
+                  fixNodeE \jEvt -> do
+                      res <- f iEvt jEvt
+                      pure { input: res.input2, output: { input: res.input1, output: res.output } }
+
+fixNodeE3 :: forall e i j k o. (Event i -> Event j -> Event k -> Node e { input1 :: Event i, input2 :: Event j, input3 :: Event k, output :: o }) -> Node e o
+fixNodeE3 f = fixNodeE \iEvt ->
+                  fixNodeE2 \jEvt kEvt -> do
+                      res <- f iEvt jEvt kEvt
+                      pure { input1: res.input2, input2: res.input3, output: { input: res.input1, output: res.output } }
+
 -- | compute fixed point with default value in Node context
 fixNodeEWith :: forall e i o. i -> (Event i -> Node e { input :: Event i, output :: o }) -> Node e o
 fixNodeEWith v f = do
@@ -296,6 +308,19 @@ fixNodeEWith v f = do
 
     pure out
 
+fixNodeE2With :: forall e i j o. i -> j -> (Event i -> Event j -> Node e { input1 :: Event i, input2 :: Event j, output :: o }) -> Node e o
+fixNodeE2With v1 v2 f = fixNodeEWith v1 \iEvt ->
+                             fixNodeEWith v2 \jEvt -> do
+                                 res <- f iEvt jEvt
+                                 pure { input: res.input2, output: { input: res.input1, output: res.output } }
+
+
+fixNodeE3With :: forall e i j k o. i -> j -> k -> (Event i -> Event j -> Event k -> Node e { input1 :: Event i, input2 :: Event j, input3 :: Event k, output :: o }) -> Node e o
+fixNodeE3With v1 v2 v3 f = fixNodeEWith v1 \iEvt ->
+                               fixNodeE2With v2 v3 \jEvt kEvt -> do
+                                   res <- f iEvt jEvt kEvt
+                                   pure { input1: res.input2, input2: res.input3, output: { input: res.input1, output: res.output } }
+
 fixNodeDWith :: forall e i o. i -> (Dynamic i -> Node e { input :: Event i, output :: o }) -> Node e o
 fixNodeDWith v f = do
     { event: inEvt, push: pushInput } <- liftEffect create
@@ -305,3 +330,16 @@ fixNodeDWith v f = do
     tell $ Disposee d
     
     pure out
+
+
+fixNodeD2With :: forall e i j o. i -> j -> (Dynamic i -> Dynamic j -> Node e { input1 :: Event i, input2 :: Event j, output :: o }) -> Node e o
+fixNodeD2With vi vj f = fixNodeDWith vi \viDyn ->
+                            fixNodeDWith vj \vjDyn -> do
+                                res <- f viDyn vjDyn
+                                pure { input: res.input2, output: { input: res.input1, output: res.output } }
+
+fixNodeD3With :: forall e i j k o. i -> j -> k -> (Dynamic i -> Dynamic j -> Dynamic k -> Node e { input1 :: Event i, input2 :: Event j, input3 :: Event k, output :: o }) -> Node e o
+fixNodeD3With vi vj vk f = fixNodeDWith vi \viDyn ->
+                               fixNodeD2With vj vk \vjDyn vkDyn -> do
+                                   res <- f viDyn vjDyn vkDyn
+                                   pure { input1: res.input2, input2: res.input3, output : { input: res.input1, output: res.output } }

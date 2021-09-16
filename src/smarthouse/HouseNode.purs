@@ -16,7 +16,7 @@ import Editor.RoofManager (ArrayEvents)
 import FRP.Event (Event)
 import Model.SmartHouse.House (House)
 import Model.UUID (class HasUUID)
-import Models.SmartHouse.ActiveItem (ActHouseRoof)
+import Models.SmartHouse.ActiveItem (ActHouseItem)
 import Type.Proxy (Proxy(..))
 
 -- | Types of operation applied to houses
@@ -34,7 +34,7 @@ newtype HouseNode = HouseNode {
     id           :: UUID,
     updated      :: Event HouseOp,
     activated    :: Event UUID,
-    actHouseRoof :: Event ActHouseRoof,
+    actHouseItem :: Event ActHouseItem,
     arrayEvents  :: ArrayEvents
     }
 
@@ -46,12 +46,12 @@ instance Default HouseNode where
         id           : emptyUUID,
         updated      : empty,
         activated    : empty,
-        actHouseRoof : empty,
+        actHouseItem : empty,
         arrayEvents  : def
         }
 
 _activated :: forall t a r. Newtype t { activated :: a | r } => Lens' t a
 _activated = _Newtype <<< prop (Proxy :: Proxy "activated")
 
-_actHouseRoof :: forall t a r. Newtype t { actHouseRoof :: a | r } => Lens' t a
-_actHouseRoof = _Newtype <<< prop (Proxy :: Proxy "actHouseRoof")
+_actHouseItem :: forall t a r. Newtype t { actHouseItem :: a | r } => Lens' t a
+_actHouseItem = _Newtype <<< prop (Proxy :: Proxy "actHouseItem")

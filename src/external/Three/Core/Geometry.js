@@ -71,12 +71,12 @@ exports.mkCircleGeometry = radius => segs => _ => {
     return new three.CircleGeometry(radius, segs)
 }
 
-exports.mkCylinderGeometry = topRadius => botRadius => height => radialSegs => openEnded=> _ => {
+exports.mkCylinderGeometry = topRadius => botRadius => height => radialSegs => openEnded => _ => {
     return new three.CylinderGeometry(topRadius, botRadius, height, radialSegs, 1, openEnded);
 }
 
-exports.mkShape = ps => _ => {
-    return new three.Shape(ps)
+exports.mkConeGeometry = r => h => rs => openEnded => _ => {
+    return new three.ConeGeometry(r, h, rs, 1, openEnded);
 }
 
 exports.mkShapeGeometry = shp => _ => {
@@ -89,6 +89,10 @@ exports.mkPlaneGeometry = w => h => wSegs => hSegs => _ => {
 
 exports.mkExtrudeGeometry = s => opt => _ => {
     return new three.ExtrudeGeometry(s, opt)
+}
+
+exports.mkTorusGeometry = r => t => rs => ts => arc => _ => {
+    return new three.TorusGeometry(r, t, rs, ts, arc);
 }
 
 exports.mkLineGeometry = ps => _ => {

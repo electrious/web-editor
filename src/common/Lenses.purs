@@ -331,3 +331,24 @@ _rightEdge = _Newtype <<< prop (Proxy :: Proxy "rightEdge")
 
 _type :: forall t a r. Newtype t { type :: a | r } => Lens' t a
 _type = _Newtype <<< prop (Proxy :: Proxy "type")
+
+_toTarget :: forall t a r. Newtype t { toTarget :: a | r } => Lens' t a
+_toTarget = _Newtype <<< prop (Proxy :: Proxy "toTarget")
+
+_fromTarget :: forall t a r. Newtype t { fromTarget :: a | r } => Lens' t a
+_fromTarget = _Newtype <<< prop (Proxy :: Proxy "fromTarget")
+
+_buildTree :: forall t a r. Newtype t { buildTree :: a | r } => Lens' t a
+_buildTree = _Newtype <<< prop (Proxy :: Proxy "buildTree")
+
+_buildChimney :: forall t a r. Newtype t { buildChimney :: a | r } => Lens' t a
+_buildChimney = _Newtype <<< prop (Proxy :: Proxy "buildChimney")
+
+_delChimney :: forall t a r. Newtype t { delChimney :: a | r } => Lens' t a
+_delChimney = _Newtype <<< prop (Proxy :: Proxy "delChimney")
+
+_chimney :: forall t a r. Newtype t { chimney :: a | r } => Lens' t a
+_chimney = _Newtype <<< prop (Proxy :: Proxy "chimney")
+
+_chimneys :: forall t a r. Newtype t { chimneys :: a | r } => Lens' t a
+_chimneys = _Newtype <<< prop (Proxy :: Proxy "chimneys")

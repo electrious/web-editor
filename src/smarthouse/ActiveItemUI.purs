@@ -3,24 +3,27 @@ module SmartHouse.ActiveItemUI where
 import Prelude hiding (div, degree)
 
 import Control.Alternative (empty)
+import Data.Compactable (compact)
 import Data.Default (class Default, def)
 import Data.Int (round)
-import Data.Lens (Lens', view, (.~), (^.))
-import Data.Lens.Iso.Newtype (_Newtype)
-import Data.Lens.Record (prop)
+import Data.Lens (view, (.~), (^.))
 import Data.List (head)
 import Data.Map (values)
-import Data.Maybe (Maybe(..), isJust, maybe)
+import Data.Maybe (Maybe(..), fromMaybe, isJust, maybe)
 import Data.Newtype (class Newtype)
-import Editor.Common.Lenses (_roof, _roofs, _slope, _slopeSelected)
+import Data.Tuple (Tuple(..))
+import Data.UUIDWrapper (UUID)
+import Editor.Common.Lenses (_buildChimney, _chimney, _delChimney, _deleted, _roof, _roofs, _slope, _slopeSelected)
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import FRP.Dynamic (Dynamic, dynEvent, step)
+import FRP.Dynamic (Dynamic, dynEvent, sampleDyn_, step)
 import FRP.Event (Event, create)
 import Foreign.Object as Obj
 import Math.Angle (Angle, degree, degreeVal, fromString)
+import Model.SmartHouse.Chimney (Chimney)
 import Model.SmartHouse.House (defaultSlope)
-import Models.SmartHouse.ActiveItem (ActHouseRoof, ActiveItem(..), activeHouse, isActiveHouse)
+import Model.UUID (idLens)
+import Models.SmartHouse.ActiveItem (ActHouseItem, ActiveItem(..), activeHouse, isActiveHouse)
 import SmartHouse.HouseEditor (_house)
 import SmartHouse.SlopeOption (SlopeOption, slopeOption)
 import Specular.Dom.Browser (Attrs)
@@ -32,26 +35,28 @@ import Specular.Dom.Node.Class (Node)
 import Specular.Dom.Widget (Widget)
 import Specular.Dom.Widgets.Button (buttonOnClick)
 import Specular.Dom.Widgets.Input (checkbox, getTextInputValue)
-import Type.Proxy (Proxy(..))
+import Specular.FRP (attachDynWith, fixEvent, holdDyn, weaken)
+import Specular.FRP as S
 import UI.Bridge (fromUIDyn, fromUIEvent, toUIDyn)
 import UI.Utils (div, mkAttrs, mkStyle, visible, (:~))
 import Unsafe.Coerce (unsafeCoerce)
 
 
 newtype ActiveItemUI = ActiveItemUI {
-    deleteHouse   :: Event Unit,
-    slopeSelected :: Event SlopeOption
+    deleted       :: Event Unit,
+    slopeSelected :: Event SlopeOption,
+    buildChimney  :: Event Boolean,
+    delChimney    :: Event UUID
     }
 
 derive instance Newtype ActiveItemUI _
 instance Default ActiveItemUI where
     def = ActiveItemUI {
-        deleteHouse   : empty,
-        slopeSelected : empty
+        deleted       : empty,
+        slopeSelected : empty,
+        buildChimney  : empty,
+        delChimney    : empty
         }
-
-_deleteHouse :: forall t a r. Newtype t { deleteHouse :: a | r } => Lens' t a
-_deleteHouse = _Newtype <<< prop (Proxy :: Proxy "deleteHouse")
 
 activeItemUIStyle :: Boolean -> Attrs
 activeItemUIStyle d = mkStyle [
@@ -68,7 +73,6 @@ delBtnLabel :: Maybe ActiveItem -> String
 delBtnLabel (Just (ActiveHouse _)) = "Delete This House"
 delBtnLabel (Just (ActiveTree _)) = "Delete This Tree"
 delBtnLabel Nothing = ""
-
 
 delButton :: Dynamic (Maybe ActiveItem) -> Widget (Event Unit)
 delButton actItemDyn = do
@@ -89,6 +93,12 @@ withTargetValue cb = \event -> do
 
 unsafeEventTarget :: DOM.Event -> Node
 unsafeEventTarget e = (unsafeCoerce e).target
+
+{-
+--------------------------------------------
+-- Slope UI
+--------------------------------------------
+-}
 
 slopeTop :: Angle
 slopeTop = degree 89.6
@@ -128,24 +138,110 @@ slopeScopeUI = div [classes ["uk-flex", "uk-flex-row", "uk-flex-middle"]] do
 
     fromUIDyn checkD
 
-getSlope :: Maybe ActHouseRoof -> Angle
+getSlope :: Maybe ActHouseItem -> Angle
 getSlope (Just h) = case h ^. _roof of
     Just r  -> r ^. _slope
     Nothing -> let r = head $ values $ h ^. _house <<< _roofs
                in maybe defaultSlope (view _slope) r
 getSlope Nothing  = defaultSlope
 
-houseSlopeUI :: Dynamic Boolean -> Dynamic Angle -> Widget (Event SlopeOption)
-houseSlopeUI showDyn slopeDyn = do
-    visDyn   <- liftEffect $ toUIDyn showDyn
-    div [classes ["uk-flex", "uk-flex-column", "uk-margin-top"], visible visDyn] do
-        text "Slope:"
-        slopeEvt <- slopeSelector slopeDyn
-        scopeD   <- slopeScopeUI
-        
-        let slopeD = step (degree 30.0) slopeEvt
-        pure $ dynEvent $ slopeOption <$> slopeD <*> scopeD
+houseSlopeUI :: Dynamic Angle -> Widget (Event SlopeOption)
+houseSlopeUI slopeDyn = do
+    text "Slope:"
+    slopeEvt <- slopeSelector slopeDyn
+    scopeD   <- slopeScopeUI
+    
+    let slopeD = step (degree 30.0) slopeEvt
+    pure $ dynEvent $ slopeOption <$> slopeD <*> scopeD
 
+{-
+--------------------------------------------
+-- Chimney UI
+--------------------------------------------
+-}
+newtype ChimneyUIEvts = ChimneyUIEvts {
+    buildChimney :: Event Boolean,
+    delChimney   :: Event UUID
+}
+
+derive instance Newtype ChimneyUIEvts _
+instance Default ChimneyUIEvts where
+    def = ChimneyUIEvts {
+        buildChimney : empty,
+        delChimney   : empty
+    }
+
+-- | button to allow user to build a new chimney
+chimneyBtn :: Widget (S.Event Boolean)
+chimneyBtn = toggleBtn label Nothing
+    where label true  = "Stop Building Chimney"
+          label false = "Build a Chimney"
+
+-- | button to allow user to toggle a state
+toggleBtn :: (Boolean -> String) -> Maybe String -> Widget (S.Event Boolean)
+toggleBtn label cls = fixEvent \tapEvt -> do
+    d <- holdDyn false tapEvt
+    e <- buttonOnClick (pure $ mkAttrs ["class" :~ ("uk-button " <> fromMaybe "" cls)]) (dynText $ label <$> d)
+    let nextEvt = attachDynWith (const <<< not) d e
+    pure $ Tuple nextEvt nextEvt
+
+
+displayStyle :: Boolean -> String
+displayStyle true = "block"
+displayStyle false = "none"
+
+-- | delete active chimney button
+delChimneyBtn :: Dynamic Boolean -> Widget (Event Unit)
+delChimneyBtn showDyn = do
+    let mkAttr s = mkAttrs ["class" :~ "uk-button uk-button-danger",
+                            "style" :~ ("display: " <> displayStyle s)]
+
+    attD <- liftEffect $ toUIDyn $ mkAttr <$> showDyn
+    e <- buttonOnClick (weaken attD) $ text "Delete this Chimney"
+    fromUIEvent e
+
+chimneyUI :: Dynamic (Maybe Chimney) -> Widget ChimneyUIEvts
+chimneyUI actChimDyn = div [classes ["uk-flex", "uk-flex-column", "uk-margin-top"]] do
+    text "Chimney:"
+    -- button to toggle building chimney mode
+    chimModeEvt <- fromUIEvent =<< chimneyBtn
+
+    -- button to delete active chimney
+    delEvt <- delChimneyBtn (isJust <$> actChimDyn)
+
+    let delChimEvt = compact $ sampleDyn_ actChimDyn delEvt
+
+    pure $ def # _buildChimney .~ chimModeEvt
+               # _delChimney   .~ (view idLens <$> delChimEvt)
+
+{-
+--------------------------------------------
+-- Active house UI
+--------------------------------------------
+-}
+newtype ActHouseEvts = ActHouseEvts {
+    slope   :: Event SlopeOption,
+    chimney :: ChimneyUIEvts
+}
+
+derive instance Newtype ActHouseEvts _
+instance Default ActHouseEvts where
+    def = ActHouseEvts {
+        slope   : empty,
+        chimney : def
+    }
+
+houseActiveUI :: Dynamic Boolean -> Dynamic (Maybe ActiveItem) -> Widget ActHouseEvts
+houseActiveUI showDyn actItemDyn = do
+    visDyn   <- liftEffect $ toUIDyn showDyn
+    let slopeDyn = getSlope <<< join <<< map activeHouse <$> actItemDyn
+        chimDyn  = join <<< map (view _chimney) <<< join <<< map activeHouse <$> actItemDyn
+    div [classes ["uk-flex", "uk-flex-column", "uk-margin-top"], visible visDyn] do
+        slopeEvt <- houseSlopeUI slopeDyn
+        chimEvts <- chimneyUI chimDyn
+
+        pure $ def # _slope   .~ slopeEvt
+                   # _chimney .~ chimEvts
 
 activeItemUI :: Dynamic (Maybe ActiveItem) -> Widget ActiveItemUI
 activeItemUI actItemDyn = do
@@ -156,10 +252,14 @@ activeItemUI actItemDyn = do
         d <- liftEffect $ toUIDyn actItemDyn
         div [class_ "uk-text-bold"] $ dynText $ subtitle <$> d
 
+        -- slope
         let isActHouseDyn = maybe false isActiveHouse <$> actItemDyn
-        slopeEvt <- houseSlopeUI isActHouseDyn $ getSlope <<< join <<< map activeHouse <$> actItemDyn
+        hEvts <- houseActiveUI isActHouseDyn actItemDyn
 
+        -- delete button
         delEvt <- delButton actItemDyn
 
-        pure $ def # _slopeSelected .~ slopeEvt
-                   # _deleteHouse   .~ delEvt
+        pure $ def # _slopeSelected .~ (hEvts ^. _slope)
+                   # _deleted       .~ delEvt
+                   # _buildChimney  .~ (hEvts ^. _chimney <<< _buildChimney)
+                   # _delChimney    .~ (hEvts ^. _chimney <<< _delChimney)

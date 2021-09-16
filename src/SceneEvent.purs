@@ -56,8 +56,8 @@ derive instance newtypeSceneTapEvent :: Newtype SceneTapEvent _
 -- | mousemove events sent to 3D object
 newtype SceneMouseMoveEvent = SceneMouseMoveEvent {
     distance    :: Number,
-    point       :: Vector3, -- position in local coord of the target object
-    face        :: Face3, -- face with local normal of the target object
+    point       :: Vector3, -- position in world coord
+    face        :: Face3, -- face with world normal
     domPosition :: Vector2 -- original mouse event position
 }
 

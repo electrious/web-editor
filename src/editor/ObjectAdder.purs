@@ -108,12 +108,12 @@ createAdderMarker updTarget pDyn marker = do
                    # _position .~ posDyn
         
         nProp = if updTarget
-                then prop # _target   .~ targetDyn
+                then prop # _target .~ targetDyn
                 else prop 
     m <- node nProp do
         -- the visible marker
         marker visDyn
-        tapMesh (def # _visible .~ pure false
+        tapMesh (def # _visible     .~ pure false
                      # _raycastable .~ visDyn
                 ) adderMarkerGeo adderMarkerMat
     

@@ -6,7 +6,7 @@ import API (API, APIConfig, APIError(..), _xCompanyId, runAPI, showAPIError)
 import API.Image (ImageResp, _link, _pixelPerMeter, getImageMeta)
 import API.Panel (loadPanels)
 import API.Roofplate (loadRoofplates)
-import API.SmartHouse (ReadyAPIResp, SavingStep(..), _companyId, createManual, isFinished, repeatCheckUntilReady, savedHouseId, uploadMeshFiles)
+import API.SmartHouse (BuiltHouseInfo, ReadyAPIResp, SavingStep(..), _companyId, createManual, isFinished, mkBuiltHouseInfo, repeatCheckUntilReady, savedHouseInfo, uploadMeshFiles)
 import Control.Alt ((<|>))
 import Control.Alternative (empty)
 import Custom.Mesh (TapMouseMesh)
@@ -26,15 +26,15 @@ import Data.Meter (meterVal)
 import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
 import Data.Traversable (traverse)
-import Data.Tuple (Tuple(..), fst, snd)
+import Data.Tuple (Tuple(..), fst)
 import Data.UUIDMap (UUIDMap)
 import Data.UUIDWrapper (UUID)
-import Editor.Common.Lenses (_apiConfig, _buttons, _height, _houseId, _leadId, _modeDyn, _mouseMove, _name, _panelType, _panels, _parent, _roofs, _slopeSelected, _tapped, _textureInfo, _updated, _width)
+import Editor.Common.Lenses (_apiConfig, _buildChimney, _buildTree, _buttons, _delChimney, _deleted, _height, _houseId, _leadId, _modeDyn, _mouseMove, _name, _panelType, _panels, _parent, _roofs, _slopeSelected, _tapped, _textureInfo, _updated, _width)
 import Editor.Editor (Editor, _sizeDyn, setMode)
 import Editor.EditorMode as EditorMode
 import Editor.HouseEditor (ArrayEditParam, HouseConfig, _dataServer, _heatmapTexture, _rotBtnTexture)
 import Editor.RoofManager (RoofsData)
-import Editor.SceneEvent (size)
+import Editor.SceneEvent (SceneTapEvent, size)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic, current, dynEvent, performDynamic, sampleDyn, step)
@@ -43,29 +43,29 @@ import FRP.Event.Extra (delay, multicast, performEvent)
 import Model.ActiveMode (ActiveMode(..), fromBoolean)
 import Model.Hardware.PanelTextureInfo (PanelTextureInfo)
 import Model.Hardware.PanelType (PanelType(..))
+import Model.Polygon (Polygon)
 import Model.SmartHouse.House (House, JSHouses(..), _trees, createHouseFrom, defaultSlope, exportHouse)
 import Model.SmartHouse.HouseTextureInfo (HouseTextureInfo, _imageFile, _size, _texture, mkHouseTextureInfo)
 import Model.SmartHouse.Tree (Tree, TreeNode, TreeOp(..))
-import Model.UUID (idLens)
-import Models.SmartHouse.ActiveItem (ActHouseRoof, ActiveItem(..))
+import Model.UUID (class HasUUID, idLens)
+import Models.SmartHouse.ActiveItem (ActHouseItem, ActiveItem(..))
 import OBJExporter (MeshFiles, exportObject)
 import Rendering.DynamicNode (eventNode)
-import Rendering.Node (Node, _exportable, fixNodeDWith, fixNodeE, fixNodeEWith, getEnv, getParent, localEnv, mkNodeEnv, node, runNode, tapMouseMesh)
+import Rendering.Node (Node, _exportable, fixNodeDWith, fixNodeE, fixNodeE2With, getEnv, getParent, localEnv, mkNodeEnv, node, runNode, tapMouseMesh)
 import Rendering.TextureLoader (textureFromUrl)
-import SmartHouse.ActiveItemUI (_deleteHouse)
 import SmartHouse.HouseEditor (HouseRenderMode(..), _arrayEditParam, _house, _roofsData, editHouse, renderHouse)
 import SmartHouse.HouseTracer (TracerMode(..), _stopTracing, _tracedPolygon, _tracerMode, _undoTracing, traceHouse)
 import SmartHouse.SlopeOption (SlopeOption)
 import SmartHouse.TreeBuilder (buildTree, editTree)
 import SmartHouse.UI (_activeItemDyn, _savingStepDyn, houseBuilderUI)
-import Smarthouse.HouseNode (HouseNode, HouseOp(..), _actHouseRoof, _activated)
+import Smarthouse.HouseNode (HouseNode, HouseOp(..), _actHouseItem, _activated)
 import Specular.Dom.Widget (runMainWidgetInNode)
 import Three.Core.Geometry (mkPlaneGeometry)
 import Three.Core.Material (mkMeshBasicMaterialWithTexture)
 import Three.Loader.TextureLoader (clampToEdgeWrapping, repeatWrapping, setRepeat, setWrapS, setWrapT, textureHeight, textureImageEvt, textureWidth)
+import Three.Math.Vector (Vector3)
 import Type.Proxy (Proxy(..))
 import UI.ButtonPane (_close, _reset, _save, _showResetDyn, _showSaveDyn, _undo)
-import UI.EditPane (_buildTree)
 import UI.EditorUIOp (EditorUIOp(..))
 import UI.RoofEditorUI (_editorOp)
 import Unsafe.Coerce (unsafeCoerce)
@@ -222,31 +222,27 @@ applyTreeOp (TreeOpDelete tid)  d = if M.member tid (d ^. _trees)
 applyTreeOp (TreeOpUpdate tree) d = d # _trees %~ M.insert (tree ^. idLens) tree
                                       # _treesToRender .~ Nothing
 
-
 exportHouses :: HouseDictData -> JSHouses
 exportHouses hd = JSHouses { houses : fromFoldable $ M.values $ exportHouse <$> hd ^. _houses }
 
--- get house update event from a list of house nodes
-getHouseUpd :: forall f. Foldable f => Functor f => f HouseNode -> Event HouseOp
-getHouseUpd = foldEvtWith (view _updated)
-
-getActiveRoof :: forall f. Foldable f => Functor f => f HouseNode -> Event ActHouseRoof
-getActiveRoof = foldEvtWith (view _actHouseRoof)
+getActiveRoof :: forall f. Foldable f => Functor f => f HouseNode -> Event ActHouseItem
+getActiveRoof = foldEvtWith (view _actHouseItem)
 
 -- get the activated house from a list of house nodes
 getActivated :: forall f. Foldable f => Functor f => f HouseNode -> Event UUID
 getActivated = foldEvtWith f
     where f n = const (n ^. idLens) <$> n ^. _activated
 
-getTappedTree :: forall f. Foldable f => Functor f => f TreeNode -> Event UUID
-getTappedTree = foldEvtWith f
+-- | get tapped event from a foldable list of values that have tapped field
+getTapped :: forall f n r a. HasUUID n => Newtype n { tapped :: Event a | r } => Foldable f => Functor f => f n -> Event UUID
+getTapped = foldEvtWith f
     where f n = const (n ^. idLens) <$> n ^. _tapped
 
-getActiveTree :: UUID -> HouseDictData -> Maybe Tree
-getActiveTree tid hd = M.lookup tid (hd ^. _trees)
+getActive :: forall v. (HouseDictData -> UUIDMap v) -> UUID -> HouseDictData -> Maybe v
+getActive f tid = M.lookup tid <<< f
 
-getTreeUpd :: forall f. Foldable f => Functor f => f TreeNode -> Event TreeOp
-getTreeUpd = foldEvtWith (view _updated)
+getUpdEvt :: forall f n o r. Foldable f => Functor f => Newtype n { updated :: Event o | r } => f n -> Event o
+getUpdEvt = foldEvtWith (view _updated)
 
 updateHouseConfig :: HouseConfig -> Event (Maybe Int) -> Effect HouseConfig
 updateHouseConfig cfg compIdEvt = do
@@ -260,13 +256,9 @@ updateHouseConfig cfg compIdEvt = do
     pure $ cfg # _apiConfig .~ step defCfg cfgEvt
 
 
-renderHouseDict :: Dynamic (Maybe UUID) -> HouseConfig -> ArrayEditParam -> Event SlopeOption -> Event RoofsData -> HouseDict -> Node HouseTextureInfo (UUIDMap HouseNode)
-renderHouseDict actIdDyn houseCfg arrParam slopeEvt roofsDatEvt houses = traverse render houses
-    where getMode h (Just i) | h ^. idLens == i = Active
-                             | otherwise        = Inactive
-          getMode _ Nothing                     = Inactive
-          
-          render h = if houseRenderMode == EditHouseMode
+renderHouseDict :: Dynamic (Maybe UUID) -> HouseConfig -> ArrayEditParam -> Event SlopeOption -> Event RoofsData -> Event Boolean -> Event UUID -> HouseDict -> Node HouseTextureInfo (UUIDMap HouseNode)
+renderHouseDict actIdDyn houseCfg arrParam slopeEvt roofsDatEvt buildChimEvt delChimEvt houses = traverse render houses
+    where render h = if houseRenderMode == EditHouseMode
                      then do
                          let md = getMode h <$> actIdDyn
                          editHouse houseCfg $ def # _modeDyn        .~ md
@@ -274,31 +266,35 @@ renderHouseDict actIdDyn houseCfg arrParam slopeEvt roofsDatEvt houses = travers
                                                   # _slopeSelected  .~ slopeEvt
                                                   # _roofsData      .~ roofsDatEvt
                                                   # _arrayEditParam .~ arrParam
+                                                  # _buildChimney   .~ buildChimEvt
+                                                  # _delChimney     .~ delChimEvt
                      else renderHouse h
-
 
 renderTrees :: forall e. Dynamic (Maybe UUID) -> TreeDict -> Node e (UUIDMap TreeNode)
 renderTrees actIdDyn trees = traverse render trees
-    where getMode t (Just i) | t ^. idLens == i = Active
-                             | otherwise        = Inactive
-          getMode _ Nothing                     = Inactive
-          
-          render t = editTree t (getMode t <$> actIdDyn)
+    where render t = editTree t (getMode t <$> actIdDyn)
+
+getMode :: forall a. HasUUID a => a -> Maybe UUID -> ActiveMode
+getMode c (Just i) | c ^. idLens == i = Active
+                   | otherwise        = Inactive
+getMode _ Nothing                     = Inactive
 
 
-tracerMode :: Maybe UUID -> Boolean -> ActiveMode
-tracerMode h t = fromBoolean $ isNothing h && not t
+tracerMode :: Maybe UUID -> Boolean -> Boolean -> ActiveMode
+tracerMode h t c = fromBoolean $ isNothing h && not t && not c
 
-treeBuilderMode :: Maybe UUID -> Boolean -> ActiveMode
-treeBuilderMode h t = fromBoolean $ isNothing h && t
+builderMode :: Maybe UUID -> Boolean -> ActiveMode
+builderMode h t = fromBoolean $ isNothing h && t
 
 newtype BuilderInputEvts = BuilderInputEvts {
     export        :: Event Unit,
     undoTracing   :: Event Unit,
     stopTracing   :: Event Unit,
     slopeSelected :: Event SlopeOption,
-    deleteHouse   :: Event Unit,
-    buildTree     :: Event Boolean
+    deleted       :: Event Unit,
+    buildTree     :: Event Boolean,
+    buildChimney  :: Event Boolean,
+    delChimney    :: Event UUID
     }
 
 derive instance Newtype BuilderInputEvts _
@@ -308,8 +304,10 @@ instance Default BuilderInputEvts where
         undoTracing   : empty,
         stopTracing   : empty,
         slopeSelected : empty,
-        deleteHouse   : empty,
-        buildTree     : empty
+        deleted       : empty,
+        buildTree     : empty,
+        buildChimney  : empty,
+        delChimney    : empty
         }
 
 _export :: forall t a r. Newtype t { export :: a | r } => Lens' t a
@@ -331,6 +329,59 @@ createHouseBuilder evts = node (def # _name .~ "house-builder") $ do
     pure $ compactHouseBuilt evt
 
 
+-- create house from the traced polygon
+getHouseOpEvt :: Event (UUIDMap HouseNode) -> Dynamic (Maybe UUID) -> Event (Polygon Vector3) -> Event Unit -> Event HouseOp
+getHouseOpEvt houseNodesEvt actIdDyn polyEvt delEvt =
+    let polyDyn   = step Nothing $ Just <$> polyEvt
+        houseDyn  = performDynamic $ traverse (createHouseFrom defaultSlope) <$> polyDyn
+        houseEvt  = compact $ dynEvent houseDyn
+
+        addHouseEvt = HouseOpCreate <$> houseEvt
+        updHouseEvt = keepLatest $ getUpdEvt <$> houseNodesEvt
+        delHouseEvt = multicast $ compact $ sampleDyn actIdDyn $ (const (map HouseOpDelete)) <$> delEvt
+    in addHouseEvt <|> updHouseEvt <|> delHouseEvt
+
+-- tree operations
+getTreeOpEvt :: Event (UUIDMap TreeNode) -> Dynamic (Maybe UUID) -> Event Unit -> Event Tree -> Event TreeOp
+getTreeOpEvt treeNodesEvt actIdDyn delEvt newTreeEvt = 
+    let addTreeEvt = TreeOpCreate <$> newTreeEvt
+        delTreeEvt = multicast $ compact $ sampleDyn actIdDyn $ (const (map TreeOpDelete)) <$> delEvt
+        updTreeEvt = keepLatest $ getUpdEvt <$> treeNodesEvt
+
+    in addTreeEvt <|> updTreeEvt <|> delTreeEvt
+
+-- manage active item
+getActiveItemEvt :: Event (UUIDMap HouseNode) -> Event (UUIDMap TreeNode) -> Event SceneTapEvent -> Event HouseDictData -> Event Unit -> Tuple (Event (Maybe UUID)) (Event (Maybe ActiveItem))
+getActiveItemEvt houseNodesEvt treeNodesEvt helperTapEvt hdEvt delEvt =
+    let deactEvt   = multicast $ const Nothing <$> helperTapEvt
+
+        actHouseEvt = keepLatest $ getActivated <$> houseNodesEvt
+        actRoofEvt  = Just <$> keepLatest (map ActiveHouse <<< getActiveRoof <$> houseNodesEvt)
+
+        treeTapEvt = multicast $ keepLatest $ getTapped <$> treeNodesEvt 
+        actTreeEvt = map ActiveTree <$> (sampleOn hdEvt $ getActive (view _trees) <$> treeTapEvt)
+
+        newActIdEvt = (Just <$> (actHouseEvt <|> treeTapEvt)) <|> deactEvt
+
+        actItemEvt = actRoofEvt <|> actTreeEvt <|> const Nothing <$> delEvt <|> const Nothing <$> deactEvt
+    in Tuple newActIdEvt actItemEvt
+
+
+-- export scene and mesh files
+exportScene :: HouseTextureInfo -> Event HouseDictData -> Event Unit -> Node HouseBuilderConfig (Tuple (Event SavingStep) (Event BuiltHouseInfo))
+exportScene tInfo hdEvt toExpEvt = do
+    pNode <- getParent
+    cfg   <- getEnv
+
+    let meshFilesEvt = performEvent $ const (exportObject pNode) <$> toExpEvt
+        housesEvt    = exportHouses <$> sampleOn_ hdEvt toExpEvt
+
+        stepEvt = multicast $ saveMeshes cfg (tInfo ^. _imageFile) meshFilesEvt housesEvt
+
+        -- get the new generated house id after saving finished
+        houseIdEvt = multicast $ compact $ savedHouseInfo <$> filter isFinished stepEvt
+    pure $ Tuple stepEvt houseIdEvt
+
 houseCfgFromBuilderCfg :: HouseBuilderConfig -> HouseConfig
 houseCfgFromBuilderCfg cfg = def # _dataServer     .~ (cfg ^. _dataServer)
                                  # _modeDyn        .~ pure EditorMode.ArrayEditing
@@ -342,107 +393,64 @@ houseCfgFromBuilderCfg cfg = def # _dataServer     .~ (cfg ^. _dataServer)
 
 builderForHouse :: BuilderInputEvts -> HouseTextureInfo -> Node HouseBuilderConfig HouseBuilt
 builderForHouse evts tInfo =
-    fixNodeEWith def \hdEvt ->
+    fixNodeE2With def Nothing \hdEvt companyIdEvt ->
         fixNodeDWith Nothing \actIdDyn ->
-            fixNodeE \roofsDatEvt ->
-                fixNodeEWith Nothing \companyIdEvt -> do
-                    pNode <- getParent
-                    cfg   <- getEnv
-                    
-                    -- add helper plane that accepts tap and drag events
-                    helper <- mkHelperPlane tInfo
+            fixNodeE \roofsDatEvt -> do
+                cfg <- getEnv
 
-                    -- render all houses
-                    let houseToRenderEvt = compact $ view _housesToRender <$> hdEvt
-                        treesToRenderEvt = compact $ view _treesToRender <$> hdEvt
+                -- add helper plane that accepts tap and drag events
+                helper <- mkHelperPlane tInfo
 
-                        slopeEvt = evts ^. _slopeSelected
-                        arrParam = def
-                
-                    houseCfg <- liftEffect $ updateHouseConfig (houseCfgFromBuilderCfg cfg) companyIdEvt
+                -- render all houses
+                let houseToRenderEvt = compact $ view _housesToRender <$> hdEvt
+                    treesToRenderEvt = compact $ view _treesToRender <$> hdEvt
 
-                    -- render houses and trees
-                    nodesEvt <- localEnv (const tInfo) $ eventNode (renderHouseDict actIdDyn houseCfg arrParam slopeEvt roofsDatEvt <$> houseToRenderEvt)
-                    treesEvt <- eventNode (renderTrees actIdDyn <$> treesToRenderEvt)
+                    slopeEvt = evts ^. _slopeSelected
+                    buildChimEvt = evts ^. _buildChimney
+                    delChimEvt   = evts ^. _delChimney
 
-                    let deactEvt    = multicast $ const Nothing <$> helper ^. _tapped
+                    mouseEvt = multicast $ helper ^. _mouseMove
+                    delEvt   = multicast $ evts ^. _deleted
+                    toExpEvt = multicast $ delay 15 $ evts ^. _export
 
-                    let actEvt      = keepLatest $ getActivated <$> nodesEvt
-                        actRoofEvt  = Just <$> keepLatest (map ActiveHouse <<< getActiveRoof <$> nodesEvt)
+                houseCfg <- liftEffect $ updateHouseConfig (houseCfgFromBuilderCfg cfg) companyIdEvt
 
-                        treeTapEvt = multicast $ keepLatest $ getTappedTree <$> treesEvt
-                        actTreeEvt = map ActiveTree <$> (sampleOn hdEvt $ getActiveTree <$> treeTapEvt)
+                -- render houses and trees
+                houseNodesEvt <- localEnv (const tInfo) $ eventNode (renderHouseDict actIdDyn houseCfg def slopeEvt roofsDatEvt buildChimEvt delChimEvt <$> houseToRenderEvt)
+                treeNodesEvt  <- eventNode (renderTrees actIdDyn <$> treesToRenderEvt)
 
-                        newActIdEvt = (Just <$> (actEvt <|> treeTapEvt)) <|> deactEvt
+                let Tuple newActIdEvt actItemEvt = getActiveItemEvt houseNodesEvt treeNodesEvt (helper ^. _tapped) hdEvt delEvt
+                    buildTreeDyn = step false $ evts ^. _buildTree
+                    buildChimDyn = step false $ evts ^. _buildChimney
 
-                        mouseEvt = multicast $ helper ^. _mouseMove
-                        delEvt   = multicast $ evts ^. _deleteHouse
+                -- trace new house
+                traceRes <- traceHouse $ def # _modeDyn     .~ (tracerMode <$> actIdDyn <*> buildTreeDyn <*> buildChimDyn)
+                                             # _mouseMove   .~ mouseEvt
+                                             # _undoTracing .~ (evts ^. _undoTracing)
+                                             # _stopTracing .~ (evts ^. _stopTracing)
 
-                        buildTreeDyn = step false $ evts ^. _buildTree
+                newTreeEvt <- buildTree (builderMode <$> actIdDyn <*> buildTreeDyn) mouseEvt
 
-                    -- trace new house
-                    traceRes <- traceHouse $ def # _modeDyn     .~ (tracerMode <$> actIdDyn <*> buildTreeDyn)
-                                                # _mouseMove   .~ mouseEvt
-                                                # _undoTracing .~ (evts ^. _undoTracing)
-                                                # _stopTracing .~ (evts ^. _stopTracing)
+                let houseOpEvt = getHouseOpEvt houseNodesEvt actIdDyn (traceRes ^. _tracedPolygon) delEvt
+                    treeOpEvt  = getTreeOpEvt treeNodesEvt actIdDyn delEvt newTreeEvt
 
-                    newTreeEvt <- buildTree (treeBuilderMode <$> actIdDyn <*> buildTreeDyn) mouseEvt
+                    -- update HouseDictData by applying the house operations
+                    newHdEvt = multicast $ sampleOn hdEvt $ (applyHouseOp <$> houseOpEvt) <|>
+                                                            (applyTreeOp <$> treeOpEvt)
 
-                    -- create house from the traced polygon
-                    let polyDyn   = step Nothing $ Just <$> traceRes ^. _tracedPolygon
-                        mkHouse   = traverse (createHouseFrom defaultSlope)
-                        houseDyn  = performDynamic $ mkHouse <$> polyDyn
-                        houseEvt  = compact $ dynEvent houseDyn
+                -- export scene 
+                Tuple stepEvt builtHouseInfoEvt <- exportScene tInfo newHdEvt toExpEvt
+                let compIdEvt = Just <<< view _companyId <$> builtHouseInfoEvt
 
-                        addHouseEvt = HouseOpCreate <$> houseEvt
-                        updHouseEvt = keepLatest (getHouseUpd <$> nodesEvt)
+                    -- load roofplate and panel data
+                    newRoofsDatEvt = keepLatest $ performEvent $ loadRoofAndPanels cfg <$> builtHouseInfoEvt
 
-                        mkDelOp _ (Just h) = Just $ HouseOpDelete h
-                        mkDelOp _ Nothing  = Nothing
-                        
-                        delHouseEvt = multicast $ compact $ sampleDyn actIdDyn $ mkDelOp <$> delEvt
+                    res = def # _hasHouse    .~ (hasHouse <$> hdEvt)
+                              # _tracerMode  .~ (traceRes ^. _tracerMode)
+                              # _saveStepEvt .~ stepEvt
+                              # _activeItem  .~ actItemEvt
 
-                        opEvt = addHouseEvt <|> updHouseEvt <|> delHouseEvt
-
-                        -- tree operations
-                        mkDelTreeOp _ (Just t) = Just $ TreeOpDelete t
-                        mkDelTreeOp _ Nothing  = Nothing
-
-                        addTreeEvt = TreeOpCreate <$> newTreeEvt
-                        delTreeEvt = multicast $ compact $ sampleDyn actIdDyn $ mkDelTreeOp <$> delEvt
-                        updTreeEvt = keepLatest $ getTreeUpd <$> treesEvt
-
-                        treeOpEvt = addTreeEvt <|> updTreeEvt <|> delTreeEvt
-
-                        -- update HouseDictData by applying the house operations
-                        newHdEvt = multicast $ sampleOn hdEvt $ (applyHouseOp <$> opEvt) <|>
-                                                                (applyTreeOp <$> treeOpEvt)
-
-                        exportEvt = multicast $ evts ^. _export
-                    
-                        toExpEvt = delay 15 exportEvt
-                    
-                        meshFilesEvt = performEvent $ const (exportObject pNode) <$> toExpEvt
-                        housesEvt    = exportHouses <$> sampleOn_ hdEvt toExpEvt
-
-                        stepEvt = multicast $ saveMeshes cfg (tInfo ^. _imageFile) meshFilesEvt housesEvt
-
-                        -- get the new generated house id after saving finished
-                        finishSavingEvt = multicast $ filter isFinished stepEvt
-                        newHouseIdEvt = compact $ savedHouseId <$> finishSavingEvt
-                        compIdEvt = Just <<< snd <$> newHouseIdEvt
-
-                        newRoofsDatEvt = keepLatest $ performEvent $ loadRoofAndPanels cfg <$> newHouseIdEvt
-
-                        res = def # _hasHouse    .~ (hasHouse <$> hdEvt)
-                                  # _tracerMode  .~ (traceRes ^. _tracerMode)
-                                  # _saveStepEvt .~ stepEvt
-                                  # _activeItem  .~ (actRoofEvt <|>
-                                                     actTreeEvt <|>
-                                                     const Nothing <$> delHouseEvt <|>
-                                                     const Nothing <$> deactEvt)
-
-                    pure { input : compIdEvt, output: { input: newRoofsDatEvt, output: { input: newActIdEvt, output : { input: newHdEvt, output : res } } } }
+                pure { input: newRoofsDatEvt, output: { input: newActIdEvt, output : { input1: newHdEvt, input2: compIdEvt, output : res } } }
 
 
 runAPIEvent :: forall a. Dynamic APIConfig -> Event (API (Event a)) -> Event a
@@ -484,13 +492,15 @@ saveMeshes cfg imgEvt mFilesEvt houseEvt =
        (mkFinished <$> readySuccEvt)
 
 mkFinished :: ReadyAPIResp -> SavingStep
-mkFinished r = Finished (r ^. _houseId) (r ^. _companyId)
+mkFinished r = Finished $ mkBuiltHouseInfo (r ^. _houseId) (r ^. _companyId)
 
 -- load roof plates and panels data after saving mesh is finished
-loadRoofAndPanels :: HouseBuilderConfig -> Tuple Int Int -> Effect (Event RoofsData)
-loadRoofAndPanels conf (Tuple houseId companyId) = do
+loadRoofAndPanels :: HouseBuilderConfig -> BuiltHouseInfo -> Effect (Event RoofsData)
+loadRoofAndPanels conf info = do
     cfg <- current $ conf ^. _apiConfig
-    let apiCfg = cfg # _xCompanyId .~ Just companyId
+    let compId = info ^. _companyId
+        houseId = info ^. _houseId
+        apiCfg = cfg # _xCompanyId .~ Just compId
     roofsEvt  <- runAPI (loadRoofplates houseId) apiCfg
     panelsEvt <- runAPI (loadPanels houseId) apiCfg
 
@@ -511,13 +521,17 @@ buildHouse editor cfg = do
     { event: slopeEvt, push: selectSlope } <- create
     { event: delHouseEvt, push: delHouse } <- create
     { event: treeEvt, push: buildTree } <- create
+    { event: chimEvt, push: buildChim } <- create
+    { event: delChimEvt, push: delChim } <- create
 
     let inputEvts = def # _export        .~ expEvt
                         # _undoTracing   .~ undoTracingEvt
                         # _stopTracing   .~ stopTracingEvt
                         # _slopeSelected .~ slopeEvt
-                        # _deleteHouse   .~ delHouseEvt
+                        # _deleted       .~ delHouseEvt
                         # _buildTree     .~ treeEvt
+                        # _buildChimney  .~ chimEvt
+                        # _delChimney    .~ delChimEvt
 
     res <- fst <$> runNode (createHouseBuilder inputEvts) (mkNodeEnv editor cfg)
     let parentEl = unsafeCoerce $ editor ^. _parent
@@ -533,7 +547,9 @@ buildHouse editor cfg = do
     void $ subscribe (const unit <$> uiEvts ^. _buttons <<< _reset) toStopTracing
     void $ subscribe (const unit <$> uiEvts ^. _buttons <<< _undo) toUndoTracing
     void $ subscribe (uiEvts ^. _slopeSelected) selectSlope
-    void $ subscribe (uiEvts ^. _deleteHouse) delHouse
+    void $ subscribe (uiEvts ^. _deleted) delHouse
     void $ subscribe (uiEvts ^. _buildTree) buildTree
+    void $ subscribe (uiEvts ^. _buildChimney) buildChim
+    void $ subscribe (uiEvts ^. _delChimney) delChim
 
     pure $ res # _editorOp .~ (const Close <$> uiEvts ^. _buttons <<< _close)

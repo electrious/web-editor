@@ -10,14 +10,14 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
-import Editor.Common.Lenses (_buttons, _height, _slopeSelected, _width)
+import Data.UUIDWrapper (UUID)
+import Editor.Common.Lenses (_buildChimney, _buildTree, _buttons, _delChimney, _deleted, _height, _slopeSelected, _width)
 import Editor.Editor (_sizeDyn)
 import Editor.SceneEvent (Size, size)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic)
 import FRP.Event (Event)
 import Models.SmartHouse.ActiveItem (ActiveItem)
-import SmartHouse.ActiveItemUI (_deleteHouse)
 import SmartHouse.SlopeOption (SlopeOption)
 import Specular.Dom.Element (attrsD, class_, classes, dynText, el)
 import Specular.Dom.Widget (Widget)
@@ -26,7 +26,7 @@ import Type.Proxy (Proxy(..))
 import UI.Bridge (toUIDyn)
 import UI.ButtonPane (ButtonsPane, _showCloseDyn, _showResetDyn, _showSaveDyn, _showUndoDyn, buttons)
 import UI.ConfirmDialog (dialogAttr)
-import UI.EditPane (_activeItem, _buildTree, editPane)
+import UI.EditPane (_activeItem, editPane)
 import UI.Utils (div, mkStyle, (:~))
 
 newtype BuilderUIConf = BuilderUIConf {
@@ -57,8 +57,10 @@ _activeItemDyn = _Newtype <<< prop (Proxy :: Proxy "activeItemDyn")
 newtype BuilderUIEvents = BuilderUIEvents {
     buttons       :: ButtonsPane,
     slopeSelected :: Event SlopeOption,
-    deleteHouse   :: Event Unit,
-    buildTree     :: Event Boolean
+    deleted       :: Event Unit,
+    buildTree     :: Event Boolean,
+    buildChimney  :: Event Boolean,
+    delChimney    :: Event UUID
     }
 
 derive instance newtypeBuilderUIEvents :: Newtype BuilderUIEvents _
@@ -66,8 +68,10 @@ instance defaultBuilderUIEvents :: Default BuilderUIEvents where
     def = BuilderUIEvents {
         buttons       : def,
         slopeSelected : empty,
-        deleteHouse   : empty,
-        buildTree     : empty
+        deleted       : empty,
+        buildTree     : empty,
+        buildChimney  : empty,
+        delChimney    : empty
         }
 
 savingStepDialog :: S.Dynamic SavingStep -> Widget Unit
@@ -103,5 +107,7 @@ houseBuilderUI cfg = do
 
         pure $ def # _buttons       .~ btns
                    # _slopeSelected .~ (editEvts ^. _activeItem <<< _slopeSelected)
-                   # _deleteHouse   .~ (editEvts ^. _activeItem <<< _deleteHouse)
+                   # _deleted       .~ (editEvts ^. _activeItem <<< _deleted)
                    # _buildTree     .~ (editEvts ^. _buildTree)
+                   # _buildChimney  .~ (editEvts ^. _activeItem <<< _buildChimney)
+                   # _delChimney    .~ (editEvts ^. _activeItem <<< _delChimney)

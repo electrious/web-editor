@@ -24,15 +24,16 @@ import Data.Set as S
 import Data.Show.Generic (genericShow)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import Data.UUIDWrapper (UUID, emptyUUID, genUUID)
 import Data.UUIDMap (UUIDMap)
 import Data.UUIDMap as UM
+import Data.UUIDWrapper (UUID, emptyUUID, genUUID)
 import Editor.Common.Lenses (_edges, _floor, _height, _id, _position, _roofs)
 import Effect (Effect)
 import Math.Angle (Angle, degree)
 import Math.LineSeg (LineSeg)
 import Model.Polygon (Polygon, _polyVerts, counterClockPoly, modifyVertAt)
 import Model.Roof.RoofPlate (Point, vec2Point)
+import Model.SmartHouse.Chimney (Chimney)
 import Model.SmartHouse.Roof (JSRoof, Roof, RoofState(..), exportRoof, roofState)
 import Model.UUID (class HasUUID, idLens)
 import SmartHouse.Algorithm.Edge (Edge, _lineEdge)
@@ -50,24 +51,26 @@ defaultSlope :: Angle
 defaultSlope = degree 30.0
 
 newtype House = House {
-    id        :: UUID,
-    floor     :: Polygon VertWithSlope,
-    height    :: Meter,
-    trees     :: UUIDMap Subtree,
-    edges     :: List Edge,
-    roofs     :: UUIDMap Roof
+    id       :: UUID,
+    floor    :: Polygon VertWithSlope,
+    height   :: Meter,
+    trees    :: UUIDMap Subtree,
+    edges    :: List Edge,
+    roofs    :: UUIDMap Roof,
+    chimneys :: UUIDMap Chimney
     }
 
 derive instance Newtype House _
 derive instance Generic House _
 instance Default House where
     def = House {
-        id        : emptyUUID,
-        floor     : def,
-        height    : meter 0.0,
-        trees     : M.empty,
-        edges     : empty,
-        roofs     : M.empty
+        id       : emptyUUID,
+        floor    : def,
+        height   : meter 0.0,
+        trees    : M.empty,
+        edges    : empty,
+        roofs    : M.empty,
+        chimneys : M.empty
         }
 instance Eq House where
     eq h1 h2 = h1 ^. _id == h2 ^. _id
@@ -88,12 +91,13 @@ createHouseFrom slope poly = do
     let roofs = generateRoofs (S.fromFoldable trees) edges
 
     pure $ House {
-        id        : i,
-        floor     : floor,
-        height    : meter 3.5,   -- default height
-        trees     : UM.fromFoldable trees,
-        edges     : edges,
-        roofs     : UM.fromFoldable roofs
+        id       : i,
+        floor    : floor,
+        height   : meter 3.5,   -- default height
+        trees    : UM.fromFoldable trees,
+        edges    : edges,
+        roofs    : UM.fromFoldable roofs,
+        chimneys : M.empty
         }
 
 updateHeight :: Meter -> House -> House

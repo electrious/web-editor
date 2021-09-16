@@ -31,9 +31,10 @@ import Math.LineSeg (LineSeg, lineVec, mkLineSeg)
 import RBush.RBush (BBox)
 import Rendering.Node (getEnv, tapMouseMesh)
 import Rendering.NodeRenderable (class NodeRenderable)
-import Three.Core.Geometry (mkShape, mkShapeGeometry)
+import Three.Core.Geometry (mkShapeGeometry)
 import Three.Core.Material (MeshBasicMaterial)
 import Three.Core.Mesh (setMaterial)
+import Three.Math.Shape (mkShapeWith)
 import Three.Math.Vector (class Vector, cross, dist, getVector, mkVec3, normal, toVec2, updateVector, vecX, vecY, vecZ, (<**>), (<+>), (<->))
 
 newtype Polygon v = Polygon (Array v)
@@ -174,7 +175,7 @@ instance nodeRenderablePolygon :: Vector v => NodeRenderable (Dynamic MeshBasicM
         matDyn <- getEnv
         mat <- liftEffect $ current matDyn
         
-        shp <- liftEffect $ mkShape $ toVec2 <$> p ^. _polyVerts
+        shp <- liftEffect $ mkShapeWith $ toVec2 <$> p ^. _polyVerts
         geo <- liftEffect $ mkShapeGeometry shp
         
         m <- tapMouseMesh def geo mat
@@ -189,7 +190,7 @@ instance nodeRenderablePolygon :: Vector v => NodeRenderable (Dynamic MeshBasicM
 
 renderPolygon :: forall v. Vector v => Polygon v -> MeshBasicMaterial -> Effect TappableMesh
 renderPolygon p mat = do
-    shp <- mkShape $ toVec2 <$> p ^. _polyVerts
+    shp <- mkShapeWith $ toVec2 <$> p ^. _polyVerts
     geo <- mkShapeGeometry shp
     mkTappableMesh geo mat
 
