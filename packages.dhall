@@ -162,6 +162,11 @@ let additions =
           ]
         , repo = "https://github.com/restaumatic/purescript-specular.git"
         , version = "94271b2af04e74961e3bd393e86d80c49f8b9267"
+        },
+        data-default = {
+          dependencies = [ "prelude" ]
+        , repo = "https://github.com/manyoo/data-default.git"
+        , version = "v0.1.0"
         }
       }
 
