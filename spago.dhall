@@ -42,17 +42,15 @@ You can edit this file as you like.
   , "refs"
   , "specular"
   , "strings"
+  , "taihe"
   , "transformers"
   , "tuples"
   , "unfoldable"
   , "unsafe-coerce"
   , "uuid"
   , "web-dom"
-  , "web-events"
   , "web-file"
   , "web-html"
-  , "web-touchevents"
-  , "web-uievents"
   , "web-xhr"
   ]
 , packages = ./packages.dhall

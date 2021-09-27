@@ -2,7 +2,7 @@ module Editor.PanelNode where
 
 import Prelude hiding (add)
 
-import Custom.Mesh (TapDragMesh, mkTapDragMesh)
+import Taihe.Mesh (TapDragMesh, mkTapDragMesh)
 import Data.Enum (class BoundedEnum, class Enum)
 import Data.Foldable (traverse_)
 import Data.Function.Memoize (class Tabulate, genericTabulate, memoize, memoize2)

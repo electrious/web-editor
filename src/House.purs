@@ -3,7 +3,7 @@ module Editor.House where
 import Prelude hiding (add)
 
 import Algorithm.MeshFlatten (VertexItem, buildRTree)
-import Custom.Mesh (TapMouseMesh(..), mouseEvtOn, tapEvtOn)
+import Taihe.Mesh (TapMouseMesh(..), mouseEvtOn, tapEvtOn)
 import Data.Array (range)
 import Data.Compactable (compact)
 import Data.Foldable (find, traverse_)

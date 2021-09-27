@@ -7,8 +7,8 @@ import Data.Show.Generic (genericShow)
 import Data.Lens ((^.))
 import Data.Newtype (class Newtype)
 import Editor.Common.Lenses (_distance, _dragType, _point)
-import Editor.Input.Commoon (DragType)
-import Editor.SceneEvent (SceneDragEvent)
+import Taihe.Input.Commoon (DragType)
+import Taihe.SceneEvent (SceneDragEvent)
 import Three.Math.Vector (Vector3)
 
 newtype DragInfo a = DragInfo {

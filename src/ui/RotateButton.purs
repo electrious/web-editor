@@ -3,7 +3,7 @@ module Editor.UI.RotateButton where
 import Prelude
 
 import Control.Monad.Reader (ask)
-import Custom.Mesh (mkTappableMesh)
+import Taihe.Mesh (mkTappableMesh)
 import Data.Function.Memoize (memoize)
 import Data.Lens (view, (^.))
 import Data.Maybe (Maybe(..))

@@ -16,7 +16,7 @@ import Editor.Common.Lenses (_apiConfig, _height, _houseId, _modeDyn, _roofs, _w
 import Editor.Editor (_sizeDyn)
 import Editor.EditorMode (EditorMode(..))
 import Editor.HouseEditor (ArrayEditParam)
-import Editor.SceneEvent (Size, size)
+import Taihe.SceneEvent (Size, size)
 import Effect.Class (liftEffect)
 import FRP.Dynamic (Dynamic, sampleDyn)
 import FRP.Event (Event, keepLatest)

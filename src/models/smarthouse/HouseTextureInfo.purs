@@ -10,7 +10,7 @@ import Data.Lens.Record (prop)
 import Data.Meter (meter)
 import Data.Newtype (class Newtype)
 import Editor.Common.Lenses (_height, _width)
-import Editor.SceneEvent as S
+import Taihe.SceneEvent as S
 import FRP.Event (Event)
 import Three.Loader.TextureLoader (Texture)
 import Type.Proxy (Proxy(..))

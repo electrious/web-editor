@@ -2,7 +2,7 @@ module Editor.UI.PlusButton where
 
 import Prelude hiding (add)
 
-import Custom.Mesh (mkTapDragMesh)
+import Taihe.Mesh (mkTapDragMesh)
 import Data.Function.Memoize (memoize)
 import Data.Lens (Lens', view, (%~), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)

@@ -167,6 +167,41 @@ let additions =
           dependencies = [ "prelude" ]
         , repo = "https://github.com/manyoo/data-default.git"
         , version = "v0.1.0"
+        },
+        taihe = {
+          dependencies = [ "argonaut-codecs"
+                          , "arrays"
+                          , "control"
+                          , "data-default"
+                          , "datetime"
+                          , "effect"
+                          , "event"
+                          , "event-extra"
+                          , "filterable"
+                          , "foldable-traversable"
+                          , "foreign-generic"
+                          , "integers"
+                          , "lists"
+                          , "math"
+                          , "maybe"
+                          , "newtype"
+                          , "numbers"
+                          , "ordered-collections"
+                          , "prelude"
+                          , "profunctor-lenses"
+                          , "psci-support"
+                          , "transformers"
+                          , "tuples"
+                          , "unsafe-coerce"
+                          , "web-dom"
+                          , "web-events"
+                          , "web-file"
+                          , "web-html"
+                          , "web-touchevents"
+                          , "web-uievents"
+                          ]
+        , repo = "https://github.com/manyoo/taihe.git"
+        , version = "master"
         }
       }
 

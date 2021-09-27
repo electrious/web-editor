@@ -30,7 +30,7 @@ import Data.UUIDMap as UM
 import Data.UUIDWrapper (UUID)
 import Editor.ArrayBuilder (runArrayBuilder)
 import Editor.Common.Lenses (_alignment, _apiConfig, _deleted, _disposable, _face, _geometry, _houseId, _id, _mesh, _modeDyn, _mouseMove, _orientation, _panelType, _panels, _point, _position, _roof, _roofId, _roofRackings, _roofs, _tapped, _updated, _verticeTree, _wrapper)
-import Editor.Disposable (class Disposable, dispose)
+import Taihe.Disposable (class Disposable, dispose)
 import Editor.EditorMode (EditorMode(..))
 import Editor.House (HouseMeshData)
 import Editor.HouseEditor (ArrayEditParam, HouseEditor, _heatmap, performEditorEvent)

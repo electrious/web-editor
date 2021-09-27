@@ -14,7 +14,7 @@ import Data.List (List(..), drop, head, length, tail, take)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Type.Proxy (Proxy(..))
-import Editor.Disposable (class Disposable, dispose)
+import Taihe.Disposable (class Disposable, dispose)
 import Effect.Class (class MonadEffect, liftEffect)
 import Rendering.Renderable (class Renderable, RenderingM)
 import Rendering.Renderable as R
