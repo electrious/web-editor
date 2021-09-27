@@ -10,7 +10,7 @@ import Data.Traversable (class Traversable, traverse_)
 import Editor.Common.Lenses (_name, _position)
 import Effect.Unsafe (unsafePerformEffect)
 import Math.LineSeg (LineSeg, _end, _start, length, lineSegsFromPolyVerts, lineVec)
-import Rendering.Node (Node, _fontSize, line, node, text3D)
+import Taihe.Node (Node, _fontSize, line, node, text3D)
 import Three.Core.Material (LineBasicMaterial, mkLineBasicMaterial)
 import Three.Math.Vector (Vector3, mkVec3, vecX, vecY, vecZ, (<**>), (<+>))
 

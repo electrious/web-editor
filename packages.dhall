@@ -201,7 +201,7 @@ let additions =
                           , "web-uievents"
                           ]
         , repo = "https://github.com/manyoo/taihe.git"
-        , version = "master"
+        , version = "v0.1.0"
         }
       }
 

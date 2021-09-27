@@ -7,7 +7,7 @@ import Data.Lens ((.~))
 import Editor.Common.Lenses (_name)
 import Model.Racking.GAF.GAFRackingComponent (GAFRackingComponent)
 import Model.Racking.GAF.Hood (Hood)
-import Rendering.Node (Node, node)
+import Taihe.Node (Node, node)
 
 renderGAF :: forall e. GAFRackingComponent -> Node e Unit
 renderGAF _ = node (def # _name .~ "GAFRackingComponent") $ pure unit
